@@ -1,4 +1,102 @@
-from typing import Any
+import logging
+import os
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from invokeai.app.services.config.config_default import InvokeAIAppConfig
+
+# Suppress the HuggingFace tokenizers fork-after-parallelism warning. The Rust
+# ``tokenizers`` library warms a thread pool the first time a tokenizer is used
+# (e.g. the UMT5 / T5 text encoder during Wan / FLUX / SD3 conditioning), then
+# complains every time we fork() afterwards — which we do, on every MP4 encode,
+# because imageio's FFMPEG plugin shells out to ffmpeg via subprocess.Popen.
+# The warning is harmless (the child correctly falls back to single-threaded
+# tokenization before exec()) but it spams the log on every video generation.
+#
+# This MUST execute before any HF library is imported. The pyproject console-script
+# (``invokeai-web = invokeai.app.run_app:run_app``) reaches this module first via
+# ``from invokeai.app.run_app import run_app``, so setting the env var at module
+# level — not inside ``run_app()`` — guarantees it lands before any transitive HF
+# import. Use ``setdefault`` so anyone who explicitly exports ``true`` upstream
+# keeps their value.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+
+def _default_miopen_find_mode() -> None:
+    """ROCm: run MIOpen's convolution-kernel search in FAST mode.
+
+    The default mode benchmarks every candidate kernel the first time a convolution shape is seen, which on a VAE-shaped
+    workload (many layers x spatial tiles x temporal chunks, separately per dtype) costs minutes of "warm-up" per new
+    shape set, and torch's MIOpen ``chooseAlgorithm`` falls back to a *global* ``emptyCache`` whenever a candidate's
+    workspace allocation fails - on multi-GPU installs that convoys the peer device mid-step (see
+    ``install_peer_aware_empty_cache``). FAST looks the shape up in MIOpen's find-db and takes the first viable kernel
+    otherwise; with a warmed find-db the difference in kernel quality is negligible. On CUDA/CPU/MPS builds MIOpen is
+    absent and the variable is inert. ``setdefault`` keeps an explicitly exported value (e.g.
+    ``MIOPEN_FIND_MODE=NORMAL`` to re-tune the find-db).
+    """
+    os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
+
+
+# MIOpen reads the variable when it is first used, so, like the tokenizer flag, it is set at module level - before torch
+# is even imported - rather than inside ``run_app()``, so no early import can run a convolution ahead of it.
+# `apply_server_runtime` repeats it as its first step, so that function states the whole runtime; ``setdefault`` makes
+# the repeat a no-op.
+_default_miopen_find_mode()
+
+
+def _configure_torch_environment(config: "InvokeAIAppConfig", logger: logging.Logger) -> None:
+    """What torch, HIP and MIOpen read once, when they initialize, as `config` sets it: the first part of the server's
+    runtime (`apply_server_runtime`). Must run before torch is imported, which its last step does."""
+    from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
+    from invokeai.app.util.torch_cuda_allocator import (
+        apply_rocm_windows_allocator_default,
+        configure_torch_cuda_allocator,
+    )
+
+    _default_miopen_find_mode()
+
+    # Before torch is imported anywhere: HIP reads its device list once, when torch initializes it, and an explicit
+    # allocator configuration below imports torch. Runs a short child process on Windows ROCm.
+    hide_integrated_gpus_on_rocm_windows(logger)
+
+    # Configure the torch CUDA memory allocator.
+    # NOTE: It is important that this happens before torch is imported.
+    if config.pytorch_cuda_alloc_conf:
+        configure_torch_cuda_allocator(config.pytorch_cuda_alloc_conf, logger)
+    else:
+        apply_rocm_windows_allocator_default(logger)
+
+    # Decide on AOTriton's experimental attention kernels before anything can run attention: torch reads the switch
+    # once, at its first fused-kernel check, and the server already runs attention while starting up. This imports
+    # torch, so it comes after the allocator configuration.
+    from invokeai.app.util.rocm_aotriton import apply_rocm_aotriton_setting
+
+    apply_rocm_aotriton_setting(config.rocm_aotriton_experimental, config.generation_devices, logger)
+
+
+def apply_server_runtime(config: "InvokeAIAppConfig", logger: logging.Logger) -> None:
+    """Give this process the server's kernels and allocation, for a process that measures what the server runs (the
+    working-memory calibration scripts). Must run before torch is imported.
+
+    The steps, in the server's order (`run_app`), with `config`'s settings:
+
+    1. ``MIOPEN_FIND_MODE`` defaults to FAST.
+    2. On ROCm under Windows, integrated GPUs are hidden from HIP.
+    3. The allocator: ``pytorch_cuda_alloc_conf``, or without one the platform's default (expandable segments for ROCm
+       on Windows).
+    4. AOTriton's experimental attention kernels, as ``rocm_aotriton_experimental`` decides.
+    5. The monkeypatches, the ROCm SDPA guard among them, with ``attention_backend`` (`apply_monkeypatches`).
+
+    Between 4 and 5 the server imports its invocations, logs its device and finds its port. The invocations' modules bind
+    library functions there, before the monkeypatches: one that binds a patched function by name at import keeps the
+    unpatched one in the server (PiD's ``scaled_dot_product_attention``), where a module imported after this function
+    binds the patched one.
+    """
+    _configure_torch_environment(config, logger)
+
+    from invokeai.app.util.startup_utils import apply_monkeypatches
+
+    apply_monkeypatches(config.attention_backend)
 
 
 def get_app():
@@ -26,7 +124,6 @@ def run_app() -> None:
     import uvicorn
 
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
     from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
@@ -34,27 +131,31 @@ def run_app() -> None:
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
-    # Configure the torch CUDA memory allocator.
-    # NOTE: It is important that this happens before torch is imported.
-    if app_config.pytorch_cuda_alloc_conf:
-        configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
+    # The server's runtime (`apply_server_runtime`) in its two parts, around the startup steps below that need torch:
+    # first what torch, HIP and MIOpen read when they initialize, before torch is imported anywhere.
+    _configure_torch_environment(app_config, logger)
 
-    # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
+    # This import must happen after the allocator is configured, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
     from invokeai.backend.util.devices import TorchDevice
 
-    torch_device_name = TorchDevice.get_torch_device_name()
+    torch_device_name = TorchDevice.get_generation_devices_summary(app_config.generation_devices)
     logger.info(f"Using torch device: {torch_device_name}")
 
-    # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
+    # Import from startup_utils here to avoid importing torch before the allocator is configured.
     from invokeai.app.util.startup_utils import (
         apply_monkeypatches,
+        check_cuda_build_compatibility,
         check_cudnn,
+        describe_torch_build,
         enable_dev_reload,
         find_open_port,
         register_mime_types,
     )
+    from invokeai.backend.krea2.attention import resolve_krea2_sdpa_backends
+
+    logger.info(describe_torch_build())
 
     # Find an open port, and modify the config accordingly.
     first_open_port = find_open_port(app_config.port)
@@ -63,13 +164,24 @@ def run_app() -> None:
         app_config.port = first_open_port
         logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
 
+    # The runtime's second part: the monkeypatches, once the invocations are imported.
+    apply_monkeypatches(app_config.attention_backend)
+
     # Miscellaneous startup tasks.
-    apply_monkeypatches()
     register_mime_types()
     check_cudnn(logger)
+    check_cuda_build_compatibility(logger)
+    # Fail here rather than inside a generation: the value is read per generation, so a typo would
+    # otherwise surface as a failed queue item minutes after the server came up.
+    resolve_krea2_sdpa_backends()
 
     # Initialize the app and event loop.
     app, loop = get_app()
+
+    from invokeai.app.api.trusted_routes import TrustedRouteGuard, get_original_frontend, snapshot_core_routes
+
+    trusted_routes = snapshot_core_routes(app)
+    trusted_frontend = get_original_frontend(app)
 
     # Load custom nodes. This must be done after importing the Graph class, which itself imports all modules from the
     # invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
@@ -96,10 +208,10 @@ def run_app() -> None:
     # are unaffected.
     from invokeai.app.api_app import SubPathASGIMiddleware
 
-    asgi_app: Any = app
+    asgi_app: Any = TrustedRouteGuard(app=app, routes=trusted_routes, frontend=trusted_frontend)
     proxy_kwargs: dict[str, Any] = {}
     if app_config.base_url:
-        asgi_app = SubPathASGIMiddleware(app, app_config.base_url)
+        asgi_app = SubPathASGIMiddleware(asgi_app, app_config.base_url)
         # `proxy_headers=True` is already uvicorn's default; we only need to widen the trusted proxies.
         proxy_kwargs = {"forwarded_allow_ips": app_config.forwarded_allow_ips}
 
@@ -124,6 +236,10 @@ def run_app() -> None:
 
     try:
         loop.run_until_complete(server.serve())
+        if not server.started:
+            # The app refused to start (its log says why, e.g. a database another process serves); uvicorn returns
+            # normally, so name the failure to whatever runs this process. 3 is uvicorn's own startup-failure code.
+            raise SystemExit(3)
     except KeyboardInterrupt:
         logger.info("InvokeAI shutting down...")
         # Gracefully shut down services (e.g. model download and install managers) so that any

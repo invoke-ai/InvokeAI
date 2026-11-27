@@ -1,0 +1,514 @@
+import type { ModelRole } from '@features/models';
+
+import { getModelBaseLabel } from '@features/models/architectures';
+
+import type {
+  FieldInputTemplate,
+  InvocationTemplate,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowInvocationNode,
+} from './types';
+
+import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList } from './fields';
+import { isInvocationNode } from './types';
+
+/** Empty required model slots are ordinary workflow requirements, not merely a fallback. */
+
+export interface WorkflowModelIdentifier {
+  key: string;
+  hash?: string;
+  name?: string;
+  base?: string;
+  type?: string;
+}
+
+export type WorkflowModelRequirement =
+  | { kind: 'exact'; identifier: WorkflowModelIdentifier; label: string }
+  | { kind: 'slot'; base: string | null; modelType: string | null; label: string };
+
+export interface WorkflowModelRequirementSet {
+  requirements: readonly WorkflowModelRequirement[];
+  primaryBase: string | null;
+}
+
+/** Display labels for known model taxonomy types. Unknown types fall back to a humanized form. */
+const MODEL_TYPE_LABELS: Record<string, string> = {
+  clip_embed: 'CLIP embed',
+  clip_vision: 'CLIP Vision',
+  control_lora: 'Control LoRA',
+  controlnet: 'ControlNet',
+  embedding: 'embedding',
+  external_image_generator: 'external image generator',
+  flux_redux: 'FLUX Redux',
+  gemma2_encoder: 'Gemma2 encoder',
+  ip_adapter: 'IP Adapter',
+  llava_onevision: 'LLaVA OneVision',
+  lora: 'LoRA',
+  main: 'checkpoint',
+  mistral_encoder: 'Mistral encoder',
+  onnx: 'ONNX model',
+  pid_decoder: 'PID decoder',
+  qwen3_encoder: 'Qwen3 encoder',
+  qwen3_vl_encoder: 'Qwen3 VL encoder',
+  qwen3_vl_vision_tower: 'Qwen3 VL vision tower',
+  qwen3_5_encoder: 'Qwen3.5 encoder',
+  qwen_vl_encoder: 'Qwen VL encoder',
+  siglip: 'SigLIP',
+  spandrel_image_to_image: 'upscaler',
+  t2i_adapter: 'T2I Adapter',
+  t5_encoder: 'T5 encoder',
+  text_llm: 'text LLM',
+  unknown: 'model',
+  vae: 'VAE',
+  wan_t5_encoder: 'Wan T5 encoder',
+};
+
+const humanize = (value: string): string => value.replaceAll(/[_-]+/g, ' ');
+
+const getModelTypeLabel = (modelType: string): string => MODEL_TYPE_LABELS[modelType] ?? humanize(modelType);
+
+const capitalize = (value: string): string => (value.length === 0 ? value : value[0]?.toUpperCase() + value.slice(1));
+
+const buildSlotLabel = (fieldTemplate: FieldInputTemplate, base: string | null, modelType: string | null): string => {
+  const baseLabel = base ? getModelBaseLabel(base) : null;
+  const typeLabel = modelType ? getModelTypeLabel(modelType) : null;
+
+  if (baseLabel && typeLabel) {
+    return `${baseLabel} ${typeLabel}`;
+  }
+
+  if (baseLabel) {
+    return `${baseLabel} model`;
+  }
+
+  if (typeLabel) {
+    return capitalize(typeLabel);
+  }
+
+  return fieldTemplate.title || fieldTemplate.name;
+};
+
+interface DuckTypedModelValue {
+  key: string;
+  hash?: unknown;
+  name?: unknown;
+  base?: unknown;
+  type?: unknown;
+}
+
+const isDuckTypedModelValue = (value: unknown): value is DuckTypedModelValue =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as Record<string, unknown>).key === 'string' &&
+  ((value as Record<string, unknown>).key as string).trim().length > 0;
+
+const buildIdentifier = (value: DuckTypedModelValue): WorkflowModelIdentifier => {
+  const identifier: WorkflowModelIdentifier = { key: value.key };
+
+  if (typeof value.hash === 'string') {
+    identifier.hash = value.hash;
+  }
+
+  if (typeof value.name === 'string') {
+    identifier.name = value.name;
+  }
+
+  if (typeof value.base === 'string') {
+    identifier.base = value.base;
+  }
+
+  if (typeof value.type === 'string') {
+    identifier.type = value.type;
+  }
+
+  return identifier;
+};
+
+const mostFrequentBase = (counts: Map<string, number>): string | null => {
+  let best: string | null = null;
+  let bestCount = 0;
+
+  for (const [base, count] of counts) {
+    if (count > bestCount) {
+      best = base;
+      bestCount = count;
+    }
+  }
+
+  return best;
+};
+
+const computePrimaryBase = (requirements: readonly WorkflowModelRequirement[]): string | null => {
+  const mainBaseCounts = new Map<string, number>();
+  const allBaseCounts = new Map<string, number>();
+
+  const bump = (counts: Map<string, number>, base: string): void => {
+    counts.set(base, (counts.get(base) ?? 0) + 1);
+  };
+
+  for (const requirement of requirements) {
+    if (requirement.kind === 'exact') {
+      if (requirement.identifier.base) {
+        bump(allBaseCounts, requirement.identifier.base);
+
+        if (requirement.identifier.type === 'main') {
+          bump(mainBaseCounts, requirement.identifier.base);
+        }
+      }
+    } else if (requirement.base) {
+      bump(allBaseCounts, requirement.base);
+    }
+  }
+
+  return mostFrequentBase(mainBaseCounts) ?? mostFrequentBase(allBaseCounts);
+};
+
+/** Connection-fed inputs are owned upstream and skipped. */
+const visitNodeModelNeeds = (
+  node: WorkflowInvocationNode,
+  template: InvocationTemplate,
+  connectionTargets: ReadonlySet<string>,
+  visitExact: (value: DuckTypedModelValue, fieldName: string) => void,
+  visitSlot: (requirement: Extract<WorkflowModelRequirement, { kind: 'slot' }>, fieldName: string) => void
+): void => {
+  for (const fieldTemplate of Object.values({ ...template.inputs, ...node.data.dynamicInputTemplates })) {
+    const isLoraCollection = fieldTemplate.type.name === 'LoRAField';
+
+    if (!isModelFieldType(fieldTemplate.type) && !isLoraCollection) {
+      continue;
+    }
+
+    if (connectionTargets.has(`${node.id}::${fieldTemplate.name}`)) {
+      continue;
+    }
+
+    const value = node.data.inputs[fieldTemplate.name]?.value;
+
+    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node graphs.
+    if (isLoraCollection) {
+      const entries = toLoraFieldCollectionList(value);
+
+      for (const entry of entries) {
+        if (isLoraFieldCollectionEntry(entry) && isDuckTypedModelValue(entry.lora)) {
+          visitExact(entry.lora, fieldTemplate.name);
+        }
+      }
+
+      // An empty collection falls through to the slot path, so a required blank field still describes what it needs.
+      if (entries.length > 0) {
+        continue;
+      }
+    }
+
+    if (isDuckTypedModelValue(value)) {
+      visitExact(value, fieldTemplate.name);
+      continue;
+    }
+
+    if (!fieldTemplate.required) {
+      continue;
+    }
+
+    const base = fieldTemplate.uiModelBase?.[0] ?? null;
+    const modelType = fieldTemplate.uiModelType?.[0] ?? null;
+
+    visitSlot(
+      { base, kind: 'slot', label: buildSlotLabel(fieldTemplate, base, modelType), modelType },
+      fieldTemplate.name
+    );
+  }
+};
+
+const getConnectionTargets = (document: ProjectGraphState): Set<string> =>
+  new Set(document.edges.map((edge) => `${edge.target}::${edge.targetHandle}`));
+
+export const extractWorkflowModelRequirements = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates
+): WorkflowModelRequirementSet => {
+  const connectionTargets = getConnectionTargets(document);
+
+  const requirements: WorkflowModelRequirement[] = [];
+  const exactKeyHashes = new Map<string, string | undefined>();
+  const seenExactDedupeKeys = new Set<string>();
+  const seenSlotSignatures = new Set<string>();
+
+  const addExactRequirement = (value: DuckTypedModelValue): void => {
+    const identifier = buildIdentifier(value);
+
+    let dedupeKey = identifier.key;
+
+    if (exactKeyHashes.has(identifier.key)) {
+      const existingHash = exactKeyHashes.get(identifier.key);
+
+      if (identifier.hash !== undefined && existingHash !== undefined && existingHash !== identifier.hash) {
+        dedupeKey = `${identifier.key}::${identifier.hash}`;
+      }
+    } else {
+      exactKeyHashes.set(identifier.key, identifier.hash);
+    }
+
+    if (seenExactDedupeKeys.has(dedupeKey)) {
+      return;
+    }
+
+    seenExactDedupeKeys.add(dedupeKey);
+    requirements.push({ identifier, kind: 'exact', label: identifier.name ?? identifier.key });
+  };
+  const addSlotRequirement = (requirement: Extract<WorkflowModelRequirement, { kind: 'slot' }>): void => {
+    const signature = `${requirement.base ?? ''}::${requirement.modelType ?? ''}`;
+
+    if (!seenSlotSignatures.has(signature)) {
+      seenSlotSignatures.add(signature);
+      requirements.push(requirement);
+    }
+  };
+
+  for (const node of document.nodes) {
+    const template =
+      isInvocationNode(node) && Object.hasOwn(templates, node.data.type) ? templates[node.data.type] : undefined;
+
+    if (isInvocationNode(node) && template) {
+      visitNodeModelNeeds(node, template, connectionTargets, addExactRequirement, addSlotRequirement);
+    }
+  }
+
+  return { primaryBase: computePrimaryBase(requirements), requirements };
+};
+
+export interface WorkflowFieldModelRequirement {
+  fieldName: string;
+  requirement: WorkflowModelRequirement;
+}
+
+/** Per node and field, so a view can mark what needs a model; nodes needing none are absent. */
+export const extractNodeModelRequirements = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates
+): ReadonlyMap<string, readonly WorkflowFieldModelRequirement[]> => {
+  const connectionTargets = getConnectionTargets(document);
+  const byNode = new Map<string, WorkflowFieldModelRequirement[]>();
+
+  for (const node of document.nodes) {
+    const template =
+      isInvocationNode(node) && Object.hasOwn(templates, node.data.type) ? templates[node.data.type] : undefined;
+
+    if (!isInvocationNode(node) || !template) {
+      continue;
+    }
+
+    const requirements: WorkflowFieldModelRequirement[] = [];
+
+    visitNodeModelNeeds(
+      node,
+      template,
+      connectionTargets,
+      (value, fieldName) => {
+        const identifier = buildIdentifier(value);
+        requirements.push({
+          fieldName,
+          requirement: { identifier, kind: 'exact', label: identifier.name ?? identifier.key },
+        });
+      },
+      (requirement, fieldName) => requirements.push({ fieldName, requirement })
+    );
+
+    if (requirements.length > 0) {
+      byNode.set(node.id, requirements);
+    }
+  }
+
+  return byNode;
+};
+
+export interface InstalledModelSummary {
+  key: string;
+  hash: string;
+  name: string;
+  base: string;
+  type: string;
+  roles?: readonly ModelRole[];
+}
+
+export interface StarterCatalogEntry {
+  name: string;
+  previous_names?: string[] | null;
+  base: string;
+  type: string;
+  source: string;
+  is_installed: boolean;
+  dependencies?: readonly { source: string; is_installed: boolean }[] | null;
+}
+
+export type ModelRequirementStatus = 'installed' | 'installing' | 'installable' | 'unresolvable';
+
+export interface ResolvedModelRequirement {
+  requirement: WorkflowModelRequirement;
+  status: ModelRequirementStatus;
+  matchedModelName: string | null;
+  starterMatch: StarterCatalogEntry | null;
+}
+
+interface ResolutionDeps {
+  installedModels: readonly InstalledModelSummary[];
+  starterModels: readonly StarterCatalogEntry[];
+  activeInstallSources: ReadonlySet<string>;
+}
+
+const findInstalledForExact = (
+  identifier: WorkflowModelIdentifier,
+  installedModels: readonly InstalledModelSummary[]
+): InstalledModelSummary | null => {
+  const byKey = installedModels.find((model) => model.key === identifier.key);
+
+  if (byKey) {
+    return byKey;
+  }
+
+  if (identifier.hash) {
+    const byHash = installedModels.find((model) => model.hash === identifier.hash);
+
+    if (byHash) {
+      return byHash;
+    }
+  }
+
+  if (identifier.name && identifier.base && identifier.type) {
+    const byNameBaseType = installedModels.find(
+      (model) => model.name === identifier.name && model.base === identifier.base && model.type === identifier.type
+    );
+
+    if (byNameBaseType) {
+      return byNameBaseType;
+    }
+  }
+
+  return null;
+};
+
+/** A model fills a slot of `modelType` through its primary type or any role (null = any type). */
+const servesType = (model: InstalledModelSummary, modelType: string | null): boolean =>
+  modelType === null || model.type === modelType || (model.roles ?? []).some((role) => role.type === modelType);
+
+const findInstalledForSlot = (
+  base: string | null,
+  modelType: string | null,
+  installedModels: readonly InstalledModelSummary[]
+): InstalledModelSummary | null =>
+  installedModels.find((model) => (base === null || model.base === base) && servesType(model, modelType)) ?? null;
+
+const matchesStarterName = (starter: StarterCatalogEntry, name: string): boolean => {
+  const target = name.toLowerCase();
+
+  if (starter.name.toLowerCase() === target) {
+    return true;
+  }
+
+  return (starter.previous_names ?? []).some((previousName) => previousName.toLowerCase() === target);
+};
+
+const findStarterForExact = (
+  identifier: WorkflowModelIdentifier,
+  starterModels: readonly StarterCatalogEntry[]
+): StarterCatalogEntry | null => {
+  if (!identifier.name || !identifier.base || !identifier.type) {
+    return null;
+  }
+
+  return (
+    starterModels.find(
+      (starter) =>
+        matchesStarterName(starter, identifier.name as string) &&
+        starter.base === identifier.base &&
+        starter.type === identifier.type
+    ) ?? null
+  );
+};
+
+const findStarterForSlot = (
+  base: string | null,
+  modelType: string | null,
+  starterModels: readonly StarterCatalogEntry[]
+): StarterCatalogEntry | null =>
+  starterModels.find(
+    (starter) => (base === null || starter.base === base) && (modelType === null || starter.type === modelType)
+  ) ?? null;
+
+const isStarterActivelyInstalling = (
+  starter: StarterCatalogEntry,
+  activeInstallSources: ReadonlySet<string>
+): boolean =>
+  activeInstallSources.has(starter.source) ||
+  (starter.dependencies ?? []).some((dependency) => activeInstallSources.has(dependency.source));
+
+const resolveFromStarter = (
+  requirement: WorkflowModelRequirement,
+  starter: StarterCatalogEntry | null,
+  activeInstallSources: ReadonlySet<string>
+): ResolvedModelRequirement => {
+  if (!starter) {
+    return { matchedModelName: null, requirement, starterMatch: null, status: 'unresolvable' };
+  }
+
+  return {
+    matchedModelName: null,
+    requirement,
+    starterMatch: starter,
+    status: isStarterActivelyInstalling(starter, activeInstallSources) ? 'installing' : 'installable',
+  };
+};
+
+/** Exact requirements match by key, hash, then name/base/type; slots by base/type; starters include dependencies. */
+export const resolveWorkflowModelRequirements = (
+  requirements: readonly WorkflowModelRequirement[],
+  deps: ResolutionDeps
+): ResolvedModelRequirement[] =>
+  requirements.map((requirement) => {
+    if (requirement.kind === 'exact') {
+      const installed = findInstalledForExact(requirement.identifier, deps.installedModels);
+
+      if (installed) {
+        return { matchedModelName: installed.name, requirement, starterMatch: null, status: 'installed' };
+      }
+
+      return resolveFromStarter(
+        requirement,
+        findStarterForExact(requirement.identifier, deps.starterModels),
+        deps.activeInstallSources
+      );
+    }
+
+    const installed = findInstalledForSlot(requirement.base, requirement.modelType, deps.installedModels);
+
+    if (installed) {
+      return { matchedModelName: installed.name, requirement, starterMatch: null, status: 'installed' };
+    }
+
+    return resolveFromStarter(
+      requirement,
+      findStarterForSlot(requirement.base, requirement.modelType, deps.starterModels),
+      deps.activeInstallSources
+    );
+  });
+
+/** Catalog names first, then exact model names or raw slot base/type: display prose is not searchable taxonomy. */
+export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): string | null => {
+  if (resolved.status === 'installed') {
+    return null;
+  }
+
+  const starterName = resolved.starterMatch?.name.trim();
+
+  if (starterName) {
+    return starterName;
+  }
+
+  const { requirement } = resolved;
+
+  if (requirement.kind === 'exact') {
+    return requirement.identifier.name?.trim() || requirement.identifier.base?.trim() || null;
+  }
+
+  return requirement.base?.trim() || requirement.modelType?.trim() || null;
+};

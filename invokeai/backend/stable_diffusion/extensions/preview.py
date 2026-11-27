@@ -53,7 +53,10 @@ class PreviewExt(ExtensionBase):
 
         self.callback(
             PipelineIntermediateState(
-                step=ctx.step_index,
+                # Steps completed, not the index of the step just run: the last frame then reports
+                # 100%, as the FLUX/SD3 callbacks already do, and the progress-image throttle never
+                # drops it as a mid-run frame.
+                step=ctx.step_index + 1,
                 order=ctx.scheduler.order,
                 total_steps=len(ctx.inputs.timesteps),
                 timestep=int(ctx.timestep),  # TODO: is there any code which uses it?

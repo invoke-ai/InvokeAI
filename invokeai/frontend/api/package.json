@@ -1,0 +1,21 @@
+{
+  "name": "@invoke-ai/api-contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "prettier --check .",
+    "format:openapi": "prettier --write openapi.json",
+    "test": "node --test scripts/typegen.test.mjs",
+    "typegen": "node scripts/typegen.js"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.10.1",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "pnpm": "10"
+  },
+  "packageManager": "pnpm@10.12.4"
+}

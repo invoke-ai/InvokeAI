@@ -39,6 +39,10 @@ class AnimaTextConditioning:
     t5xxl_ids: torch.Tensor
     t5xxl_weights: torch.Tensor | None = None
     mask: torch.Tensor | None = None
+    qwen35_states: torch.Tensor | None = None
+    """Qwen3.5 hidden states for Anima-3.8B's semantic connector. Shape: (num_layers, seq_len, 2560)."""
+    qwen35_mask: torch.Tensor | None = None
+    """True for valid Qwen3.5 tokens. Shape: (seq_len,)."""
 
 
 @dataclass

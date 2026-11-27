@@ -1,0 +1,20 @@
+---
+import { parseTags } from '../i18n.mjs';
+
+type Props = {
+  /** A translated message with `<name>…</name>` tags around the text that markup wraps. */
+  message: string;
+};
+
+// Renders a translated sentence with markup inside it, react-i18next style. The default slot is a function of each
+// tag's text and name that returns its markup, so the caller owns the element and its scoped styles:
+//   <Trans message={t('footer.credit')}>{(text: string) => <a href="…">{text}</a>}</Trans>
+// Text is always escaped: `set:html` only receives the slot's rendered output, never the message.
+const parts = await Promise.all(
+  parseTags(Astro.props.message).map(async (part) =>
+    'tag' in part ? { html: await Astro.slots.render('default', [part.text, part.tag]) } : part
+  )
+);
+---
+
+{parts.map((part) => ('html' in part ? <Fragment set:html={part.html} /> : part.text))}

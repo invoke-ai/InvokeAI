@@ -7,9 +7,13 @@ from zipfile import ZipFile
 
 import pytest
 
-from invokeai.app.services.board_records.board_records_common import BoardRecord, BoardRecordNotFoundException
+from invokeai.app.services.board_records.board_records_common import (
+    BOARD_NAME_MAX_LENGTH,
+    BoardRecord,
+    BoardRecordNotFoundException,
+)
 from invokeai.app.services.bulk_download.bulk_download_common import BulkDownloadTargetException
-from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
+from invokeai.app.services.bulk_download.bulk_download_default import MAX_BOARD_NAME_BYTES, BulkDownloadService
 from invokeai.app.services.events.events_common import (
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
@@ -141,6 +145,139 @@ def test_handler_streams_local_path_when_available(
     assert_handler_success(
         expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
     )
+
+
+def prepare_two_image_download(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
+    """Patch the invoker for a two-image download; returns the dtos and the disk path lookup to patch."""
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+
+    first = mock_image_dto
+    second = mock_image_dto.model_copy(update={"image_name": "second_image.png"})
+    dtos = {dto.image_name: dto for dto in (first, second)}
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", lambda name: dtos[name])
+
+    disk_dir = tmp_path / "images_on_disk"
+    disk_dir.mkdir()
+    for name in dtos:
+        (disk_dir / name).write_text(f"contents of {name}")
+    return list(dtos), disk_dir
+
+
+def test_archive_is_not_downloadable_until_complete(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """A client polling get_path must never be handed a half-written archive."""
+    names, disk_dir = prepare_two_image_download(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+
+    visible_while_writing: list[bool] = []
+
+    def get_local_path(name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
+        if name == names[1]:
+            # The first image is already written into the archive at this point.
+            try:
+                service.get_path("test.zip")
+                visible_while_writing.append(True)
+            except BulkDownloadTargetException:
+                visible_while_writing.append(False)
+        return disk_dir / name
+
+    monkeypatch.setattr(mock_invoker.services.image_files, "get_local_path", get_local_path)
+
+    service.handler(names, None, None)
+
+    assert visible_while_writing == [False]
+    with ZipFile(service.get_path("test.zip")) as zip_file:
+        assert zip_file.testzip() is None
+        assert sorted(zip_file.namelist()) == sorted(f"general/{name}" for name in names)
+        for name in names:
+            assert zip_file.read(f"general/{name}").decode() == f"contents of {name}"
+    assert [p.name for p in (tmp_path / "bulk_downloads").iterdir()] == ["test.zip"]
+
+
+def patch_board_name(mock_invoker: Invoker, monkeypatch: Any, board_name: str) -> None:
+    monkeypatch.setattr(
+        mock_invoker.services.board_records,
+        "get",
+        lambda *args, **kwargs: BoardRecord(
+            board_id="12345",
+            board_name=board_name,
+            user_id="test_user",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+        ),
+    )
+
+
+def test_board_download_with_maximum_length_board_name_completes(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """A board name of the maximum allowed length must not push the archive name past filesystem limits."""
+    _, _, mock_image_contents = prepare_handler_test(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+    patch_board_name(mock_invoker, monkeypatch, "b" * BOARD_NAME_MAX_LENGTH)
+
+    item_id = service.generate_item_id("12345")
+    # uuid_string is patched to "test": the id is "<truncated name>_test", a prefix of the full name.
+    assert item_id == "b" * MAX_BOARD_NAME_BYTES + "_test"
+    service.handler(None, "12345", item_id)
+
+    zip_path = Path(service.get_path(item_id + ".zip"))
+    with ZipFile(zip_path) as zip_file:
+        assert zip_file.read(f"general/{mock_image_dto.image_name}").decode() == mock_image_contents
+    assert [p.name for p in zip_path.parent.iterdir()] == [zip_path.name]
+    assert isinstance(mock_invoker.services.events.events[-1], BulkDownloadCompleteEvent)
+
+
+def test_board_name_is_cut_at_a_character_boundary(monkeypatch: Any, mock_invoker: Invoker):
+    """Multi-byte letters are kept whole when the byte cap falls inside one."""
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+    # One ASCII letter first so the 2-byte letters straddle the cap when it is even.
+    board_name = "a" + "ä" * 100
+    patch_board_name(mock_invoker, monkeypatch, board_name)
+
+    item_id = service.generate_item_id("12345")
+    name_part = item_id.removesuffix("_test")
+
+    assert board_name.startswith(name_part)
+    assert name_part.startswith("aä")
+    assert len(name_part.encode("utf-8")) <= MAX_BOARD_NAME_BYTES
+    # No further whole character would have fit.
+    assert len((name_part + "ä").encode("utf-8")) > MAX_BOARD_NAME_BYTES
+
+
+def test_failed_archive_leaves_no_file_behind(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """If writing fails midway, no partial archive may remain or become downloadable."""
+    names, disk_dir = prepare_two_image_download(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+
+    def get_local_path(name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
+        return disk_dir / ("missing.png" if name == names[1] else name)
+
+    def open_stream(name: str, thumbnail: bool = False, image_subfolder: str = "") -> io.BytesIO:
+        raise FileNotFoundError(name)
+
+    monkeypatch.setattr(mock_invoker.services.image_files, "get_local_path", get_local_path)
+    monkeypatch.setattr(mock_invoker.services.image_files, "open_stream", open_stream)
+
+    with pytest.raises(FileNotFoundError):
+        service.handler(names, None, None)
+
+    events = mock_invoker.services.events.events
+    assert isinstance(events[0], BulkDownloadStartedEvent)
+    assert isinstance(events[-1], BulkDownloadErrorEvent)
+    assert not any(isinstance(event, BulkDownloadCompleteEvent) for event in events)
+    with pytest.raises(BulkDownloadTargetException):
+        service.get_path("test.zip")
+    assert list((tmp_path / "bulk_downloads").iterdir()) == []
 
 
 def test_generate_id(monkeypatch: Any):

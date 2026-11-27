@@ -1,19 +1,24 @@
 """Tests for the custom nodes router."""
 
 import json
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from invokeai.app.api.routers.custom_nodes import (
     PACK_MANIFEST_FILENAME,
+    _extract_pack_name_from_source,
     _get_installed_packs,
     _import_workflows_from_pack,
     _load_node_pack,
     _purge_pack_modules,
     _read_pack_manifest,
     _remove_workflows_by_ids,
+    _validate_pack_name,
     _write_pack_manifest,
+    uninstall_custom_node_pack,
 )
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -75,6 +80,72 @@ class TestGetInstalledPacks:
             packs = _get_installed_packs()
         assert len(packs) == 3
         assert [p.name for p in packs] == ["alpha_pack", "middle_pack", "zebra_pack"]
+
+
+class TestPackNameValidation:
+    """Tests for safely deriving node pack directory names from install sources."""
+
+    def test_validate_pack_name_accepts_safe_names(self) -> None:
+        assert _validate_pack_name("good_pack") == "good_pack"
+        assert _validate_pack_name("pack-1.2") == "pack-1.2"
+
+    def test_validate_pack_name_rejects_path_segments(self) -> None:
+        for pack_name in ("", ".", "..", "foo/bar", "..\\outside", "foo\nbar"):
+            try:
+                _validate_pack_name(pack_name)
+            except ValueError:
+                continue
+            raise AssertionError(f"Expected {pack_name!r} to be rejected")
+
+    def test_extracts_pack_name_from_git_url(self) -> None:
+        assert _extract_pack_name_from_source("https://github.com/example/my-pack.git") == "my-pack"
+
+    def test_rejects_empty_pack_name(self) -> None:
+        try:
+            _extract_pack_name_from_source("")
+        except ValueError:
+            return
+        raise AssertionError("Expected empty pack name to be rejected")
+
+    def test_rejects_dot_segments(self) -> None:
+        for source in ("https://github.com/example/..", "https://github.com/example/.git"):
+            try:
+                _extract_pack_name_from_source(source)
+            except ValueError:
+                continue
+            raise AssertionError(f"Expected {source!r} to be rejected")
+
+    def test_rejects_windows_path_separator_traversal(self) -> None:
+        try:
+            _extract_pack_name_from_source("https://github.com/example/..\\outside.git")
+        except ValueError:
+            return
+        raise AssertionError("Expected Windows path separator traversal to be rejected")
+
+
+class TestUninstallPackNameValidation:
+    """Tests that uninstall validates direct path parameters before deleting files."""
+
+    def test_rejects_invalid_pack_names_before_filesystem_side_effects(self) -> None:
+        for pack_name in ("..", ".", "foo/bar", "..\\outside"):
+            with (
+                patch("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path") as mock_get_path,
+                # Patch the router's `shutil` attribute, NOT `shutil.rmtree`: patching the latter
+                # mutates the global shutil module, so a gc pass that finalizes a TemporaryDirectory
+                # leaked anywhere else in the suite calls the mock and fails assert_not_called().
+                patch("invokeai.app.api.routers.custom_nodes.shutil") as mock_shutil,
+                patch("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids") as mock_remove_workflows,
+            ):
+                # The route is `def`, not `async def`, so that its synchronous filesystem work
+                # runs in the threadpool instead of on the event loop.
+                response = uninstall_custom_node_pack(MagicMock(), pack_name)
+
+            assert response.name == pack_name
+            assert response.success is False
+            assert response.message == "Invalid node pack name."
+            mock_get_path.assert_not_called()
+            mock_shutil.rmtree.assert_not_called()
+            mock_remove_workflows.assert_not_called()
 
 
 class TestImportWorkflowsFromPack:
@@ -497,3 +568,87 @@ class TestUninstallReinstallReloadsSubmodules:
             )
         finally:
             _purge_pack_modules(pack_name)
+
+
+class TestConcurrentPackMutation:
+    """Guards that two concurrent pack operations cannot corrupt each other.
+
+    Install, uninstall and reload were `async def` bodies containing no `await`, which made them
+    implicitly mutually exclusive — the event loop had no point at which to switch between two of
+    them. Dispatched to the threadpool they interleave for real, and install's failure path is
+    destructive: it `rmtree`s `target_dir` on a failed clone, without knowing whether that
+    directory is its own or one a concurrent install just finished writing.
+    """
+
+    # How long the losing install waits for the winner before giving up. Only reached when the
+    # two installs are correctly serialized — then nobody ever sets the event.
+    RACER_CLONE_WAIT = 1.0
+    SOURCE = "https://github.com/example/my-pack.git"
+
+    def test_failed_install_does_not_delete_a_concurrent_install(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        from invokeai.app.api.routers.custom_nodes import InstallNodePackRequest, install_custom_node_pack
+
+        racer_past_exists_check = threading.Event()
+        winner_installed = threading.Event()
+        clone_calls: list[list[str]] = []
+        calls_lock = threading.Lock()
+
+        def fake_clone(cmd, **kwargs):  # type: ignore[no-untyped-def]
+            target = Path(cmd[3])
+            with calls_lock:
+                is_racer = not clone_calls
+                clone_calls.append(cmd)
+
+            if is_racer:
+                # Reaching here means the exists-check has already passed. Fail only after the
+                # other install has written its files — that ordering is what turns this
+                # request's cleanup into a deletion of somebody else's pack.
+                racer_past_exists_check.set()
+                winner_installed.wait(timeout=TestConcurrentPackMutation.RACER_CLONE_WAIT)
+                return subprocess.CompletedProcess(cmd, 128, "", "fatal: clone failed")
+
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "__init__.py").write_text("")
+            winner_installed.set()
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        responses: list[object] = []
+        responses_lock = threading.Lock()
+
+        def attempt() -> None:
+            response = install_custom_node_pack(MagicMock(), InstallNodePackRequest(source=self.SOURCE))
+            with responses_lock:
+                responses.append(response)
+
+        with (
+            patch("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", return_value=tmp_path),
+            # A stand-in module rather than patching `subprocess.run` itself: patching the real
+            # module would leak into the rest of the suite, and the router's `except
+            # subprocess.TimeoutExpired` needs a real exception class to catch.
+            patch(
+                "invokeai.app.api.routers.custom_nodes.subprocess",
+                SimpleNamespace(run=fake_clone, TimeoutExpired=subprocess.TimeoutExpired),
+            ),
+            patch("invokeai.app.api.routers.custom_nodes._load_node_pack"),
+            patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"),
+        ):
+            racer = threading.Thread(target=attempt)
+            racer.start()
+            # Start the second install only once the first is past the exists-check, so the
+            # interleaving under test is reached deterministically rather than by luck.
+            assert racer_past_exists_check.wait(timeout=10)
+
+            winner = threading.Thread(target=attempt)
+            winner.start()
+
+            for thread in (racer, winner):
+                thread.join(timeout=30)
+                assert not thread.is_alive()
+
+        pack_dir = tmp_path / "my-pack"
+        assert (pack_dir / "__init__.py").exists(), (
+            "The successful install's pack directory was deleted by the failed install's cleanup."
+        )
+        assert sum(1 for response in responses if response.success) == 1  # type: ignore[attr-defined]

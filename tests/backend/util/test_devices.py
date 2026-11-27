@@ -2,13 +2,24 @@
 Test abstract device class.
 """
 
+import ctypes
+import threading
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 import torch
 
 from invokeai.app.services.config import get_config
-from invokeai.backend.util.devices import TorchDevice, choose_precision, choose_torch_device, torch_dtype
+from invokeai.backend.util.devices import (
+    EmptyCacheOutcome,
+    TorchDevice,
+    choose_precision,
+    choose_torch_device,
+    device_has_dedicated_vram,
+    device_is_integrated,
+    torch_dtype,
+)
 
 devices = ["cpu", "cuda:0", "cuda:1", "cuda:2", "mps"]
 device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
@@ -22,6 +33,178 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+@pytest.mark.parametrize(
+    ("device_name", "integrated", "expected"),
+    [
+        pytest.param("cpu", None, False, id="cpu-shared"),
+        pytest.param("mps", None, False, id="mps-shared"),
+        pytest.param("cuda:1", True, True, id="rocm-apu-keeps-dedicated-budget"),
+        pytest.param("xpu:2", True, False, id="integrated-xpu-shared"),
+        pytest.param("xpu:2", False, True, id="discrete-xpu-dedicated"),
+        pytest.param("xpu:2", None, True, id="unknown-xpu-dedicated"),
+    ],
+)
+def test_device_memory_budget_classification(device_name, integrated, expected, monkeypatch):
+    device = torch.device(device_name)
+
+    def probe(probed_device):
+        assert probed_device == device
+        return integrated
+
+    monkeypatch.setattr("invokeai.backend.util.devices.xpu_device_is_integrated", probe)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(torch.version, "hip", "7.15.26333")
+    assert device_has_dedicated_vram(device) is expected
+
+
+# ===== per-thread session device (multi-GPU worker pinning) ================
+
+
+def test_session_device_overrides_config():
+    """A per-thread session device takes precedence over the global config.device."""
+    config = get_config()
+    config.device = "cpu"
+    try:
+        TorchDevice.set_session_device("cuda:1")
+        assert TorchDevice.choose_torch_device() == torch.device("cuda:1")
+    finally:
+        TorchDevice.clear_session_device()
+    # Once cleared, we fall back to the global config.
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
+
+
+def test_session_device_is_thread_local():
+    """Each thread sees only its own pinned device; the main thread is unaffected."""
+    config = get_config()
+    config.device = "cpu"
+    results: dict[str, torch.device] = {}
+    barrier = threading.Barrier(2)
+
+    def worker(name: str, device: str):
+        TorchDevice.set_session_device(device)
+        # Wait so both threads have set their device before either reads it, proving isolation.
+        barrier.wait()
+        results[name] = TorchDevice.choose_torch_device()
+        TorchDevice.clear_session_device()
+
+    t0 = threading.Thread(target=worker, args=("a", "cuda:0"))
+    t1 = threading.Thread(target=worker, args=("b", "cuda:1"))
+    t0.start()
+    t1.start()
+    t0.join()
+    t1.join()
+
+    assert results["a"] == torch.device("cuda:0")
+    assert results["b"] == torch.device("cuda:1")
+    # The main thread never set a session device, so it still uses the global config.
+    assert TorchDevice.get_session_device() is None
+    assert TorchDevice.choose_torch_device() == torch.device("cpu")
+
+
+# ===== generation_devices resolution (config -> concrete device list) =======
+
+
+def test_get_generation_devices_auto_expands_to_all_cuda():
+    """`auto` enumerates every visible CUDA device (when the legacy `device` is not pinned)."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+        # Discrete GPUs, whatever the machine running the test has (its iGPU would be left out).
+        patch(
+            "invokeai.backend.util.devices.torch.cuda.get_device_properties",
+            _cuda_properties({0: False, 1: False, 2: False}),
+        ),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+            torch.device("cuda:2"),
+        ]
+
+
+def test_get_generation_devices_auto_respects_pinned_legacy_device():
+    """An upgraded install that pinned the legacy `device` setting (e.g. to keep generation off a
+    display GPU) must not silently start workers on every GPU: `auto` resolves to the pinned device
+    only. An explicit generation_devices list still overrides the pin."""
+    config = get_config()
+    config.device = "cuda:1"
+    try:
+        with (
+            patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+            patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+        ):
+            assert TorchDevice.get_generation_devices("auto") == [torch.device("cuda:1")]
+            # An explicit list wins over the legacy pin.
+            assert TorchDevice.get_generation_devices(["cuda:0", "cuda:2"]) == [
+                torch.device("cuda:0"),
+                torch.device("cuda:2"),
+            ]
+    finally:
+        config.device = "auto"
+
+
+def test_get_generation_devices_auto_without_cuda():
+    """`auto` falls back to the single best device when no accelerator is available."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=False),
+        patch("invokeai.backend.util.devices.torch.backends.mps.is_available", return_value=False),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [torch.device("cpu")]
+
+
+def test_get_generation_devices_explicit_list_is_deduplicated():
+    """An explicit list is normalized and deduplicated, preserving order."""
+    # Mock CUDA as present so the device-existence validation passes on CPU-only runners.
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=2),
+    ):
+        assert TorchDevice.get_generation_devices(["cuda:0", "cuda:0", "cuda:1"]) == [
+            torch.device("cuda:0"),
+            torch.device("cuda:1"),
+        ]
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_get_generation_devices_empty(value):
+    """`None` or an empty list resolves to an empty list (caller handles the single-device fallback)."""
+    assert TorchDevice.get_generation_devices(value) == []
+
+
+def test_generation_devices_summary_suffix_tied_to_full_device_set():
+    """A device's `#N` suffix stays tied to its cuda index even when other devices are disabled.
+
+    Regression test: with 4 identically-named GPUs, disabling cuda:1 must leave cuda:2/cuda:3 as
+    #3/#4 (not renumber them to #2/#3), so the backend log matches the frontend's labeling.
+    """
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=4),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_name", return_value="NVIDIA GeForce RTX 4090"),
+    ):
+        summary = TorchDevice.get_generation_devices_summary(["cuda:0", "cuda:2", "cuda:3"])
+        assert summary == (
+            "[NVIDIA GeForce RTX 4090 #1 (cuda:0), "
+            "NVIDIA GeForce RTX 4090 #3 (cuda:2), "
+            "NVIDIA GeForce RTX 4090 #4 (cuda:3)]"
+        )
+
+
+def test_generation_devices_summary_single_device_has_no_suffix():
+    """A single resolved device is summarized by bare name, with no bracket or `#N` suffix."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=4),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_name", return_value="NVIDIA GeForce RTX 4090"),
+    ):
+        assert TorchDevice.get_generation_devices_summary(["cuda:2"]) == "NVIDIA GeForce RTX 4090"
 
 
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
@@ -132,6 +315,91 @@ def test_legacy_precision_name():
         assert "float32" == choose_precision(torch.device("cpu"))
 
 
+# ===== choose_bfloat16_safe_dtype (a dtype question, not a memory one) =====
+
+
+def _record_constructors(monkeypatch) -> list[dict]:
+    """Capture what the dtype probe asks the backend for, without changing the answer.
+
+    Stubs return a CPU tensor so a device the test machine does not have can still be asked
+    about. Covers the constructors a probe would plausibly use; a probe that asks some other
+    way records nothing, which the assertions treat as asking for nothing.
+    """
+    asked: list[dict] = []
+    real_empty = torch.empty
+
+    def stub(*args, **kwargs):
+        asked.append({"size": args[0] if args else None, "device": kwargs.get("device")})
+        return real_empty(0, dtype=kwargs.get("dtype"))
+
+    for name in ("empty", "zeros", "ones", "tensor"):
+        monkeypatch.setattr(torch, name, stub)
+    return asked
+
+
+def test_the_bfloat16_probe_asks_the_named_device_for_nothing(monkeypatch):
+    """Two properties at once, because each one alone is satisfiable by a broken probe: whatever
+    it asks for must be empty -- a real element is an allocation a full GPU can refuse, which is
+    how a dtype query once failed a run -- and it must be asked of the device in question, not of
+    whichever device is convenient."""
+    asked = _record_constructors(monkeypatch)
+    device = torch.device("cuda:0")
+
+    assert TorchDevice.choose_bfloat16_safe_dtype(device) is torch.bfloat16
+    assert all(request["size"] in (0, (), []) for request in asked)
+    assert all(request["device"] == device for request in asked)
+
+
+def test_an_unreachable_device_still_raises_rather_than_guessing(monkeypatch):
+    """A device that cannot be reached -- an out-of-range ordinal, a backend this build lacks --
+    is a broken configuration, not a dtype verdict. Answering it with a plausible dtype buries
+    the real error in whichever loader allocates first."""
+
+    def invalid_device(*args, **kwargs):
+        raise RuntimeError("CUDA error: invalid device ordinal")
+
+    monkeypatch.setattr(torch, "empty", invalid_device)
+
+    with pytest.raises(RuntimeError, match="invalid device ordinal"):
+        TorchDevice.choose_bfloat16_safe_dtype(torch.device("cuda:9"))
+
+
+@pytest.mark.parametrize(
+    ("device_name", "expected"),
+    [("cuda", torch.float16), ("mps", torch.float32), ("xpu", torch.float32)],
+)
+def test_a_backend_that_rejects_bfloat16_falls_back_by_device(monkeypatch, device_name, expected):
+    """A rejected dtype is a verdict, unlike a device that cannot answer, and the fallback is
+    half-width on CUDA but full-width everywhere else."""
+
+    def unsupported(*args, **kwargs):
+        raise TypeError("BFloat16 is not supported on this device")
+
+    monkeypatch.setattr(torch, "empty", unsupported)
+
+    assert TorchDevice.choose_bfloat16_safe_dtype(torch.device(device_name)) is expected
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_the_flux_vae_dtype_keeps_a_configured_float32_or_bfloat16(dtype):
+    assert TorchDevice.dtype_avoiding_float16(dtype, torch.device("cpu")) is dtype
+
+
+@pytest.mark.parametrize("bfloat16_supported, expected", [(True, torch.bfloat16), (False, torch.float32)])
+def test_the_flux_vae_dtype_replaces_float16_with_bfloat16_or_else_float32(monkeypatch, bfloat16_supported, expected):
+    """Full width also on CUDA, unlike `choose_bfloat16_safe_dtype`: the FLUX autoencoders are broken in float16."""
+    empty = torch.empty
+
+    def answer(*args, dtype, device):
+        if not bfloat16_supported:
+            raise TypeError("BFloat16 is not supported on this device")
+        return empty(0, dtype=dtype)
+
+    monkeypatch.setattr(torch, "empty", answer)
+
+    assert TorchDevice.dtype_avoiding_float16(torch.float16, torch.device("cuda")) is expected
+
+
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
 
 
@@ -169,3 +437,787 @@ def test_choose_anima_inference_dtype_auto_delegates_to_safe_dtype():
         result = TorchDevice.choose_anima_inference_dtype(device)
     assert result is sentinel
     mock_safe.assert_called_once_with(device)
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_rejects_out_of_range_cuda(mock_avail, mock_count):
+    # cuda:2 does not exist on a 2-GPU machine — fail fast instead of deferring to first allocation.
+    with pytest.raises(ValueError, match="only 2 CUDA"):
+        TorchDevice.get_generation_devices(["cuda:2"])
+
+
+@patch("torch.cuda.device_count", return_value=2)
+@patch("torch.cuda.is_available", return_value=True)
+def test_get_generation_devices_accepts_in_range_cuda(mock_avail, mock_count):
+    assert [str(d) for d in TorchDevice.get_generation_devices(["cuda:1"])] == ["cuda:1"]
+
+
+@patch("torch.cuda.is_available", return_value=False)
+def test_get_generation_devices_rejects_cuda_when_unavailable(mock_avail):
+    with pytest.raises(ValueError, match="no CUDA"):
+        TorchDevice.get_generation_devices(["cuda:0"])
+
+
+@patch("torch.backends.mps.is_available", return_value=False)
+def test_get_generation_devices_rejects_mps_when_unavailable(mock_mps):
+    # e.g. Linux, or an unsupported macOS build — fail fast instead of starting a worker and cache
+    # pinned to a device that only errors at the first tensor operation.
+    with pytest.raises(ValueError, match="MPS is not available"):
+        TorchDevice.get_generation_devices(["mps"])
+
+
+@patch("torch.backends.mps.is_available", return_value=True)
+def test_get_generation_devices_accepts_mps_when_available(mock_mps):
+    assert [str(d) for d in TorchDevice.get_generation_devices(["mps"])] == ["mps"]
+
+
+# ===== XPU (Intel GPU) ======================================================
+
+device_types_xpu = [
+    ("cpu", torch.float32),
+    ("cuda:0", torch.float32),
+    ("mps", torch.float32),
+    ("xpu", torch.float16),
+    ("xpu:0", torch.float16),
+]
+
+
+@pytest.mark.parametrize("device_name", ["xpu:0", "xpu:1"])
+def test_device_choice_xpu(device_name):
+    """An explicit xpu:N device in the config is honored verbatim."""
+    config = get_config()
+    config.device = device_name
+    assert TorchDevice.choose_torch_device() == torch.device(device_name)
+
+
+def test_auto_device_prefers_xpu_over_cpu():
+    """With no CUDA/MPS and an XPU present, `auto` selects (and normalizes) xpu."""
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        config = get_config()
+        config.device = "auto"
+        assert TorchDevice.choose_torch_device() == torch.device("xpu", 0)
+
+
+def test_auto_device_prefers_cuda_over_xpu():
+    """CUDA outranks XPU in auto selection."""
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.current_device", return_value=0),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+    ):
+        config = get_config()
+        config.device = "auto"
+        assert TorchDevice.choose_torch_device().type == "cuda"
+
+
+@pytest.mark.parametrize("device_dtype_pair", device_types_xpu)
+def test_device_dtype_xpu(device_dtype_pair):
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        config.precision = "auto"
+        assert TorchDevice.choose_torch_dtype() == dtype
+
+
+def test_normalize_xpu():
+    with (
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.current_device", return_value=0, create=True),
+    ):
+        assert TorchDevice.normalize("xpu") == torch.device("xpu", 0)
+        assert TorchDevice.normalize("xpu:1") == torch.device("xpu", 1)
+    with patch("invokeai.backend.util.devices._xpu_is_available", return_value=False):
+        assert TorchDevice.normalize("xpu") == torch.device("xpu")
+
+
+# ===== TorchDevice.xpu_mem_get_info fallback ================================
+
+
+def test_xpu_mem_get_info_native():
+    """When torch.xpu.mem_get_info works, its result is passed through."""
+    with patch.object(torch.xpu, "mem_get_info", return_value=(5, 10), create=True):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (5, 10)
+
+
+def _install_fake_sysman(free: int, size: int, indices=(0,)):
+    """Point the Sysman cache at a stub that reports fixed figures for the given device indices."""
+    import invokeai.backend.util.level_zero as level_zero
+
+    def fake_get_state(_handle, state_ref):
+        state = state_ref._obj
+        state.free = free
+        state.size = size
+        return 0
+
+    lib = SimpleNamespace(zesMemoryGetState=fake_get_state)
+    level_zero._sysman_attempted = True
+    level_zero._sysman = (lib, {i: [ctypes.c_void_p(1)] for i in indices})
+    return level_zero
+
+
+def test_xpu_memory_info_resolves_an_index_less_device():
+    """An index-less device must resolve to the current device rather than returning None.
+
+    Returning None would silently skip the driver-global query and drop to the blind estimate --
+    an accuracy regression with no visible symptom.
+    """
+    from invokeai.backend.util.level_zero import reset_cache, xpu_memory_info
+
+    gib = 1 << 30
+    level_zero = _install_fake_sysman(free=5 * gib, size=8 * gib, indices=(0,))
+    try:
+        with patch.object(torch.xpu, "current_device", return_value=0, create=True):
+            assert xpu_memory_info(torch.device("xpu")) == (5 * gib, 8 * gib)
+        assert xpu_memory_info(torch.device("xpu", 0)) == (5 * gib, 8 * gib)
+        # A device Sysman has no module for yields None rather than another device's numbers.
+        assert xpu_memory_info(torch.device("xpu", 3)) is None
+        assert xpu_memory_info(torch.device("cpu")) is None
+    finally:
+        reset_cache()
+        assert level_zero._sysman is None
+
+
+def test_get_device_name_degrades_instead_of_raising():
+    """Naming is for labels and logs only, so a backend that cannot answer must not take the
+    caller down. torch.xpu.get_device_name goes through _lazy_init, which raises AssertionError
+    (not RuntimeError) on a build without XPU."""
+    with patch.object(
+        torch.xpu, "get_device_name", side_effect=AssertionError("Torch not compiled with XPU enabled"), create=True
+    ):
+        assert TorchDevice.get_device_name(torch.device("xpu", 1)) == "xpu:1"
+    with patch.object(torch.cuda, "get_device_name", side_effect=RuntimeError("no driver")):
+        assert TorchDevice.get_device_name(torch.device("cuda", 0)) == "cuda:0"
+
+
+def test_get_device_name_returns_backend_name_when_available():
+    with patch.object(torch.xpu, "get_device_name", return_value="Intel(R) Arc(TM) Pro B70 Graphics", create=True):
+        assert TorchDevice.get_device_name(torch.device("xpu", 0)) == "Intel(R) Arc(TM) Pro B70 Graphics"
+    assert TorchDevice.get_device_name(torch.device("cpu")) == "CPU"
+
+
+def test_xpu_mem_get_info_falls_back_to_sysman_before_estimating():
+    """Level Zero Sysman is driver-global like mem_get_info, so it must be preferred over the
+    process-local estimate, which is blind to VRAM held by other processes."""
+    gib = 1 << 30
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError("aspect missing"), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=(15 * gib, 32 * gib)) as mock_sysman,
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=0, create=True),
+    ):
+        # The blind estimate would say 32 GiB free here; Sysman's 15 GiB must win.
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (15 * gib, 32 * gib)
+    mock_sysman.assert_called_once()
+
+
+def test_xpu_mem_get_info_unknown_total_raises():
+    """An unreadable total_memory propagates rather than being reported as (0, 0).
+
+    Returning (0, 0) would make ModelCache._get_vram_available collapse to a constant
+    -working_mem budget for the life of the process (the vram_allocated term cancels
+    against _get_vram_in_use), silently forcing per-layer autocast forever.
+
+    Sysman is stubbed unavailable so the total_memory tier is the one under test. Without
+    that stub this passes only where Level Zero cannot answer -- and fails on exactly the
+    Intel hardware the probe exists for, where Sysman returns before total_memory is read.
+    """
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=RuntimeError(), create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=None),
+        patch.object(torch.xpu, "get_device_properties", side_effect=RuntimeError("unreadable"), create=True),
+        patch.object(torch.xpu, "memory_reserved", side_effect=RuntimeError(), create=True),
+    ):
+        with pytest.raises(RuntimeError, match="unreadable"):
+            TorchDevice.xpu_mem_get_info(torch.device("xpu"))
+
+
+@pytest.mark.parametrize(
+    "native_error",
+    [
+        RuntimeError("aspect missing"),
+        # torch.xpu._lazy_init raises AssertionError, not RuntimeError, on a build without XPU.
+        AssertionError("Torch not compiled with XPU enabled"),
+    ],
+    ids=["missing-sycl-aspect", "torch-without-xpu"],
+)
+def test_xpu_mem_get_info_estimates_when_native_and_sysman_both_fail(native_error):
+    """Last resort: total_memory minus this process's reserved bytes.
+
+    The native failure type moves between torch releases, so both spellings must reach the
+    estimate rather than propagating.
+    """
+    gib = 1 << 30
+    with (
+        patch.object(torch.xpu, "mem_get_info", side_effect=native_error, create=True),
+        patch("invokeai.backend.util.devices.xpu_memory_info", return_value=None),
+        patch.object(
+            torch.xpu, "get_device_properties", return_value=SimpleNamespace(total_memory=32 * gib), create=True
+        ),
+        patch.object(torch.xpu, "memory_reserved", return_value=2 * gib, create=True),
+    ):
+        assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (30 * gib, 32 * gib)
+
+
+@pytest.mark.parametrize(
+    ("budget_gib", "expected_free_gib"),
+    [(None, 10), (13, 7), (16, 10), (5, 0)],
+    ids=["no-budget", "budget-is-tighter", "torch-is-tighter", "over-budget"],
+)
+def test_cuda_mem_get_info_is_capped_by_the_windows_video_memory_budget(budget_gib, expected_free_gib):
+    """On Windows ROCm, torch's free figure ignores other processes and the point where Windows starts paging. The
+    headroom is the budget minus this process's live allocations (16 - 10 = 6 GiB here)."""
+    gib = 1024**3
+    device = torch.device("cuda", 0)
+    budget = None if budget_gib is None else budget_gib * gib
+    with (
+        patch.object(torch.cuda, "mem_get_info", return_value=(10 * gib, 16 * gib)),
+        patch("invokeai.backend.util.devices.video_memory_budget", return_value=budget) as mock_budget,
+    ):
+        assert TorchDevice.cuda_mem_get_info(device) == (expected_free_gib * gib, 16 * gib)
+    mock_budget.assert_called_once_with(device)
+
+
+def test_get_generation_devices_auto_expands_to_all_xpu():
+    """With no CUDA, `auto` enumerates every visible XPU device."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+    ):
+        assert TorchDevice.get_generation_devices("auto") == [torch.device("xpu:0"), torch.device("xpu:1")]
+
+
+def _auto_xpu_devices(integrated_map: dict[int, bool | None]):
+    """Resolve `auto` with N XPU devices whose integrated-ness is given per index."""
+    config = get_config()
+    config.device = "auto"
+
+    def fake_is_integrated(device: torch.device):
+        return integrated_map.get(device.index)
+
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=len(integrated_map), create=True),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", side_effect=fake_is_integrated),
+    ):
+        return TorchDevice.get_generation_devices("auto")
+
+
+def test_auto_excludes_integrated_gpu_when_a_discrete_one_exists():
+    """The mainstream Arc config is iGPU + discrete card; `auto` must not dispatch to the iGPU."""
+    assert _auto_xpu_devices({0: True, 1: False}) == [torch.device("xpu:1")]
+
+
+def test_auto_keeps_integrated_gpu_when_it_is_the_only_device():
+    """Dropping the only GPU would leave nothing to generate on."""
+    assert _auto_xpu_devices({0: True}) == [torch.device("xpu:0")]
+
+
+def test_auto_keeps_devices_of_unknown_type():
+    """A None answer from the Level Zero probe must not narrow the device list on a guess."""
+    assert _auto_xpu_devices({0: None, 1: None}) == [torch.device("xpu:0"), torch.device("xpu:1")]
+
+
+def test_explicit_generation_devices_can_still_select_an_integrated_gpu():
+    """The exclusion applies to `auto` only; naming a device opts into it."""
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=True),
+    ):
+        assert TorchDevice.get_generation_devices(["xpu:0"]) == [torch.device("xpu:0")]
+
+
+def test_get_generation_devices_rejects_out_of_range_xpu():
+    with (
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+    ):
+        with pytest.raises(ValueError, match="only 2 XPU"):
+            TorchDevice.get_generation_devices(["xpu:2"])
+
+
+def test_get_generation_devices_rejects_xpu_when_unavailable():
+    with patch("invokeai.backend.util.devices._xpu_is_available", return_value=False):
+        with pytest.raises(ValueError, match="no XPU"):
+            TorchDevice.get_generation_devices(["xpu:0"])
+
+
+def test_generation_devices_summary_xpu_pair():
+    """Two identically-named XPUs get stable #N suffixes, same as CUDA."""
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=False),
+        patch("invokeai.backend.util.devices._xpu_is_available", return_value=True),
+        patch("torch.xpu.device_count", return_value=2, create=True),
+        patch("torch.xpu.get_device_name", return_value="Intel Arc Pro B70", create=True),
+    ):
+        summary = TorchDevice.get_generation_devices_summary(["xpu:0", "xpu:1"])
+        assert summary == "[Intel Arc Pro B70 #1 (xpu:0), Intel Arc Pro B70 #2 (xpu:1)]"
+
+
+def test_session_device_index_on_xpu():
+    """Worker labels resolve the device index for XPU sessions too."""
+    try:
+        TorchDevice.set_session_device("xpu:1")
+        assert TorchDevice.get_session_device_index() == 1
+        assert TorchDevice.get_session_device_label() == " (#1)"
+    finally:
+        TorchDevice.clear_session_device()
+
+
+def test_empty_cache_skips_while_peer_device_busy(monkeypatch):
+    """TorchDevice.empty_cache() must not run the process-global (peer-convoying) empty_cache
+    while another generation device is mid-session, and must run it when the pool is quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice
+
+    calls: list[str] = []
+    monkeypatch.setattr(torch_mod.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    monkeypatch.setattr(torch_mod.backends.mps, "is_available", lambda: False)
+
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    try:
+        TorchDevice.set_session_device(torch.device("cuda:1"))
+        try:
+            GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+            try:
+                TorchDevice.empty_cache()
+                assert calls == [], "empty_cache ran while a peer device was mid-session"
+            finally:
+                GENERATION_DEVICE_POOL.release_session(torch.device("cuda:0"))
+            TorchDevice.empty_cache()
+            assert calls == ["cuda"], "empty_cache did not run once the pool was quiet"
+        finally:
+            TorchDevice.clear_session_device()
+    finally:
+        GENERATION_DEVICE_POOL.reset()
+
+
+def test_install_peer_aware_empty_cache_wraps_torch_entry_point(monkeypatch):
+    """Third-party callers (diffusers' internal empty_device_cache) invoke
+    torch.cuda.empty_cache directly; the installed wrapper must apply the same
+    skip-while-a-peer-generates policy, idempotently, and pass through when quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice, install_peer_aware_empty_cache
+
+    calls: list[str] = []
+    original = torch_mod.cuda.empty_cache
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    try:
+        install_peer_aware_empty_cache()
+        wrapped = torch_mod.cuda.empty_cache
+        assert wrapped is not original
+        install_peer_aware_empty_cache()
+        assert torch_mod.cuda.empty_cache is wrapped, "install must be idempotent"
+
+        GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+        try:
+            TorchDevice.set_session_device(torch.device("cuda:1"))
+            try:
+                GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+                try:
+                    torch_mod.cuda.empty_cache()  # what diffusers calls
+                    assert calls == [], "wrapper ran empty_cache while a peer was mid-session"
+                finally:
+                    GENERATION_DEVICE_POOL.release_session(torch.device("cuda:0"))
+                torch_mod.cuda.empty_cache()
+                assert calls == ["cuda"], "wrapper did not pass through once quiet"
+            finally:
+                TorchDevice.clear_session_device()
+        finally:
+            GENERATION_DEVICE_POOL.reset()
+    finally:
+        # monkeypatch restores the attribute we set; make sure the true original is back for
+        # other tests regardless of ordering.
+        torch_mod.cuda.empty_cache = original
+
+
+def test_skipped_empty_cache_is_deferred_and_flushed_at_a_quiet_moment(monkeypatch):
+    """A peer-aware skip must not lose the release: it is recorded as deferred, stays pending
+    while any other device is still busy, and is performed exactly once by the first flush that
+    finds the pool quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice
+
+    calls: list[str] = []
+    monkeypatch.setattr(torch_mod.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    monkeypatch.setattr(torch_mod.backends.mps, "is_available", lambda: False)
+
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    TorchDevice._empty_cache_deferred.clear()
+    try:
+        # Nothing pending: a flush is a no-op even when quiet.
+        TorchDevice.flush_deferred_empty_cache()
+        assert calls == []
+
+        # Worker on cuda:0 finishes (cancels) while cuda:1 is mid-render: its release is deferred.
+        GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:1"))
+        TorchDevice.set_session_device(torch.device("cuda:0"))
+        try:
+            TorchDevice.empty_cache()
+            assert calls == []
+            assert TorchDevice._empty_cache_deferred.is_set(), "skip did not record a deferred release"
+            # The requester itself cannot flush while the peer is busy; the request stays pending.
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == []
+            assert TorchDevice._empty_cache_deferred.is_set()
+        finally:
+            TorchDevice.clear_session_device()
+
+        # The busy worker on cuda:1 reaches a step boundary: no OTHER device is busy from its
+        # point of view, so it performs the deferred release itself, once.
+        TorchDevice.set_session_device(torch.device("cuda:1"))
+        try:
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"], "busy worker did not flush the deferred release at its step boundary"
+            assert not TorchDevice._empty_cache_deferred.is_set()
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"], "a flushed request was repeated"
+        finally:
+            TorchDevice.clear_session_device()
+            GENERATION_DEVICE_POOL.release_session(torch.device("cuda:1"))
+    finally:
+        TorchDevice._empty_cache_deferred.clear()
+        GENERATION_DEVICE_POOL.reset()
+
+
+def test_peer_aware_wrapper_defers_and_a_direct_run_clears_the_request(monkeypatch):
+    """Third-party calls through the installed torch.cuda.empty_cache wrapper defer the same
+    way, and any real run (from either entry point) satisfies the pending request."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice, install_peer_aware_empty_cache
+
+    calls: list[str] = []
+    original = torch_mod.cuda.empty_cache
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    TorchDevice._empty_cache_deferred.clear()
+    try:
+        install_peer_aware_empty_cache()
+        GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+        try:
+            TorchDevice.set_session_device(torch.device("cuda:0"))
+            GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:1"))
+            try:
+                torch_mod.cuda.empty_cache()  # what diffusers calls
+                assert calls == []
+                assert TorchDevice._empty_cache_deferred.is_set(), "wrapper skip did not defer the release"
+            finally:
+                GENERATION_DEVICE_POOL.release_session(torch.device("cuda:1"))
+            # Quiet again: a direct call runs and clears the request, so a later flush is a no-op.
+            torch_mod.cuda.empty_cache()
+            assert calls == ["cuda"]
+            assert not TorchDevice._empty_cache_deferred.is_set(), "a real run left the request pending"
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"]
+        finally:
+            TorchDevice.clear_session_device()
+            GENERATION_DEVICE_POOL.reset()
+    finally:
+        TorchDevice._empty_cache_deferred.clear()
+        torch_mod.cuda.empty_cache = original
+
+
+def test_disable_conv_benchmark_empty_cache_flips_torch_flag():
+    """The multi-GPU startup path must clear torch's post-conv-find emptyCache flag (and no-op
+    gracefully on builds that lack it)."""
+    from invokeai.backend.util.devices import disable_conv_benchmark_empty_cache
+
+    getter = getattr(torch._C, "_cuda_get_conv_benchmark_empty_cache", None)
+    setter = getattr(torch._C, "_cudnn_set_conv_benchmark_empty_cache", None)
+    if getter is None or setter is None:
+        # CPU-only torch builds lack the flag; the function must still be a safe no-op.
+        disable_conv_benchmark_empty_cache()
+        return
+
+    original = getter()
+    try:
+        setter(True)
+        disable_conv_benchmark_empty_cache()
+        assert getter() is False
+        # Idempotent: a second call keeps it disabled without raising.
+        disable_conv_benchmark_empty_cache()
+        assert getter() is False
+    finally:
+        setter(original)
+
+
+class TestCudaStreamCaptureShim:
+    """NVIDIA's Windows ARM64 torch crashes in is_current_stream_capturing() without a device; the shim answers False
+    there and stays out of the way everywhere else."""
+
+    @staticmethod
+    def _cuda_build_without_device(monkeypatch) -> None:
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: True)
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+        # A fresh, unshimmed stand-in for torch's function (the shim may already be live in this process), raising
+        # as torch does without a device; monkeypatch restores whatever was there before.
+        def is_current_stream_capturing() -> bool:
+            raise RuntimeError("no CUDA device")
+
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", is_current_stream_capturing)
+
+    def test_answers_false_without_a_device_and_installs_once(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        shim = torch.cuda.is_current_stream_capturing
+        assert shim is not unshimmed, "the shim must replace the function"
+        assert shim() is False
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is shim, "a second install must not wrap the shim"
+
+    def test_leaves_torch_alone_where_cuda_works_or_is_absent(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        original = torch.cuda.is_current_stream_capturing
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", original)
+        monkeypatch.setattr(torch.version, "cuda", None)
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+    def test_leaves_torch_alone_off_windows_arm64(self, monkeypatch):
+        """Other CUDA builds raise without a device rather than crash; they keep torch's own function."""
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: False)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is unshimmed
+
+
+# ===== integrated GPUs on CUDA/ROCm =========================================
+
+
+def _cuda_properties(integrated_map: dict[int, bool | None]):
+    """A `torch.cuda.get_device_properties` stand-in; None leaves `is_integrated` off the properties."""
+
+    def get_device_properties(index):
+        index = index.index if isinstance(index, torch.device) else index
+        flag = integrated_map[index]
+        return SimpleNamespace() if flag is None else SimpleNamespace(is_integrated=int(flag))
+
+    return get_device_properties
+
+
+def _auto_cuda_devices(integrated_map: dict[int, bool | None]):
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        return TorchDevice.get_generation_devices("auto")
+
+
+def test_auto_excludes_the_ryzen_igpu_that_rocm_enumerates_next_to_a_radeon():
+    """Measured on Windows ROCm: an RX 9060 XT at index 0 and the Ryzen iGPU (gfx1036, `is_integrated=1`) at index 1.
+    `auto` must not give the iGPU half of the queue."""
+    assert _auto_cuda_devices({0: False, 1: True}) == [torch.device("cuda:0")]
+
+
+def test_auto_keeps_a_cuda_igpu_that_is_the_only_gpu():
+    assert _auto_cuda_devices({0: True}) == [torch.device("cuda:0")]
+
+
+def test_auto_keeps_cuda_devices_whose_properties_do_not_say():
+    assert _auto_cuda_devices({0: None, 1: None}) == [torch.device("cuda:0"), torch.device("cuda:1")]
+
+
+def test_device_is_integrated_is_unknown_when_the_properties_cannot_be_read():
+    with patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", side_effect=RuntimeError("no GPU")):
+        assert device_is_integrated(torch.device("cuda", 0)) is None
+
+
+@pytest.mark.parametrize(
+    ("integrated_map", "current", "expected"),
+    [
+        ({0: True, 1: False}, 0, torch.device("cuda", 1)),
+        ({0: False, 1: True}, 0, torch.device("cuda", 0)),
+        ({0: True}, 0, torch.device("cuda", 0)),
+        ({0: None, 1: False}, 0, torch.device("cuda", 0)),
+    ],
+    ids=["igpu-first", "discrete-first", "igpu-only", "unknown-stays"],
+)
+def test_auto_device_skips_an_igpu_enumerated_before_the_discrete_card(integrated_map, current, expected):
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.current_device", return_value=current),
+        patch("torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        assert TorchDevice.choose_torch_device() == expected
+
+
+def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch):
+    """The peer-aware wrapper on torch.cuda.empty_cache would defer a forced call again; it must reach torch."""
+    calls: list[str] = []
+
+    def original() -> None:
+        calls.append("torch")
+
+    def wrapper() -> None:
+        calls.append("deferred")
+
+    wrapper.__wrapped__ = original  # type: ignore[attr-defined]
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", wrapper)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(TorchDevice, "_another_generation_device_busy", classmethod(lambda cls: True))
+
+    assert TorchDevice.empty_cache() is EmptyCacheOutcome.DEFERRED
+    assert calls == []
+    assert TorchDevice.empty_cache(force=True) is EmptyCacheOutcome.RAN
+    assert calls == ["torch"]
+
+
+def _explicit_cuda_devices(integrated_map: dict[int, bool | None], requested: list[str], platform: str, hip):
+    with (
+        patch("invokeai.backend.util.devices.sys.platform", platform),
+        patch("invokeai.backend.util.devices.torch.version.hip", hip),
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        return TorchDevice.get_generation_devices(requested)
+
+
+def test_naming_the_igpu_beside_a_radeon_on_windows_rocm_is_refused():
+    """Every kernel on it crashed the process (Ryzen gfx1036 beside an RX 9060 XT); refuse it with a reason instead."""
+    with pytest.raises(ValueError, match="integrated GPU"):
+        _explicit_cuda_devices({0: True, 1: False}, ["cuda:0"], "win32", "7.15.26333")
+
+
+@pytest.mark.parametrize(
+    ("integrated_map", "requested", "platform", "hip"),
+    [
+        ({0: True, 1: False}, ["cuda:1"], "win32", "7.15.26333"),  # the discrete card
+        ({0: True}, ["cuda:0"], "win32", "7.15.26333"),  # an APU on its own
+        ({0: True, 1: False}, ["cuda:0"], "linux", "7.15.26333"),  # ROCm on Linux
+        ({0: True, 1: False}, ["cuda:0"], "win32", None),  # CUDA
+    ],
+    ids=["discrete", "apu-alone", "linux-rocm", "cuda"],
+)
+def test_an_explicit_device_is_kept_unless_it_is_that_igpu(integrated_map, requested, platform, hip):
+    assert _explicit_cuda_devices(integrated_map, requested, platform, hip) == [torch.device(requested[0])]
+
+
+# ===== choose_krea2_transformer_dtype ============
+
+
+@pytest.mark.parametrize("precision", ["auto", "float16", "bfloat16"])
+def test_choose_krea2_transformer_dtype_runs_gguf_on_mps_in_float32(monkeypatch, precision):
+    monkeypatch.setattr(get_config(), "precision", precision)
+    assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=True, device=torch.device("mps")) is torch.float32
+
+
+@pytest.mark.parametrize(("is_gguf", "device_type"), [(False, "mps"), (True, "cpu"), (True, "cuda"), (False, "cuda")])
+@pytest.mark.parametrize("precision", ["auto", "float16", "float32"])
+def test_choose_krea2_transformer_dtype_otherwise_ignores_precision(monkeypatch, is_gguf, device_type, precision):
+    """The loader and denoise both ask this; precision must not split them (Krea-2 text encoding ignores it too)."""
+    monkeypatch.setattr(get_config(), "precision", precision)
+    device = torch.device(device_type)
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16) as mock_safe:
+        assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=is_gguf, device=device) is torch.bfloat16
+    mock_safe.assert_called_once_with(device)
+
+
+class _CountingObserver:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def before_empty_cache(self) -> None:
+        self.calls.append("before")
+
+    def after_empty_cache(self, released: bool) -> None:
+        self.calls.append(f"after:{released}")
+
+
+@pytest.fixture
+def refusing_backend(monkeypatch):
+    """A CUDA backend whose release raises, and the observer that sees every release attempt."""
+    from invokeai.backend.util import devices as devices_module
+
+    class Backend:
+        calls = 0
+
+        def refuse(self) -> None:
+            self.calls += 1
+            raise torch.OutOfMemoryError("CUDA out of memory while releasing\nsecond line of detail")
+
+    backend = Backend()
+    backend.observer = _CountingObserver()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", backend.refuse)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "_xpu_is_available", lambda: False)
+    monkeypatch.setattr(devices_module, "EMPTY_CACHE_OBSERVERS", [backend.observer])
+    TorchDevice._empty_cache_deferred.clear()
+    return backend
+
+
+def test_empty_cache_the_backend_refuses_is_reported_as_refused(refusing_backend, caplog):
+    """An ordinary release is advisory: a device context that cannot return its cached blocks (or runs out of
+    memory doing so) must not fail the eviction, offload or Empty Cache request that asked for it."""
+    with caplog.at_level("WARNING"):
+        outcome = TorchDevice.empty_cache()
+
+    assert outcome is EmptyCacheOutcome.REFUSED
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after:False"]
+    assert not TorchDevice._empty_cache_deferred.is_set()
+    assert "CUDA out of memory while releasing" in caplog.text
+    assert "second line of detail" not in caplog.text
+
+
+def test_forced_empty_cache_the_backend_refuses_raises(refusing_backend):
+    """A forced caller cannot proceed as if the release ran (a short reserve hangs on Windows, a probe window would
+    record a baseline that still counts the blocks), so the refusal reaches it."""
+    with pytest.raises(torch.OutOfMemoryError, match="while releasing"):
+        TorchDevice.empty_cache(force=True)
+
+    assert refusing_backend.calls == 1
+    assert refusing_backend.observer.calls == ["before", "after:False"]

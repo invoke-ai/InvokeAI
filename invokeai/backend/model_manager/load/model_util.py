@@ -1,4 +1,3 @@
-# Copyright (c) 2024 The InvokeAI Development Team
 """Various utility functions needed by the loader and caching system."""
 
 import json
@@ -10,8 +9,9 @@ import onnxruntime as ort
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer
+from transformers import CLIPTokenizer, PreTrainedTokenizerBase, ProcessorMixin, T5Tokenizer
 
+from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
@@ -30,6 +30,9 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     # the models themselves.
     if isinstance(model, DiffusionPipeline):
         return _calc_pipeline_by_data(model)
+    elif isinstance(model, AnimaIPAdapter):
+        # Its bundled LoRA is held outside the module, where `calc_module_size` does not see it.
+        return calc_module_size(model) + model.lora_patch().calc_size()
     elif isinstance(model, torch.nn.Module):
         return calc_module_size(model)
     elif isinstance(model, IAIOnnxRuntimeModel):
@@ -74,6 +77,11 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         # Catch-all for other tokenizer types (e.g., Qwen2Tokenizer, Qwen3Tokenizer).
         # Tokenizers are small relative to models, so returning 0 is acceptable.
         return 0
+    elif isinstance(model, ProcessorMixin):
+        # Multimodal processors (e.g. Qwen3VLProcessor, loaded as the MiniMax H3 Processor
+        # submodel) bundle a tokenizer with image/video preprocessor configs - a few MB of
+        # non-tensor state, so 0 is acceptable like the tokenizers above.
+        return 0
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
         # supported model types.
@@ -113,7 +121,21 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         return model_path.stat().st_size
 
     if subfolder is not None:
-        model_path = model_path / subfolder
+        subfolder_path = model_path / subfolder
+        if subfolder_path.exists():
+            model_path = subfolder_path
+        elif (model_path / "config.json").is_file() and not (model_path / "model_index.json").is_file():
+            # Standalone single-component install: the loader reads the weights directly from the model
+            # root (a flat `config.json` + weights folder), not from a `<subfolder>/` dir — e.g. a
+            # mix-and-match Qwen3-VL / Z-Image Qwen3 / Wan T5 encoder, or a flat Wan VAE. Estimate from
+            # the root so the cache reserves the right amount before the cold load; otherwise it
+            # under-reserves to 0 and evicts nothing, spiking transient RAM (the transformer stays
+            # resident while the encoder is constructed). A real diffusers pipeline that merely lacks
+            # this subfolder (e.g. an undownloaded safety_checker) still has `model_index.json` at the
+            # root, so it keeps returning 0 below.
+            pass  # keep model_path at the root
+        else:
+            return 0
 
     # this can happen when, for example, the safety checker is not downloaded.
     if not model_path.exists():

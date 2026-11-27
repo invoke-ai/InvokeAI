@@ -1,0 +1,263 @@
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+
+import { Box, chakra, HStack, Text } from '@chakra-ui/react';
+import { Fragment, useCallback } from 'react';
+
+import { HIDDEN_SCROLLBAR_CSS, markHiddenEdges, SCROLL_EDGE_FADE_CSS, SCROLL_EDGE_FADE_PX } from './scrollStripEdges';
+import { Tooltip } from './Tooltip';
+import { wheelScrollsHorizontally } from './wheelScrollsHorizontally';
+
+const TAB_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
+const TAB_SHOWN_BG = 'gray.hoverTint/15';
+const TAB_DISABLED_PROPS = { layerStyle: 'disabled' } as const;
+// Inset: the tablist clips at the tabs' own height, so an outside ring would be cut off.
+const TAB_FOCUS_VISIBLE_PROPS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' } as const;
+const ENABLED_TAB = '[role="tab"]:not([aria-disabled="true"])';
+// This raw hover selector must skip `aria-disabled` tabs, as the theme's `_hover` condition does.
+const TABLIST_CSS = {
+  [`& > ${ENABLED_TAB}:hover + [data-segment-divider], & > [data-segment-divider]:has(+ ${ENABLED_TAB}:hover)`]: {
+    opacity: 0,
+  },
+};
+const SCROLLING_TABLIST_CSS = { ...TABLIST_CSS, ...HIDDEN_SCROLLBAR_CSS, ...SCROLL_EDGE_FADE_CSS };
+
+const attachScrollingTablist = (element: HTMLElement | null) => {
+  if (!element) {
+    return;
+  }
+  const releaseWheel = wheelScrollsHorizontally(element);
+  const releaseEdges = markHiddenEdges(element);
+
+  return () => {
+    if (typeof releaseWheel === 'function') {
+      releaseWheel();
+    }
+    if (typeof releaseEdges === 'function') {
+      releaseEdges();
+    }
+  };
+};
+
+/** The strip's fixed height; collapsed blocks and drag snaps size against it. */
+export const SEGMENT_TABS_HEIGHT_PX = 40;
+
+export interface SegmentTab<T extends string = string> {
+  id: T;
+  label: ReactNode;
+  /** The tab's name when its label is an icon; it is also shown as the tab's tooltip. */
+  ariaLabel?: string;
+  disabled?: boolean;
+}
+
+const isTabEnabled = (tab: HTMLElement): boolean => tab.getAttribute('aria-disabled') !== 'true';
+
+/** Focus scrolling cannot be relied on: a pointer press does not focus a button in every browser. */
+const revealInStrip = (tab: HTMLElement): void => {
+  const strip = tab.closest<HTMLElement>('[role="tablist"]');
+  if (!strip || strip.scrollWidth <= strip.clientWidth) {
+    return;
+  }
+  const bounds = strip.getBoundingClientRect();
+  const rect = tab.getBoundingClientRect();
+  const left = bounds.left + SCROLL_EDGE_FADE_PX;
+  const right = bounds.right - SCROLL_EDGE_FADE_PX;
+  if (rect.left < left) {
+    strip.scrollLeft -= left - rect.left;
+  } else if (rect.right > right) {
+    strip.scrollLeft += rect.right - right;
+  }
+};
+
+const revealSelectedTab = (tab: HTMLElement | null): void => {
+  if (tab) {
+    revealInStrip(tab);
+  }
+};
+
+/** A focused disabled tab still steps to its enabled neighbours; focus never scrolls the strip's ancestors. */
+const focusSibling = (event: ReactKeyboardEvent<HTMLElement>, isScrollable: boolean) => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {
+    return;
+  }
+  const tabs = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')];
+  const current = tabs.indexOf(document.activeElement as HTMLElement);
+  if (current === -1) {
+    return;
+  }
+  event.preventDefault();
+  const enabled = tabs.filter(isTabEnabled);
+  let next: HTMLElement | undefined;
+  if (event.key === 'Home') {
+    next = enabled[0];
+  } else if (event.key === 'End') {
+    next = enabled.at(-1);
+  } else {
+    const step = event.key === 'ArrowRight' ? 1 : tabs.length - 1;
+    for (let offset = 1; offset < tabs.length && !next; offset += 1) {
+      const candidate = tabs[(current + step * offset) % tabs.length]!;
+      next = isTabEnabled(candidate) ? candidate : undefined;
+    }
+  }
+  if (!next) {
+    return;
+  }
+  if (isScrollable) {
+    next.focus({ preventScroll: true });
+    revealInStrip(next);
+  } else {
+    next.focus();
+  }
+};
+
+const focusSiblingInScrollingStrip = (event: ReactKeyboardEvent<HTMLElement>) => focusSibling(event, true);
+const focusSiblingInStrip = (event: ReactKeyboardEvent<HTMLElement>) => focusSibling(event, false);
+
+/** Wire caller-owned panels with segmentTabsPanelId/segmentTabsTabId; showActivePanel=false keeps selection. */
+export const SegmentTabs = <T extends string>({
+  activeId,
+  ariaLabel,
+  idBase,
+  isCompact = false,
+  isScrollable = false,
+  onSelect,
+  showActivePanel = true,
+  tabs,
+  trailing,
+}: {
+  activeId: T;
+  ariaLabel: string;
+  idBase: string;
+  isCompact?: boolean;
+  /** Tabs keep full labels and the strip scrolls sideways; a vertical wheel scrolls it and a hiding end fades. */
+  isScrollable?: boolean;
+  onSelect: (id: T) => void;
+  showActivePanel?: boolean;
+  tabs: readonly SegmentTab<T>[];
+  trailing?: ReactNode;
+}) => (
+  <HStack
+    align="center"
+    flexShrink={0}
+    gap="0.5"
+    h={isCompact ? '8' : `${SEGMENT_TABS_HEIGHT_PX}px`}
+    minW="0"
+    px={isCompact ? '0' : '1.5'}
+  >
+    <HStack
+      aria-label={ariaLabel}
+      aria-orientation="horizontal"
+      ref={isScrollable ? attachScrollingTablist : undefined}
+      css={isScrollable ? SCROLLING_TABLIST_CSS : TABLIST_CSS}
+      flex="1"
+      gap="0.5"
+      minW="0"
+      overflowX={isScrollable ? 'auto' : 'hidden'}
+      overflowY="hidden"
+      role="tablist"
+      onKeyDown={isScrollable ? focusSiblingInScrollingStrip : focusSiblingInStrip}
+    >
+      {tabs.map((tab, index) => (
+        <Fragment key={tab.id}>
+          {index > 0 ? (
+            <Box
+              aria-hidden
+              bg="border.emphasized"
+              data-segment-divider=""
+              flexShrink={0}
+              h="3.5"
+              opacity={showActivePanel && (tab.id === activeId || tabs[index - 1]!.id === activeId) ? 0 : 1}
+              rounded="full"
+              transition="opacity var(--wb-motion-duration-fast)"
+              w="1px"
+            />
+          ) : null}
+          <SegmentTabButton
+            ariaLabel={tab.ariaLabel}
+            disabled={tab.disabled ?? false}
+            id={tab.id}
+            idBase={idBase}
+            isScrollable={isScrollable}
+            isSelected={tab.id === activeId}
+            isShown={tab.id === activeId && showActivePanel}
+            label={tab.label}
+            onSelect={onSelect}
+          />
+        </Fragment>
+      ))}
+    </HStack>
+    {trailing}
+  </HStack>
+);
+
+export const segmentTabsPanelId = (idBase: string): string => `${idBase}-panel`;
+export const segmentTabsTabId = (idBase: string, tabId: string): string => `${idBase}-tab-${tabId}`;
+
+const SegmentTabButton = <T extends string>({
+  ariaLabel,
+  disabled,
+  id,
+  idBase,
+  isScrollable,
+  isSelected,
+  isShown,
+  label,
+  onSelect,
+}: {
+  ariaLabel?: string;
+  disabled: boolean;
+  id: T;
+  idBase: string;
+  isScrollable: boolean;
+  isSelected: boolean;
+  /** Selected AND its panel is visible; a collapsed block keeps selection without the shown look. */
+  isShown: boolean;
+  label: ReactNode;
+  onSelect: (id: T) => void;
+}) => {
+  const select = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      // A click on the already selected tab does not move selection, so the selected tab's ref cannot reveal it.
+      if (isScrollable) {
+        revealInStrip(event.currentTarget);
+      }
+      onSelect(id);
+    },
+    [id, isScrollable, onSelect]
+  );
+
+  const button = (
+    <chakra.button
+      ref={isScrollable && isSelected ? revealSelectedTab : undefined}
+      aria-controls={isShown ? segmentTabsPanelId(idBase) : undefined}
+      // Not native `disabled`: a selected tab with nothing to show keeps the tablist reachable.
+      aria-disabled={disabled || undefined}
+      aria-label={ariaLabel}
+      aria-selected={isSelected}
+      bg={isShown ? TAB_SHOWN_BG : 'transparent'}
+      color={isShown ? 'fg' : 'fg.muted'}
+      fontSize="md"
+      flexShrink={isScrollable ? 0 : undefined}
+      fontWeight="medium"
+      h="7"
+      id={segmentTabsTabId(idBase, id)}
+      minW="10"
+      overflow="hidden"
+      px="2.5"
+      role="tab"
+      rounded="control"
+      tabIndex={isSelected ? 0 : -1}
+      transition="background var(--wb-motion-duration-fast), color var(--wb-motion-duration-fast)"
+      type="button"
+      _disabled={TAB_DISABLED_PROPS}
+      _focusVisible={TAB_FOCUS_VISIBLE_PROPS}
+      _hover={isShown ? undefined : TAB_HOVER_PROPS}
+      onClick={disabled ? undefined : select}
+    >
+      <Text as="span" truncate>
+        {label}
+      </Text>
+    </chakra.button>
+  );
+
+  return ariaLabel ? <Tooltip content={ariaLabel}>{button}</Tooltip> : button;
+};

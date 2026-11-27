@@ -8,7 +8,9 @@ from typing_extensions import Any
 
 from invokeai.backend.model_manager.configs.base import Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    NotAMatchError,
     common_config_paths,
+    get_config_dict_or_raise,
     raise_for_class_name,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -35,11 +37,12 @@ class SigLIP_Diffusers_Config(Diffusers_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        raise_for_class_name(
-            common_config_paths(mod.path),
-            {
-                "SiglipModel",
-            },
-        )
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+        if "_class_name" in config or "architectures" in config:
+            raise_for_class_name(config, {"SiglipModel"})
+        # SigLIP2's fixed-resolution checkpoints (e.g. google/siglip2-base-patch16-512) name no class, only the
+        # model type; the vision tower is what the loader builds.
+        elif config.get("model_type") != "siglip" or not isinstance(config.get("vision_config"), dict):
+            raise NotAMatchError("config is not a SigLIP model config")
 
         return cls(**override_fields)

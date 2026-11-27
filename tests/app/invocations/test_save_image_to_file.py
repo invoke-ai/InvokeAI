@@ -124,6 +124,7 @@ class TestSaveImageToFileInvocation:
 
         with pytest.raises(ValueError, match="[Aa]bsolute"):
             node.invoke(ctx)
+        ctx.images.save.assert_not_called()
 
     @pytest.mark.parametrize(
         "traversal_path",
@@ -140,6 +141,41 @@ class TestSaveImageToFileInvocation:
 
         with pytest.raises(ValueError):
             node.invoke(ctx)
+        ctx.images.save.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "field, make_value",
+        [
+            ("prefix", lambda outside: f"{outside}/"),
+            ("prefix", lambda outside: "../escaped_"),
+            ("suffix", lambda outside: "/../../escaped"),
+            ("suffix", lambda outside: "\\..\\escaped"),
+        ],
+    )
+    def test_filename_affixes_cannot_escape_target_dir(self, tmp_path, field, make_value):
+        outputs = tmp_path / "outputs"
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        img = Image.new("RGB", (8, 8))
+        ctx = _make_context(outputs, img)
+        node = _build_node(**{field: make_value(outside)})
+
+        with pytest.raises(ValueError, match="plain filename"):
+            node.invoke(ctx)
+
+        assert not any(outside.iterdir())
+        assert not any(p.is_file() for p in tmp_path.iterdir())
+        ctx.images.save.assert_not_called()
+
+    def test_output_directory_naming_a_file_saves_nothing(self, tmp_path):
+        (tmp_path / "taken").write_text("not a directory")
+        img = Image.new("RGB", (8, 8))
+        ctx = _make_context(tmp_path, img)
+        node = _build_node(output_directory="taken")
+
+        with pytest.raises(OSError):
+            node.invoke(ctx)
+        ctx.images.save.assert_not_called()
 
     def test_png_format(self, tmp_path):
         img = Image.new("RGBA", (8, 8), (10, 20, 30, 128))

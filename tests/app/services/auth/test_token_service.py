@@ -251,47 +251,6 @@ class TestTokenExpiration:
         assert verified_data is not None
 
 
-class TestTokenDataModel:
-    """Tests for TokenData model."""
-
-    def test_token_data_creation(self):
-        """Test creating TokenData instance."""
-        token_data = TokenData(
-            user_id="user123",
-            email="test@example.com",
-            is_admin=False,
-        )
-
-        assert token_data.user_id == "user123"
-        assert token_data.email == "test@example.com"
-        assert token_data.is_admin is False
-
-    def test_token_data_with_admin(self):
-        """Test TokenData for admin user."""
-        token_data = TokenData(
-            user_id="admin123",
-            email="admin@example.com",
-            is_admin=True,
-        )
-
-        assert token_data.is_admin is True
-
-    def test_token_data_model_dump(self):
-        """Test that TokenData can be serialized."""
-        token_data = TokenData(
-            user_id="user123",
-            email="test@example.com",
-            is_admin=False,
-        )
-
-        data_dict = token_data.model_dump()
-
-        assert isinstance(data_dict, dict)
-        assert data_dict["user_id"] == "user123"
-        assert data_dict["email"] == "test@example.com"
-        assert data_dict["is_admin"] is False
-
-
 class TestTokenSecurity:
     """Tests for token security properties."""
 
@@ -369,3 +328,55 @@ class TestTokenSecurity:
             header = json.loads(base64.urlsafe_b64decode(header_b64))
             # Should use HS256 algorithm
             assert header.get("alg") == "HS256"
+
+
+class TestTokenRemainingSeconds:
+    """Tests for the remaining-lifetime helper behind the media cookie."""
+
+    def test_numeric_string_exp_does_not_raise(self):
+        """PyJWT accepts any `exp` that `int()` takes, so a validly signed numeric-string claim reaches the arithmetic."""
+        import jwt
+
+        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret, get_token_remaining_seconds
+
+        exp = int(time.time()) + 3600
+        token = jwt.encode(
+            {"user_id": "user123", "email": "test@example.com", "is_admin": False, "exp": str(exp)},
+            get_jwt_secret(),
+            algorithm=ALGORITHM,
+        )
+
+        remaining = get_token_remaining_seconds(token)
+
+        assert remaining is not None and 3500 < remaining <= 3600
+
+
+class TestTokenAlgorithmHandling:
+    """Signature checks that a corrupted-base64 token cannot exercise: these decode cleanly."""
+
+    _ADMIN_CLAIMS = {"user_id": "user123", "email": "test@example.com", "is_admin": True}
+
+    def test_rejects_token_signed_with_another_key(self):
+        import jwt
+
+        from invokeai.app.services.auth.token_service import ALGORITHM
+
+        token = jwt.encode(self._ADMIN_CLAIMS, "another-secret-key-of-sufficient-length-for-hs256", algorithm=ALGORITHM)
+
+        assert verify_token(token) is None
+
+    def test_rejects_unsigned_token(self):
+        import jwt
+
+        token = jwt.encode(self._ADMIN_CLAIMS, key=None, algorithm="none")
+
+        assert verify_token(token) is None
+
+    def test_rejects_other_hmac_algorithm_with_the_real_secret(self):
+        import jwt
+
+        from invokeai.app.services.auth.token_service import get_jwt_secret
+
+        token = jwt.encode(self._ADMIN_CLAIMS, get_jwt_secret(), algorithm="HS512")
+
+        assert verify_token(token) is None

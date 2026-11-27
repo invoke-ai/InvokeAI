@@ -9,7 +9,11 @@ from typing import Any
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.invoker import Invoker
 
 
@@ -21,6 +25,21 @@ def _save_image(mock_invoker: Invoker, image_name: str, user_id: str) -> None:
         width=10,
         height=10,
         has_workflow=False,
+        user_id=user_id,
+    )
+
+
+def _save_video(mock_invoker: Invoker, video_name: str, user_id: str) -> None:
+    mock_invoker.services.video_records.save(
+        video_name=video_name,
+        video_origin=ResourceOrigin.INTERNAL,
+        video_category=ImageCategory.GENERAL,
+        width=10,
+        height=10,
+        duration=1.0,
+        fps=8.0,
+        has_workflow=False,
+        is_intermediate=False,
         user_id=user_id,
     )
 
@@ -79,3 +98,107 @@ def test_admin_sees_all_dates(
     assert r.status_code == status.HTTP_200_OK
     total = sum(b.get("image_count", 0) for b in r.json())
     assert total >= 2  # admin sees images from both users
+
+
+def test_item_names_by_date_requires_auth(enable_multiuser: Any, client: TestClient):
+    r = client.get("/api/v1/virtual_boards/by_date/2026-05-18/item_names")
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_video_only_date_appears_as_virtual_board(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """A date containing only videos must still surface as a virtual board (video_count > 0)."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_video(mock_invoker, "u1-vid-only.mp4", user1.user_id)
+
+    r = client.get(
+        "/api/v1/virtual_boards/by_date",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    boards = r.json()
+    assert len(boards) == 1
+    assert boards[0]["image_count"] == 0
+    assert boards[0]["video_count"] == 1
+    assert boards[0]["cover_video_name"] == "u1-vid-only.mp4"
+    assert boards[0]["cover_image_name"] is None
+
+
+def test_item_names_by_date_returns_video_refs(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """Selecting a virtual date must return polymorphic refs — videos included, per-user filtered."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-mixed.png", user1.user_id)
+    _save_video(mock_invoker, "u1-mixed.mp4", user1.user_id)
+
+    r = client.get(
+        "/api/v1/virtual_boards/by_date",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    date = r.json()[0]["date"]
+
+    r = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    refs = {(item["kind"], item["name"]) for item in body["items"]}
+    assert refs == {("image", "u1-mixed.png"), ("video", "u1-mixed.mp4")}
+    assert body["total_count"] == 2
+
+
+def test_item_names_by_date_forwards_starred_filter(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """`starred` narrows a date board to starred or unstarred items and reports the narrowed total."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-starred.png", user1.user_id)
+    _save_image(mock_invoker, "u1-plain.png", user1.user_id)
+    mock_invoker.services.image_records.update("u1-starred.png", ImageRecordChanges(starred=True))
+
+    headers = {"Authorization": f"Bearer {user1_token}"}
+    date = client.get("/api/v1/virtual_boards/by_date", headers=headers).json()[0]["date"]
+
+    starred = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"starred": "true"}, headers=headers
+    )
+    unstarred = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"starred": "false"}, headers=headers
+    )
+
+    assert starred.status_code == status.HTTP_200_OK
+    assert [item["name"] for item in starred.json()["items"]] == ["u1-starred.png"]
+    assert starred.json()["total_count"] == 1
+    assert unstarred.status_code == status.HTTP_200_OK
+    assert [item["name"] for item in unstarred.json()["items"]] == ["u1-plain.png"]
+    assert unstarred.json()["total_count"] == 1
+
+
+def test_item_names_by_date_forwards_media_kind(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """`media_kind` narrows a date board to one kind and reports the narrowed total."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-kind.png", user1.user_id)
+    _save_video(mock_invoker, "u1-kind.mp4", user1.user_id)
+
+    headers = {"Authorization": f"Bearer {user1_token}"}
+    date = client.get("/api/v1/virtual_boards/by_date", headers=headers).json()[0]["date"]
+
+    videos = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"media_kind": "video"}, headers=headers
+    )
+    images = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"media_kind": "image"}, headers=headers
+    )
+
+    assert videos.status_code == status.HTTP_200_OK
+    assert [(item["kind"], item["name"]) for item in videos.json()["items"]] == [("video", "u1-kind.mp4")]
+    assert videos.json()["total_count"] == 1
+    assert images.status_code == status.HTTP_200_OK
+    assert [(item["kind"], item["name"]) for item in images.json()["items"]] == [("image", "u1-kind.png")]
+    assert images.json()["total_count"] == 1

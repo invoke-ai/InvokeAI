@@ -1,0 +1,33 @@
+import type { ReactNode } from 'react';
+
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+import { createExternalStore } from '@platform/state/externalStore';
+
+export interface QueueConfirmation {
+  body: ReactNode;
+  /** The way out, named for what it keeps ("Keep running"), so it never reads like the action it declines. */
+  cancelLabel: string;
+  confirmLabel: string;
+  onConfirm: () => Promise<void> | void;
+  title: string;
+}
+
+const queueConfirmationStore = createExternalStore<{ confirmation: QueueConfirmation | null }>({ confirmation: null });
+
+export const requestQueueConfirmation = (confirmation: QueueConfirmation): void => {
+  queueConfirmationStore.setSnapshot({ confirmation });
+};
+
+export const clearQueueConfirmation = (): void => {
+  queueConfirmationStore.setSnapshot({ confirmation: null });
+};
+
+registerAccountOwnedResource({
+  clear: clearQueueConfirmation,
+  name: 'queue-confirmation',
+});
+
+export const getQueueConfirmation = (): QueueConfirmation | null => queueConfirmationStore.getSnapshot().confirmation;
+
+export const useQueueConfirmation = (): QueueConfirmation | null =>
+  queueConfirmationStore.useSelector((snapshot) => snapshot.confirmation, Object.is);

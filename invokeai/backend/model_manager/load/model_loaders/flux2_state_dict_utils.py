@@ -14,8 +14,14 @@ Based on the diffusers `convert_flux2_to_diffusers.py` key mappings.
 """
 
 import re
+from typing import Any
 
 import torch
+
+from invokeai.backend.quantization.fp8_scaled import (
+    QKV_SPLIT_SIDECHANNEL_SUFFIXES,
+    split_qkv_sidechannel,
+)
 
 
 def _flux2_chunk_tensor(tensor, chunks: int):
@@ -52,11 +58,16 @@ def _flux2_swap_scale_shift(weight):
     return torch.cat([scale, shift], dim=0)
 
 
-def _convert_flux2_double_block_key(key: str, tensor, converted: dict) -> str | None:
+def _convert_flux2_double_block_key(
+    key: str, tensor, converted: dict, *, destinations: list[str] | None = None
+) -> str | None:
     """Convert a `double_blocks.X.*` key to `transformer_blocks.X.*` format.
 
     Returns the new key, or None if the key was consumed by writing directly into
-    `converted` (fused QKV split into separate projections).
+    `converted` (fused QKV split into separate projections). ``destinations``, when given, collects
+    the keys written that way, and only those: a split this function *declines* to perform -- a
+    fused qkv whose rows are not divisible by three -- leaves it empty and reports the unchanged key
+    through the return value instead, which is what the caller records.
     """
     parts = key.split(".")
     block_idx = parts[1]
@@ -68,18 +79,28 @@ def _convert_flux2_double_block_key(key: str, tensor, converted: dict) -> str | 
     if "img_attn.qkv.weight" in rest:
         if _flux2_malformed_for_chunk(tensor, 3):
             return key
-        q, k, v = _flux2_chunk_tensor(tensor, 3)
-        converted[f"{prefix}.attn.to_q.weight"] = q
-        converted[f"{prefix}.attn.to_k.weight"] = k
-        converted[f"{prefix}.attn.to_v.weight"] = v
+        targets = [
+            f"{prefix}.attn.to_q.weight",
+            f"{prefix}.attn.to_k.weight",
+            f"{prefix}.attn.to_v.weight",
+        ]
+        for target, part in zip(targets, _flux2_chunk_tensor(tensor, 3), strict=True):
+            converted[target] = part
+        if destinations is not None:
+            destinations.extend(targets)
         return None
     elif "txt_attn.qkv.weight" in rest:
         if _flux2_malformed_for_chunk(tensor, 3):
             return key
-        q, k, v = _flux2_chunk_tensor(tensor, 3)
-        converted[f"{prefix}.attn.add_q_proj.weight"] = q
-        converted[f"{prefix}.attn.add_k_proj.weight"] = k
-        converted[f"{prefix}.attn.add_v_proj.weight"] = v
+        targets = [
+            f"{prefix}.attn.add_q_proj.weight",
+            f"{prefix}.attn.add_k_proj.weight",
+            f"{prefix}.attn.add_v_proj.weight",
+        ]
+        for target, part in zip(targets, _flux2_chunk_tensor(tensor, 3), strict=True):
+            converted[target] = part
+        if destinations is not None:
+            destinations.extend(targets)
         return None
 
     # Attention output projection
@@ -134,8 +155,21 @@ def _convert_flux2_single_block_key(key: str, tensor, converted: dict) -> str | 
     return key
 
 
-def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
-    """Convert a FLUX.2 transformer BFL-format state dict to diffusers format."""
+def _convert_flux2_weight_keys(sd: dict, *, key_map: dict[str, list[str]] | None = None) -> dict:
+    """Convert the *weight* keys of a FLUX.2 BFL state dict to diffusers format.
+
+    Quantization side-channel keys must not be routed through here. The block renames below are
+    substring tests, so `img_attn.proj.weight_scale` satisfies `"img_attn.proj.weight" in rest`
+    and would be written to the weight's destination key -- overwriting the weight with its own
+    scale. `convert_flux2_bfl_to_diffusers` keeps them out and places them separately.
+
+    ``key_map``, when given, records where each source key went: one destination for a rename, three
+    for a fused ``qkv`` that was split, and the source key itself for one that was *not*. That record
+    is what places the side channel. Asking a probe where a layer would go cannot see the
+    shape-dependent branches: it answered "three destinations" for a fused weight the converter had
+    left alone, so the scale was split three ways onto modules that did not exist while the weight
+    kept none.
+    """
     converted: dict = {}
 
     # Basic key renames
@@ -155,6 +189,7 @@ def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
 
     for old_key, tensor in sd.items():
         new_key = old_key
+        split_destinations: list[str] = []
 
         # Apply basic renames
         if old_key in key_renames:
@@ -164,21 +199,27 @@ def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
             if old_key == "final_layer.adaLN_modulation.1.weight":
                 tensor = _flux2_swap_scale_shift(tensor)
             converted[new_key] = tensor
+            if key_map is not None:
+                key_map[old_key] = [new_key]
             continue
 
         # Convert double_blocks.X.* to transformer_blocks.X.*
         if old_key.startswith("double_blocks."):
-            new_key = _convert_flux2_double_block_key(old_key, tensor, converted)
-            if new_key is None:
-                continue  # Key was handled specially
+            new_key = _convert_flux2_double_block_key(old_key, tensor, converted, destinations=split_destinations)
         # Convert single_blocks.X.* to single_transformer_blocks.X.*
         elif old_key.startswith("single_blocks."):
             new_key = _convert_flux2_single_block_key(old_key, tensor, converted)
-            if new_key is None:
-                continue  # Key was handled specially
+
+        if new_key is None:
+            # The helper wrote into `converted` itself, and recorded where.
+            if key_map is not None:
+                key_map[old_key] = split_destinations
+            continue
 
         if new_key != old_key or new_key not in converted:
             converted[new_key] = tensor
+        if key_map is not None:
+            key_map[old_key] = [new_key]
 
     return converted
 
@@ -322,5 +363,97 @@ def convert_flux2_vae_bfl_to_diffusers(sd: dict) -> dict:
 
         # Keep other keys as-is (like encoder.conv_in, decoder.conv_in, decoder.conv_out, bn.*)
         converted[new_key] = tensor
+
+    return converted
+
+
+def _flux2_sidechannel_parts(key: Any) -> tuple[str, str] | None:
+    """Split ``<module path>.<suffix>`` for a quantization side-channel key, else None."""
+    if not isinstance(key, str):
+        return None
+    for suffix in QKV_SPLIT_SIDECHANNEL_SUFFIXES:
+        if key.endswith(f".{suffix}"):
+            return key[: -len(suffix) - 1], suffix
+    return None
+
+
+# Converter transforms that reorder weight *rows*. A per-output-channel weight scale has one entry
+# per row, so it has to be reordered identically or every row ends up scaled by another row's
+# factor. The fused-QKV split is handled separately (`split_qkv_sidechannel`); this is the only
+# other row-reordering transform the converter applies.
+_ROW_PERMUTED_BY_CONVERSION = {"final_layer.adaLN_modulation.1"}
+
+
+def _mirror_row_permutation(base: str, suffix: str, value: Any) -> Any:
+    """Apply the converter's row reordering to a per-output-channel weight scale.
+
+    Only weight scales carry per-row structure: the activation scale is per-tensor and the
+    `comfy_quant` marker is a byte blob, both of which describe the whole layer and must be copied
+    verbatim. A per-tensor weight scale is likewise unaffected.
+    """
+    if base not in _ROW_PERMUTED_BY_CONVERSION or suffix not in ("weight_scale", "scale_weight"):
+        return value
+    tensor = torch.as_tensor(value) if hasattr(value, "shape") else value
+    if not hasattr(tensor, "shape") or tensor.dim() < 1 or tensor.numel() <= 1 or tensor.shape[0] % 2 != 0:
+        return value
+    return _flux2_swap_scale_shift(tensor)
+
+
+def convert_flux2_bfl_to_diffusers(sd: dict, *, module_map: dict[str, list[str]] | None = None) -> dict:
+    """Convert a FLUX.2 transformer BFL-format state dict to diffusers format.
+
+    Quantization scales and markers are carried to wherever their weight landed. Doing that is not
+    optional for a scaled-fp8 checkpoint: a scale left on the fused ``qkv`` path is keyed on a
+    module the diffusers model does not have, so `attach_fp8_scales` finds nothing and the three
+    split weights stay quantized but *unscaled* -- off by 1/weight_scale, with nothing logged.
+
+    ``module_map``, when given, receives the record the placement uses: each source module to the
+    module(s) its weight became. Callers with something else to re-key in the checkpoint's own scheme
+    -- the header's per-layer hints and its int8 markers -- read it, rather than asking a probe what
+    the rename *would* do, which cannot see the branches that depend on the tensor. It is updated,
+    not adopted, so a caller that reuses a dict cannot end up with two records interleaved.
+
+    A module named only in the header and absent from the file gets no entry, and the caller keeps
+    the name as it stands. What happens then is the caller's business and differs: the fp8
+    extraction ignores a hint that names no layer, while the int8 swap refuses the checkpoint by name
+    ("is marked int8_tensorwise but is missing its weight"). Both predate this record.
+    """
+    weights = {k: v for k, v in sd.items() if _flux2_sidechannel_parts(k) is None}
+    key_map: dict[str, list[str]] = {}
+    converted = _convert_flux2_weight_keys(weights, key_map=key_map)
+
+    # The conversion records where each *key* went; a side channel is keyed on the *module*. Read the
+    # module off whatever the source key was rather than assuming it was `<module>.weight`: BFL
+    # stores a norm's parameter as `.scale`, and this converter accepts both spellings. (The probe
+    # this replaces got that right; a first draft of this map looked the destination up under
+    # `<base>.weight` and would have left every such scale behind. Caught in review, not shipped.)
+    #
+    # Only a destination ending `.weight` names a module a scale can sit beside. A `.bias` is not
+    # renamed by this converter at all, so without the filter it contributes the module a second
+    # time and the side channel is taken for a fused-qkv split.
+    modules: dict[str, list[str]] = {}
+    for source, moved_to in key_map.items():
+        stem = source.rsplit(".", 1)[0] if "." in source else source
+        landed = [target[: -len(".weight")] for target in moved_to if target.endswith(".weight")]
+        if landed:
+            modules.setdefault(stem, []).extend(landed)
+    if module_map is not None:
+        module_map.update(modules)
+
+    for key, value in sd.items():
+        parts = _flux2_sidechannel_parts(key)
+        if parts is None:
+            continue
+        base, suffix = parts
+        destinations = modules.get(base, [])
+        if not destinations:
+            # Unknown layer: keep the key as it is. `extract_fp8_scaled_layers` drops a scale with
+            # no matching fp8 weight, which is the safe outcome -- better than guessing a target.
+            converted[key] = value
+        elif len(destinations) == 1:
+            converted[f"{destinations[0]}.{suffix}"] = _mirror_row_permutation(base, suffix, value)
+        else:
+            for destination, part in zip(destinations, split_qkv_sidechannel(key, value), strict=True):
+                converted[f"{destination}.{suffix}"] = part
 
     return converted

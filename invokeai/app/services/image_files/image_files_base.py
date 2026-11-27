@@ -1,5 +1,6 @@
 import io
 from abc import ABC, abstractmethod
+from collections.abc import Collection, Iterator, Sequence
 from pathlib import Path
 from typing import BinaryIO, Optional
 
@@ -22,6 +23,16 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         """Gets the internal path to an image or thumbnail."""
+        pass
+
+    @abstractmethod
+    def iter_image_paths(self) -> Iterator[Path]:
+        """Yields supported image paths in stable order, excluding reserved trees and symlinks."""
+        pass
+
+    @abstractmethod
+    def iter_thumbnail_paths(self) -> Iterator[Path]:
+        """Yields thumbnail paths in stable order, excluding reserved trees and symlinks."""
         pass
 
     @property
@@ -77,13 +88,76 @@ class ImageFileStorageBase(ABC):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass
 
     @abstractmethod
+    def generate_thumbnail_if_missing(
+        self, image_name: str, image_subfolder: str = "", thumbnail_size: int = 256
+    ) -> bool:
+        """Atomically creates a thumbnail only when absent, without rewriting the source image."""
+        pass
+
+    @abstractmethod
+    def copy(
+        self,
+        source_image_name: str,
+        image_name: str,
+        source_subfolder: str = "",
+        image_subfolder: str = "",
+        thumbnail_size: int = 256,
+    ) -> None:
+        """Duplicates an existing image's file and thumbnail under a new name.
+
+        A byte-level copy, not a re-encode: every PNG chunk travels, including ones this
+        application does not parse, and no pixels are decoded.
+        """
+        pass
+
+    @abstractmethod
+    def get_file_size_bytes(self, image_name: str, image_subfolder: str = "") -> Optional[int]:
+        """Bytes the image and its thumbnail occupy; None when the full-size file is missing."""
+        pass
+
+    @abstractmethod
     def delete(self, image_name: str, image_subfolder: str = "") -> None:
         """Deletes an image and its thumbnail (if one exists)."""
+        pass
+
+    @abstractmethod
+    def stage_delete(self, image_name: str, image_subfolder: str = "") -> object:
+        """Moves an image's files out of service and returns a rollback token."""
+        pass
+
+    @abstractmethod
+    def begin_delete(self, images: Sequence[tuple[str, str]]) -> object:
+        """Durably records the intent to purge the (image_name, image_subfolder) pairs' files.
+
+        Call this before deleting the records, then ``commit_delete()`` after. If the process dies
+        in between, startup recovery uses the journal to purge the files of every listed image
+        whose record is gone, and leaves the files of every image whose record survives.
+        """
+        pass
+
+    @abstractmethod
+    def commit_delete(self, token: object, image_names: Optional[Collection[str]] = None) -> None:
+        """Permanently removes the files represented by a delete token.
+
+        ``image_names`` narrows a pending-delete token to the records that were actually deleted;
+        it is ignored for a staged-delete token.
+        """
+        pass
+
+    @abstractmethod
+    def abandon_delete(self, token: object) -> None:
+        """Drops a pending-delete journal without purging anything, leaving the files in place."""
+        pass
+
+    @abstractmethod
+    def rollback_delete(self, token: object) -> None:
+        """Restores files represented by a staged-delete token."""
         pass
 
     @abstractmethod
@@ -94,4 +168,9 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def get_graph(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
         """Gets the graph of an image."""
+        pass
+
+    @abstractmethod
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
+        """Gets the per-image resolved-input Graph JSON, when present."""
         pass

@@ -1,16 +1,20 @@
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
+    ensure_fonts_dir,
     get_config,
     load_and_migrate_config,
+    load_config_from_root,
 )
 from invokeai.app.services.shared.graph import Graph
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -80,6 +84,100 @@ def test_path_resolution_root_not_set(patch_rootdir: None):
     assert config.root_path == expected_root
 
 
+def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    assert InvokeAIAppConfig().wan_memory_optimization is False
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\nwan_memory_optimization: true\n')
+
+    assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
+
+
+@pytest.mark.parametrize(("yaml_line", "expected"), [("", True), ("multiuser: false\n", False)])
+def test_sign_in_is_required_unless_single_user_mode_is_set_explicitly(
+    tmp_path: Path, patch_rootdir: None, yaml_line: str, expected: bool
+) -> None:
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\n{yaml_line}')
+
+    assert load_and_migrate_config(temp_config_file).multiuser is expected
+
+
+@pytest.mark.parametrize(
+    ("yaml_value", "expected"),
+    [("on", "on"), ("off", "off"), ('"on"', "on"), ("auto", "auto")],
+    ids=["unquoted-on", "unquoted-off", "quoted", "auto"],
+)
+def test_rocm_aotriton_experimental_loads_unquoted_on_and_off(
+    tmp_path: Path, patch_rootdir: None, yaml_value: str, expected: str
+) -> None:
+    """YAML 1.1 reads an unquoted `on`/`off` as a boolean; the startup log tells users to write exactly that."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\nrocm_aotriton_experimental: {yaml_value}\n')
+
+    assert load_and_migrate_config(temp_config_file).rocm_aotriton_experimental == expected
+
+
+def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    # The default must stay `full`: anything else would quietly reduce durability for every existing
+    # install on upgrade.
+    assert InvokeAIAppConfig().db_synchronous == "full"
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
+
+    assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
+
+
+def test_attention_backend_defaults_to_auto_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    # The default must stay `auto`: SageAttention changes images at the same seed, so it is opt-in only.
+    assert InvokeAIAppConfig().attention_backend == "auto"
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\nattention_backend: sage\n')
+
+    assert load_and_migrate_config(temp_config_file).attention_backend == "sage"
+
+
+@pytest.mark.parametrize("kernel", ["cudnn", "flash", "efficient", "math"])
+def test_attention_backend_pins_a_pytorch_kernel_from_yaml(tmp_path: Path, patch_rootdir: None, kernel: str) -> None:
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\nattention_backend: {kernel}\n')
+
+    assert load_and_migrate_config(temp_config_file).attention_backend == kernel
+
+
+def test_attention_backend_rejects_a_kernel_it_does_not_know() -> None:
+    # `default` is an INVOKE_KREA2_SDPA_BACKEND value, not an attention_backend one.
+    for value in ("xformers", "default"):
+        with pytest.raises(ValidationError):
+            InvokeAIAppConfig(attention_backend=value)
+
+
+def test_load_config_from_root_reads_that_roots_file_and_writes_nothing(tmp_path: Path, patch_rootdir: None) -> None:
+    root = tmp_path / "install"
+    root.mkdir()
+    (root / "invokeai.yaml").write_text(
+        'schema_version: "4.0.3"\ndb_dir: elsewhere\noutputs_dir: pictures\ndb_synchronous: normal\n'
+    )
+
+    config = load_config_from_root(root)
+
+    assert config.db_path == (root / "elsewhere" / "invokeai.db").resolve()
+    assert config.outputs_path == (root / "pictures").resolve()
+    assert config.db_synchronous == "normal"
+    assert [path.name for path in root.iterdir()] == ["invokeai.yaml"]
+
+
+def test_load_config_from_root_lets_the_environment_win_over_the_file(
+    tmp_path: Path, patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "invokeai.yaml").write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
+    monkeypatch.setenv("INVOKEAI_DB_SYNCHRONOUS", "full")
+
+    assert load_config_from_root(tmp_path).db_synchronous == "full"
+
+
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
@@ -88,6 +186,24 @@ def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):
     config = load_and_migrate_config(temp_config_file)
     assert config.host == "192.168.1.1"
     assert config.port == 8080
+
+
+def test_pid_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    assert InvokeAIAppConfig().pid_memory_optimization is False
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\npid_memory_optimization: true\n')
+
+    assert load_and_migrate_config(temp_config_file).pid_memory_optimization is True
+
+
+def test_tiny_autoencoder_previews_defaults_to_false_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    assert InvokeAIAppConfig().tiny_autoencoder_previews is False
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\ntiny_autoencoder_previews: true\n')
+
+    assert load_and_migrate_config(temp_config_file).tiny_autoencoder_previews is True
 
 
 def test_migrate_v3_config_from_file(tmp_path: Path, patch_rootdir: None):
@@ -166,6 +282,8 @@ def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
     assert config.port == 8080
     # image_subfolder_strategy should have its default value
     assert config.image_subfolder_strategy == "flat"
+    # Older releases default to single-user mode, so the rewrite states sign-in explicitly.
+    assert yaml.safe_load(temp_config_file.read_text())["multiuser"] is True
 
 
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
@@ -201,13 +319,15 @@ def test_write_config_to_file(patch_rootdir: None):
             assert "port: 8080" in content
 
 
-def test_update_config_with_dict(patch_rootdir: None):
+def test_update_config_with_dict(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
     """Test updating the config with a dictionary."""
-    config = InvokeAIAppConfig()
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    config = InvokeAIAppConfig(multiuser=True)
     update_dict = {"host": "10.10.10.10", "port": 6060}
     config.update_config(update_dict)
     assert config.host == "10.10.10.10"
     assert config.port == 6060
+    assert config.multiuser is True
 
 
 def test_update_config_with_object(patch_rootdir: None):
@@ -261,6 +381,7 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
     monkeypatch.setenv("INVOKEAI_HOST", "1.2.3.4")
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
     get_config.cache_clear()
     config = get_config()
     get_config.cache_clear()
@@ -269,6 +390,8 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     assert config.config_file_path == config_file_path
     assert config_file_path.exists()
     assert example_file_path.exists()
+    assert (tmp_path / "fonts").exists()
+    assert (tmp_path / "fonts" / "README.txt").exists()
 
     # The example file should have the default values
     example_file_content = example_file_path.read_text()
@@ -278,12 +401,99 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     # It should also have the `remote_api_tokens` key
     assert "remote_api_tokens" in example_file_content
 
-    # Neither env vars nor default values should be written to the config file
+    # Neither env vars nor default values should be written to the config file, except the sign-in choice, which
+    # older releases default differently
     config_file_content = config_file_path.read_text()
     assert "host" not in config_file_content
+    assert yaml.safe_load(config_file_content)["multiuser"] is True
 
     # Undo our change to the singleton class
     InvokeAIArgs.did_parse = False
+
+
+def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> InvokeAIAppConfig:
+    monkeypatch.setattr(InvokeAIArgs, "did_parse", True)
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    get_config.cache_clear()
+    try:
+        return get_config()
+    finally:
+        get_config.cache_clear()
+
+
+@pytest.mark.parametrize("ending", ["\n", ""])
+def test_startup_appends_sign_in_to_a_config_file_without_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ending: str
+) -> None:
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    content = '# my notes\nschema_version: "4.0.3"\nport: 8080  # kept\n# last' + ending
+    (tmp_path / "invokeai.yaml").write_text(content)
+
+    config = _start(tmp_path, monkeypatch)
+
+    assert config.multiuser is False
+    assert config.port == 8080
+    assert (tmp_path / "invokeai.yaml").read_text() == content + ("" if ending else "\n") + "multiuser: true\n"
+
+
+@pytest.mark.parametrize(
+    ("content", "warns"),
+    [
+        ('# my notes\nschema_version: "4.0.3"\nport: 8080\nmultiuser: false\n', False),
+        ('{schema_version: "4.0.3", port: 8080}\n', True),
+    ],
+    ids=["states-sign-in", "flow-style"],
+)
+def test_startup_leaves_a_config_file_untouched_when_it_states_sign_in_or_cannot_take_a_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture, content: str, warns: bool
+) -> None:
+    (tmp_path / "invokeai.yaml").write_text(content)
+
+    with caplog.at_level("WARNING"):
+        config = _start(tmp_path, monkeypatch)
+
+    assert config.port == 8080
+    assert (tmp_path / "invokeai.yaml").read_text() == content
+    assert ("Unable to add the multiuser setting" in caplog.text) is warns
+
+
+def test_startup_still_loads_a_read_only_config_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    config_file = tmp_path / "invokeai.yaml"
+    content = 'schema_version: "4.0.3"\nport: 8080\n'
+    config_file.write_text(content)
+    config_file.chmod(0o444)
+    try:
+        if os.access(config_file, os.W_OK):
+            pytest.skip("this user can write read-only files")
+        with caplog.at_level("WARNING"):
+            config = _start(tmp_path, monkeypatch)
+    finally:
+        config_file.chmod(0o644)
+
+    assert config.port == 8080
+    assert config_file.read_text() == content
+    assert "Unable to add the multiuser setting" in caplog.text
+
+
+def test_ensure_fonts_dir_logs_warning_on_oserror(
+    patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    original_mkdir = Path.mkdir
+    fonts_path = tmp_path / "fonts"
+
+    def mock_mkdir(self: Path, *args: Any, **kwargs: Any) -> None:
+        if self == fonts_path:
+            raise OSError("read-only")
+        original_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+    with caplog.at_level("WARNING"):
+        ensure_fonts_dir(fonts_path)
+
+    assert "Unable to initialize fonts directory" in caplog.text
 
 
 def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

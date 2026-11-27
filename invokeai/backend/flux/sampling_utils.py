@@ -1,10 +1,12 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
 import math
-from typing import Callable
 
 import torch
 from einops import rearrange, repeat
+
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, time_shift
+from invokeai.backend.util.devices import TorchDevice
 
 
 def get_noise(
@@ -17,7 +19,7 @@ def get_noise(
 ):
     # We always generate noise on the same device and dtype then cast to ensure consistency across devices/dtypes.
     rand_device = "cpu"
-    rand_dtype = torch.float16
+    rand_dtype = TorchDevice.choose_noise_dtype(torch.float16)
     return torch.randn(
         num_samples,
         16,
@@ -30,31 +32,30 @@ def get_noise(
     ).to(device=device, dtype=dtype)
 
 
-def time_shift(mu: float, sigma: float, t: torch.Tensor) -> torch.Tensor:
-    return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
+# FLUX.1's shift fit. 4096 image tokens is a 1024x1024 frame -- one megapixel, and the resolution the reference
+# pipeline defaults to.
+#
+# Extrapolated past it, mu reaches 3.23 at 2048px, 6.70 at 3072px and 11.55 at 4096px, and the schedule flattens
+# with it -- the smallest non-zero timestep rises to 0.47, 0.97 and 0.9997. `clip_timestep_schedule_fractional` then
+# has almost nothing left below `1 - denoising_start`. Steps surviving a 30-step request at `denoising_start=0.5`:
+# 8 at 1 MP, 6 at 1.6 MP, 4 at 2.4 MP, 2 at 4.2 MP, and one from ~2112px square. From ~3376px square any
+# `denoising_start` of 0.01 or more leaves one; only a full denoise from 0 escapes the clip. Asking for more steps
+# barely helps: at 2048px and 0.499, 100 keep 4 and 1000 keep 39.
+#
+# The effect is graded, not a cliff: between 1 MP and ~1.6 MP the unheld schedule is not degenerate, and holding mu
+# there is a judgement -- never evaluate the fit outside the range it was built on -- rather than a defect fix.
+# ComfyUI's default FLUX.1 sampling uses a fixed shift of 1.15 at every resolution. Below 256 tokens mu merely sags to
+# 0.457, which is harmless. The hold is on an *area*, so a 1024x1280 canvas is already above it.
+FLUX_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 
 
-def get_lin_function(x1: float = 256, y1: float = 0.5, x2: float = 4096, y2: float = 1.15) -> Callable[[float], float]:
-    m = (y2 - y1) / (x2 - x1)
-    b = y1 - m * x1
-    return lambda x: m * x + b
-
-
-def get_schedule(
-    num_steps: int,
-    image_seq_len: int,
-    base_shift: float = 0.5,
-    max_shift: float = 1.15,
-    shift: bool = True,
-) -> list[float]:
+def get_schedule(num_steps: int, image_seq_len: int, shift: bool = True) -> list[float]:
     # extra step for zero
     timesteps = torch.linspace(1, 0, num_steps + 1)
 
     # shifting the schedule to favor high timesteps for higher signal images
     if shift:
-        # estimate mu based on linear estimation between two points
-        mu = get_lin_function(y1=base_shift, y2=max_shift)(image_seq_len)
-        timesteps = time_shift(mu, 1.0, timesteps)
+        timesteps = time_shift(FLUX_SHIFT_FIT.shift(image_seq_len), timesteps)
 
     return timesteps.tolist()
 

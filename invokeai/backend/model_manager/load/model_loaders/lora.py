@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for LoRA model loading in InvokeAI."""
 
 from logging import Logger
@@ -9,10 +8,12 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.krea2.control_lora import krea2_control_lora_from_state_dict
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi.omi import convert_from_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -22,6 +23,12 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY
+from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+    lora_model_from_ernie_image_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
+from invokeai.backend.patches.lora_conversions.flux3_lora_conversion_utils import lora_model_from_flux3_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
     lora_model_from_flux_aitoolkit_state_dict,
@@ -57,13 +64,55 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_conversion_utils import (
+    lora_model_from_ideogram4_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
+    lora_model_from_krea2_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import lora_model_from_ltx2_state_dict
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_constants import lycoris_flat_family
+from invokeai.backend.patches.lora_conversions.lycoris_flat_lora_conversion_utils import (
+    lora_model_from_lycoris_flat_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
+    lora_model_from_minimax_h3_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.moss_image_lora_constants import has_moss_image_lora_keys
+from invokeai.backend.patches.lora_conversions.moss_image_lora_conversion_utils import (
+    lora_model_from_moss_image_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
+from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+    lora_model_from_qwen_image_21_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.sd3_lora_conversion_utils import lora_model_from_sd3_state_dict
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
+from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
+
+_DORA_MAGNITUDE_SUFFIXES = (*DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY, ".dora_magnitude")
+_FACTORIZED_LAYER_SUFFIXES = (".hada_w1_a", ".lokr_w1", ".lokr_w1_a")
+
+
+def _layer_prefixes_with_suffixes(state_dict: dict[str, torch.Tensor], suffixes: tuple[str, ...]) -> set[str]:
+    prefixes: set[str] = set()
+    for key in state_dict:
+        for suffix in suffixes:
+            if key.endswith(suffix):
+                prefixes.add(key[: -len(suffix)])
+                break
+    return prefixes
+
+
+def _count_factorized_layers_with_dora_magnitude(state_dict: dict[str, torch.Tensor]) -> int:
+    magnitude_layers = _layer_prefixes_with_suffixes(state_dict, _DORA_MAGNITUDE_SUFFIXES)
+    factorized_layers = _layer_prefixes_with_suffixes(state_dict, _FACTORIZED_LAYER_SUFFIXES)
+    return len(magnitude_layers & factorized_layers)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
@@ -72,6 +121,7 @@ from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils imp
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlLoRa, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Krea2, type=ModelType.ControlLoRa, format=ModelFormat.LyCORIS)
 class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
@@ -117,11 +167,25 @@ class LoRALoader(ModelLoader):
         ]:
             state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
 
+        factorized_dora_layers = _count_factorized_layers_with_dora_magnitude(state_dict)
+
+        # SimpleTuner's LyCORIS flattens the model's own module names behind `lycoris_` (#10174); map them back and
+        # hand each family its own converter. State dicts this layout does not claim (SD 3's flat spelling, which
+        # `lora_model_from_sd3_state_dict` resolves already, and every other format) fall through to the dispatch.
+        if lycoris_flat_family(state_dict) is not None:
+            model = lora_model_from_lycoris_flat_state_dict(state_dict, base=self._model_base)
         # Apply state_dict key conversions, if necessary.
-        if self._model_base == BaseModelType.StableDiffusionXL:
+        elif self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base in (BaseModelType.Flux, BaseModelType.Flux2):
+            if has_flux3_lora_keys(state_dict):
+                # Versions without FLUX.3 LoRA support registered these as FLUX.1 LoRAs, whose conversion would map
+                # their layers onto nothing or onto the wrong modules.
+                raise ValueError(
+                    f"LoRA '{config.name}' is a FLUX.3 LoRA, registered as a {self._model_base.value} LoRA by an earlier "
+                    "version of InvokeAI. Use Re-identify model in the Model Manager to register it as a FLUX.3 LoRA."
+                )
             if config.format is ModelFormat.OMI:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
@@ -163,20 +227,83 @@ class LoRALoader(ModelLoader):
                     raise ValueError("LoRA model is in unsupported FLUX format")
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
+        elif self._model_base == BaseModelType.Flux3:
+            # diffusers/PEFT, BFL-native (ai-toolkit, ComfyUI) or raw PEFT keys, mapped onto the diffusers transformer;
+            # the header holds a diffusers file's PEFT config, which sets its scale.
+            model = lora_model_from_flux3_state_dict(
+                state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
+            )
+        elif self._model_base == BaseModelType.MossImage:
+            # ai-toolkit, ComfyUI, kohya/LyCORIS, DiffSynth and diffusers/PEFT keys already name the transformer's
+            # modules; a fused `proj.qkv` is cut into the `proj.q/k/v` it has. The header holds a diffusers file's
+            # PEFT config, which sets its scale.
+            model = lora_model_from_moss_image_state_dict(
+                state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
+            )
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.ZImage:
+            if has_moss_image_lora_keys(state_dict):
+                # Versions without MOSS-Image LoRA support registered these as Z-Image LoRAs, whose conversion would
+                # map their layers onto nothing.
+                raise ValueError(
+                    f"LoRA '{config.name}' is a MOSS-Image LoRA, registered as a Z-Image LoRA by an earlier version of "
+                    "InvokeAI. Use Re-identify model in the Model Manager to register it as a MOSS-Image LoRA."
+                )
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.QwenImage:
             model = lora_model_from_qwen_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.QwenImage21:
+            # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
+            model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Krea2 and config.type is ModelType.ControlLoRa:
+            model = krea2_control_lora_from_state_dict(state_dict)
+        elif self._model_base == BaseModelType.Krea2:
+            # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
+            # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).
+            model = lora_model_from_krea2_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.Anima:
             # Anima LoRAs use Kohya-style or diffusers PEFT format targeting Cosmos DiT blocks.
             model = lora_model_from_anima_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Wan:
+            # Wan LoRAs use Kohya / diffusers PEFT / native PEFT formats targeting
+            # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
+            model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.MiniMaxH3:
+            # MiniMax H3 LoRAs use PEFT lora_A/lora_B or kohya-flattened keys in the
+            # checkpoint's native single-file layout (fused qkv_proj / SwiGLU fc1, adaln_proj).
+            # alpha=None -> a file's own .alpha tensors, else alpha=rank, matching the
+            # published Turbo LoRA's "no extra scaling".
+            model = lora_model_from_minimax_h3_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.LTX2:
+            # LTX-2 LoRAs use PEFT lora_A/lora_B keys in the official Lightricks single-file
+            # layout; the conversion renames them onto the transformer's diffusers module paths
+            # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
+            # is what the published distilled accelerator (no .alpha tensors) expects.
+            model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.ErnieImage:
+            # ERNIE-Image LoRAs already name the transformer's own (diffusers) modules; only the container
+            # prefix is stripped. Without .alpha tensors (ai-toolkit) alpha = rank, i.e. the patch applies unscaled.
+            model = lora_model_from_ernie_image_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.Ideogram4:
+            # Converted onto the vendored transformer every Ideogram 4 build loads into; diffusers' split q/k/v
+            # are fused into its single `attention.qkv`. Without .alpha tensors alpha = rank (unscaled).
+            model = lora_model_from_ideogram4_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.StableDiffusion3:
+            # diffusers, PEFT, SimpleTuner LyCORIS and kohya MMDiT names, all onto diffusers' SD3Transformer2DModel
+            # and the two CLIP encoders; T5 layers are dropped with a warning.
+            model = lora_model_from_sd3_state_dict(state_dict=state_dict)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
+
+        if factorized_dora_layers:
+            self._logger.warning(
+                f"LoRA '{config.name}' contains {factorized_dora_layers} LoKr/LoHa layers with unsupported DoRA "
+                "magnitudes; applying those layers as plain LoKr/LoHa."
+            )
 
         model.to(dtype=self._torch_dtype)
         return model

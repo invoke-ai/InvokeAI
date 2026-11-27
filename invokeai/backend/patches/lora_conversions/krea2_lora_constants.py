@@ -1,0 +1,147 @@
+"""Krea-2 LoRA prefix constants, kohya key-reconstruction helpers and the Control LoRA detector.
+
+The prefixes namespace LoRA patch keys when applying them to Krea-2 models.
+
+The kohya/LyCORIS reconstruction helpers and the Control LoRA detector live here rather than in
+``krea2_lora_conversion_utils`` so that ``model_manager.configs.lora`` can identify those files without importing
+the converter: the converter pulls in the patch layers, which import ``model_manager.load``, closing an import cycle
+back into ``model_manager.configs``. Same reason ``anima_lora_constants`` exists.
+"""
+
+import re
+from typing import Any
+
+from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
+    INDEX_PLACEHOLDER,
+    ParsingTree,
+    insert_periods_into_kohya_key,
+    kohya_module_path_is_leaf,
+)
+
+# Prefix for Krea-2 transformer (Krea2Transformer2DModel) LoRA layers.
+KREA2_LORA_TRANSFORMER_PREFIX = "lora_transformer-"
+
+# Prefix for Krea-2 Qwen3-VL text encoder LoRA layers.
+KREA2_LORA_QWEN3VL_PREFIX = "lora_qwen3vl-"
+
+# LyCORIS LoKr weight keys: the Kronecker operands ``lokr_w1`` / ``lokr_w2``, each optionally factored further into
+# an ``_a``/``_b`` pair, plus the optional Tucker core ``lokr_t2``. Identification (``model_manager.configs.lora``)
+# and the converter's suffix map both derive from this one list so they cannot drift apart.
+LOKR_WEIGHT_KEYS = ("lokr_w1", "lokr_w1_a", "lokr_w1_b", "lokr_w2", "lokr_w2_a", "lokr_w2_b", "lokr_t2")
+
+
+# --- Kohya / LyCORIS (flattened) -> native key mapping ---------------------------------------------------------
+# sd-scripts and LyCORIS flatten the module path (``path.replace(".", "_")``) and prefix it with
+# ``lora_unet_``, e.g. ``lora_unet_blocks_6_attn_wv.lora_down.weight``. Flattening is lossy — nothing in the key
+# records where a '_' used to be a '.' — so we reconstruct the dotted path against the native module vocabulary
+# below and accept it only if it lands on a leaf. A key we cannot reconstruct with certainty is left untouched
+# rather than rewritten into a plausible-looking key that matches no module.
+KREA2_KOHYA_PREFIX = "lora_unet_"
+
+# Native Krea-2 transformer/text-fusion block leaves. Only the Linears are listed: the non-Linear natives
+# (``mod.lin``, ``prenorm``/``postnorm``, ``attn.qknorm.*``, ``last.norm``/``last.modulation``) have no Linear
+# counterpart in the diffusers layout — ``mod.lin`` for instance is folded into the ``scale_shift_table``
+# parameter — so an adapter targeting them cannot be applied, and renaming it anyway would turn "unsupported"
+# into a silent no-op.
+_NATIVE_KREA2_BLOCK_SUBTREE: ParsingTree = {
+    "attn": {"wq": {}, "wk": {}, "wv": {}, "wo": {}, "gate": {}},
+    "mlp": {"gate": {}, "up": {}, "down": {}},
+}
+
+# Parsing tree for the native (ComfyUI) Krea-2 module layout, i.e. the keys the renames in
+# ``krea2_lora_conversion_utils`` understand. Walking it resolves the flattened form's only real ambiguity — ``layerwise_blocks`` / ``refiner_blocks`` are
+# the native components that themselves contain an underscore.
+_KREA2_NATIVE_KOHYA_PARSING_TREE: ParsingTree = {
+    "blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+    "txtfusion": {
+        "layerwise_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "refiner_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "projector": {},
+    },
+    "first": {},
+    # Literal indices rather than INDEX_PLACEHOLDER: these are ``nn.Sequential`` stages, and only the
+    # positions listed in the converter's ``_NATIVE_KREA2_TOP_LEVEL_RENAMES`` hold a Linear — the rest are
+    # activations with no weights. Accepting any index would rewrite e.g. ``lora_unet_tmlp_1`` into ``tmlp.1.*``, which the
+    # native pass then does not recognize, leaving a half-converted key instead of the untouched original.
+    "tmlp": {"0": {}, "2": {}},
+    "tproj": {"1": {}},
+    "txtmlp": {"1": {}, "3": {}},
+    "last": {"linear": {}},
+}
+
+
+def unflatten_kohya_krea2_module_path(flat_path: str) -> str | None:
+    """Reconstruct a dotted native Krea-2 module path from its kohya-flattened form.
+
+    Returns ``None`` when the reconstruction is not a native module path the converter can map, in which case
+    the caller must leave the key alone.
+    """
+    try:
+        module_path = insert_periods_into_kohya_key(flat_path, _KREA2_NATIVE_KOHYA_PARSING_TREE)
+    except ValueError:
+        # Tokens left over: not a native Krea-2 module path.
+        return None
+    return module_path if kohya_module_path_is_leaf(module_path, _KREA2_NATIVE_KOHYA_PARSING_TREE) else None
+
+
+def split_kohya_krea2_key(key: str | int) -> tuple[str, str, str] | None:
+    """Split a kohya/LyCORIS key into (flattened module path, separator, weight suffix).
+
+    Returns ``None`` for anything not in the kohya layout, including the non-string keys that ``.pt`` /
+    ``.ckpt`` sources can carry. The flattened module path runs up to the first '.'; the weight suffix
+    (``lora_down.weight``, ``alpha``, ...) follows it. Some writers emit a doubled separator after the
+    prefix, hence the ``lstrip``. Every caller splits through here so the converter's per-module gate, the
+    rewrite it guards, and identification can never disagree about which module a key belongs to.
+    """
+    if not isinstance(key, str) or not key.startswith(KREA2_KOHYA_PREFIX):
+        return None
+    flat_path, dot, weight_suffix = key[len(KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
+    return flat_path, dot, weight_suffix
+
+
+def is_kohya_krea2_lora_key(key: str | int) -> bool:
+    """True if ``key`` is a kohya-flattened key naming a Krea-2 module the converter can reconstruct.
+
+    Identification (``model_manager.configs.lora``) uses this instead of matching ``lora_unet_<module>``
+    prefixes. That spelling is not Krea-2's alone: Wan writes ``lora_unet_blocks_<idx>_...`` and Anima
+    ``lora_unet_[llm_adapter_]blocks_<idx>_...``, so a prefix match sweeps their kohya LoRAs into the
+    explicit Krea-2 override, where they install and then silently no-op at generation time. Reconstructing
+    the path against the native Krea-2 module vocabulary rejects them - ``self_attn``, ``cross_attn`` and
+    ``mlp_layer0`` are not leaves in it - while still accepting the doubled-separator spelling that the
+    converter tolerates but no ``lora_unet_`` prefix spells out.
+    """
+    split = split_kohya_krea2_key(key)
+    return split is not None and unflatten_kohya_krea2_module_path(split[0]) is not None
+
+
+# --- Krea-2 Control LoRA (https://github.com/Tanmaypatil123/Krea-2-controlnet) ---------------------------------
+# Native module names, block LoRAs as ``<module>.A`` (down) / ``<module>.B`` (up), and the input projection
+# ``first`` widened to take ``[noisy latent tokens | control latent tokens]``: twice the packed latent width.
+KREA2_CONTROL_LORA_INPUT_WIDTH = 2 * 64
+KREA2_HIDDEN_SIZE = 6144
+KREA2_CONTROL_LORA_PROJECTION_KEYS = ("first.weight", "first.bias")
+_KREA2_CONTROL_LORA_BLOCK_KEY = re.compile(
+    r"blocks\.[0-9]+\.(?:"
+    + "|".join(re.escape(f"{group}.{leaf}") for group, leaves in _NATIVE_KREA2_BLOCK_SUBTREE.items() for leaf in leaves)
+    + r")\.[AB]"
+)
+
+
+def is_krea2_control_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
+    """True only for a ``[6144, 128]`` ``first`` projection plus complete A/B pairs on block Linears, nothing else."""
+    weight = state_dict.get("first.weight")
+    bias = state_dict.get("first.bias")
+    if weight is None or bias is None:
+        return False
+    if tuple(weight.shape) != (KREA2_HIDDEN_SIZE, KREA2_CONTROL_LORA_INPUT_WIDTH) or tuple(bias.shape) != (
+        KREA2_HIDDEN_SIZE,
+    ):
+        return False
+    modules: dict[str, set[str]] = {}
+    for key in state_dict:
+        if key in KREA2_CONTROL_LORA_PROJECTION_KEYS:
+            continue
+        if not isinstance(key, str) or _KREA2_CONTROL_LORA_BLOCK_KEY.fullmatch(key) is None:
+            return False
+        modules.setdefault(key[:-2], set()).add(key[-1])
+    return bool(modules) and all(halves == {"A", "B"} for halves in modules.values())

@@ -1,17 +1,18 @@
 import locale
+import re
 from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path as FilePath
 from threading import Lock
-from typing import Any
+from typing import Any, Literal, Union
 
 import torch
 import yaml
 from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from invokeai.app.api.auth_dependencies import AdminUserOrDefault
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
@@ -23,10 +24,13 @@ from invokeai.app.services.config.config_default import (
     load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
+from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.shared.database.startup import redacted_database_url
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
 
@@ -49,13 +53,24 @@ class AppVersion(BaseModel):
     version: str = Field(description="App version")
 
 
+class FrontendConfig(BaseModel):
+    """Presentation settings any signed-in user may read; never include private runtime configuration here."""
+
+    show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+
+
+@app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
+def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
+    return FrontendConfig(show_donation_link=get_config().show_donation_link)
+
+
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
-async def get_version() -> AppVersion:
+def get_version() -> AppVersion:
     return AppVersion(version=__version__)
 
 
 @app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=dict[str, str])
-async def get_app_deps() -> dict[str, str]:
+def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
     deps: dict[str, str] = {dist.metadata["Name"]: dist.version for dist in distributions()}
     try:
         cuda = getattr(getattr(torch, "version", None), "cuda", None) or "N/A"  # pyright: ignore[reportAttributeAccessIssue]
@@ -70,8 +85,25 @@ async def get_app_deps() -> dict[str, str]:
 
 
 @app_router.get("/patchmatch_status", operation_id="get_patchmatch_status", status_code=200, response_model=bool)
-async def get_patchmatch_status() -> bool:
+def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
     return PatchMatch.patchmatch_available()
+
+
+@app_router.post(
+    "/database/vacuum",
+    operation_id="vacuum_database",
+    status_code=204,
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Admin privileges required"},
+        500: {"description": "Database vacuum failed"},
+    },
+)
+def vacuum_database(_: AdminUserOrDefault) -> None:
+    try:
+        ApiDependencies.invoker.services.database.clean()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database vacuum failed") from e
 
 
 class InvokeAIAppConfigWithSetFields(BaseModel):
@@ -100,6 +132,7 @@ class ExternalProviderConfigModel(BaseModel):
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
+    "atlascloud": ("external_atlascloud_api_key", "external_atlascloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
     "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
@@ -118,6 +151,16 @@ def _remove_nullable_default_from_schema(schema: dict[str, Any]) -> None:
             schema.update(non_null_schemas[0])
 
 
+_GENERATION_DEVICE_PATTERN = re.compile(r"^(cpu|mps|xpu(:\d+)?|cuda(:\d+)?)$")
+
+
+class GenerationDeviceOption(BaseModel):
+    """A device that may be selected for generation."""
+
+    device: str = Field(description="The device identifier, e.g. 'cuda:0', 'mps', or 'cpu'")
+    name: str = Field(description="Human-readable device name")
+
+
 class UpdateAppGenerationSettingsRequest(BaseModel):
     """Writable generation-related app settings."""
 
@@ -131,20 +174,115 @@ class UpdateAppGenerationSettingsRequest(BaseModel):
         ge=0,
         description="Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.",
     )
+    generation_devices: Union[Literal["auto"], list[str]] | None = Field(
+        default=None,
+        description="Devices to use for parallel generation. `auto` uses every available GPU; provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices. Takes effect after restarting InvokeAI.",
+        json_schema_extra=_remove_nullable_default_from_schema,
+    )
+
+    @field_validator("generation_devices")
+    @classmethod
+    def validate_generation_devices(
+        cls, v: Union[Literal["auto"], list[str], None]
+    ) -> Union[Literal["auto"], list[str], None]:
+        if v is None or v == "auto":
+            return v
+        # Mirror the InvokeAIAppConfig validator: an empty list would be rejected there anyway,
+        # but catching it here turns an eventual 500 into a request-validation 422.
+        if len(v) == 0:
+            raise ValueError("generation_devices cannot be an empty list. Use 'auto' or a list of devices.")
+        for device in v:
+            if not _GENERATION_DEVICE_PATTERN.match(device):
+                raise ValueError(
+                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', 'cuda:N', "
+                    "'xpu', or 'xpu:N'."
+                )
+        return v
 
     @model_validator(mode="after")
     def validate_explicit_nulls(self) -> "UpdateAppGenerationSettingsRequest":
         if "image_subfolder_strategy" in self.model_fields_set and self.image_subfolder_strategy is None:
             raise ValueError("image_subfolder_strategy may not be null")
+        if "generation_devices" in self.model_fields_set and self.generation_devices is None:
+            raise ValueError("generation_devices may not be null")
         return self
+
+
+REDACTED_SECRET = "**********"
+
+
+def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
+    """Return a copy of the config with credential fields masked.
+
+    The runtime config carries provider API keys and model-download bearer tokens. The route is admin-only, but no
+    client - not even an admin's browser - has any use for the raw values; the UI only cares whether a credential is
+    configured.
+
+    NOTE: coverage is by convention, not automatic. Only `*_api_key` fields listed in
+    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` and credentials embedded in
+    `download_proxy` are masked. If you add a credential to InvokeAIAppConfig under any other
+    name, you must extend this function or it will be served verbatim.
+    """
+    updates: dict[str, Any] = {}
+
+    for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
+        if not field_name.endswith("_api_key"):
+            continue
+        if getattr(config, field_name, None):
+            updates[field_name] = REDACTED_SECRET
+
+    if config.remote_api_tokens:
+        updates["remote_api_tokens"] = [
+            pair.model_copy(update={"token": REDACTED_SECRET}) for pair in config.remote_api_tokens
+        ]
+
+    if config.download_proxy and "@" in config.download_proxy:
+        updates["download_proxy"] = REDACTED_SECRET
+
+    if config.db_url:
+        updates["db_url"] = redacted_database_url(config.db_url)
+
+    return config.model_copy(update=updates) if updates else config
+
+
+@app_router.get(
+    "/generation_device_options",
+    operation_id="get_generation_device_options",
+    status_code=200,
+    response_model=list[GenerationDeviceOption],
+)
+def get_generation_device_options(current_user: CurrentUserOrDefault) -> list[GenerationDeviceOption]:
+    """List the devices available for generation, for use with the `generation_devices` setting."""
+    options: list[GenerationDeviceOption] = []
+    if torch.cuda.is_available():
+        for index in range(torch.cuda.device_count()):
+            device = f"cuda:{index}"
+            try:
+                name = torch.cuda.get_device_name(index)
+            except Exception:
+                name = device
+            options.append(GenerationDeviceOption(device=device, name=name))
+    elif hasattr(torch, "xpu") and torch.xpu.is_available():
+        for index in range(torch.xpu.device_count()):
+            device = f"xpu:{index}"
+            try:
+                name = torch.xpu.get_device_name(index)
+            except Exception:
+                name = device
+            options.append(GenerationDeviceOption(device=device, name=name))
+    elif torch.backends.mps.is_available():
+        options.append(GenerationDeviceOption(device="mps", name="Apple MPS"))
+    else:
+        options.append(GenerationDeviceOption(device="cpu", name="CPU"))
+    return options
 
 
 @app_router.get(
     "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
 )
-async def get_runtime_config() -> InvokeAIAppConfigWithSetFields:
+def get_runtime_config(current_admin: AdminUserOrDefault) -> InvokeAIAppConfigWithSetFields:
     config = get_config()
-    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
 
 @app_router.patch(
@@ -153,10 +291,18 @@ async def get_runtime_config() -> InvokeAIAppConfigWithSetFields:
     status_code=200,
     response_model=InvokeAIAppConfigWithSetFields,
 )
-async def update_runtime_config(
+def update_runtime_config(
     _: AdminUserOrDefault,
     changes: UpdateAppGenerationSettingsRequest = Body(description="Writable runtime configuration changes"),
 ) -> InvokeAIAppConfigWithSetFields:
+    # The request model validates the *shape* of generation_devices; also verify the devices exist
+    # on this machine before persisting, so we can't write a config that fails on the next startup
+    # (e.g. 'cuda:99' on a 2-GPU box). Same resolution the startup path uses.
+    if changes.generation_devices is not None:
+        try:
+            TorchDevice.get_generation_devices(changes.generation_devices)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
     with _EXTERNAL_PROVIDER_CONFIG_LOCK:
         config = get_config()
         update_dict = changes.model_dump(exclude_unset=True)
@@ -169,7 +315,7 @@ async def update_runtime_config(
 
         persisted_config.update_config(update_dict)
         persisted_config.write_file(config.config_file_path)
-        return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+        return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
 
 @app_router.get(
@@ -178,7 +324,7 @@ async def update_runtime_config(
     status_code=200,
     response_model=list[ExternalProviderStatusModel],
 )
-async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
+def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> list[ExternalProviderStatusModel]:
     statuses = ApiDependencies.invoker.services.external_generation.get_provider_statuses()
     return [status_to_model(status) for status in statuses.values()]
 
@@ -189,7 +335,7 @@ async def get_external_provider_statuses() -> list[ExternalProviderStatusModel]:
     status_code=200,
     response_model=list[ExternalProviderConfigModel],
 )
-async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
+def get_external_provider_configs(current_admin: AdminUserOrDefault) -> list[ExternalProviderConfigModel]:
     config = get_config()
     return [_build_external_provider_config(provider_id, config) for provider_id in EXTERNAL_PROVIDER_FIELDS]
 
@@ -200,7 +346,7 @@ async def get_external_provider_configs() -> list[ExternalProviderConfigModel]:
     status_code=200,
     response_model=ExternalProviderConfigModel,
 )
-async def set_external_provider_config(
+def set_external_provider_config(
     _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
     update: ExternalProviderConfigUpdate = Body(description="External provider configuration settings"),
@@ -219,9 +365,14 @@ async def set_external_provider_config(
         raise HTTPException(status_code=400, detail="No external provider config fields provided")
 
     api_key_removed = update.api_key is not None and updates.get(api_key_field) is None
+    api_key_set = update.api_key is not None and updates.get(api_key_field) is not None
     _apply_external_provider_update(updates)
     if api_key_removed:
         _remove_external_models_for_provider(provider_id)
+    elif api_key_set:
+        # Configuring a key should make the provider's models usable without a
+        # restart; queue its external starter models the same way startup does.
+        _sync_external_starter_models_for_provider(provider_id)
     return _build_external_provider_config(provider_id, get_config())
 
 
@@ -231,7 +382,7 @@ async def set_external_provider_config(
     status_code=200,
     response_model=ExternalProviderConfigModel,
 )
-async def reset_external_provider_config(
+def reset_external_provider_config(
     _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
 ) -> ExternalProviderConfigModel:
@@ -316,6 +467,19 @@ def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig)
     )
 
 
+def _sync_external_starter_models_for_provider(provider_id: str) -> None:
+    invoker = ApiDependencies.invoker
+    try:
+        sync_configured_external_starter_models(
+            configured_provider_ids={provider_id},
+            model_manager=invoker.services.model_manager,
+            logger=invoker.services.logger,
+        )
+    except Exception as error:
+        # Queuing installs must never fail the config save; surface and move on.
+        invoker.services.logger.warning(f"Failed queueing external starter models for '{provider_id}': {error}")
+
+
 def _remove_external_models_for_provider(provider_id: str) -> None:
     model_manager = ApiDependencies.invoker.services.model_manager
     external_models = model_manager.store.search_by_attr(
@@ -340,7 +504,7 @@ def _remove_external_models_for_provider(provider_id: str) -> None:
     responses={200: {"description": "The operation was successful"}},
     response_model=LogLevel,
 )
-async def get_log_level() -> LogLevel:
+def get_log_level(current_admin: AdminUserOrDefault) -> LogLevel:
     """Returns the log level"""
     return LogLevel(ApiDependencies.invoker.services.logger.level)
 
@@ -351,7 +515,8 @@ async def get_log_level() -> LogLevel:
     responses={200: {"description": "The operation was successful"}},
     response_model=LogLevel,
 )
-async def set_log_level(
+def set_log_level(
+    current_admin: AdminUserOrDefault,
     level: LogLevel = Body(description="New log verbosity level"),
 ) -> LogLevel:
     """Sets the log verbosity level"""
@@ -364,7 +529,7 @@ async def set_log_level(
     operation_id="clear_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def clear_invocation_cache() -> None:
+def clear_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.clear()
 
@@ -374,7 +539,7 @@ async def clear_invocation_cache() -> None:
     operation_id="enable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def enable_invocation_cache() -> None:
+def enable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.enable()
 
@@ -384,7 +549,7 @@ async def enable_invocation_cache() -> None:
     operation_id="disable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def disable_invocation_cache() -> None:
+def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.disable()
 
@@ -394,6 +559,6 @@ async def disable_invocation_cache() -> None:
     operation_id="get_invocation_cache_status",
     responses={200: {"model": InvocationCacheStatus}},
 )
-async def get_invocation_cache_status() -> InvocationCacheStatus:
+def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()

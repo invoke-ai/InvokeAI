@@ -1,0 +1,230 @@
+import { createListCollection, Field, HStack, Input, Slider, Stack, Switch, Text } from '@chakra-ui/react';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { Select } from '@platform/ui/Select';
+import { useCallback, useId, useMemo, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { SettingFieldProps, SettingLayer } from './contracts';
+
+import { resolveSettingsText } from './contracts';
+import { SettingLayerIndicator } from './SettingLayerIndicator';
+
+export interface SettingControlProps extends Pick<SettingFieldProps, 'field' | 'surface'> {
+  value: boolean | number | string;
+  onChange: (value: boolean | number | string) => void;
+  disabled?: boolean;
+  /** The row's own value, if it has one; the binding decides (see {@link SettingLayer}). */
+  layer?: SettingLayer;
+}
+
+const DIALOG_DIRECTION = { base: 'column', md: 'row' } as const;
+const DIALOG_ALIGNMENT = { base: 'stretch', md: 'center' } as const;
+const DIALOG_CONTROL_WIDTH = { base: 'full', md: '52' } as const;
+const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetached: true } as const;
+// The quick select is only as wide as its value, so its menu opens from its end at a width of its own.
+const QUICK_SELECT_POSITIONING = { placement: 'bottom-end', strategy: 'fixed', hideWhenDetached: true } as const;
+const QUICK_SELECT_CONTENT_PROPS = { minW: '10rem' } as const;
+
+/** Presentation only. Normalization, persistence and side effects belong to the binding. */
+export const SettingControl = ({ field, surface, value, onChange, disabled, layer }: SettingControlProps) => {
+  const { t } = useTranslation();
+  const descriptionId = useId();
+  const label = resolveSettingsText(field.label, t);
+  const description = surface === 'dialog' && field.description ? resolveSettingsText(field.description, t) : undefined;
+  const items = useMemo(
+    () =>
+      field.kind === 'select'
+        ? field.options.map((option) => ({ ...option, label: resolveSettingsText(option.label, t) }))
+        : [],
+    [field, t]
+  );
+  const collection = useMemo(() => createListCollection({ items }), [items]);
+  const selectValue = useMemo(() => [String(value)], [value]);
+  const sliderValue = useMemo(() => [Number(value)], [value]);
+  const sliderLabel = useMemo(() => [label], [label]);
+  const handleCheckedChange = useCallback(({ checked }: { checked: boolean }) => onChange(checked), [onChange]);
+  const handleSelectChange = useCallback(
+    ({ value: next }: { value: string[] }) => {
+      if (next[0] !== undefined) {
+        onChange(next[0]);
+      }
+    },
+    [onChange]
+  );
+  const handleSliderChange = useCallback(
+    ({ value: next }: { value: number[] }) => {
+      if (next[0] !== undefined) {
+        onChange(next[0]);
+      }
+    },
+    [onChange]
+  );
+  const handleNumberChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const next = event.currentTarget.valueAsNumber;
+      if (Number.isFinite(next)) {
+        onChange(next);
+      }
+    },
+    [onChange]
+  );
+
+  if (field.kind === 'boolean') {
+    return (
+      <Switch.Root
+        data-setting-control=""
+        checked={value === true}
+        disabled={disabled}
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        gap="4"
+        w="full"
+        onCheckedChange={handleCheckedChange}
+      >
+        <Stack gap="1">
+          <HStack gap="2">
+            <Switch.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
+              {label}
+            </Switch.Label>
+            {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+          </HStack>
+          {description ? (
+            <Text id={descriptionId} color="fg.muted" fontSize="md">
+              {description}
+            </Text>
+          ) : null}
+        </Stack>
+        <Switch.HiddenInput aria-describedby={description ? descriptionId : undefined} />
+        <Switch.Control flexShrink={0}>
+          <Switch.Thumb />
+        </Switch.Control>
+      </Switch.Root>
+    );
+  }
+
+  if (field.kind === 'select' && surface === 'quick') {
+    // Laid out like the switch rows it sits among: the label leads, the select trails it at the row's end.
+    return (
+      <Field.Root
+        data-setting-control=""
+        disabled={disabled}
+        display="flex"
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap="4"
+      >
+        <HStack gap="2" minW="0">
+          {/* Names the hidden select, which hands a click's focus on to the trigger as a native label would. */}
+          <Field.Label fontSize="md" fontWeight="500">
+            {label}
+          </Field.Label>
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+        </HStack>
+        <Select
+          collection={collection}
+          contentProps={QUICK_SELECT_CONTENT_PROPS}
+          value={selectValue}
+          fitContent
+          maxW="60%"
+          portalled={false}
+          // Fixed positioning escapes scrolling/clipped surfaces; staying inline preserves modal focus and ARIA.
+          positioning={QUICK_SELECT_POSITIONING}
+          onValueChange={handleSelectChange}
+        />
+      </Field.Root>
+    );
+  }
+
+  if (field.kind === 'slider' && surface === 'quick') {
+    // One inline row like the switches and selects around it: the scrubber carries its own label and value.
+    return (
+      <HStack data-setting-control="" gap="2">
+        <ScrubberField
+          disabled={disabled}
+          flex="1"
+          label={label}
+          max={field.max}
+          min={field.min}
+          step={field.step ?? 1}
+          value={Number(value)}
+          onChange={onChange}
+        />
+        {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+      </HStack>
+    );
+  }
+
+  return (
+    <Field.Root
+      data-setting-control=""
+      disabled={disabled}
+      display="flex"
+      flexDirection={surface === 'quick' ? 'column' : DIALOG_DIRECTION}
+      alignItems={surface === 'quick' ? 'stretch' : DIALOG_ALIGNMENT}
+      justifyContent="space-between"
+      gap="3"
+    >
+      <Stack gap="1" flex="1">
+        <HStack gap="2">
+          <Field.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
+            {label}
+          </Field.Label>
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+        </HStack>
+        {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
+      </Stack>
+      {field.kind === 'select' ? (
+        <Select
+          collection={collection}
+          value={selectValue}
+          disabled={disabled}
+          size="lg"
+          w={DIALOG_CONTROL_WIDTH}
+          flexShrink={0}
+          portalled={false}
+          // Fixed positioning escapes scrolling/clipped surfaces; staying inline preserves modal focus and ARIA.
+          positioning={SELECT_POSITIONING}
+          onValueChange={handleSelectChange}
+        />
+      ) : field.kind === 'slider' ? (
+        <HStack w={surface === 'quick' ? 'full' : DIALOG_CONTROL_WIDTH} gap="3" flexShrink={0}>
+          <Slider.Root
+            aria-label={sliderLabel}
+            disabled={disabled}
+            value={sliderValue}
+            min={field.min}
+            max={field.max}
+            step={field.step ?? 1}
+            flex="1"
+            onValueChange={handleSliderChange}
+          >
+            <Slider.Control>
+              <Slider.Track>
+                <Slider.Range />
+              </Slider.Track>
+              <Slider.Thumbs />
+            </Slider.Control>
+          </Slider.Root>
+          <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" minW="6" textAlign="end">
+            {value}
+          </Text>
+        </HStack>
+      ) : field.kind === 'number' ? (
+        <Input
+          aria-label={label}
+          type="number"
+          min={field.min}
+          max={field.max}
+          step={field.step ?? 1}
+          value={String(value)}
+          disabled={disabled}
+          size="lg"
+          w="24"
+          onChange={handleNumberChange}
+        />
+      ) : null}
+    </Field.Root>
+  );
+};

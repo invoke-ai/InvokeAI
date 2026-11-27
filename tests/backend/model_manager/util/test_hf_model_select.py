@@ -403,3 +403,152 @@ def test_select_flux_schnell_files(
 ) -> None:
     filtered_files = filter_files(flux_schnell_test_files, variant)
     assert set(filtered_files) == {Path(f) for f in expected_files}
+
+
+# A subset of huggingface.co/MiniMaxAI/MiniMax-H3: a root-level Modular Diffusers pipeline whose
+# repo also carries a sibling task transformer (transformer_ref) that a slim install must be able
+# to skip while still fetching the root pipeline index and the transformer's bare config.json.
+@pytest.fixture
+def minimax_h3_test_files() -> list[Path]:
+    return [
+        Path(f)
+        for f in [
+            "MiniMax-H3/.gitattributes",
+            "MiniMax-H3/LICENSE",
+            "MiniMax-H3/README.md",
+            "MiniMax-H3/model_index.json",
+            "MiniMax-H3/modular_model_index.json",
+            "MiniMax-H3/audio_scheduler/scheduler_config.json",
+            "MiniMax-H3/audio_vae/config.json",
+            "MiniMax-H3/audio_vae/diffusion_pytorch_model.safetensors",
+            "MiniMax-H3/processor/chat_template.json",
+            "MiniMax-H3/processor/preprocessor_config.json",
+            "MiniMax-H3/processor/tokenizer.json",
+            "MiniMax-H3/scheduler/scheduler_config.json",
+            "MiniMax-H3/text_encoder/config.json",
+            "MiniMax-H3/text_encoder/model-00001-of-00002.safetensors",
+            "MiniMax-H3/text_encoder/model-00002-of-00002.safetensors",
+            "MiniMax-H3/text_encoder/model.safetensors.index.json",
+            "MiniMax-H3/tokenizer/merges.txt",
+            "MiniMax-H3/tokenizer/tokenizer_config.json",
+            "MiniMax-H3/tokenizer/vocab.json",
+            "MiniMax-H3/transformer/config.json",
+            "MiniMax-H3/transformer/diffusion_pytorch_model-00001-of-00002.safetensors",
+            "MiniMax-H3/transformer/diffusion_pytorch_model-00002-of-00002.safetensors",
+            "MiniMax-H3/transformer/diffusion_pytorch_model.safetensors.index.json",
+            "MiniMax-H3/transformer_ref/config.json",
+            "MiniMax-H3/transformer_ref/diffusion_pytorch_model-00001-of-00002.safetensors",
+            "MiniMax-H3/transformer_ref/diffusion_pytorch_model-00002-of-00002.safetensors",
+            "MiniMax-H3/vae/config.json",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00001-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00002-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00003-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model.safetensors.index.json",
+        ]
+    ]
+
+
+def test_select_subfolders_with_explicit_files(minimax_h3_test_files: list[Path]) -> None:
+    """Explicit file entries ride alongside subfolder entries: the root pipeline index and the
+    transformer's bare config.json are included verbatim (the latter would otherwise be dropped by
+    the config-only-folder pruning), while the transformer weights stay excluded."""
+    filtered_files = filter_files(
+        minimax_h3_test_files,
+        subfolders=[
+            Path("modular_model_index.json"),
+            Path("transformer/config.json"),
+            Path("tokenizer"),
+            Path("processor"),
+            Path("vae"),
+            Path("audio_vae"),
+        ],
+    )
+    assert set(filtered_files) == {
+        Path(f)
+        for f in [
+            "MiniMax-H3/modular_model_index.json",
+            "MiniMax-H3/transformer/config.json",
+            "MiniMax-H3/tokenizer/merges.txt",
+            "MiniMax-H3/tokenizer/tokenizer_config.json",
+            "MiniMax-H3/tokenizer/vocab.json",
+            "MiniMax-H3/processor/chat_template.json",
+            "MiniMax-H3/processor/preprocessor_config.json",
+            "MiniMax-H3/processor/tokenizer.json",
+            "MiniMax-H3/vae/config.json",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00001-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00002-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model-00003-of-00003.safetensors",
+            "MiniMax-H3/vae/diffusion_pytorch_model.safetensors.index.json",
+            "MiniMax-H3/audio_vae/config.json",
+            "MiniMax-H3/audio_vae/diffusion_pytorch_model.safetensors",
+        ]
+    }
+
+
+def test_select_explicit_files_only(minimax_h3_test_files: list[Path]) -> None:
+    """A list made up solely of explicit files selects exactly those files - not the whole repo."""
+    filtered_files = filter_files(
+        minimax_h3_test_files,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json")],
+    )
+    assert set(filtered_files) == {
+        Path("MiniMax-H3/modular_model_index.json"),
+        Path("MiniMax-H3/transformer/config.json"),
+    }
+
+
+def test_select_explicit_weights_file_bypasses_name_prefilter() -> None:
+    """An explicit weights-file entry is included even when its name would fail the 'model'
+    naming-convention prefilter that subfolder contents are subject to."""
+    files = [
+        Path(f)
+        for f in [
+            "Repo/README.md",
+            "Repo/text_encoders/foo_int8_convrot.safetensors",
+            "Repo/vae/config.json",
+            "Repo/vae/diffusion_pytorch_model.safetensors",
+        ]
+    ]
+    filtered_files = filter_files(
+        files,
+        subfolders=[Path("text_encoders/foo_int8_convrot.safetensors"), Path("vae")],
+    )
+    assert set(filtered_files) == {
+        Path("Repo/text_encoders/foo_int8_convrot.safetensors"),
+        Path("Repo/vae/config.json"),
+        Path("Repo/vae/diffusion_pytorch_model.safetensors"),
+    }
+
+
+def test_select_nonexistent_entry_selects_nothing(minimax_h3_test_files: list[Path]) -> None:
+    """An entry matching neither a file nor a folder contributes nothing (and does not disable
+    the subfolder filtering for the remaining entries)."""
+    filtered_files = filter_files(
+        minimax_h3_test_files,
+        subfolders=[Path("no_such_entry.json"), Path("audio_vae")],
+    )
+    assert set(filtered_files) == {
+        Path("MiniMax-H3/audio_vae/config.json"),
+        Path("MiniMax-H3/audio_vae/diffusion_pytorch_model.safetensors"),
+    }
+
+
+def test_select_multiple_plain_subfolders_unchanged(minimax_h3_test_files: list[Path]) -> None:
+    """Regression: a pure-folder multi-subfolder list (the pre-existing '+' syntax) behaves as
+    before - explicit-file handling must not alter it."""
+    filtered_files = filter_files(
+        minimax_h3_test_files,
+        subfolders=[Path("text_encoder"), Path("tokenizer")],
+    )
+    assert set(filtered_files) == {
+        Path(f)
+        for f in [
+            "MiniMax-H3/text_encoder/config.json",
+            "MiniMax-H3/text_encoder/model-00001-of-00002.safetensors",
+            "MiniMax-H3/text_encoder/model-00002-of-00002.safetensors",
+            "MiniMax-H3/text_encoder/model.safetensors.index.json",
+            "MiniMax-H3/tokenizer/merges.txt",
+            "MiniMax-H3/tokenizer/tokenizer_config.json",
+            "MiniMax-H3/tokenizer/vocab.json",
+        ]
+    }

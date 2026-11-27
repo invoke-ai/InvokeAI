@@ -210,7 +210,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return
 
         # The remainder if this code is called when attention_type=='auto'.
-        if self.unet.device.type == "cuda":
+        if self.unet.device.type in ("cuda", "xpu"):
             if is_xformers_available() and prefer_xformers:
                 self.enable_xformers_memory_efficient_attention()
                 return
@@ -452,6 +452,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
+
+        # HiDiffusion modules share this dictionary. Setting the logical step here prevents separate CFG forwards from
+        # advancing the RAU-Net schedule independently and lets window attention reuse one shift for the whole step.
+        if hasattr(self.unet, "info"):
+            self.unet.info["step_index"] = step_index
 
         # Handle masked image-to-image (a.k.a inpainting).
         if mask_guidance is not None:

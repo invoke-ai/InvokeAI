@@ -1,9 +1,11 @@
 """FastAPI routes for custom node management."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
+import threading
 import traceback
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -28,6 +30,19 @@ logger = InvokeAILogger.get_logger()
 # were imported by that pack. Used on uninstall to delete only pack-imported workflows
 # — deleting by tag alone is unsafe because users can edit tags on their own workflows.
 PACK_MANIFEST_FILENAME = ".invokeai_pack_manifest.json"
+PACK_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+GIT_CLONE_TIMEOUT_SECONDS = 120
+
+# Install, uninstall and reload all mutate the same three pieces of global state: the custom-nodes
+# directory, `sys.modules`, and the invocation registry. As `async def` bodies containing no
+# `await` they could not interleave with each other - the event loop had no point at which to
+# switch. Running in the threadpool they can, and the interleavings are destructive: a failed
+# install's cleanup `rmtree`s the directory a concurrent install just cloned into, and an uninstall
+# can delete a pack out from under an install. This lock restores the exclusion explicitly.
+#
+# It is held across the git clone (up to its 120s timeout), which delays other *pack* operations
+# only. Before the routes were made synchronous the same clone blocked the entire event loop.
+_PACK_MUTATION_LOCK = threading.Lock()
 
 
 class NodePackInfo(BaseModel):
@@ -84,6 +99,27 @@ def _get_custom_nodes_path() -> Path:
     return config.custom_nodes_path
 
 
+def _validate_pack_name(pack_name: str) -> str:
+    """Validate pack directory names before using them in filesystem paths."""
+    if (
+        not pack_name
+        or pack_name in {".", ".."}
+        or "/" in pack_name
+        or "\\" in pack_name
+        or not PACK_NAME_RE.fullmatch(pack_name)
+    ):
+        raise ValueError("Invalid node pack name.")
+    return pack_name
+
+
+def _extract_pack_name_from_source(source: str) -> str:
+    """Derive a safe node pack name from a git source string."""
+    pack_name = source.rstrip("/").split("/")[-1]
+    if pack_name.endswith(".git"):
+        pack_name = pack_name[:-4]
+    return _validate_pack_name(pack_name)
+
+
 def _get_installed_packs() -> list[NodePackInfo]:
     """Scans the custom nodes directory and returns info about installed packs."""
     custom_nodes_path = _get_custom_nodes_path()
@@ -131,7 +167,7 @@ def _get_installed_packs() -> list[NodePackInfo]:
     operation_id="list_custom_node_packs",
     response_model=NodePackListResponse,
 )
-async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackListResponse:
+def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackListResponse:
     """Lists all installed custom node packs.
 
     Admin-only: the response includes absolute filesystem paths, and non-admins have no
@@ -146,7 +182,7 @@ async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackL
     operation_id="install_custom_node_pack",
     response_model=InstallNodePackResponse,
 )
-async def install_custom_node_pack(
+def install_custom_node_pack(
     current_admin: AdminUserOrDefault,
     request: InstallNodePackRequest = Body(description="The source URL to install from."),
 ) -> InstallNodePackResponse:
@@ -156,13 +192,29 @@ async def install_custom_node_pack(
 
     source = request.source.strip()
 
-    # Extract pack name from URL
-    pack_name = source.rstrip("/").split("/")[-1]
-    if pack_name.endswith(".git"):
-        pack_name = pack_name[:-4]
+    # Extract and validate pack name before using it in filesystem paths.
+    try:
+        pack_name = _extract_pack_name_from_source(source)
+    except ValueError as exc:
+        return InstallNodePackResponse(
+            name="",
+            success=False,
+            message=str(exc),
+        )
 
     target_dir = custom_nodes_path / pack_name
 
+    with _PACK_MUTATION_LOCK:
+        return _install_pack(source, pack_name, target_dir, owner_user_id=current_admin.user_id)
+
+
+def _install_pack(source: str, pack_name: str, target_dir: Path, owner_user_id: str) -> InstallNodePackResponse:
+    """Clones and loads a pack. Callers must hold `_PACK_MUTATION_LOCK`.
+
+    The exists-check and the cleanup `rmtree` in the failure paths below are only safe as a pair
+    while no other pack operation can run: without the lock two installs of the same pack both
+    pass the check, and the one whose clone fails deletes the other's freshly cloned directory.
+    """
     if target_dir.exists():
         return InstallNodePackResponse(
             name=pack_name,
@@ -176,7 +228,7 @@ async def install_custom_node_pack(
             ["git", "clone", source, str(target_dir)],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=GIT_CLONE_TIMEOUT_SECONDS,
         )
 
         if result.returncode != 0:
@@ -213,7 +265,7 @@ async def install_custom_node_pack(
         _load_node_pack(pack_name, target_dir)
 
         # Import any workflows found in the pack, owned by the installing admin and shared with all users
-        imported_workflow_ids = _import_workflows_from_pack(target_dir, pack_name, owner_user_id=current_admin.user_id)
+        imported_workflow_ids = _import_workflows_from_pack(target_dir, pack_name, owner_user_id=owner_user_id)
         _write_pack_manifest(target_dir, imported_workflow_ids)
         workflows_imported = len(imported_workflow_ids)
         workflow_msg = f" Imported {workflows_imported} workflow(s)." if workflows_imported > 0 else ""
@@ -257,7 +309,7 @@ async def install_custom_node_pack(
     operation_id="uninstall_custom_node_pack",
     response_model=UninstallNodePackResponse,
 )
-async def uninstall_custom_node_pack(
+def uninstall_custom_node_pack(
     current_admin: AdminUserOrDefault,
     pack_name: str,
 ) -> UninstallNodePackResponse:
@@ -266,9 +318,20 @@ async def uninstall_custom_node_pack(
     Note: A restart is required for the node removal to take full effect.
     Installed nodes from the pack will remain registered until restart.
     """
+    try:
+        pack_name = _validate_pack_name(pack_name)
+    except ValueError as exc:
+        return UninstallNodePackResponse(name=pack_name, success=False, message=str(exc))
+
     custom_nodes_path = _get_custom_nodes_path()
     target_dir = custom_nodes_path / pack_name
 
+    with _PACK_MUTATION_LOCK:
+        return _uninstall_pack(pack_name, target_dir)
+
+
+def _uninstall_pack(pack_name: str, target_dir: Path) -> UninstallNodePackResponse:
+    """Removes a pack and its imported workflows. Callers must hold `_PACK_MUTATION_LOCK`."""
     if not target_dir.exists():
         return UninstallNodePackResponse(
             name=pack_name,
@@ -324,7 +387,7 @@ async def uninstall_custom_node_pack(
     "/reload",
     operation_id="reload_custom_nodes",
 )
-async def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, str]:
+def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, str]:
     """Triggers a reload of all custom nodes.
 
     This re-scans the nodes directory and loads any new node packs.
@@ -338,12 +401,15 @@ async def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, st
 
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 
-    load_custom_nodes(custom_nodes_path, logger)
+    # Imports pack modules and registers their invocations, so it must not run alongside an
+    # install or uninstall doing the same to the same directory.
+    with _PACK_MUTATION_LOCK:
+        load_custom_nodes(custom_nodes_path, logger)
 
-    # Invalidate the OpenAPI schema cache so the frontend gets updated node definitions
-    from invokeai.app.api_app import app
+        # Invalidate the OpenAPI schema cache so the frontend gets updated node definitions
+        from invokeai.app.api_app import app
 
-    app.openapi_schema = None
+        app.openapi_schema = None
 
     return {"status": "Custom nodes reloaded successfully."}
 

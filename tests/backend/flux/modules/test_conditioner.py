@@ -35,7 +35,8 @@ class FakePartiallyLoadedEncoder(torch.nn.Module):
         return FakeEncoderOutput(pooler_output=torch.ones((1, 4), dtype=torch.float32))
 
 
-def test_hf_encoder_uses_effective_device_for_partially_loaded_models():
+def test_hf_encoder_uses_effective_device_when_no_device_given():
+    # Backwards-compatible fallback: with no explicit device, HFEncoder infers it from parameter residency.
     effective_device = torch.device("meta")
     encoder = FakePartiallyLoadedEncoder(effective_device=effective_device)
     hf_encoder = HFEncoder(encoder=encoder, tokenizer=FakeTokenizer(), is_clip=True, max_length=77)
@@ -43,3 +44,17 @@ def test_hf_encoder_uses_effective_device_for_partially_loaded_models():
     hf_encoder(["test prompt"])
 
     assert encoder.forward_input_device == effective_device
+
+
+def test_hf_encoder_prefers_explicit_device():
+    # Regression test for #9373: when all weights are offloaded to CPU, inferring the device would yield CPU and run
+    # the whole encode there. An explicit compute device (as the invocation now passes) must take precedence.
+    encoder = FakePartiallyLoadedEncoder(effective_device=torch.device("cpu"))
+    compute_device = torch.device("meta")
+    hf_encoder = HFEncoder(
+        encoder=encoder, tokenizer=FakeTokenizer(), is_clip=True, max_length=77, device=compute_device
+    )
+
+    hf_encoder(["test prompt"])
+
+    assert encoder.forward_input_device == compute_device

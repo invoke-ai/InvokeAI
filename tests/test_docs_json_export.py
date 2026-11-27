@@ -4,6 +4,11 @@ import importlib.util
 import json
 from pathlib import Path
 
+# Absolute, like `test_check_pins.py` and `test_new_architecture_script.py`: a path relative to
+# the process cwd only resolves when pytest is started from the repository root, and the four
+# tests below fail with a FileNotFoundError from anywhere else.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 def _load_module(module_path: Path, module_name: str):
     spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -15,7 +20,7 @@ def _load_module(module_path: Path, module_name: str):
 
 
 def test_docs_json_export_bundle_structure():
-    module = _load_module(Path("scripts/generate_docs_json.py"), "generate_docs_json")
+    module = _load_module(REPO_ROOT / "scripts" / "generate_docs_json.py", "generate_docs_json")
 
     bundle = module.build_docs_bundle()
 
@@ -23,7 +28,7 @@ def test_docs_json_export_bundle_structure():
 
 
 def test_docs_json_export_includes_images_interface_and_host_setting():
-    module = _load_module(Path("scripts/generate_docs_json.py"), "generate_docs_json")
+    module = _load_module(REPO_ROOT / "scripts" / "generate_docs_json.py", "generate_docs_json")
 
     bundle = module.build_docs_bundle()
 
@@ -36,7 +41,7 @@ def test_docs_json_export_includes_images_interface_and_host_setting():
 
 
 def test_docs_json_export_includes_rendering_metadata():
-    module = _load_module(Path("scripts/generate_docs_json.py"), "generate_docs_json")
+    module = _load_module(REPO_ROOT / "scripts" / "generate_docs_json.py", "generate_docs_json")
 
     bundle = module.build_docs_bundle()
 
@@ -57,7 +62,7 @@ def test_docs_json_export_includes_rendering_metadata():
 
 
 def test_docs_json_export_writes_expected_files(tmp_path: Path):
-    module = _load_module(Path("scripts/generate_docs_json.py"), "generate_docs_json")
+    module = _load_module(REPO_ROOT / "scripts" / "generate_docs_json.py", "generate_docs_json")
 
     bundle = module.build_docs_bundle()
     module.write_docs_bundle(bundle, tmp_path)

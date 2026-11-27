@@ -1,0 +1,56 @@
+import { createLogger } from '@platform/logging/logger';
+import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+import { createExternalStore } from '@platform/state/externalStore';
+import { apiFetchJson } from '@platform/transport/http';
+
+const logger = createLogger({ area: 'whats-new', namespace: 'app' });
+
+export interface WhatsNewSnapshot {
+  /** Closed during this page load, so a version arriving after a manual close does not reopen the notes. */
+  isDismissed: boolean;
+  /** Opened from the app menu; the automatic first-run showing is derived from preferences instead. */
+  isRequested: boolean;
+  /** The server version, or null while unknown; held here because account transitions clear the query cache. */
+  version: string | null;
+}
+
+const store = createExternalStore<WhatsNewSnapshot>({ isDismissed: false, isRequested: false, version: null });
+
+let versionLoad: Promise<void> | null = null;
+
+// The server version is not account data; only the request to show the notes follows the account.
+registerAccountOwnedResource({
+  clear: () => store.patchSnapshot({ isDismissed: false, isRequested: false }),
+  name: 'whats-new',
+});
+
+/** The version only changes across a server restart, so one successful read per page load is enough. */
+export const loadAppVersion = (): Promise<void> => {
+  if (store.getSnapshot().version !== null) {
+    return Promise.resolve();
+  }
+
+  versionLoad ??= apiFetchJson<{ version: string }>('/api/v1/app/version')
+    .then((response) => store.patchSnapshot({ version: response.version }))
+    .catch((error: unknown) => {
+      // The notes stay closed until a later load succeeds; nothing else depends on them.
+      logger.warn({ error, message: 'Failed to load the app version', name: 'app.whats-new.version-failed' });
+    })
+    .finally(() => {
+      versionLoad = null;
+    });
+
+  return versionLoad;
+};
+
+export const openWhatsNew = (): void => {
+  store.patchSnapshot({ isRequested: true });
+  // A failed boot read leaves the version out of the header and links; try again while the notes are open.
+  void loadAppVersion();
+};
+
+export const dismissWhatsNew = (): void => store.patchSnapshot({ isDismissed: true, isRequested: false });
+
+export const getWhatsNewSnapshot = (): WhatsNewSnapshot => store.getSnapshot();
+
+export const useWhatsNewSnapshot = (): WhatsNewSnapshot => store.useSnapshot();

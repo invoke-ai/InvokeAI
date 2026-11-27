@@ -1,0 +1,27 @@
+import { lazy, Suspense } from 'react';
+
+/** Load all live panels from one shared chunk while mounting independently. */
+
+const loadLivePanels = () => import('./livePanels');
+
+const ModelsNotice = lazy(() => loadLivePanels().then((module) => ({ default: module.ModelsNotice })));
+const ModelsRequiredHint = lazy(() => loadLivePanels().then((module) => ({ default: module.ModelsRequiredHint })));
+const QueueStatusBand = lazy(() => loadLivePanels().then((module) => ({ default: module.QueueStatusBand })));
+const RecentOutputs = lazy(() => loadLivePanels().then((module) => ({ default: module.RecentOutputs })));
+
+const PANELS = {
+  models: ModelsNotice,
+  modelsRequired: ModelsRequiredHint,
+  outputs: RecentOutputs,
+  queue: QueueStatusBand,
+} as const;
+
+export const LivePanel = ({ panel }: { panel: keyof typeof PANELS }) => {
+  const Panel = PANELS[panel];
+
+  return (
+    <Suspense fallback={null}>
+      <Panel />
+    </Suspense>
+  );
+};

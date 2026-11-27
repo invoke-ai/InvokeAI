@@ -1,9 +1,21 @@
+import threading
+import weakref
+from contextlib import contextmanager
+from typing import Iterator
+
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
+    StorageKey,
+    analyze_state_dict,
+    move_shared,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
-from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.logging import InvokeAILogger
 
 
@@ -14,34 +26,142 @@ class CachedModelWithPartialLoad:
     MPS memory, etc.
     """
 
-    def __init__(self, model: torch.nn.Module, compute_device: torch.device, keep_ram_copy: bool = False):
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        compute_device: torch.device,
+        keep_ram_copy: bool = False,
+        shared_store: SharedCpuWeightsStore | None = None,
+        cache_key: str | None = None,
+    ):
         self._model = model
         self._compute_device = compute_device
+        # When set, this model's CPU weights are a shared canonical copy owned by `shared_store`
+        # under `cache_key`; `release_shared_weights()` must be called exactly once on eviction.
+        self._shared_store: SharedCpuWeightsStore | None = None
+        self._shared_key: str | None = None
+        self._shared_release_finalizer: weakref.finalize | None = None
+        # Assigned for real at the end of __init__; initialized here so the acquire-failure path
+        # below can call release_shared_weights(), which reads it, before that assignment runs.
+        self._cpu_state_dict: dict[str, torch.Tensor] | None = None
+        # The page-locked CPU weights this model streams with `async_weight_streaming`; created on the first load that
+        # leaves streaming weights in RAM. `release_pinned_weights()` releases them on eviction, the finalizer if the
+        # wrapper is dropped without one.
+        self._pin_holder: weight_streaming.PinHolder | None = None
+        self._pin_release_finalizer: weakref.finalize | None = None
+        # Set on eviction. An evicted record can still finish a lock that was under way; it must not pin again, as
+        # nothing would release that before the wrapper is collected.
+        self._pinning_retired = False
+        # Whether weights moved since the pins were last brought up to date (`pin_streamed_weights`).
+        self._pins_stale = True
+        # Serializes `pin_streamed_weights`: two threads locking this model at once (a session and the image index
+        # worker) would otherwise both create a holder, or one would return while the other's update still runs.
+        # Releases do not take it: eviction must not wait behind a slow first pin.
+        self._pin_lock = threading.Lock()
+        # The cache locks of this wrapper (`begin_streaming_lock`), the storages they locked in the registry (None
+        # while the feature is not in use for them), and whether the lock planned VRAM for streaming copies.
+        self._streaming_locks = 0
+        self._locked_keys: frozenset | None = None
+        self._ram_storages: list[torch.UntypedStorage] | None = None
+        self._ram_keys: frozenset | None = None
+        self._registration_planned = True
 
         model_state_dict = model.state_dict()
         # A CPU read-only copy of the model's state dict. Used for faster model unloads from VRAM, and to speed up LoRA
         # patching. Set to `None` if keep_ram_copy is False.
-        self._cpu_state_dict: dict[str, torch.Tensor] | None = model_state_dict if keep_ram_copy else None
+        cpu_state_dict: dict[str, torch.Tensor] | None = model_state_dict if keep_ram_copy else None
 
         # A dictionary of the size of each tensor in the state dict.
         # HACK(ryand): We use this dictionary any time we are doing byte tracking calculations. We do this for
         # consistency in case the application code has modified the model's size (e.g. by casting to a different
         # precision). Of course, this means that we are making model cache load/unload decisions based on model size
         # data that may not be fully accurate.
-        self._state_dict_bytes = {k: calc_tensor_size(v) for k, v in model_state_dict.items()}
-
+        #
+        # Note: these are computed from the model's own state dict *before* the shared-weights re-point
+        # below. The re-point only swaps tensor storage; keys, shapes and dtypes are unchanged, so the
+        # metadata is identical either way. Computing it first keeps the acquire the last (and only
+        # failure-prone) step, so a failure there can release the reference cleanly without leaking it.
+        #
+        # Tied weights share one tensor under several keys. Their bytes are charged to the first of those keys and
+        # the rest are charged 0, so every sum over this dict counts the memory once; `_aliases` below keeps the
+        # group moving as a unit, so a charged key and its free aliases are never on different devices.
+        aliases = analyze_state_dict(model_state_dict)
+        self._aliases = aliases.groups
+        self._state_dict_bytes = aliases.bytes_by_key
         self._total_bytes = sum(self._state_dict_bytes.values())
+        # The dtype each of those byte counts is in. A holder may cast weights in place (the SD VAE nodes upcast the
+        # VAE to fp32); the last unlock returns them to these dtypes (see `restore_counted_dtypes`), so between locks
+        # the bytes on each device are what `cur_vram_bytes()` and `total_bytes()` report.
+        self._state_dict_dtypes = {key: tensor.dtype for key, tensor in model_state_dict.items()}
         self._cur_vram_bytes: int | None = None
-
         self._modules_that_support_autocast = self._find_modules_that_support_autocast()
         self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
             model_state_dict
         )
         self._state_dict_keys_by_module_prefix = self._group_state_dict_keys_by_module_prefix(model_state_dict)
+        # What `cast_to_device` could stream asynchronously at most; bounds the VRAM reserve of a streaming lock.
+        self._streamable_bytes = sum(
+            self._state_dict_bytes[key]
+            for key, tensor in model_state_dict.items()
+            if key not in self._keys_in_modules_that_do_not_support_autocast
+            and weight_streaming.is_streamable_tensor(tensor)
+        )
+
+        # In multi-GPU mode, share a single canonical CPU copy of the weights across the per-device
+        # caches instead of keeping one copy per device (see SharedCpuWeightsStore). If another
+        # device already registered this key, re-point our module's params at the shared tensors and
+        # drop our freshly-built duplicate so the weights live once in RAM.
+        if cpu_state_dict is not None and shared_store is not None and cache_key is not None:
+            canonical = shared_store.acquire(cache_key, cpu_state_dict)
+            self._cpu_state_dict = canonical  # Release this exact entry if construction fails.
+            self._shared_store = shared_store
+            self._shared_key = cache_key
+            try:
+                if canonical is not cpu_state_dict:
+                    self._model.load_state_dict(canonical, assign=True)
+                cpu_state_dict = canonical
+                # A cache dropped without a shutdown() never routes its records through
+                # _delete_cache_entry, so nothing would call release_shared_weights() and the
+                # canonical tensors would stay resident (and counted by the RAM budget) forever.
+                # The finalizer must not reference `self` (its args are held strongly — that would
+                # make the wrapper immortal) and must not take the store's non-reentrant lock (it
+                # runs in GC context): release_deferred only enqueues; the store applies it on its
+                # next operation. release_shared_weights() detaches this on the normal eviction
+                # path, so the release happens exactly once either way. Registered inside this try
+                # so a failure here (e.g. MemoryError) releases the just-acquired reference too.
+                self._shared_release_finalizer = weakref.finalize(
+                    self, shared_store.release_deferred, cache_key, canonical
+                )
+                self._shared_release_finalizer.atexit = False
+            except BaseException:
+                # The re-point or finalizer registration failed after acquiring a reference;
+                # release it so the shared entry's refcount isn't leaked (this wrapper will never
+                # be inserted into the cache).
+                self.release_shared_weights()
+                raise
+
+        self._cpu_state_dict = cpu_state_dict
+
+    def _select_with_aliases(self, selected: set[str], key: str) -> int:
+        """Add `key` and everything tied to it to `selected`; return the bytes that adds.
+
+        A group moves as a unit: selecting only the alias that is charged 0 bytes would move the memory while the
+        accounting recorded nothing.
+        """
+        added_bytes = 0
+        for group_key in self._aliases.get(key, (key,)):
+            if group_key not in selected:
+                selected.add(group_key)
+                added_bytes += self._state_dict_bytes[group_key]
+        return added_bytes
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
-        """Find all modules that support autocasting."""
-        return {n: m for n, m in self._model.named_modules() if isinstance(m, CustomModuleMixin)}  # type: ignore
+        """Find all modules that support autocasting and let the cache stream their weights."""
+        return {
+            n: m
+            for n, m in self._model.named_modules()
+            if isinstance(m, CustomModuleMixin) and m.streams_weights  # type: ignore
+        }
 
     def _find_keys_in_modules_that_do_not_support_autocast(self, state_dict: dict[str, torch.Tensor]) -> set[str]:
         keys_in_modules_that_do_not_support_autocast: set[str] = set()
@@ -105,12 +225,26 @@ class CachedModelWithPartialLoad:
         for module in self._model.modules():
             for name, buffer in module.named_buffers():
                 if name in module._non_persistent_buffers_set:
-                    module._buffers[name] = buffer.to(device, copy=True)
+                    if buffer.device.type != device.type or (
+                        device.index is not None and buffer.device.index != device.index
+                    ):
+                        module._buffers[name] = buffer.to(device, copy=True)
 
     def _set_autocast_enabled_in_all_modules(self, enabled: bool):
         """Set autocast_enabled flag in all modules that support device autocasting."""
         for module in self._modules_that_support_autocast.values():
             module.set_device_autocasting_enabled(enabled)
+
+    @contextmanager
+    def _transfer_operation(self) -> Iterator[None]:
+        """Invalidate derived residency state if a transfer leaves the model partially changed."""
+        try:
+            yield
+        except BaseException:
+            self._cur_vram_bytes = None
+            self._pins_stale = True
+            self._set_autocast_enabled_in_all_modules(True)
+            raise
 
     @property
     def model(self) -> torch.nn.Module:
@@ -120,6 +254,174 @@ class CachedModelWithPartialLoad:
         """Get a read-only copy of the model's state dict in RAM."""
         # TODO(ryand): Document this better.
         return self._cpu_state_dict
+
+    @property
+    def uses_shared_weights(self) -> bool:
+        """True if this model's CPU weights are deduplicated in a SharedCpuWeightsStore.
+
+        When True, its RAM is accounted by the store (counted once across devices); when False, its
+        RAM is per-instance and must be counted by the RamBudget's non-shared total.
+        """
+        return self._shared_store is not None
+
+    def release_shared_weights(self) -> None:
+        """Release this model's reference to its shared canonical CPU weights, if any.
+
+        Must be called exactly once when the cache entry is evicted. Idempotent: a second call is a
+        no-op. After release, the shared store frees the canonical tensors once the last device that
+        held this key releases it.
+        """
+        if self._shared_release_finalizer is not None:
+            # The eviction path is releasing synchronously; the collection-time fallback must not
+            # release the same reference a second time.
+            self._shared_release_finalizer.detach()
+            self._shared_release_finalizer = None
+        if self._shared_store is not None and self._shared_key is not None:
+            self._shared_store.release(self._shared_key, self._cpu_state_dict)
+            self._shared_store = None
+            self._shared_key = None
+
+    def release_pinned_weights(self) -> bool:
+        """Release this model's page-locked CPU weights (see `pin_streamed_weights`); whether it had any. Called on
+        eviction; idempotent. Storages another holder (a wrapper on another GPU sharing these weights) still uses stay
+        pinned."""
+        # Set first: a `pin_streamed_weights` running concurrently checks it again after registering and undoes that.
+        self._pinning_retired = True
+        if self._pin_release_finalizer is not None:
+            self._pin_release_finalizer.detach()
+            self._pin_release_finalizer = None
+        holder, self._pin_holder = self._pin_holder, None
+        return holder is not None and weight_streaming.PINNED_STORAGES.release(holder)
+
+    def _streams_weights(self) -> bool:
+        return not self._pinning_retired and weight_streaming.can_stream_weights_to(
+            self._compute_device, has_ram_copy=self._cpu_state_dict is not None
+        )
+
+    def _streamable_ram_storages(self) -> list[torch.UntypedStorage]:
+        """The storages of the RAM copy the custom modules could stream: all that can ever be registered for this model.
+        Fixed for the wrapper's life, so listed once."""
+        if self._ram_storages is None:
+            ram_copy = self._cpu_state_dict
+            assert ram_copy is not None  # Callers check `has_ram_copy`.
+            self._ram_storages = [
+                tensor.untyped_storage()
+                for key, tensor in ram_copy.items()
+                if key not in self._keys_in_modules_that_do_not_support_autocast
+                and weight_streaming.is_streamable_tensor(tensor)
+            ]
+        return self._ram_storages
+
+    def begin_streaming_lock(self) -> None:
+        """Called by the cache as it takes a lock on this model, under its lock and before anything moves.
+
+        While the lock lasts, the storages of the RAM copy are not unregistered (see `PinnedStorageRegistry`): the
+        cache's partial loads, the repair of required weights, the synchronous fallback copies and the unpatching of
+        LoRAs all copy from them on this thread's own streams, and the registry cannot see those copies. Another
+        thread that is unregistering one of them makes this wait for it. Also withdraws the plan for streaming copies
+        (`weight_streaming_reserve_bytes`) until this lock plans it again.
+        """
+        if self._streaming_locks == 0:
+            self._registration_planned = False
+            if weight_streaming.can_stream_weights_to(self._compute_device, self._cpu_state_dict is not None):
+                if self._ram_keys is None:
+                    self._ram_keys = weight_streaming.storage_keys(self._streamable_ram_storages())
+                weight_streaming.PINNED_STORAGES.lock(self._ram_keys)
+                self._locked_keys = self._ram_keys
+        self._streaming_locks += 1
+
+    def end_streaming_lock(self) -> None:
+        """Called by the cache as a lock on this model ends, whether or not it settled."""
+        self._streaming_locks -= 1
+        if self._streaming_locks == 0 and self._locked_keys is not None:
+            keys, self._locked_keys = self._locked_keys, None
+            registry = weight_streaming.PINNED_STORAGES
+            registry.unlock(keys)
+            # Unregisters what an eviction left pending behind this lock. A thread holding the registration lock drains
+            # when it releases it.
+            registry.drain_deferred()
+
+    def weight_streaming_reserve_bytes(self) -> int:
+        """VRAM a lock that leaves streamed weights in RAM needs beyond the model's resident weights and the working
+        memory: the copies in flight, at most `weight_streaming.STREAM_BUDGET_BYTES`. The layer being computed needs
+        no reserve, the synchronous path holds it as well.
+
+        The answer is the plan: when it is 0 (nothing streams, or the pinned-RAM cap leaves no room), this lock
+        registers nothing new, so no streaming starts that nobody reserved VRAM for.
+        """
+        self._registration_planned = False
+        if self._streamable_bytes == 0 or not self._streams_weights():
+            return 0
+        registry = weight_streaming.PINNED_STORAGES
+        if not registry.can_register(self._compute_device):
+            return 0
+        if not registry.has_room_for_any(self._streamable_ram_storages()):
+            return 0
+        self._registration_planned = True
+        return min(weight_streaming.STREAM_BUDGET_BYTES, self._streamable_bytes)
+
+    def pin_streamed_weights(self) -> None:
+        """Page-lock the CPU-resident weights the custom modules stream, so `cast_to_device` copies them
+        asynchronously (`async_weight_streaming`), and mark them as streamed by this lock. What earlier locks pinned
+        stays pinned (see `PinnedStorageRegistry`): models that take turns in VRAM pay for registration once.
+
+        Called by the holder of a settled lock, outside the global load lock and the cache's lock: page-locking
+        weights that are still only mapped from their file reads them into RAM (about 2.5 s/GiB measured), which
+        must not stall other models' construction or this device's cache. The lock keeps the residency fixed.
+
+        Only with a RAM copy: its tensors are the ones the parameters point to while offloaded, and they stay put
+        across loads and unloads. Without one, offloaded weights are fresh allocations on every unload.
+        """
+        with self._pin_lock:
+            self._pin_streamed_weights_locked()
+
+    def mark_streamed_weights_idle(self) -> None:
+        """Called by the cache when the model's last lock ends: its pins stay, but another model's registration may
+        reclaim them under the pinned-RAM cap."""
+        holder = self._pin_holder
+        if holder is not None:
+            weight_streaming.PINNED_STORAGES.idle(holder)
+
+    def _pin_streamed_weights_locked(self) -> None:
+        registry = weight_streaming.PINNED_STORAGES
+        if not self._streams_weights():
+            # Also covers the setting being switched off while pins are held.
+            holder = self._pin_holder
+            if holder is not None:
+                registry.release(holder)
+                self._pins_stale = True
+            return
+        holder = self._pin_holder
+        if not self._pins_stale and holder is not None and registry.activate(holder):
+            return  # Nothing moved since the last lock, and all it streams is still pinned.
+        if holder is None:
+            holder = weight_streaming.PinHolder(self._compute_device)
+            # Like the shared-weights finalizer: must not reference `self`, and only enqueues (GC context).
+            finalizer = weakref.finalize(self, registry.release_deferred, holder)
+            finalizer.atexit = False
+            self._pin_holder, self._pin_release_finalizer = holder, finalizer
+        self._pins_stale = False
+        ram_copy = self._cpu_state_dict
+        assert ram_copy is not None  # `_streams_weights` requires it.
+        # Only storages of the RAM copy: they live as long as this wrapper, so the registry holding them keeps nothing
+        # alive that would otherwise be freed (a holder may have cast weights in place, see `restore_counted_dtypes`).
+        streamed = [
+            tensor.untyped_storage()
+            for key, tensor in self._model.state_dict().items()
+            if tensor.device.type == "cpu"
+            and key not in self._keys_in_modules_that_do_not_support_autocast
+            and weight_streaming.is_streamable_tensor(tensor)
+            and key in ram_copy
+            and ram_copy[key].untyped_storage().data_ptr() == tensor.untyped_storage().data_ptr()
+        ]
+        try:
+            registry.update(holder, streamed, register_new=self._registration_planned)
+        except BaseException:
+            self._pins_stale = True
+            raise
+        if self._pinning_retired:
+            # Evicted while registering: `release_pinned_weights` may have released before this update.
+            registry.release(holder)
 
     def total_bytes(self) -> int:
         """Get the total size (in bytes) of all the weights in the model."""
@@ -157,18 +459,31 @@ class CachedModelWithPartialLoad:
         movement invalidates the cached VRAM accounting.
         """
         cur_state_dict = self._model.state_dict()
-        keys_to_repair = {
-            key
-            for key in self._keys_in_modules_that_do_not_support_autocast
-            if cur_state_dict[key].device.type != self._compute_device.type
-        }
-        if len(keys_to_repair) == 0:
-            return 0
+        keys_to_repair: set[str] = set()
+        repaired_required_tensors = 0
+        for key in self._keys_in_modules_that_do_not_support_autocast:
+            if cur_state_dict[key].device.type != self._compute_device.type:
+                # Tied names come along, but the count stays what the caller asked about: required tensors repaired.
+                self._select_with_aliases(keys_to_repair, key)
+                repaired_required_tensors += 1
+        with self._transfer_operation():
+            if keys_to_repair:
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_repair, self._compute_device)
+            self._move_non_persistent_buffers_to_device(self._compute_device)
+            if keys_to_repair:
+                self._cur_vram_bytes = None
+        if keys_to_repair:
+            self._pins_stale = True
+        return repaired_required_tensors
 
-        self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_repair, self._compute_device)
-        self._move_non_persistent_buffers_to_device(self._compute_device)
-        self._cur_vram_bytes = None
-        return len(keys_to_repair)
+    def restore_counted_dtypes(self) -> None:
+        """Return every weight a holder cast in place to the dtype `cur_vram_bytes()` and `total_bytes()` count it in.
+
+        The cache calls this when the last lock ends (see `ModelCache._unpin`) and `return_to_counted_dtypes` does the
+        work. Weights keep their devices, so a VRAM count already taken stays true, unless a tied weight's names were
+        split across devices: they all get the tensor of the first name visited, on its device.
+        """
+        return_to_counted_dtypes(self._model, self._state_dict_dtypes, self._aliases, self._cpu_state_dict)
 
     def _load_state_dict_with_device_conversion(
         self, state_dict: dict[str, torch.Tensor], keys_to_convert: set[str], target_device: torch.device
@@ -202,6 +517,7 @@ class CachedModelWithPartialLoad:
         peak virtual memory usage. Specifically, we want to avoid a case where we hold references to all of the CPU weights
         and CUDA weights simultaneously, because Windows will reserve virtual memory for both.
         """
+        moved: dict[StorageKey, torch.Tensor] = {}
         for module_name, module in self._model.named_modules():
             module_keys = self._state_dict_keys_by_module_prefix.get(module_name, [])
             # Calculate the length of the module name prefix.
@@ -214,7 +530,7 @@ class CachedModelWithPartialLoad:
                 if key in keys_to_convert:
                     # It is important that we overwrite `state_dict[key]` to avoid keeping two copies of the same
                     # parameter.
-                    state_dict[key] = state_dict[key].to(target_device)
+                    state_dict[key] = move_shared(state_dict[key], target_device, moved)
                 # Note that we keep parameters that have not been moved to a new device in case the module implements
                 # weird custom state dict loading logic that requires all parameters to be present.
                 module_state_dict[key[prefix_len:]] = state_dict[key]
@@ -238,11 +554,13 @@ class CachedModelWithPartialLoad:
         """Convert parameters to the target device and load them into the model. Leverages the `cpu_state_dict` to speed
         up transfers of weights to the CPU.
         """
+        moved: dict[StorageKey, torch.Tensor] = {}
         for key in keys_to_convert:
             if target_device.type == "cpu":
+                # The CPU copy already shares one tensor between tied keys, so this restores the tie too.
                 state_dict[key] = cpu_state_dict[key]
             else:
-                state_dict[key] = state_dict[key].to(target_device)
+                state_dict[key] = move_shared(state_dict[key], target_device, moved)
 
         self._model.load_state_dict(state_dict, assign=True)
 
@@ -253,25 +571,45 @@ class CachedModelWithPartialLoad:
         Returns:
             The number of bytes loaded into VRAM.
         """
-        # TODO(ryand): Handle the case where an exception is thrown while loading or unloading weights. At the very
-        # least, we should reset self._cur_vram_bytes to None.
+        vram_bytes_loaded, _truncated = self.partial_load_to_vram_chunk(vram_bytes_to_load, max_bytes=None)
+        return vram_bytes_loaded
+
+    @torch.no_grad()
+    def partial_load_to_vram_chunk(self, vram_bytes_to_load: int, max_bytes: int | None) -> tuple[int, bool]:
+        """Load more weights into VRAM without exceeding vram_bytes_to_load, optionally stopping after max_bytes.
+
+        `vram_bytes_to_load` is the capacity budget (how much VRAM the weights may occupy);
+        `max_bytes` is a per-call pacing cap that lets a caller split one long RAM->VRAM stream
+        into bounded passes (so a lock held around each pass is released between passes).
+        Successive calls resume from the current residency, so calling until `truncated` is False
+        reaches exactly the state a single uncapped call would have reached.
+
+        Returns:
+            (vram_bytes_loaded, truncated): `truncated` is True iff the scan stopped because
+            `max_bytes` was reached while more weights would otherwise have been selected — i.e.
+            another call can make further progress toward the same `vram_bytes_to_load` budget.
+        """
+        if max_bytes is not None and max_bytes <= 0:
+            # A non-positive cap would return (0, truncated=True) forever and spin any caller that
+            # loops until settled.
+            raise ValueError(f"max_bytes must be positive when set; got {max_bytes}.")
 
         vram_bytes_loaded = 0
+        truncated = False
 
         cur_state_dict = self._model.state_dict()
 
         # Identify the keys that will be loaded into VRAM.
         keys_to_load: set[str] = set()
 
-        # First, process the keys that *must* be loaded into VRAM.
+        # First, process the keys that *must* be loaded into VRAM. The pacing cap does not apply to
+        # these: a pass must never end with the model in a state that cannot run.
         for key in self._keys_in_modules_that_do_not_support_autocast:
             param = cur_state_dict[key]
             if param.device.type == self._compute_device.type:
                 continue
 
-            keys_to_load.add(key)
-            param_size = self._state_dict_bytes[key]
-            vram_bytes_loaded += param_size
+            vram_bytes_loaded += self._select_with_aliases(keys_to_load, key)
 
         if vram_bytes_loaded > vram_bytes_to_load:
             logger = InvokeAILogger.get_logger()
@@ -290,35 +628,52 @@ class CachedModelWithPartialLoad:
             if param.device.type == self._compute_device.type:
                 continue
 
+            if max_bytes is not None and vram_bytes_loaded >= max_bytes:
+                # The pacing cap is reached and at least one more off-device key exists. Whether
+                # that key would have fit the capacity budget is deliberately not checked here —
+                # the next pass re-derives it with a fresh budget.
+                truncated = True
+                break
+
             param_size = self._state_dict_bytes[key]
+            if param_size == 0 and key in self._aliases:
+                # A tied key whose group is charged to another name. It is loaded with that name, against the budget;
+                # selecting it here would move the group's memory without the budget ever seeing its bytes.
+                continue
+
             if vram_bytes_loaded + param_size > vram_bytes_to_load:
                 # TODO(ryand): Should we just break here? If we couldn't fit this parameter into VRAM, is it really
                 # worth continuing to search for a smaller parameter that would fit?
                 fully_loaded = False
                 continue
 
-            keys_to_load.add(key)
-            vram_bytes_loaded += param_size
+            vram_bytes_loaded += self._select_with_aliases(keys_to_load, key)
 
-        if len(keys_to_load) > 0:
-            # We load the entire state dict, not just the parameters that changed, in case there are modules that
-            # override _load_from_state_dict() and do some funky stuff that requires the entire state dict.
-            # Alternatively, in the future, grouping parameters by module could probably solve this problem.
-            self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_load, self._compute_device)
+        with self._transfer_operation():
+            if len(keys_to_load) > 0:
+                # We load the entire state dict, not just the parameters that changed, in case there are modules that
+                # override _load_from_state_dict() and do some funky stuff that requires the entire state dict.
+                # Alternatively, in the future, grouping parameters by module could probably solve this problem.
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_load, self._compute_device)
 
-        if self._cur_vram_bytes is not None:
-            self._cur_vram_bytes += vram_bytes_loaded
+            if self._cur_vram_bytes is not None:
+                self._cur_vram_bytes += vram_bytes_loaded
 
-        if fully_loaded:
-            self._set_autocast_enabled_in_all_modules(False)
-        else:
-            self._set_autocast_enabled_in_all_modules(True)
+            if fully_loaded and not truncated:
+                self._set_autocast_enabled_in_all_modules(False)
+            else:
+                # Not fully resident (or a truncated pass whose remaining keys are unknown): the
+                # autocast wrappers must stay enabled so the model stays runnable either way.
+                self._set_autocast_enabled_in_all_modules(True)
 
-        # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate in
-        # the vram_bytes_loaded tracking.
-        self._move_non_persistent_buffers_to_device(self._compute_device)
+            # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate
+            # in the vram_bytes_loaded tracking.
+            self._move_non_persistent_buffers_to_device(self._compute_device)
 
-        return vram_bytes_loaded
+        if keys_to_load:
+            self._pins_stale = True
+
+        return vram_bytes_loaded, truncated
 
     @torch.no_grad()
     def partial_unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
@@ -346,20 +701,29 @@ class CachedModelWithPartialLoad:
             if param.device.type == offload_device:
                 continue
 
-            if keep_required_weights_in_vram and key in self._keys_in_modules_that_do_not_support_autocast:
+            # A group is kept whenever any of its names is required: offloading it through one of its other names
+            # would take the required tensor to the CPU with it, and the next forward would fail on the device
+            # mismatch.
+            if keep_required_weights_in_vram and any(
+                group_key in self._keys_in_modules_that_do_not_support_autocast
+                for group_key in self._aliases.get(key, (key,))
+            ):
                 required_weights_in_vram += self._state_dict_bytes[key]
                 continue
 
-            keys_to_offload.add(key)
-            vram_bytes_freed += self._state_dict_bytes[key]
+            vram_bytes_freed += self._select_with_aliases(keys_to_offload, key)
 
-        if len(keys_to_offload) > 0:
-            self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_offload, torch.device("cpu"))
+        with self._transfer_operation():
+            if len(keys_to_offload) > 0:
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_offload, torch.device("cpu"))
 
-        if self._cur_vram_bytes is not None:
-            self._cur_vram_bytes -= vram_bytes_freed
+            if self._cur_vram_bytes is not None:
+                self._cur_vram_bytes -= vram_bytes_freed
 
-        # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
-        # layers.
-        self._set_autocast_enabled_in_all_modules(True)
+            # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
+            # layers.
+            self._set_autocast_enabled_in_all_modules(True)
+
+        if keys_to_offload:
+            self._pins_stale = True
         return vram_bytes_freed

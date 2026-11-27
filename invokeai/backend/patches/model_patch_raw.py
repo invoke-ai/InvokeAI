@@ -1,4 +1,3 @@
-# Copyright (c) 2024 The InvokeAI Development team
 from typing import Mapping, Optional
 
 import torch

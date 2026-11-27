@@ -5,7 +5,6 @@ from typing import Optional, TypedDict
 
 import cv2
 import numpy as np
-from mediapipe.python.solutions.face_mesh import FaceMesh  # type: ignore[import]
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from PIL.Image import Image as ImageType
 from pydantic import field_validator
@@ -20,6 +19,7 @@ from invokeai.app.invocations.fields import ImageField, InputField, OutputField,
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.mediapipe_face import mediapipe_import_error
 
 
 @invocation_output("face_mask_output")
@@ -194,7 +194,13 @@ def generate_face_box_mask(
         # Convert RGBA to RGB by removing the alpha channel.
         np_image = np_image[:, :, :3]
 
-    # Create a FaceMesh object for face landmark detection and mesh generation.
+    # Create a FaceMesh object for face landmark detection and mesh generation. Imported here, not at
+    # module level: mediapipe is absent on Windows ARM64 and this module is imported at startup.
+    try:
+        from mediapipe.python.solutions.face_mesh import FaceMesh  # type: ignore[import]
+    except ImportError as e:
+        raise mediapipe_import_error(e) from e
+
     face_mesh = FaceMesh(
         max_num_faces=999,
         min_detection_confidence=minimum_confidence,

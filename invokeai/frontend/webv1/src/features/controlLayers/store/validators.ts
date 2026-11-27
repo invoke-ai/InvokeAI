@@ -1,0 +1,348 @@
+import type {
+  CanvasControlLayerState,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
+  RefImageState,
+} from 'features/controlLayers/store/types';
+import { isKrea2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import {
+  type AnyModelConfigWithExternal,
+  isExternalApiModelConfig,
+  type MainOrExternalModelConfig,
+} from 'services/api/types';
+
+const WARNINGS = {
+  UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
+  RG_NO_PROMPTS_OR_IP_ADAPTERS: 'controlLayers.warnings.rgNoPromptsOrIPAdapters',
+  RG_NEGATIVE_PROMPT_NOT_SUPPORTED: 'controlLayers.warnings.rgNegativePromptNotSupported',
+  RG_REFERENCE_IMAGES_NOT_SUPPORTED: 'controlLayers.warnings.rgReferenceImagesNotSupported',
+  RG_AUTO_NEGATIVE_NOT_SUPPORTED: 'controlLayers.warnings.rgAutoNegativeNotSupported',
+  RG_NO_REGION: 'controlLayers.warnings.rgNoRegion',
+  IDEOGRAM4_TXT2IMG_ONLY: 'controlLayers.warnings.ideogram4Txt2ImgOnly',
+  IP_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.ipAdapterNoModelSelected',
+  IP_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.ipAdapterIncompatibleBaseModel',
+  IP_ADAPTER_NO_IMAGE_SELECTED: 'controlLayers.warnings.ipAdapterNoImageSelected',
+  CONTROL_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.controlAdapterNoModelSelected',
+  CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.controlAdapterIncompatibleBaseModel',
+  CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
+  FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA: 'controlLayers.warnings.fluxFillIncompatibleWithControlLoRA',
+  CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL: 'controlLayers.warnings.controlAdapterDuplicateAnimaLLLiteModel',
+  KREA2_ONLY_ONE_REFERENCE_IMAGE: 'controlLayers.warnings.krea2OnlyOneReferenceImage',
+} as const;
+
+type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
+
+export const getRegionalGuidanceWarnings = (
+  entity: CanvasRegionalGuidanceState,
+  model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
+
+  if (entity.objects.length === 0) {
+    // Layer is in empty state
+    warnings.push(WARNINGS.RG_NO_REGION);
+  }
+
+  if (entity.positivePrompt === null && entity.negativePrompt === null && entity.referenceImages.length === 0) {
+    // Must have at least 1 prompt or IP Adapter
+    warnings.push(WARNINGS.RG_NO_PROMPTS_OR_IP_ADAPTERS);
+  }
+
+  if (model) {
+    if (model.base === 'sd-3' || model.base === 'sd-2') {
+      // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+      return warnings;
+    }
+
+    if (model.base === 'flux') {
+      // Some features are not supported for flux models
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'flux2') {
+      // FLUX.2 Klein applies a single attention mask uniformly across all transformer blocks;
+      // regional negatives / auto-negative are not supported. Reference images (IP Adapters)
+      // are handled via FLUX.2's built-in kontext path, not via regional reference images.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'z-image') {
+      // Z-Image has similar limitations to FLUX - no negative prompts via CFG by default
+      // Reference images (IP Adapters) are not supported for Z-Image
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'anima') {
+      // Reference images (IP Adapters) are not supported for Anima
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'krea-2') {
+      // Krea-2's canvas graph currently exposes positive regional text only. The denoise node supports
+      // masked negative conditioning in workflows, but canvas auto-negative and regional reference images
+      // require graph integrations that Krea-2 does not provide.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+    }
+
+    if (model.base === 'ideogram-4') {
+      // Ideogram 4 regions contribute only a positive prompt + bbox to the structured caption
+      // (see collectIdeogram4PromptInputs). Negative prompts, auto-negative and reference images are
+      // silently dropped, so warn they are unsupported rather than letting the layer look effective.
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+    }
+
+    entity.referenceImages.forEach(({ config }) => {
+      if (!config.model) {
+        // No model selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+      } else if (config.model.base !== model.base) {
+        // Supported model architecture but doesn't match
+        warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+      }
+
+      if (!config.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+    });
+  }
+
+  return warnings;
+};
+
+export const areBasesCompatibleForRefImage = (
+  first?: ModelIdentifierField | AnyModelConfigWithExternal | null,
+  second?: ModelIdentifierField | AnyModelConfigWithExternal | null
+): boolean => {
+  if (!first || !second) {
+    return false;
+  }
+  if (first.base !== second.base) {
+    return false;
+  }
+  if (
+    first.base === 'flux' &&
+    (first.name.toLowerCase().includes('kontext') || second.name.toLowerCase().includes('kontext')) &&
+    first.key !== second.key
+  ) {
+    // FLUX Kontext requires the main model and the reference image model to be the same model
+    return false;
+  }
+  return true;
+};
+
+export const getGlobalReferenceImageWarnings = (
+  entity: RefImageState,
+  model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
+
+  if (model) {
+    if (isExternalApiModelConfig(model)) {
+      if (!entity.config.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+      return warnings;
+    }
+
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
+      // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+      return warnings;
+    }
+
+    const { config } = entity;
+
+    // FLUX.2, Qwen Image Edit, Wan, Krea-2 and MiniMax H3 reference images don't require a model - it's built-in
+    if (
+      config.type !== 'flux2_reference_image' &&
+      config.type !== 'qwen_image_reference_image' &&
+      config.type !== 'wan_reference_image' &&
+      config.type !== 'krea2_reference_image' &&
+      config.type !== 'minimax_h3_reference_image'
+    ) {
+      if (!('model' in config) || !config.model) {
+        // No model selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+      } else if (!areBasesCompatibleForRefImage(config.model, model)) {
+        // Supported model architecture but doesn't match
+        warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+      }
+    }
+
+    if (!entity.config.image) {
+      // No image selected - for Qwen Image Edit, Wan and MiniMax H3, an image is optional
+      // at the entity level. Wan I2V *requires* one but enforcement happens at graph-build
+      // time so the warning doesn't fire on T2V/TI2V variants that ignore ref images. For
+      // MiniMax H3 an empty ref image simply means plain text-to-video.
+      if (
+        config.type !== 'qwen_image_reference_image' &&
+        config.type !== 'wan_reference_image' &&
+        config.type !== 'minimax_h3_reference_image'
+      ) {
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+    }
+  }
+
+  return warnings;
+};
+
+/**
+ * Warnings that depend on the *other* reference images, not just this one.
+ *
+ * Krea-2's style reference splices a single reference's attention keys/values into the target, so the
+ * graph builder consumes exactly one image. Without this the extra entities would be dropped silently,
+ * which reads as "all of them are being used".
+ *
+ * Deliberately separate from `getGlobalReferenceImageWarnings`: the graph builder filters its candidates
+ * on that function returning no warnings, and folding this in would exclude the one image we *do* use.
+ */
+export const getGlobalReferenceImageWarningsInContext = (
+  entity: RefImageState,
+  allEntities: RefImageState[],
+  model: MainOrExternalModelConfig | null | undefined
+): string[] => {
+  const warnings: string[] = [...getGlobalReferenceImageWarnings(entity, model)];
+
+  if (model?.base === 'krea-2') {
+    // Mirrors the graph builder's candidate filter, including the strength-0 bypass: a reference at 0 is
+    // skipped entirely, so the next one becomes the one that is used and must not be flagged as extra.
+    const usable = allEntities.filter(
+      (e) => e.isEnabled && isKrea2ReferenceImageConfig(e.config) && e.config.image && e.config.styleStrength > 0
+    );
+    const isUsable = usable.some((e) => e.id === entity.id);
+    if (isUsable && usable.length > 1 && usable[0]?.id !== entity.id) {
+      warnings.push(WARNINGS.KREA2_ONLY_ONE_REFERENCE_IMAGE);
+    }
+  }
+
+  return warnings;
+};
+
+export const getControlLayerWarnings = (
+  entity: CanvasControlLayerState,
+  model: MainOrExternalModelConfig | null | undefined,
+  controlLayers?: CanvasControlLayerState[]
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
+
+  if (entity.objects.length === 0) {
+    // Layer is in empty state
+    warnings.push(WARNINGS.CONTROL_ADAPTER_NO_CONTROL);
+  }
+
+  if (!entity.controlAdapter.model) {
+    // No model selected
+    warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
+  } else if (model) {
+    if (model.base === 'sd-3' || model.base === 'sd-2') {
+      // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+    } else if (model.base === 'anima' && entity.controlAdapter.type !== 'anima_lllite') {
+      // Anima only supports ControlNet-LLLite control layers. This also catches layers persisted with type
+      // 'controlnet' before the anima_lllite adapter type existed - the graph builder ignores them, so they must
+      // warn instead of silently no-oping.
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+    } else if (entity.controlAdapter.model.base !== model.base) {
+      // Supported model architecture but doesn't match
+      warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+    } else if (
+      model.base === 'flux' &&
+      model.variant === 'dev_fill' &&
+      entity.controlAdapter.model.type === 'control_lora'
+    ) {
+      // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA
+      warnings.push(WARNINGS.FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA);
+    } else if (entity.controlAdapter.type === 'anima_lllite' && controlLayers) {
+      // Each Anima ControlNet-LLLite model may only be applied once per generation - the backend rejects duplicates
+      const modelKey = entity.controlAdapter.model.key;
+      const hasDuplicate = controlLayers.some(
+        (other) =>
+          other.id !== entity.id &&
+          other.isEnabled &&
+          other.controlAdapter.type === 'anima_lllite' &&
+          other.controlAdapter.model?.key === modelKey
+      );
+      if (hasDuplicate) {
+        warnings.push(WARNINGS.CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL);
+      }
+    }
+  }
+
+  return warnings;
+};
+
+export const getRasterLayerWarnings = (
+  entity: CanvasRasterLayerState,
+  model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
+
+  // Ideogram 4 is text-to-image only (buildIdeogram4Graph asserts txt2img). A raster layer with content
+  // makes the compositor pick img2img/outpaint, which the graph builder rejects only at enqueue — warn
+  // here so canvas readiness blocks it up front.
+  if (model?.base === 'ideogram-4' && entity.objects.length > 0) {
+    warnings.push(WARNINGS.IDEOGRAM4_TXT2IMG_ONLY);
+  }
+
+  return warnings;
+};
+
+export const getInpaintMaskWarnings = (
+  entity: CanvasInpaintMaskState,
+  model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
+
+  // Ideogram 4 is text-to-image only; an inpaint mask with content makes the compositor pick inpaint,
+  // which the Ideogram graph builder cannot handle. Warn so canvas readiness blocks it before enqueue.
+  if (model?.base === 'ideogram-4' && entity.objects.length > 0) {
+    warnings.push(WARNINGS.IDEOGRAM4_TXT2IMG_ONLY);
+  }
+
+  return warnings;
+};

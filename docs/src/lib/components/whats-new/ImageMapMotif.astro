@@ -1,0 +1,139 @@
+---
+/*
+ * The Image Map: points start scattered, drift into colored clusters by similarity and take their autotag labels; a
+ * few stay unclustered in gray, as on the map. Points stay visible throughout, so the map is never empty, even paused
+ * at its first frame. The still frame is the clustered, labelled map. The labels are tags from the Image Map
+ * screenshot in the guide.
+ */
+import Stage from './Stage.astro';
+
+const width = 560;
+const height = 200;
+
+// A seeded generator keeps the layout identical between builds.
+let seed = 7;
+const random = () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+const gaussian = () => Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random());
+
+const clusters = [
+  { label: 'beach', x: 128, y: 124, color: 'var(--invoke-warning)', count: 11 },
+  { label: 'formal wear', x: 262, y: 74, color: 'var(--docs-accent)', count: 12 },
+  { label: 'dog', x: 386, y: 134, color: 'var(--invoke-success)', count: 10 },
+  { label: 'street', x: 476, y: 76, color: 'var(--invoke-danger)', count: 9 },
+];
+
+const scatter = (x: number, y: number) => ({
+  dx: (24 + random() * (width - 48) - x).toFixed(1),
+  dy: (18 + random() * (height - 36) - y).toFixed(1),
+  // A small negative delay staggers the drift without hiding a point before its cycle starts.
+  delay: (random() * -0.8).toFixed(2),
+});
+
+const points = [
+  ...clusters.flatMap(({ x, y, color, count }) =>
+    Array.from({ length: count }, () => {
+      const px = x + gaussian() * 13;
+      const py = y + gaussian() * 9;
+      return { x: px, y: py, r: 3.2, color, ...scatter(px, py) };
+    }),
+  ),
+  ...Array.from({ length: 10 }, () => {
+    const px = 30 + random() * (width - 60);
+    const py = 20 + random() * (height - 40);
+    return { x: px, y: py, r: 2.4, color: 'var(--invoke-neutral-500)', ...scatter(px, py) };
+  }),
+];
+
+// Inter at 9 units is about 5 units per character.
+const labelWidth = (label: string) => label.length * 5 + 12;
+---
+
+<Stage width={width} height={height}>
+  <svg class="wn-svg" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+    <g class="grid">
+      {[70, 140, 210, 280, 350, 420, 490].map((x) => <path d={`M${x} 0V${height}`} />)}
+      {[50, 100, 150].map((y) => <path d={`M0 ${y}H${width}`} />)}
+    </g>
+    {
+      points.map(({ x, y, r, color, dx, dy, delay }) => (
+        <circle
+          class="point"
+          cx={x.toFixed(1)}
+          cy={y.toFixed(1)}
+          r={r}
+          style={`fill: ${color}; --dx: ${dx}px; --dy: ${dy}px; --delay: ${delay}s`}
+        />
+      ))
+    }
+    {
+      clusters.map(({ label, x, y }) => (
+        <g class="label">
+          <rect x={x - labelWidth(label) / 2} y={y - 40} width={labelWidth(label)} height="15" rx="3" />
+          <text x={x} y={y - 29.5} text-anchor="middle">
+            {label}
+          </text>
+        </g>
+      ))
+    }
+  </svg>
+</Stage>
+
+<style>
+  /* The plot's only ground: faint grid lines on the tile's surface, still visible on its hover fill. */
+  .grid path {
+    stroke: color-mix(in oklab, var(--docs-border) 70%, transparent);
+    stroke-width: 1;
+  }
+
+  .label {
+    rect {
+      fill: color-mix(in oklab, var(--docs-bg) 88%, transparent);
+    }
+
+    text {
+      fill: var(--wn-strong);
+      font-size: 9px;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .point {
+      animation: im-cluster 10s var(--wn-ease) var(--delay) infinite;
+    }
+
+    .label {
+      animation: im-label 10s var(--wn-ease) infinite;
+    }
+  }
+
+  /* Scattered, into clusters, held while labelled, then back out to the same scatter. */
+  @keyframes im-cluster {
+    0%,
+    10%,
+    100% {
+      translate: var(--dx) var(--dy);
+    }
+    44%,
+    86% {
+      translate: 0 0;
+    }
+  }
+
+  @keyframes im-label {
+    0%,
+    46%,
+    88%,
+    100% {
+      opacity: 0;
+    }
+    54%,
+    82% {
+      opacity: 1;
+    }
+  }
+</style>

@@ -1,0 +1,720 @@
+import { isNumber, startCase } from 'es-toolkit/compat';
+import { FieldParseError } from 'features/nodes/types/error';
+import type {
+  BoardFieldInputTemplate,
+  BooleanFieldInputTemplate,
+  ColorFieldInputTemplate,
+  ControlNetMetadataFieldInputTemplate,
+  EnumFieldInputTemplate,
+  FieldInputTemplate,
+  FieldType,
+  FloatFieldCollectionInputTemplate,
+  FloatFieldInputTemplate,
+  FloatGeneratorFieldInputTemplate,
+  ImageFieldCollectionInputTemplate,
+  ImageFieldInputTemplate,
+  ImageGeneratorFieldInputTemplate,
+  IntegerFieldCollectionInputTemplate,
+  IntegerFieldInputTemplate,
+  IntegerGeneratorFieldInputTemplate,
+  IPAdapterMetadataFieldInputTemplate,
+  LoRAFieldCollectionInputTemplate,
+  LoRAMetadataFieldInputTemplate,
+  MetadataExtraFieldInputTemplate,
+  ModelIdentifierFieldInputTemplate,
+  SavedWorkflowFieldInputTemplate,
+  SchedulerFieldInputTemplate,
+  StatefulFieldType,
+  StatelessFieldInputTemplate,
+  StringFieldCollectionInputTemplate,
+  StringFieldInputTemplate,
+  StringGeneratorFieldInputTemplate,
+  StylePresetFieldInputTemplate,
+  SystemPromptFieldInputTemplate,
+  T2IAdapterMetadataFieldInputTemplate,
+  VideoFieldInputTemplate,
+} from 'features/nodes/types/field';
+import {
+  getFloatGeneratorArithmeticSequenceDefaults,
+  getImageGeneratorImagesFromBoardDefaults,
+  getIntegerGeneratorArithmeticSequenceDefaults,
+  getStringGeneratorParseStringDefaults,
+  isFloatCollectionFieldType,
+  isImageCollectionFieldType,
+  isIntegerCollectionFieldType,
+  isLoRAFieldCollectionFieldType,
+  isStatefulFieldType,
+  isStringCollectionFieldType,
+} from 'features/nodes/types/field';
+import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
+import { isSchemaObject } from 'features/nodes/types/openapi';
+import { t } from 'i18next';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
+  (arg: { schemaObject: InvocationFieldSchema; baseField: Omit<T, 'type' | 'default'>; fieldType: T['type'] }) => T;
+
+const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? 0,
+  };
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildIntegerFieldCollectionInputTemplate: FieldInputTemplateBuilder<IntegerFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildFloatFieldInputTemplate: FieldInputTemplateBuilder<FloatFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? 0,
+  };
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildFloatFieldCollectionInputTemplate: FieldInputTemplateBuilder<FloatFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildStringFieldInputTemplate: FieldInputTemplateBuilder<StringFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StringFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? '',
+  };
+
+  if (schemaObject.minLength !== undefined) {
+    template.minLength = schemaObject.minLength;
+  }
+
+  if (schemaObject.maxLength !== undefined) {
+    template.maxLength = schemaObject.maxLength;
+  }
+
+  return template;
+};
+
+const buildStringFieldCollectionInputTemplate: FieldInputTemplateBuilder<StringFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StringFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minLength !== undefined) {
+    template.minLength = schemaObject.minLength;
+  }
+
+  if (schemaObject.maxLength !== undefined) {
+    template.maxLength = schemaObject.maxLength;
+  }
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  return template;
+};
+
+const buildBooleanFieldInputTemplate: FieldInputTemplateBuilder<BooleanFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: BooleanFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? false,
+  };
+
+  return template;
+};
+
+const buildModelIdentifierFieldInputTemplate: FieldInputTemplateBuilder<ModelIdentifierFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ModelIdentifierFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: BoardFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? 'auto',
+  };
+
+  return template;
+};
+
+const buildStylePresetFieldInputTemplate: FieldInputTemplateBuilder<StylePresetFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StylePresetFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildSystemPromptFieldInputTemplate: FieldInputTemplateBuilder<SystemPromptFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SystemPromptFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ImageFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVideoFieldInputTemplate: FieldInputTemplateBuilder<VideoFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: VideoFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ImageFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  return template;
+};
+
+const buildLoRAFieldCollectionInputTemplate: FieldInputTemplateBuilder<LoRAFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: LoRAFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    // An empty collection is always valid, so we default to an empty list rather than leaving the
+    // field unsatisfied. This is what lets a node with no LoRAs selected still fire.
+    default: schemaObject.default ?? [],
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  return template;
+};
+
+const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  let options: EnumFieldInputTemplate['options'] = [];
+  if (schemaObject.anyOf) {
+    const filteredAnyOf = schemaObject.anyOf.filter((i) => {
+      if (isSchemaObject(i)) {
+        if (i.type === 'null') {
+          return false;
+        }
+      }
+      return true;
+    });
+    const firstAnyOf = filteredAnyOf[0];
+    if (filteredAnyOf.length !== 1 || !isSchemaObject(firstAnyOf)) {
+      options = [];
+    } else {
+      options = firstAnyOf.const ? [firstAnyOf.const] : (firstAnyOf.enum ?? []);
+    }
+  } else if (schemaObject.const) {
+    options = [schemaObject.const];
+  } else {
+    options = schemaObject.enum ?? [];
+  }
+  if (options.length === 0) {
+    throw new FieldParseError(t('nodes.unableToExtractEnumOptions'));
+  }
+  const template: EnumFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    options,
+    ui_choice_labels: schemaObject.ui_choice_labels,
+    default: schemaObject.default ?? options[0],
+  };
+
+  return template;
+};
+
+const buildColorFieldInputTemplate: FieldInputTemplateBuilder<ColorFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ColorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? { r: 127, g: 127, b: 127, a: 255 },
+  };
+
+  return template;
+};
+
+const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SchedulerFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? 'dpmpp_3m_k',
+  };
+
+  return template;
+};
+
+const buildSavedWorkflowFieldInputTemplate: FieldInputTemplateBuilder<SavedWorkflowFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SavedWorkflowFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? '',
+  };
+
+  if (schemaObject.minLength !== undefined) {
+    template.minLength = schemaObject.minLength;
+  }
+
+  if (schemaObject.maxLength !== undefined) {
+    template.maxLength = schemaObject.maxLength;
+  }
+
+  return template;
+};
+
+const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getFloatGeneratorArithmeticSequenceDefaults(),
+  };
+
+  return template;
+};
+
+const buildIntegerGeneratorFieldInputTemplate: FieldInputTemplateBuilder<IntegerGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getIntegerGeneratorArithmeticSequenceDefaults(),
+  };
+
+  return template;
+};
+
+const buildStringGeneratorFieldInputTemplate: FieldInputTemplateBuilder<StringGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StringGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getStringGeneratorParseStringDefaults(),
+  };
+
+  return template;
+};
+
+const buildImageGeneratorFieldInputTemplate: FieldInputTemplateBuilder<ImageGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ImageGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getImageGeneratorImagesFromBoardDefaults(),
+  };
+
+  return template;
+};
+
+const buildLoRAMetadataFieldInputTemplate: FieldInputTemplateBuilder<LoRAMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildControlNetMetadataFieldInputTemplate: FieldInputTemplateBuilder<ControlNetMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildIPAdapterMetadataFieldInputTemplate: FieldInputTemplateBuilder<IPAdapterMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildT2IAdapterMetadataFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapterMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+// MetadataExtraField is synthesized by graphToWorkflow for `core_metadata` extras and never
+// produced by parseSchema. This builder exists only to satisfy the StatefulFieldType['name'] record.
+const buildMetadataExtraFieldInputTemplate: FieldInputTemplateBuilder<MetadataExtraFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
+  BoardField: buildBoardFieldInputTemplate,
+  BooleanField: buildBooleanFieldInputTemplate,
+  ColorField: buildColorFieldInputTemplate,
+  EnumField: buildEnumFieldInputTemplate,
+  FloatField: buildFloatFieldInputTemplate,
+  ImageField: buildImageFieldInputTemplate,
+  VideoField: buildVideoFieldInputTemplate,
+  IntegerField: buildIntegerFieldInputTemplate,
+  // LoRAField is always handled by the collection branch above (COLLECTION / SINGLE_OR_COLLECTION);
+  // this entry is a defensive fallback to satisfy the exhaustive builder map.
+  LoRAField: buildLoRAFieldCollectionInputTemplate,
+  ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
+  SchedulerField: buildSchedulerFieldInputTemplate,
+  SavedWorkflowField: buildSavedWorkflowFieldInputTemplate,
+  StringField: buildStringFieldInputTemplate,
+  StylePresetField: buildStylePresetFieldInputTemplate,
+  SystemPromptField: buildSystemPromptFieldInputTemplate,
+  FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
+  IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
+  StringGeneratorField: buildStringGeneratorFieldInputTemplate,
+  ImageGeneratorField: buildImageGeneratorFieldInputTemplate,
+  LoRAMetadataField: buildLoRAMetadataFieldInputTemplate,
+  ControlNetMetadataField: buildControlNetMetadataFieldInputTemplate,
+  IPAdapterMetadataField: buildIPAdapterMetadataFieldInputTemplate,
+  T2IAdapterMetadataField: buildT2IAdapterMetadataFieldInputTemplate,
+  MetadataExtraField: buildMetadataExtraFieldInputTemplate,
+};
+
+export const buildFieldInputTemplate = (
+  fieldSchema: InvocationFieldSchema,
+  fieldName: string,
+  fieldType: FieldType
+): FieldInputTemplate => {
+  const {
+    input,
+    ui_hidden,
+    ui_component,
+    ui_type,
+    ui_order,
+    ui_choice_labels,
+    orig_required: required,
+    ui_model_base,
+    ui_model_type,
+    ui_model_variant,
+    ui_model_format,
+    ui_model_provider_id,
+  } = fieldSchema;
+
+  // This is the base field template that is common to all fields. The builder function will add all other
+  // properties to this template.
+  const baseField: Omit<FieldInputTemplate, 'type' | 'default'> = {
+    name: fieldName,
+    title: fieldSchema.title ?? (fieldName ? startCase(fieldName) : ''),
+    required,
+    description: fieldSchema.description ?? '',
+    fieldKind: 'input' as const,
+    input,
+    ui_hidden,
+    ui_component,
+    ui_type,
+    ui_order,
+    ui_choice_labels,
+    ui_model_base,
+    ui_model_type,
+    ui_model_variant,
+    ui_model_format,
+    ui_model_provider_id,
+  };
+
+  if (isStatefulFieldType(fieldType)) {
+    if (isImageCollectionFieldType(fieldType)) {
+      return buildImageFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isStringCollectionFieldType(fieldType)) {
+      return buildStringFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isIntegerCollectionFieldType(fieldType)) {
+      return buildIntegerFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isFloatCollectionFieldType(fieldType)) {
+      return buildFloatFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isLoRAFieldCollectionFieldType(fieldType)) {
+      return buildLoRAFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else {
+      const builder = TEMPLATE_BUILDER_MAP[fieldType.name];
+      const template = builder({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+
+      return template;
+    }
+  } else {
+    // This is a StatelessField, create it directly.
+    const template: StatelessFieldInputTemplate = {
+      ...baseField,
+      input: 'connection', // stateless --> connection only inputs
+      type: fieldType,
+      default: undefined, // stateless --> no default value
+    };
+
+    return template;
+  }
+};

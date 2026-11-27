@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -27,6 +25,7 @@ from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.app.util.path_safety import is_plain_filename, resolve_contained_path
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
     linear_srgb_from_oklch,
@@ -231,7 +230,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Mask from Alpha",
     tags=["image", "mask"],
     category="mask",
-    version="1.2.2",
+    version="1.3.0",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Extracts the alpha channel of an image as a mask."""
@@ -242,7 +241,17 @@ class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
-        image_mask = image.split()[-1]
+        if image.mode == "1":
+            # A one-bit image is already a black and white mask. Use it as an L image so that it inverts correctly.
+            image_mask = image.convert("L")
+        elif image.mode != "P" and len(image.getbands()) == 1:
+            # A grayscale image (L, I, I;16 or F) is already a mask, so use it as is.
+            image_mask = image
+        else:
+            # Converting gives an image without an alpha channel a fully opaque one. Its last band is a color or
+            # palette channel, not alpha.
+            image_mask = image.convert("RGBA").getchannel("A")
+
         if self.invert:
             image_mask = ImageOps.invert(image_mask)
 
@@ -1164,36 +1173,36 @@ class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
-
-        image_dto = context.images.save(image=image)
-
-        uuid = Path(image_dto.image_name).stem
-
+        # Validate every path input before the gallery save, so a rejected path leaves no orphan image behind.
         outputs_path = context.config.get().outputs_path
         assert outputs_path is not None
 
         if not self.output_directory:
             target_dir = outputs_path
         else:
-            raw_str = self.output_directory
-            raw = Path(raw_str)
-            has_windows_drive = len(raw_str) >= 2 and raw_str[0].isalpha() and raw_str[1] == ":"
-            starts_with_sep = raw_str.startswith("/") or raw_str.startswith("\\")
-            if raw.is_absolute() or raw.drive or has_windows_drive or starts_with_sep:
-                raise ValueError(
-                    f"Absolute paths are not allowed in output_directory: {raw_str!r}. "
-                    "Use a path relative to the InvokeAI outputs folder."
-                )
-            candidate = (outputs_path / raw).resolve()
-            outputs_resolved = outputs_path.resolve()
-            if outputs_resolved != candidate and outputs_resolved not in candidate.parents:
-                raise ValueError(f"output_directory must stay within the outputs folder: {raw_str!r}")
-            target_dir = candidate
+            try:
+                target_dir = resolve_contained_path(outputs_path, self.output_directory)
+            except ValueError as e:
+                raise ValueError(f"Invalid output_directory {self.output_directory!r}: {e}") from e
 
+        # The real stem is the gallery uuid (hex and dashes), so a uuid-shaped placeholder checks the affixes
+        # exactly: a separator, drive or `..` in prefix/suffix would otherwise steer the write out of target_dir.
+        if not is_plain_filename(f"{self.prefix}00000000-0000-0000-0000-000000000000{self.suffix}.{self.file_format}"):
+            raise ValueError(
+                f"Invalid prefix {self.prefix!r} or suffix {self.suffix!r}: the exported filename must be a plain "
+                "filename without path separators, '..', drive letters or reserved characters."
+            )
+
+        # Before the gallery save too: a refusal here (output_directory names an existing file) leaves nothing behind.
         target_dir.mkdir(parents=True, exist_ok=True)
 
+        image = context.images.get_pil(self.image.image_name)
+
+        image_dto = context.images.save(image=image)
+
+        uuid = Path(image_dto.image_name).stem
         filename = f"{self.prefix}{uuid}{self.suffix}.{self.file_format}"
+
         target_path = target_dir / filename
 
         if self.file_format == "png":
@@ -1348,45 +1357,21 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_dto = context.images.save(image=pil_mask, image_category=ImageCategory.MASK)
             return ImageOutput.build(image_dto)
 
-        np_mask = numpy.array(pil_mask)
+        np_mask = numpy.asarray(pil_mask)
 
         # Threshold the mask to create a binary mask - 0 for black, 255 for white
         # If we don't threshold we can get some weird artifacts
-        np_mask = numpy.where(np_mask > self.threshold, 255, 0).astype(numpy.uint8)
+        _, np_result = cv2.threshold(np_mask, self.threshold, 255, cv2.THRESH_BINARY)
 
-        # Create a mask for the black region (1 where black, 0 otherwise)
-        black_mask = (np_mask == 0).astype(numpy.uint8)
+        # Create a distance transform of the thresholded mask. Distances are measured to the
+        # nearest black pixel, so the black region is exactly where dist == 0.
+        dist = cv2.distanceTransform(np_result, cv2.DIST_L2, 5)
 
-        # Invert the black region
-        bg_mask = 1 - black_mask
-
-        # Create a distance transform of the inverted mask
-        dist = cv2.distanceTransform(bg_mask, cv2.DIST_L2, 5)
-
-        # Normalize distances so that pixels <fade_size_px become a linear gradient (0 to 1)
-        d_norm = numpy.clip(dist / self.fade_size_px, 0, 1)
-
-        # Control points: x values (normalized distance) and corresponding fade pct y values.
-
-        # There are some magic numbers here that are used to create a smooth transition:
-        # - The first point is at 0% of fade size from edge of mask (meaning the edge of the mask), and is 0% fade (black)
-        # - The second point is 1px from the edge of the mask and also has 0% fade, effectively expanding the mask
-        #   by 1px. This fixes an issue where artifacts can occur at the edge of the mask
-        # - The third point is at 20% of the fade size from the edge of the mask and has 20% fade
-        # - The fourth point is at 80% of the fade size from the edge of the mask and has 90% fade
-        # - The last point is at 100% of the fade size from the edge of the mask and has 100% fade (white)
-
-        # x values: 0 = mask edge, 1 = fade_size_px from edge
-        x_control = numpy.array([0.0, 1.0 / self.fade_size_px, 0.2, 0.8, 1.0])
-        # y values: 0 = black, 1 = white
-        y_control = numpy.array([0.0, 0.0, 0.2, 0.9, 1.0])
-
-        # Fit a cubic polynomial that smoothly passes through the control points
-        coeffs = numpy.polyfit(x_control, y_control, 3)
-        poly = numpy.poly1d(coeffs)
-
-        # Evaluate the polynomial
-        feather = poly(d_norm)
+        # np_result is also the final image for everywhere except the fade band. The black
+        # region is already 0, and everything at or beyond the fade distance is already 255,
+        # which is what the forced 1.0 below works out to. Only the band still needs the
+        # polynomial, and for the default 16px fade on a 1024x1024 mask that is a few
+        # percent of the pixels rather than all of them.
 
         # The polynomial fit isn't perfect. Points beyond the fade distance are likely to be slightly less than 1.0,
         # even though the control points indicate that they should be exactly 1.0. This is due to the nature of the
@@ -1394,18 +1379,46 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # When this occurs, the area outside the mask and fade-out will not be 100% transparent. For example, it may
         # have an alpha value of 1 instead of 0. So we must force pixels at or beyond the fade distance to exactly 1.0.
+        # That forced 1.0 is 255, which those pixels already hold, so they are left untouched.
 
-        # Force pixels at or beyond the fade distance to exactly 1.0
-        feather = numpy.where(d_norm >= 1.0, 1.0, feather)
+        # The fade band is the only part that still needs the polynomial. Building the mask
+        # in place avoids a second full-size temporary.
+        band = dist > 0
+        band &= dist < self.fade_size_px
 
-        # Clip any other values to ensure they're in the valid range [0,1]
-        feather = numpy.clip(feather, 0, 1)
+        if band.any():
+            # Control points: x values (normalized distance) and corresponding fade pct y values.
 
-        # Build final image.
-        np_result = numpy.where(black_mask == 1, 0, (feather * 255).astype(numpy.uint8))
+            # There are some magic numbers here that are used to create a smooth transition:
+            # - The first point is at 0% of fade size from edge of mask (meaning the edge of the mask), and is 0% fade (black)
+            # - The second point is 1px from the edge of the mask and also has 0% fade, effectively expanding the mask
+            #   by 1px. This fixes an issue where artifacts can occur at the edge of the mask
+            # - The third point is at 20% of the fade size from the edge of the mask and has 20% fade
+            # - The fourth point is at 80% of the fade size from the edge of the mask and has 90% fade
+            # - The last point is at 100% of the fade size from the edge of the mask and has 100% fade (white)
+
+            # x values: 0 = mask edge, 1 = fade_size_px from edge
+            x_control = numpy.array([0.0, 1.0 / self.fade_size_px, 0.2, 0.8, 1.0])
+            # y values: 0 = black, 1 = white
+            y_control = numpy.array([0.0, 0.0, 0.2, 0.9, 1.0])
+
+            # Fit a cubic polynomial that smoothly passes through the control points
+            coeffs = numpy.polyfit(x_control, y_control, 3)
+            poly = numpy.poly1d(coeffs)
+
+            # Evaluate the polynomial on the band only. Normalizing just those distances is
+            # the same as normalizing the whole image and clipping, because 0 < dist < fade_size_px
+            # there. Calling the same poly() keeps the arithmetic identical to before rather
+            # than depending on how a hand-written expression promotes dtypes.
+            feather = poly(dist[band] / self.fade_size_px)
+
+            # Clip any other values to ensure they're in the valid range [0,1]
+            numpy.clip(feather, 0, 1, out=feather)
+
+            np_result[band] = (feather * 255).astype(numpy.uint8)
 
         # Convert back to PIL, grayscale
-        pil_result = Image.fromarray(np_result.astype(numpy.uint8), mode="L")
+        pil_result = Image.fromarray(np_result, mode="L")
 
         image_dto = context.images.save(image=pil_result, image_category=ImageCategory.MASK)
 

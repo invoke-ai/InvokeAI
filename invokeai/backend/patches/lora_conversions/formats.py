@@ -1,6 +1,7 @@
 from typing import Any
 
 from invokeai.backend.model_manager.taxonomy import FluxLoRAFormat
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
 )
@@ -23,12 +24,21 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
 from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils import (
     is_state_dict_likely_in_flux_xlabs_format,
 )
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import QWEN_IMAGE_ONLY_MODULE_RE
 
 
 def flux_format_from_state_dict(
     state_dict: dict[str | int, Any],
     metadata: dict[str, Any] | None = None,
 ) -> FluxLoRAFormat | None:
+    # FLUX.3's native keys start `diffusion_model.single_blocks.N.`, as FLUX.1's and FLUX.2's BFL layout does, and the
+    # ai-toolkit and BFL-PEFT probes below look no further than that, so a FLUX.3 LoRA would identify as theirs too.
+    if has_flux3_lora_keys(state_dict):
+        return None
+    # Qwen-Image's OneTrainer LoRAs spell `transformer_blocks_N_<module>` as FLUX's do, and the OneTrainer probe accepts
+    # any module name; FLUX has none of Qwen-Image's per-stream modulation and MLP modules.
+    if any(isinstance(key, str) and QWEN_IMAGE_ONLY_MODULE_RE.search(key) for key in state_dict):
+        return None
     if is_state_dict_likely_in_flux_kohya_format(state_dict):
         return FluxLoRAFormat.Kohya
     elif is_state_dict_likely_in_flux_onetrainer_bfl_format(state_dict, metadata):

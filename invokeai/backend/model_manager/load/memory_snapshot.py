@@ -6,6 +6,7 @@ import torch
 from typing_extensions import Self
 
 from invokeai.backend.model_manager.util.libc_util import LibcUtil, Struct_mallinfo2
+from invokeai.backend.util.devices import TorchDevice
 
 GB = 2**30  # 1 GB
 
@@ -47,8 +48,13 @@ class MemorySnapshot:
         # supported on all platforms.
         process_ram = psutil.Process().memory_info().rss
 
-        if torch.cuda.is_available():
-            vram = torch.cuda.memory_allocated()
+        # Dispatch on the resolved execution device, not on availability order: on a box with both
+        # an NVIDIA card and an Arc, running on XPU, the CUDA branch would report a constant 0.
+        device = TorchDevice.choose_torch_device()
+        if device.type == "cuda" and torch.cuda.is_available():
+            vram = torch.cuda.memory_allocated(device)
+        elif device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+            vram = torch.xpu.memory_allocated(device)
         else:
             # TODO: We could add support for mps.current_allocated_memory() as well. Leaving out for now until we have
             # time to test it properly.

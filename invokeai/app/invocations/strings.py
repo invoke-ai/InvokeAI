@@ -73,12 +73,10 @@ class StringSplitInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> String2Output:
-        result = self.string.split(self.delimiter, 1)
-        if len(result) == 2:
-            part1, part2 = result
-        else:
-            part1 = result[0]
-            part2 = ""
+        # A blank delimiter splits on whitespace, which yields no parts for empty or whitespace-only input.
+        result = self.string.split(self.delimiter or None, 1)
+        part1 = result[0] if result else ""
+        part2 = result[1] if len(result) == 2 else ""
 
         return String2Output(string_1=part1, string_2=part2)
 
@@ -127,8 +125,10 @@ class StringReplaceInvocation(BaseInvocation):
         pattern = self.search_string or ""
         new_string = self.string or ""
         if len(pattern) > 0:
-            if not self.use_regex:
-                # None regex so make case insensitve
-                pattern = "(?i)" + re.escape(pattern)
-            new_string = re.sub(pattern, (self.replace_string or ""), new_string)
+            replacement = self.replace_string or ""
+            if self.use_regex:
+                new_string = re.sub(pattern, replacement, new_string)
+            else:
+                # Plain text: case-insensitive match, and a callable so backslashes in the replacement stay literal.
+                new_string = re.sub("(?i)" + re.escape(pattern), lambda _match: replacement, new_string)
         return StringOutput(value=new_string)

@@ -14,29 +14,69 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
 
   2. Make sure the node is contained in a new Python (.py) file. Preferably, the node is in a repo with a README detailing the nodes usage & examples to help others more easily use your node. Including the tag "invokeai-node" in your repository's README can also help other users find it more easily.
 
-  3. Submit a pull request with a link to your node(s) repo in GitHub against the `main` branch to add the node to the [Community Nodes](../../../workflows/community-nodes) list
-
-      Make sure you are following the template below and have provided all relevant details about the node and what it does. Example output images and workflows are very helpful for other users looking to use your node.
+  3. Submit a pull request against the `main` branch that adds your pack to the [Community Nodes](/users-guide/workflows/community-nodes/) list, as described in [Listing your node pack](#listing-your-node-pack) below.
 
   4. A maintainer will review the pull request and node. If the node is aligned with the direction of the project, you may be asked for permission to include it in the core project.
 </Steps>
 
-### Community Node Template
+### Supporting multi-GPU text-encoder offload
 
-Append the following template to your pull request and the [Community Nodes](../../../workflows/community-nodes) page when submitting a node to be added to the community nodes list:
+On a machine with more than one GPU, InvokeAI can run several generation sessions at once — one per GPU. When fewer sessions are running than there are GPUs, the spare GPUs sit idle. To put that capacity to use, InvokeAI can run a session's **prompt/text encoder** on a currently-idle GPU instead of on the GPU running the denoise pipeline. This avoids evicting the denoise model from VRAM just to make room for the encoder, and lets the cached encoder be reused across generations.
 
-```md
----
+This is controlled globally by the `offload_text_encoders_to_idle_gpus` config setting (enabled by default) and opted into **per node** via the `@invocation` decorator:
 
-### Super Cool Node Template
+```python
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 
-**Description:** This node allows you to do super cool things with InvokeAI.
 
-**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
-
-**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
-
-**Output Examples**
-
-![InvokeAI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
+@invocation(
+    "my_text_encoder",
+    title="Prompt - My Model",
+    category="conditioning",
+    version="1.0.0",
+    idle_gpu_offloadable=True,  # opt in to idle-GPU offload
+)
+class MyTextEncoderInvocation(BaseInvocation):
+    ...
 ```
+
+When the feature is enabled and an idle GPU is available, the **entire node** is temporarily re-pinned to a borrowed idle GPU: any model it loads goes onto that GPU and runs there. If no idle GPU is free (e.g. every GPU is busy with its own session), the node simply runs on its own GPU, unchanged. The borrow holds the idle GPU exclusively for the duration of the node, so it can never run concurrently against a native session on that same GPU.
+
+Because the whole node is moved to another device, only mark a node `idle_gpu_offloadable=True` if **all** of the following hold:
+
+- **It is encoder-only.** Its sole GPU work is loading one or more encoder models and running their forward pass. It must not load or run the denoise/transformer or VAE, or do any other work tied to the session's own GPU.
+- **It stores its result on the CPU before returning.** Move output tensors to the CPU (`tensor.detach().to("cpu")`) and save them as conditioning/tensors. The denoiser picks them up and moves them onto its own GPU later — this is what makes the cross-GPU handoff safe and device-agnostic.
+- **It places inputs on the loaded model's device, not a fixed device.** Resolve the device from the model you just loaded (e.g. `get_effective_device(model)` from `invokeai.backend.model_manager.load.model_cache.utils`, or `TorchDevice.choose_torch_device()`), rather than hard-coding `cuda:0`. The built-in `flux_text_encoder` and `compel` nodes are good references.
+- **Its runtime is dominated by that forward pass.** The borrow holds the lent GPU's lock for the whole node, and a session dequeued onto that GPU blocks until it is released. Model caches are per-device, so the first borrow of a GPU cold-loads the encoder there — that cost is paid once and then amortizes across later borrows, which hit the cache. Work that recurs on *every* execution does not amortize, so a node that runs something open-ended per call (an autoregressive `generate()` loop, say) will stall the lent GPU again on every generation. If your node has both kinds of work, split them: `ernie_image_prompt_enhancer` was carved out of `ernie_image_text_encoder` for exactly this reason, leaving the encoder offloadable and keeping the enhancer's `generate()` on the session's own GPU.
+
+:::caution[Only mark encoder-only nodes]
+If a node that also runs the denoiser, VAE, or other session-GPU work is marked `idle_gpu_offloadable=True`, that work will be re-pinned to the wrong GPU and can misplace tensors or raise device-mismatch errors. When in doubt, leave it unset (the default is `False`) — the node will still work correctly, just without the offload optimization.
+:::
+
+### Listing your node pack
+
+Each pack on the [Community Nodes](/users-guide/workflows/community-nodes/) page is one YAML file in
+`docs/src/content/community-nodes/`. Add a file for yours, such as `super-cool-nodes.yaml`:
+
+```yaml
+title: Super Cool Nodes
+author: your-github-name
+repo: https://github.com/your-github-name/super-cool-nodes
+summary: Does super cool things to images.
+categories: [image-effects]
+nodes:
+  - name: Super Cool Node
+    description: Makes an image super cool.
+links:
+  - label: Example workflow
+    url: https://github.com/your-github-name/super-cool-nodes/blob/main/example-workflow.json
+thumbnail: ./super-cool-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/your-github-name/super-cool-nodes/main/example.png
+    alt: An image before and after the Super Cool Node
+```
+
+The [README in that folder](https://github.com/invoke-ai/InvokeAI/blob/main/docs/src/content/community-nodes/README.md)
+lists every field and category, and how to make the card's small WebP thumbnail, which goes beside the YAML file.
+Example images and workflows help others decide to use your pack. Users install a pack
+by pasting its Git URL into the Nodes manager, which needs an `__init__.py` at the top level of your repository.

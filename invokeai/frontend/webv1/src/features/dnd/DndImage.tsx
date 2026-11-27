@@ -1,0 +1,89 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Image } from '@invoke-ai/ui-library';
+import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
+import { singleImageDndSource } from 'features/dnd/dnd';
+import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
+import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
+import { dndInputFix } from 'features/dnd/util';
+import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { ImageDTO } from 'services/api/types';
+
+const sx = {
+  objectFit: 'contain',
+  maxW: 'full',
+  maxH: 'full',
+  '&[data-is-dragging=true]': {
+    opacity: 0.3,
+  },
+} satisfies SystemStyleObject;
+
+type Props = {
+  imageDTO: ImageDTO;
+  asThumbnail?: boolean;
+} & ImageProps;
+
+export const DndImage = memo(
+  forwardRef(({ imageDTO, asThumbnail, ...rest }: Props, forwardedRef) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const ref = useRef<HTMLImageElement>(null);
+    useImperativeHandle(forwardedRef, () => ref.current!, []);
+    const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
+    const imageUrl = useMediaUrl(asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url);
+    const fallbackUrl = useMediaUrl(asThumbnail ? undefined : imageDTO.thumbnail_url);
+
+    useMiddleClickOpenInNewTab(ref, imageDTO.image_url);
+
+    useEffect(() => {
+      const element = ref.current;
+      if (!element) {
+        return;
+      }
+      return combine(
+        dndInputFix(element),
+        draggable({
+          element,
+          getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
+          onDragStart: () => {
+            setIsDragging(true);
+          },
+          onDrop: () => {
+            setIsDragging(false);
+          },
+          onGenerateDragPreview: (args) => {
+            if (singleImageDndSource.typeGuard(args.source.data)) {
+              setSingleImageDragPreview({
+                singleImageDndData: args.source.data,
+                onGenerateDragPreviewArgs: args,
+                setDragPreviewState,
+              });
+            }
+          },
+        })
+      );
+    }, [imageDTO]);
+
+    useImageContextMenu(imageDTO, ref);
+
+    return (
+      <>
+        <Image
+          role="button"
+          ref={ref}
+          src={imageUrl}
+          fallbackSrc={fallbackUrl}
+          width={imageDTO.width}
+          height={imageDTO.height}
+          sx={sx}
+          data-is-dragging={isDragging}
+          {...rest}
+        />
+        {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
+      </>
+    );
+  })
+);
+DndImage.displayName = 'DndImage';

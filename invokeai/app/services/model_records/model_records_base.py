@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """
 Abstract base class for storing and retrieving model configuration records.
 """
@@ -6,13 +5,13 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, List, Optional, Set, Union
+from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
+from invokeai.backend.model_manager.configs.base import SourceURL
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
@@ -22,17 +21,30 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     BaseModelType,
     ClipVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     FluxVariantType,
+    Krea2VariantType,
+    LTX2VariantType,
+    MiniMaxH3VariantType,
+    MistralVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    PiDDecoderVariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
+    Qwen35VariantType,
+    QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
+    SD3VariantType,
+    WanLoRAVariantType,
+    WanVariantType,
     ZImageVariantType,
 )
 
@@ -67,18 +79,6 @@ class ModelRecordOrderBy(str, Enum):
     Path = "path"
 
 
-class ModelSummary(BaseModel):
-    """A short summary of models for UI listing purposes."""
-
-    key: str = Field(description="model key")
-    type: ModelType = Field(description="model type")
-    base: BaseModelType = Field(description="base model")
-    format: ModelFormat = Field(description="model format")
-    name: str = Field(description="model name")
-    description: str = Field(description="short description of model")
-    tags: Set[str] = Field(description="tags associated with model")
-
-
 class ModelRecordChanges(BaseModelExcludeNull):
     """A set of changes to apply to a model."""
 
@@ -86,7 +86,19 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source: Optional[str] = Field(description="original source of the model", default=None)
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
-    source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
+    source_url: Optional[str] = Field(
+        description="User-editable URL for the model (e.g. download page or model page)", default=None
+    )
+    source_urls: Optional[list[SourceURL]] = Field(
+        default=None,
+        description="Web pages about the model, set by starters and installs. Users edit source_url instead.",
+    )
+
+    @field_validator("source_urls", mode="before")
+    @classmethod
+    def clear_source_urls_on_null(cls, v: Any) -> Any:
+        # The config field is a non-null list, so an explicit null clears it as [] does.
+        return [] if v is None else v
 
     @field_validator("source_url", mode="before")
     @classmethod
@@ -104,7 +116,14 @@ class ModelRecordChanges(BaseModelExcludeNull):
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     type: Optional[ModelType] = Field(description="Type of model", default=None)
+    # Deliberately NOT validated here. This model is the *update* body as well as the install body, and the model
+    # edit form posts the whole record back (`ModelEdit.tsx` seeds the form from the config, key included), so a
+    # validator on this field makes a model whose key predates key validation impossible to edit: FastAPI answers
+    # 422 before the handler runs, and the UI offers no way to change a key. The same model is also re-parsed from
+    # install markers written by older versions during startup recovery. The key is validated where an install
+    # adopts one (`install_model`) and again at every join that builds a path out of it.
     key: Optional[str] = Field(description="Database ID for this model", default=None)
+
     hash: Optional[str] = Field(description="hash of model file", default=None)
     file_size: Optional[int] = Field(description="Size of model file", default=None)
     format: Optional[str] = Field(description="format of model file", default=None)
@@ -132,14 +151,26 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | ClipVariantType
         | FluxVariantType
         | Flux2VariantType
+        | Flux3VariantType
         | ZImageVariantType
         | QwenImageVariantType
+        | WanVariantType
+        | WanLoRAVariantType
+        | SD3VariantType
         | Qwen3VariantType
+        | Qwen3VLVariantType
+        | Qwen35VariantType
+        | AnimaVariantType
+        | Krea2VariantType
+        | QwenImage21VariantType
+        | MiniMaxH3VariantType
+        | LTX2VariantType
+        | MistralVariantType
+        | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )
-    upcast_attention: Optional[bool] = Field(description="Whether to upcast attention.", default=None)
     config_path: Optional[str] = Field(description="Path to config file for model", default=None)
 
 
@@ -149,13 +180,11 @@ class ModelRecordServiceBase(ABC):
     @abstractmethod
     def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
-        Add a model to the database.
+        Add a model to the database; the config's key becomes the record's key.
 
-        :param key: Unique key for the model
-        :param config: Model configuration record, either a dict with the
-         required fields or a ModelConfigBase instance.
+        :param config: Model configuration record.
 
-        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
+        Raises DuplicateModelException when a model with the same path or key is installed.
         """
         pass
 
@@ -176,9 +205,12 @@ class ModelRecordServiceBase(ABC):
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
-        :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param changes: A set of changes to apply to this model. Changes are validated before being written. A
+        model's key cannot change: `changes.key`, if set, must equal `key`, or ValueError is raised.
         :param allow_class_change: If True, allows changes that would change the model config class. For example,
         changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
+        A non-null change to a field that neither the current nor the resulting config class has raises ValueError
+        and nothing is written.
         """
         pass
 
@@ -206,25 +238,8 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        """
-        Retrieve the configuration for the indicated model.
-
-        :param hash: Hash of model config to be fetched.
-
-        Exceptions: UnknownModelException
-        """
-        pass
-
-    @abstractmethod
-    def list_models(
-        self,
-        page: int = 0,
-        per_page: int = 10,
-        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
-        direction: SQLiteDirection = SQLiteDirection.Ascending,
-    ) -> PaginatedResults[ModelSummary]:
-        """Return a paginated summary listing of each model in the database."""
+    def get_model_paths(self) -> list[str]:
+        """Return the path of every model record, also of a record whose config no longer validates."""
         pass
 
     @abstractmethod

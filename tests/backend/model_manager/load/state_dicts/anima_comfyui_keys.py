@@ -2,7 +2,7 @@
 
 Captured from `anima-base-v1.0.safetensors`. The full checkpoint has 685 tensors under the
 `net.` prefix; this fixture keeps `net.blocks.0.*` plus all non-block `net.*` keys. Used to
-exercise `_strip_anima_bundle_prefix` (the `net.` -> unprefixed strip). The ComfyUI-bundled
+exercise `strip_anima_bundle_prefix` (the `net.` -> unprefixed strip). The ComfyUI-bundled
 `model.diffusion_model.*` variant is covered by a small synthetic dict in the test.
 """
 

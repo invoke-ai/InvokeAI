@@ -1,0 +1,295 @@
+"""Tests for TextLLMWithPresetInvocation.
+
+The model-loading and pipeline-run code paths are exercised by the existing
+TextLLMInvocation node. What is unique to TextLLMWithPresetInvocation is that the system
+prompt is fetched from system_prompt_records by id -- and that this lookup must enforce the
+same own/public/default/admin rules the REST API does, since the record store itself is
+unscoped and the resolved content ends up in the LLM's system message.
+"""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from invokeai.app.invocations.fields import SystemPromptField
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.text_llm import TextLLMInvocation, TextLLMWithPresetInvocation
+from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
+    EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
+    EXPAND_PROMPT_MAX_TOKENS_MAX,
+    SystemPromptNotFoundError,
+)
+
+
+def _make_invocation(prompt_id: str = "test-id", max_tokens: int = 50) -> TextLLMWithPresetInvocation:
+    return TextLLMWithPresetInvocation(
+        id="test-node",
+        prompt="a cat",
+        system_prompt=SystemPromptField(system_prompt_id=prompt_id),
+        text_llm_model=ModelIdentifierField(key="dummy", hash="x", name="dummy", base="any", type="text_llm"),
+        max_tokens=max_tokens,
+        seed=123,
+    )
+
+
+def test_plain_text_llm_node_passes_seed_to_llm() -> None:
+    inv = TextLLMInvocation(
+        id="test-node",
+        prompt="a cat",
+        system_prompt="system instruction",
+        text_llm_model=ModelIdentifierField(key="dummy", hash="x", name="dummy", base="any", type="text_llm"),
+        max_tokens=50,
+        seed=321,
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        result = inv.invoke(MagicMock())
+
+    assert result.value == "expanded"
+    assert mock_run.call_args.kwargs["prompt"] == "a cat"
+    assert mock_run.call_args.kwargs["system_prompt"] == "system instruction"
+    assert mock_run.call_args.kwargs["max_tokens"] == 50
+    assert mock_run.call_args.kwargs["seed"] == 321
+
+
+def _make_context(
+    prompt_record_content: str | None,
+    *,
+    record_max_tokens: int | None = None,
+    multiuser: bool = False,
+    record_user_id: str = "system",
+    record_is_public: bool = True,
+    queue_user_id: str = "alice",
+    queue_user_is_admin: bool = False,
+) -> MagicMock:
+    """Build a context whose system_prompt_records.get returns a record with the given content,
+    or raises SystemPromptNotFoundError when content is None."""
+    context = MagicMock()
+    context._services.configuration.multiuser = multiuser
+    context._data.queue_item.user_id = queue_user_id
+    context._services.users.get.return_value = MagicMock(is_admin=queue_user_is_admin)
+    if prompt_record_content is None:
+        context._services.system_prompt_records.get.side_effect = SystemPromptNotFoundError("not found")
+    else:
+        record = MagicMock()
+        record.content = prompt_record_content
+        record.max_tokens = record_max_tokens
+        record.user_id = record_user_id
+        record.is_public = record_is_public
+        context._services.system_prompt_records.get.return_value = record
+    return context
+
+
+def test_preset_node_loads_content_from_db_and_passes_to_llm() -> None:
+    inv = _make_invocation(prompt_id="abc")
+    context = _make_context(prompt_record_content="custom system instruction")
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        result = inv.invoke(context)
+
+    # The DB lookup happened with the configured id …
+    context._services.system_prompt_records.get.assert_called_once_with("abc")
+    # … and the content from the record was forwarded to the shared pipeline helper.
+    assert mock_run.call_count == 1
+    kwargs = mock_run.call_args.kwargs
+    assert kwargs["system_prompt"] == "custom system instruction"
+    assert kwargs["prompt"] == "a cat"
+    assert kwargs["max_tokens"] == 50
+    assert kwargs["seed"] == 123
+
+    assert result.value == "expanded"
+
+
+def test_preset_node_reports_a_missing_preset() -> None:
+    inv = _make_invocation(prompt_id="missing-id")
+    context = _make_context(prompt_record_content=None)
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm") as mock_run:
+        with pytest.raises(ValueError, match="could not be found"):
+            inv.invoke(context)
+
+    # Pipeline must NOT be invoked if the preset can't be resolved.
+    mock_run.assert_not_called()
+
+
+def test_preset_node_rejects_another_users_private_prompt_in_multiuser() -> None:
+    # The exact escalation the REST layer blocks: user2 knows the id of user1's private prompt
+    # (the create response echoes it) and enqueues a graph referencing it.
+    inv = _make_invocation(prompt_id="alice-private")
+    context = _make_context(
+        prompt_record_content="alice's secret instruction",
+        multiuser=True,
+        record_user_id="alice",
+        record_is_public=False,
+        queue_user_id="bob",
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm") as mock_run:
+        with pytest.raises(ValueError, match="not accessible to this user"):
+            inv.invoke(context)
+
+    mock_run.assert_not_called()
+
+
+def test_preset_node_rejects_a_privatized_prompt_owned_by_the_single_user_id() -> None:
+    # 'system' is both the seeded-defaults owner and the synthetic id every request carries in
+    # single-user mode, so prompts created before an install switched to multiuser are owned by
+    # it. Once such a prompt is made private it must be unreachable here, exactly as
+    # GET /system_prompts/i/{id} 403s on it -- no "owned by 'system' means built-in" shortcut.
+    inv = _make_invocation(prompt_id="pre-upgrade-private")
+    context = _make_context(
+        prompt_record_content="secret instruction from the single-user era",
+        multiuser=True,
+        record_user_id="system",
+        record_is_public=False,
+        queue_user_id="bob",
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm") as mock_run:
+        with pytest.raises(ValueError, match="not accessible to this user"):
+            inv.invoke(context)
+
+    mock_run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "record_user_id,record_is_public,queue_user_id,queue_user_is_admin",
+    [
+        ("system", True, "bob", False),  # seeded default (they are is_public=TRUE)
+        ("alice", True, "bob", False),  # explicitly shared
+        ("bob", False, "bob", False),  # owner
+        ("alice", False, "admin", True),  # admin
+    ],
+)
+def test_preset_node_allows_accessible_prompts_in_multiuser(
+    record_user_id: str, record_is_public: bool, queue_user_id: str, queue_user_is_admin: bool
+) -> None:
+    inv = _make_invocation(prompt_id="some-id")
+    context = _make_context(
+        prompt_record_content="instruction",
+        multiuser=True,
+        record_user_id=record_user_id,
+        record_is_public=record_is_public,
+        queue_user_id=queue_user_id,
+        queue_user_is_admin=queue_user_is_admin,
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        assert inv.invoke(context).value == "expanded"
+
+    assert mock_run.call_args.kwargs["system_prompt"] == "instruction"
+
+
+def test_preset_node_skips_the_ownership_check_in_single_user_mode() -> None:
+    # Single-user installs have no meaningful user identity; every prompt is reachable.
+    inv = _make_invocation(prompt_id="some-id")
+    context = _make_context(
+        prompt_record_content="instruction",
+        multiuser=False,
+        record_user_id="someone-else",
+        record_is_public=False,
+    )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        assert inv.invoke(context).value == "expanded"
+
+    context._services.users.get.assert_not_called()
+    assert mock_run.call_count == 1
+
+
+def test_preset_node_uses_the_presets_own_cap_when_the_field_is_unset() -> None:
+    # The whole point of a per-prompt cap: a structured preset that needs 500 tokens must not be
+    # truncated at the shared default just because the workflow left the field alone.
+    inv = _make_invocation(max_tokens=0)
+    context = _make_context(prompt_record_content="structured instruction", record_max_tokens=500)
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        inv.invoke(context)
+
+    assert mock_run.call_args.kwargs["max_tokens"] == 500
+
+
+def test_preset_node_falls_back_to_the_default_when_neither_names_a_cap() -> None:
+    inv = _make_invocation(max_tokens=0)
+    context = _make_context(prompt_record_content="instruction", record_max_tokens=None)
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        inv.invoke(context)
+
+    assert mock_run.call_args.kwargs["max_tokens"] == EXPAND_PROMPT_MAX_TOKENS_DEFAULT
+
+
+def test_an_explicit_field_value_overrides_the_presets_cap() -> None:
+    # An author who typed a number meant it, even when the preset carries one of its own.
+    inv = _make_invocation(max_tokens=50)
+    context = _make_context(prompt_record_content="instruction", record_max_tokens=500)
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        inv.invoke(context)
+
+    assert mock_run.call_args.kwargs["max_tokens"] == 50
+
+
+def test_a_node_built_from_the_schema_default_defers_to_the_preset() -> None:
+    # Both editors materialise every input from the schema default, so the default has to be a
+    # value the node accepts AND has to mean "defer". Declaring the field `int | None` made the
+    # default null, which the editors turn into 0 and the field's own lower bound then rejected --
+    # so the node 422'd on enqueue instead of honouring the preset's cap.
+    default = TextLLMWithPresetInvocation.model_json_schema()["properties"]["max_tokens"]["default"]
+    inv = _make_invocation(max_tokens=default)
+    context = _make_context(prompt_record_content="instruction", record_max_tokens=500)
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="expanded") as mock_run:
+        inv.invoke(context)
+
+    assert mock_run.call_args.kwargs["max_tokens"] == 500
+
+
+def test_the_field_publishes_its_bounds_where_the_editors_read_them() -> None:
+    # Constraints nested inside an `anyOf` are dropped by both editors' field-template builders,
+    # which leaves the node's number input unbounded and silences the pre-enqueue range check.
+    prop = TextLLMWithPresetInvocation.model_json_schema()["properties"]["max_tokens"]
+
+    assert "anyOf" not in prop
+    assert (prop["minimum"], prop["maximum"]) == (0, EXPAND_PROMPT_MAX_TOKENS_MAX)
+
+
+def test_preset_node_cache_hit_does_not_bypass_the_access_check_for_another_user() -> None:
+    # Alice may use her private prompt and warms the shared invocation cache; Bob enqueues the
+    # byte-identical node. The cache must not hand him alice's output without the check running.
+    from types import SimpleNamespace
+
+    from invokeai.app.invocations.baseinvocation import services_for_queue_user
+    from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(node_cache_size=5, multiuser=True),
+        invocation_cache=MemoryInvocationCache(max_cache_size=5),
+        intermediates=MagicMock(),
+        logger=MagicMock(),
+    )
+    context = _make_context(
+        prompt_record_content="alice's secret instruction",
+        multiuser=True,
+        record_user_id="alice",
+        record_is_public=False,
+        queue_user_id="alice",
+    )
+    context._skip_invocation_cache = False  # a MagicMock attribute would be truthy and bypass the cache
+
+    def run() -> str:
+        return (
+            _make_invocation(prompt_id="alice-private")
+            .invoke_internal_with_effects(context, services_for_queue_user(services, context._data.queue_item.user_id))
+            .output.value
+        )
+
+    with patch("invokeai.app.invocations.text_llm._run_text_llm", return_value="alice's expansion") as mock_run:
+        assert run() == "alice's expansion"
+        assert run() == "alice's expansion"  # same user, same inputs: served from the cache
+        assert mock_run.call_count == 1
+
+        context._data.queue_item.user_id = "bob"
+        with pytest.raises(ValueError, match="not accessible to this user"):
+            run()
+        assert mock_run.call_count == 1

@@ -6,8 +6,8 @@ from diffusers.models import UNet2DConditionModel
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
     CustomAttnProcessor2_0,
-    IPAdapterAttentionWeights,
 )
+from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterAttentionWeights
 
 
 class UNetIPAdapterData(TypedDict):

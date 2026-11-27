@@ -1,5 +1,6 @@
 import accelerate
 import pytest
+import torch
 
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import get_flux_transformers_params
@@ -64,3 +65,25 @@ def test_lora_model_from_flux_aitoolkit_state_dict():
     state_dict = keys_to_mock_state_dict(flux_aitoolkit_state_dict_keys)
 
     assert lora_model_from_flux_aitoolkit_state_dict(state_dict)
+
+
+def test_lora_model_from_flux_aitoolkit_state_dict_groups_alpha_with_block_and_top_level_layers():
+    rank = 4
+    alpha = 2.0
+    state_dict: dict[str, torch.Tensor] = {}
+    for layer_name in ("double_blocks.0.img_attn.proj", "img_in"):
+        prefix = f"diffusion_model.{layer_name}"
+        state_dict[f"{prefix}.lora_A.weight"] = torch.ones(rank, 8)
+        state_dict[f"{prefix}.lora_B.weight"] = torch.ones(8, rank)
+        state_dict[f"{prefix}.alpha"] = torch.tensor(alpha)
+
+    assert is_state_dict_likely_in_flux_aitoolkit_format(state_dict)
+
+    model = lora_model_from_flux_aitoolkit_state_dict(state_dict)
+
+    expected_keys = {
+        "lora_transformer-double_blocks.0.img_attn.proj",
+        "lora_transformer-img_in",
+    }
+    assert set(model.layers) == expected_keys
+    assert all(layer.scale() == pytest.approx(alpha / rank) for layer in model.layers.values())

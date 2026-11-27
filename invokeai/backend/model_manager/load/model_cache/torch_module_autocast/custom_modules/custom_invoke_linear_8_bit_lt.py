@@ -1,7 +1,6 @@
 import bitsandbytes as bnb
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     autocast_linear_forward_sidecar_patches,
 )
@@ -11,6 +10,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.patches.layers.param_shape_utils import get_param_shape
 from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 class CustomInvokeLinear8bitLt(InvokeLinear8bitLt, CustomModuleMixin):
@@ -20,7 +21,7 @@ class CustomInvokeLinear8bitLt(InvokeLinear8bitLt, CustomModuleMixin):
             tensor is not None
             and input.is_floating_point()
             and tensor.is_floating_point()
-            and not isinstance(tensor, GGMLTensor)
+            and not isinstance(tensor, (GGMLTensor, SDNQTensor))
             and tensor.dtype != input.dtype
         ):
             tensor = tensor.to(dtype=input.dtype)

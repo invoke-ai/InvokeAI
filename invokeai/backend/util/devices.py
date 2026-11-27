@@ -1,15 +1,117 @@
-from typing import Dict, Literal, Optional, Union
+import sys
+import threading
+from collections import Counter, defaultdict
+from enum import Enum
+from functools import wraps
+from typing import Dict, Literal, Optional, Protocol, Union
 
+import psutil
 import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.util.host_platform import is_windows_arm64
+from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.wddm import video_memory_budget
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
+XPU_DEVICE = torch.device("xpu")
 MPS_DEVICE = torch.device("mps")
+
+# Devices for which the blind free-VRAM estimate has already been reported, so the
+# warning is emitted once per device rather than on every cache query.
+_XPU_MEM_FALLBACK_WARNED: set[str] = set()
+
+
+class EmptyCacheOutcome(Enum):
+    """What `TorchDevice.empty_cache` did. Callers compare members explicitly; only RAN returned memory to the driver."""
+
+    RAN = "ran"
+    DEFERRED = "deferred"  # another generation device is mid-session; flush_deferred_empty_cache() runs it later
+    REFUSED = "refused"  # the backend raised; logged as a warning, the blocks stay reserved
+
+
+class EmptyCacheObserver(Protocol):
+    def before_empty_cache(self) -> None: ...
+
+    def after_empty_cache(self, released: bool) -> None: ...
+
+
+EMPTY_CACHE_OBSERVERS: list[EmptyCacheObserver] = []
+"""Told about every `TorchDevice.empty_cache` that attempts a release, just before and just after it, in
+registration order; `released` is False when the backend refused (raised). The working-memory probe registers here
+while a calibration scope is open, so that a release inside a measured window ends a segment there
+(`invokeai.backend.working_memory.probe`); otherwise the list is empty and a release pays one truth test for it.
+Observers must not raise."""
+
+
+def _xpu_is_available() -> bool:
+    """Return True if a torch XPU (Intel GPU) device is available."""
+    return hasattr(torch, "xpu") and torch.xpu.is_available()
+
+
+def _unusable_rocm_windows_igpu(device: torch.device) -> bool:
+    """Whether `device` is an integrated GPU next to a discrete one under ROCm on Windows.
+
+    Any kernel launched there crashed the process with an access violation (measured: Ryzen gfx1036 beside an RX 9060
+    XT), so naming it is refused with a clear error. An APU on its own is left alone: it is all the machine has.
+    """
+    if sys.platform != "win32" or torch.version.hip is None or device_is_integrated(device) is not True:
+        return False
+    return any(device_is_integrated(torch.device("cuda", i)) is False for i in range(torch.cuda.device_count()))
+
+
+def device_is_integrated(device: torch.device) -> Optional[bool]:
+    """Return True/False if ``device`` is an integrated GPU, or None if it cannot be determined.
+
+    XPU asks Level Zero. A CUDA device answers through its properties, which on ROCm also report AMD's integrated
+    graphics: HIP enumerates the Radeon iGPU of a Ryzen desktop CPU next to a discrete card (measured: gfx1036 beside
+    an RX 9060 XT on Windows, ``is_integrated=1``). CPU and MPS are not GPUs that could be paired with a discrete
+    card, so they answer False.
+    """
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device)
+    if device.type != "cuda":
+        return False
+    try:
+        index = device.index if device.index is not None else torch.cuda.current_device()
+        flag = getattr(torch.cuda.get_device_properties(index), "is_integrated", None)
+    except Exception:
+        return None
+    return None if flag is None else bool(flag)
+
+
+def device_has_dedicated_vram(device: torch.device) -> bool:
+    """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
+
+    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
+    XPU type keeps the discrete-device policy rather than guessing.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device) is not True
+    return False
+
+
+def _default_cuda_device() -> torch.device:
+    """The CUDA device ``device: auto`` means: the current one, unless it is an integrated GPU and a discrete one exists.
+
+    HIP may enumerate an APU's integrated graphics before the discrete card, and the current device is the first one
+    until something pins another, so without this an iGPU could become the default device.
+    """
+    current = torch.device("cuda", torch.cuda.current_device())
+    if device_is_integrated(current) is not True:
+        return CUDA_DEVICE
+    for index in range(torch.cuda.device_count()):
+        candidate = torch.device("cuda", index)
+        if device_is_integrated(candidate) is False:
+            return candidate
+    return CUDA_DEVICE
 
 
 @deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
@@ -44,16 +146,68 @@ class TorchDevice:
 
     CPU_DEVICE = torch.device("cpu")
     CUDA_DEVICE = torch.device("cuda")
+    XPU_DEVICE = torch.device("xpu")
     MPS_DEVICE = torch.device("mps")
+
+    # Per-thread execution device. When set (by a session-processor worker thread bound to a
+    # specific GPU), `choose_torch_device()` returns it instead of consulting the global config.
+    # This is the lynchpin that makes the ~79 `choose_torch_device()` call sites (nodes, model
+    # patcher, etc.) resolve to the calling worker's GPU without per-call-site changes.
+    _session_device = threading.local()
+
+    # Set when a peer-aware empty_cache (this class's or the installed torch.cuda wrapper) skipped
+    # the real call because another generation device was mid-session. The skipped release is
+    # not lost: `flush_deferred_empty_cache()` performs it at the first step boundary or session
+    # end that finds no other generation device mid-session.
+    _empty_cache_deferred = threading.Event()
+
+    @classmethod
+    def set_session_device(cls, device: Union[str, torch.device]) -> None:
+        """Pin the calling thread's execution device. Used by multi-GPU session workers."""
+        cls._session_device.device = cls.normalize(device)
+
+    @classmethod
+    def get_session_device(cls) -> Optional[torch.device]:
+        """Return the calling thread's pinned execution device, or None if unset."""
+        return getattr(cls._session_device, "device", None)
+
+    @classmethod
+    def clear_session_device(cls) -> None:
+        """Remove the calling thread's pinned execution device, reverting to global config."""
+        if hasattr(cls._session_device, "device"):
+            del cls._session_device.device
+
+    @classmethod
+    def get_session_device_index(cls) -> Optional[int]:
+        """Return the CUDA index of the calling thread's effective device, or None if not on CUDA.
+
+        Resolves the thread-local session device when a worker has pinned one (multi-GPU), otherwise
+        falls back to the globally-configured device. Used to annotate logs/progress with the GPU
+        number so concurrent sessions can be told apart.
+        """
+        device = cls.get_session_device() or cls.choose_torch_device()
+        return device.index if device.type in ("cuda", "xpu") else None
+
+    @classmethod
+    def get_session_device_label(cls) -> str:
+        """Return a ``" (#N)"`` suffix for the calling thread's CUDA device, or ``""`` when not on CUDA."""
+        index = cls.get_session_device_index()
+        return f" (#{index})" if index is not None else ""
 
     @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
+        # A worker thread pinned to a specific GPU takes precedence over the global config.
+        session_device = cls.get_session_device()
+        if session_device is not None:
+            return session_device
         app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
-            device = CUDA_DEVICE
+            device = _default_cuda_device()
+        elif _xpu_is_available():
+            device = XPU_DEVICE
         elif torch.backends.mps.is_available():
             device = MPS_DEVICE
         else:
@@ -77,6 +231,14 @@ class TorchDevice:
                 # Use the user-defined precision
                 return cls._to_dtype(config.precision)
 
+        elif device.type == "xpu" and _xpu_is_available():
+            if config.precision == "auto":
+                # Default to float16 for XPU (Intel GPU) devices
+                return cls._to_dtype("float16")
+            else:
+                # Use the user-defined precision
+                return cls._to_dtype(config.precision)
+
         elif device.type == "mps" and torch.backends.mps.is_available():
             if config.precision == "auto":
                 # Default to float16 for MPS devices
@@ -88,26 +250,407 @@ class TorchDevice:
         return cls._to_dtype("float32")
 
     @classmethod
+    def choose_noise_dtype(cls, legacy_dtype: torch.dtype) -> torch.dtype:
+        """The dtype to draw seeded noise in on the CPU, for the draws that used to happen in `legacy_dtype`.
+
+        float32 unless `noise_dtype` asks for the old draw. torch's float32 `randn`/`rand` give the same numbers on
+        every version, but its float16/bfloat16 ones changed after 2.7 (for tensors of 16 or more elements), so a
+        seed drawn in half precision gives a different image on macOS, which stays on torch 2.7, than on
+        Windows/Linux.
+        """
+        return legacy_dtype if get_config().noise_dtype == "float16" else torch.float32
+
+    @classmethod
+    def get_device_name(cls, device: torch.device) -> str:
+        """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU').
+
+        Falls back to the device's own string form when the backend cannot name it. This is used
+        only for labelling and logging, so a backend that cannot answer must not take the caller
+        down with it -- notably an XPU device on a torch build without XPU, where ``_lazy_init``
+        raises ``AssertionError``. The raised type varies between torch releases, so the except is
+        deliberately broad rather than enumerating types that move.
+        """
+        try:
+            if device.type == "cuda":
+                return torch.cuda.get_device_name(device)
+            if device.type == "xpu":
+                return torch.xpu.get_device_name(device)
+        except Exception:
+            return str(device)
+        return device.type.upper()
+
+    @classmethod
     def get_torch_device_name(cls) -> str:
         """Return the device name for the current torch device."""
-        device = cls.choose_torch_device()
-        return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
+        return cls.get_device_name(cls.choose_torch_device())
+
+    @classmethod
+    def get_generation_devices_summary(cls, generation_devices: Union[str, list[str], None]) -> str:
+        """Build a human-readable summary of the devices that will be used for generation.
+
+        For a single device, returns just its name (e.g. ``'AMD Radeon PRO W7900'`` or ``'CPU'``). For
+        multiple devices, returns a bracketed list annotating each with its GPU number and device id,
+        e.g. ``'[AMD Radeon PRO W7900 #1 (cuda:0), AMD Radeon PRO W7900 #2 (cuda:1)]'``. Identically
+        named GPUs get a 1-based ``#N`` suffix so they can be told apart; a uniquely named device gets
+        no suffix.
+
+        The ``#N`` suffix is tied to each device's position in the full set of available devices, not
+        to its position in the (possibly filtered) `generation_devices` list. This keeps a device's
+        label stable when other devices are disabled — e.g. disabling ``cuda:1`` leaves ``cuda:2`` as
+        ``#3`` rather than renumbering it to ``#2`` — and keeps the backend log consistent with the
+        frontend, which labels devices over the full available set.
+        """
+        devices = cls.get_generation_devices(generation_devices)
+        if not devices:
+            # Empty resolution (e.g. `generation_devices` set to an empty list) falls back to the
+            # single globally-configured device.
+            devices = [cls.choose_torch_device()]
+
+        if len(devices) == 1:
+            return cls.get_device_name(devices[0])
+
+        labels = cls._get_device_labels()
+        parts = [f"{labels.get(str(device)) or cls.get_device_name(device)} ({device})" for device in devices]
+        return "[" + ", ".join(parts) + "]"
+
+    @classmethod
+    def _get_device_labels(cls) -> dict[str, str]:
+        """Map each available device id (e.g. ``'cuda:0'``) to its disambiguated human-readable name.
+
+        Identically-named devices get a stable 1-based ``#N`` suffix tied to their order in the full
+        available-device enumeration, so the suffix does not shift when devices are filtered out of
+        `generation_devices`. Mirrors the frontend's device labeling.
+        """
+        all_devices = cls._all_available_devices()
+        names = [cls.get_device_name(device) for device in all_devices]
+        name_counts = Counter(names)
+        ordinals: dict[str, int] = defaultdict(int)
+        labels: dict[str, str] = {}
+        for device, name in zip(all_devices, names, strict=True):
+            ordinals[name] += 1
+            labels[str(device)] = f"{name} #{ordinals[name]}" if name_counts[name] > 1 else name
+        return labels
+
+    @classmethod
+    def _all_available_devices(cls) -> list[torch.device]:
+        """Every device generation could run on: all visible CUDA (or XPU) devices, or the single
+        best available device (mps/cpu) when neither is available. Ignores configuration — used for
+        enumeration/labeling, where filtered-out devices must still be listed."""
+        if torch.cuda.is_available():
+            return [torch.device(f"cuda:{index}") for index in range(torch.cuda.device_count())]
+        if _xpu_is_available():
+            return [torch.device(f"xpu:{index}") for index in range(torch.xpu.device_count())]
+        return [cls.choose_torch_device()]
+
+    @classmethod
+    def _auto_generation_devices(cls) -> list[torch.device]:
+        """The device list `generation_devices: auto` expands to.
+
+        Level Zero and ROCm enumerate the CPU's integrated GPU alongside any discrete card, so on
+        the mainstream configurations (iGPU + discrete Arc, Ryzen iGPU + discrete Radeon) `auto`
+        would dispatch half the queue to the iGPU and make it a text-encoder borrow target. Drop
+        integrated GPUs here.
+
+        Two deliberate limits: a device whose type cannot be determined is kept (the probe returns
+        None, and narrowing on a guess is worse than the status quo), and a machine whose only GPU
+        is integrated keeps it -- otherwise there would be nothing to generate on. An explicit
+        `generation_devices` list is unaffected, so an iGPU can still be opted into -- except under
+        ROCm on Windows, where no kernel runs on one (see `_unusable_rocm_windows_igpu`).
+        """
+        integrated: list[torch.device] = []
+        remaining: list[torch.device] = []
+        for device in cls._all_available_devices():
+            (integrated if device_is_integrated(device) is True else remaining).append(device)
+        if not integrated or not remaining:
+            return integrated + remaining
+        InvokeAILogger.get_logger(__name__).info(
+            f"Excluding integrated GPU(s) {[str(d) for d in integrated]} from `generation_devices: auto`. "
+            "List them explicitly in `generation_devices` to use them for generation."
+        )
+        return remaining
+
+    @classmethod
+    def get_generation_devices(cls, generation_devices: Union[str, list[str], None]) -> list[torch.device]:
+        """Resolve the configured `generation_devices` into a concrete, deduplicated device list.
+
+        - ``"auto"`` (the default) defers to an explicitly pinned legacy ``device:`` setting (an
+          upgraded install that pinned e.g. ``device: cuda:1`` to avoid its display GPU must not
+          silently start generating on every GPU); otherwise it expands to every visible CUDA
+          device except integrated GPUs next to a discrete one (see `_auto_generation_devices`),
+          or the single best available device (mps/cpu) when CUDA is unavailable.
+        - An explicit list is normalized and deduplicated, with order preserved, and overrides the
+          legacy ``device:`` setting.
+        - ``None`` or an empty list yields an empty list; the caller decides the single-device fallback.
+        """
+        if generation_devices == "auto":
+            legacy_device = get_config().device
+            if legacy_device != "auto":
+                device_strs: list[str] = [legacy_device]
+            else:
+                device_strs = [str(device) for device in cls._auto_generation_devices()]
+        elif not generation_devices:
+            return []
+        else:
+            device_strs = list(generation_devices)
+
+        devices: list[torch.device] = []
+        seen: set[str] = set()
+        for device_str in device_strs:
+            device = cls.normalize(device_str)
+            # Fail fast on a CUDA device that doesn't exist, rather than starting a worker pinned to
+            # it that only errors cryptically at the first tensor allocation. ("auto" only generates
+            # valid indices, so this just validates explicitly-configured devices.)
+            if device.type == "cuda":
+                if not torch.cuda.is_available():
+                    raise ValueError(f"generation_devices requested '{device_str}', but no CUDA device is available.")
+                if device.index is not None and device.index >= torch.cuda.device_count():
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
+                        f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
+                    )
+                if _unusable_rocm_windows_igpu(device):
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', which is an integrated GPU; under ROCm on "
+                        "Windows nothing can run on it. Name a discrete GPU or use 'auto'. Invoke hides the integrated "
+                        "GPU at startup, so device numbers count the discrete GPUs only, unless that failed (see the "
+                        "startup log) or HIP_VISIBLE_DEVICES was set to include it."
+                    )
+            elif device.type == "xpu":
+                if not _xpu_is_available():
+                    raise ValueError(f"generation_devices requested '{device_str}', but no XPU device is available.")
+                if device.index is not None and device.index >= torch.xpu.device_count():
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', but only {torch.xpu.device_count()} "
+                        f"XPU device(s) are available (valid indices 0-{torch.xpu.device_count() - 1})."
+                    )
+            elif device.type == "mps" and not torch.backends.mps.is_available():
+                raise ValueError(f"generation_devices requested '{device_str}', but MPS is not available.")
+            if str(device) not in seen:
+                seen.add(str(device))
+                devices.append(device)
+        return devices
 
     @classmethod
     def normalize(cls, device: Union[str, torch.device]) -> torch.device:
-        """Add the device index to CUDA devices."""
+        """Add the device index to CUDA and XPU devices."""
         device = torch.device(device)
         if device.index is None and device.type == "cuda" and torch.cuda.is_available():
             device = torch.device(device.type, torch.cuda.current_device())
+        elif device.index is None and device.type == "xpu" and _xpu_is_available():
+            device = torch.device(device.type, torch.xpu.current_device())
         return device
 
     @classmethod
-    def empty_cache(cls) -> None:
-        """Clear the GPU device cache."""
-        if torch.backends.mps.is_available():
-            torch.mps.empty_cache()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    def synchronize(cls, device: torch.device) -> None:
+        """Wait for the work already queued on `device`. A no-op on CPU, which runs synchronously."""
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        elif device.type == "xpu":
+            torch.xpu.synchronize(device)
+        elif device.type == "mps":
+            torch.mps.synchronize()
+
+    @classmethod
+    def empty_cache(cls, force: bool = False) -> EmptyCacheOutcome:
+        """Clear the GPU device cache — unless another generation device is mid-session.
+        Returns RAN, DEFERRED (skipped for a busy peer) or REFUSED (the backend raised).
+
+        `force` runs it regardless, for callers whose alternative is worse than stalling a busy peer for the rest of
+        its current step: a model about to run without the driver-free working memory it needs, which on Windows
+        hangs instead of failing (see `ModelCache._release_allocator_blocks_for_reserve`), and the opt-in
+        `clear_vram_after_session` release, whose next session would otherwise budget its first load against memory
+        the allocator still holds.
+
+        ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
+        caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
+        device with a long kernel in flight blocks until that kernel completes with the mutex
+        held. On a multi-GPU box this freezes the busy worker — it cannot allocate or even
+        deallocate a tensor — for the remainder of its current step (observed via py-spy on a
+        dual-GPU ROCm rig: one worker spinning in HIP ``release_block`` inside ``emptyCache``,
+        the other parked on the allocator mutex; a video step is 40-100 s).
+
+        empty_cache is advisory — torch reuses its own cached blocks whether or not they are
+        returned to the driver — so when any OTHER registered generation device is running a
+        session, skip it rather than convoy. Cost of skipping: driver-level free-memory
+        queries (``mem_get_info``) count the still-cached blocks as used, so the model cache's
+        VRAM accounting turns conservative until a quiet-moment call runs. On single-GPU
+        installs a worker never sees another busy device, so its own calls run as before; only
+        a thread with no session device (the cache keep-alive timer, the cache's background
+        worker) defers while the worker is mid-session, and that release runs at the next flush
+        that finds no other device mid-session instead of being dropped.
+
+        A skipped call is recorded as deferred rather than dropped: the memory it would have
+        returned (a canceled session's working set, a timed-out cache's weights) stays cached in
+        the allocator — invisible to the caller's own accounting, but counted as used by the
+        driver and every other process — until `flush_deferred_empty_cache()` runs it from a
+        quiet moment. Without that, VRAM freed on one GPU stayed resident until the peer's
+        whole render finished and something else happened to call empty_cache.
+
+        A release the backend refuses (a `RuntimeError` such as `torch.AcceleratorError` or `OutOfMemoryError` from a
+        broken or exhausted device context) is, for an ordinary call, logged as a warning and reported as REFUSED,
+        never raised: the release is advisory, torch keeps reusing the blocks it could not return, and the operation
+        that asked for it (an eviction, an offload, the Empty Cache request, the release after a session) must still
+        complete. A context that stays broken fails the next real operation on its own. A `force` call raises the
+        error instead, because its caller cannot proceed as if the release ran: a short working-memory reserve on
+        Windows hangs instead of failing (`ModelCache._release_allocator_blocks_for_reserve`), and the working-memory
+        probe would record a measurement window whose baseline still counts the blocks.
+        """
+        if not force and cls._another_generation_device_busy():
+            cls._empty_cache_deferred.set()
+            InvokeAILogger.get_logger(cls.__name__).debug(
+                "Deferring empty_cache: another generation device is mid-session."
+            )
+            return EmptyCacheOutcome.DEFERRED
+        # Clear before running: a skip that races in after this point re-sets the flag, so a
+        # request is never lost, only (harmlessly) repeated.
+        cls._empty_cache_deferred.clear()
+        observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
+        for observer in observers:
+            observer.before_empty_cache()
+        released = False
+        try:
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            if torch.cuda.is_available():
+                # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
+                cuda_empty_cache = torch.cuda.empty_cache
+                (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
+            if _xpu_is_available():
+                torch.xpu.empty_cache()
+            released = True
+        except RuntimeError as e:
+            if force:
+                raise
+            reason = str(e)
+            InvokeAILogger.get_logger(cls.__name__).warning(
+                f"Could not release cached device memory: {reason.splitlines()[0] if reason else type(e).__name__}. "
+                "The memory stays reserved by this process; restart Invoke if generations keep failing with GPU "
+                "errors."
+            )
+            return EmptyCacheOutcome.REFUSED
+        finally:
+            for observer in observers:
+                observer.after_empty_cache(released)
+        return EmptyCacheOutcome.RAN
+
+    @classmethod
+    def flush_deferred_empty_cache(cls) -> None:
+        """Run an empty_cache that a peer-aware skip deferred, if the pool is quiet now.
+
+        Call this from points where the calling worker's own device is at a natural sync point
+        and a driver-level free is cheap — a denoise step boundary (the progress path calls it)
+        or the end of a session. It is a flag test when nothing is pending, so it is safe to call
+        often. When a device other than the caller's is still mid-session the flush is skipped
+        again (and stays pending): the release runs at the first flush that finds no OTHER device
+        mid-session, which on a box whose GPUs stay busy is when one of them goes idle. The cost to
+        a busy worker that runs it is re-allocating its own cached working blocks on the next step,
+        once per request.
+        """
+        if not cls._empty_cache_deferred.is_set():
+            return
+        cls.empty_cache()
+
+    @classmethod
+    def _another_generation_device_busy(cls) -> bool:
+        """True when a generation device OTHER than this thread's session device is running.
+
+        Imported lazily: the device pool module imports this one at top level.
+        """
+        from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+
+        return GENERATION_DEVICE_POOL.any_other_device_busy(cls.get_session_device())
+
+    @classmethod
+    def xpu_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
+        """Return ``(free, total)`` VRAM in bytes for an XPU (Intel GPU) device.
+
+        Three sources are tried in order, most accurate first:
+
+        1. ``torch.xpu.mem_get_info()`` -- driver-global, but needs the SYCL
+           ``ext_intel_free_memory`` aspect, which is missing on some driver/kernel
+           combinations (notably GPU passthrough VMs and WSL2).
+        2. Level Zero Sysman ``zesMemoryGetState`` -- the same driver-global figure by
+           another route, frequently available when the SYCL aspect is not.
+        3. ``total_memory`` minus this process's reserved bytes -- a last-resort estimate.
+
+        The failure type is torch-version dependent -- ``RuntimeError`` from the
+        missing aspect, ``AssertionError`` from ``torch.xpu._lazy_init()`` on a
+        build without XPU -- so the probe catches broadly rather than enumerating
+        types that move between releases.
+
+        Only source 3 is blind to VRAM held by other processes; callers get a driver-global
+        answer whenever the platform can give one. A failure to read ``total_memory`` is
+        deliberately *not* swallowed: a device whose properties cannot be read is not usable
+        as an execution device, and returning ``(0, 0)`` would collapse the model cache's
+        available-VRAM arithmetic to a constant negative budget for the lifetime of the
+        process.
+        """
+        try:
+            return torch.xpu.mem_get_info(device)
+        except Exception:
+            pass
+
+        sysman_info = xpu_memory_info(device)
+        if sysman_info is not None:
+            return sysman_info
+
+        # total_memory does not depend on the unavailable free-memory aspect. Allowed to
+        # raise -- see the docstring.
+        total_bytes = int(torch.xpu.get_device_properties(device).total_memory)
+        try:
+            reserved_bytes = torch.xpu.memory_reserved(device)
+        except Exception:
+            reserved_bytes = 0
+
+        device_key = str(device)
+        if device_key not in _XPU_MEM_FALLBACK_WARNED:
+            _XPU_MEM_FALLBACK_WARNED.add(device_key)
+            InvokeAILogger.get_logger(__name__).warning(
+                f"Neither torch.xpu.mem_get_info() nor Level Zero Sysman could report free VRAM "
+                f"for {device}; estimating it as total memory minus this process's reserved bytes. "
+                "The estimate ignores VRAM held by other processes, so the model cache may "
+                "over-commit on a shared GPU. Set max_cache_vram_gb explicitly if you hit OOMs."
+            )
+
+        return (max(total_bytes - reserved_bytes, 0), total_bytes)
+
+    @classmethod
+    def cuda_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
+        """Return ``(free, total)`` VRAM in bytes for a CUDA or ROCm device.
+
+        ``torch.cuda.mem_get_info``, except that on a ROCm build under Windows the free figure is capped by what the
+        Windows video-memory budget still allows this process (`wddm.video_memory_budget`). There, torch's figure is
+        the device total minus this process's own live allocations: it ignores other processes, and Windows pages
+        allocations into shared system memory well before it is exhausted instead of failing them.
+        """
+        free, total = torch.cuda.mem_get_info(device)
+        budget = video_memory_budget(device)
+        if budget is not None:
+            free = min(free, max(budget - (total - free), 0))
+        return free, total
+
+    @classmethod
+    def memory_available_to_process(cls, device: torch.device) -> int:
+        """What this process can hold on a GPU `device`, what it holds there included.
+
+        On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
+        allocated. On one whose "VRAM" is system RAM (MPS, an integrated XPU): the system's available RAM plus what the
+        backend holds for this process (`torch.mps.driver_allocated_memory`, `torch.xpu.memory_reserved`), since the
+        device totals say nothing about what the host still has free. The model cache budgets from it
+        (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
+        device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
+        not a GPU.
+        """
+        if device.type == "cuda":
+            free, _ = cls.cuda_mem_get_info(device)
+            return free + torch.cuda.memory_allocated(device)
+        if device.type == "xpu" and device_has_dedicated_vram(device):
+            free, _ = cls.xpu_mem_get_info(device)
+            return free + torch.xpu.memory_allocated(device)
+        if device.type in ("mps", "xpu"):
+            held = torch.mps.driver_allocated_memory() if device.type == "mps" else torch.xpu.memory_reserved(device)
+            return int(psutil.virtual_memory().available) + int(held)
+        raise ValueError(f"Unsupported execution device: {device.type}")
 
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
@@ -120,22 +663,48 @@ class TorchDevice:
         This is useful for models that require bfloat16 precision (e.g., Z-Image, Flux)
         but need to run on hardware that may not support bfloat16.
 
+        Asking costs no device memory. A device that cannot be reached at all still raises, as
+        it did before: that is a broken device, not a verdict on dtypes, and it belongs to the
+        caller.
+
         Args:
             device: The target device. If None, uses choose_torch_device().
 
         Returns:
-            torch.bfloat16 if supported, torch.float16 for CUDA without bfloat16 support,
-            or torch.float32 for CPU/MPS.
+            torch.bfloat16 if supported, torch.float16 for CUDA that rejects bfloat16, or
+            torch.float32 for any other device that rejects it (CPU, MPS, XPU).
         """
         device = device or cls.choose_torch_device()
         try:
-            # Test if bfloat16 is supported on this device
-            torch.tensor([1.0], dtype=torch.bfloat16, device=device)
-            return torch.bfloat16
+            # Zero elements, because this is a question about the dtype and not about memory. A
+            # backend rejects an unsupported dtype from a size-independent check it runs before
+            # it reaches its allocator, and an allocator is asked for nothing at all: torch's
+            # `empty_mps` gates bfloat16 on the macOS version above the allocate() call, and the
+            # MPS allocator skips the Metal buffer entirely for zero bytes. Probing with a real
+            # element instead put an allocation between a caller and its dtype -- 256 bytes that
+            # a full GPU can refuse, failing a run where no memory had been asked for yet.
+            torch.empty(0, dtype=torch.bfloat16, device=device)
         except TypeError:
             # bfloat16 not supported - fallback based on device type
             if device.type == "cuda":
                 return torch.float16
+            return torch.float32
+        return torch.bfloat16
+
+    @classmethod
+    def dtype_avoiding_float16(cls, dtype: torch.dtype, device: torch.device) -> torch.dtype:
+        """`dtype`, except float16: bfloat16 where `device` has it, float32 otherwise.
+
+        The dtype of the autoencoders that are broken or unstable in float16 -- the dtype
+        `precision: auto` picks on CUDA and MPS: the standalone FLUX.1 and FLUX.2 VAEs and the
+        Qwen-Image-2.1 pipeline's. A float32 or bfloat16 request is kept as it is. The loaders take it
+        from the configured dtype, and a calibration plan sizes its FLUX decodes by it.
+        """
+        if dtype != torch.float16:
+            return dtype
+        try:
+            return torch.empty(0, dtype=torch.bfloat16, device=device).dtype
+        except TypeError:
             return torch.float32
 
     @classmethod
@@ -151,3 +720,112 @@ class TorchDevice:
         if config.precision == "auto":
             return cls.choose_bfloat16_safe_dtype(device)
         return NAME_TO_PRECISION[config.precision]
+
+    @classmethod
+    def choose_krea2_transformer_dtype(cls, is_gguf: bool, device: Optional[torch.device] = None) -> torch.dtype:
+        """Choose the dtype a Krea-2 transformer runs in. Its loader and the denoise step must agree.
+
+        GGUF on MPS runs in float32: with bfloat16 it produces noise there. The GGUF compute dtype is
+        not only the dequantization target -- on MPS every GGUF Linear casts its input to it, so the
+        whole transformer, and therefore the latents, conditioning and LoRA sidecar weights fed to it,
+        must use the same dtype. Everything else keeps the bfloat16-safe default. ``config.precision``
+        is deliberately not consulted, since the Krea-2 text encoder and other loaders ignore it too.
+        """
+        device = device or cls.choose_torch_device()
+        if is_gguf and device.type == "mps":
+            return torch.float32
+        return cls.choose_bfloat16_safe_dtype(device)
+
+
+_PEER_AWARE_SENTINEL = "_invokeai_peer_aware"
+
+
+_STREAM_CAPTURE_SHIM_SENTINEL = "_invokeai_no_device_shim"
+
+
+def install_cuda_stream_capture_shim() -> None:
+    """On Windows ARM64 with no usable CUDA device, make ``torch.cuda.is_current_stream_capturing()`` answer False.
+
+    NVIDIA's out-of-tree CUDA 13.4 build, the only torch for Windows ARM64, dies there with an access violation
+    instead of raising as other CUDA builds do without a device. transformers calls it on every forward pass
+    (``masking_utils`` via ``is_tracing``) inside a try/except that expects the raise, so on a Windows ARM64
+    machine without an NVIDIA GPU any text encoder or LLM forward would take the process down. Without a device
+    there is no stream to capture, so False is the true answer. Limited to that platform so every other build
+    keeps torch's own behaviour. Idempotent; a no-op where CUDA works or the build has no CUDA.
+    """
+    if not is_windows_arm64() or torch.version.cuda is None or torch.cuda.is_available():
+        return
+    if getattr(torch.cuda.is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, False):
+        return
+
+    def is_current_stream_capturing() -> bool:
+        return False
+
+    setattr(is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, True)
+    torch.cuda.is_current_stream_capturing = is_current_stream_capturing
+
+
+def install_peer_aware_empty_cache() -> None:
+    """Rebind ``torch.cuda.empty_cache`` itself with the peer-aware guard (idempotent).
+
+    ``TorchDevice.empty_cache`` already skips while another generation device is mid-session,
+    but third-party libraries call ``torch.cuda.empty_cache`` directly and convoy the peer all
+    the same — py-spy caught diffusers doing it from inside every model materialization
+    (``from_pretrained`` -> ``_load_pretrained_model`` -> ``empty_device_cache``,
+    ``modeling_utils.py``; likewise ``from_single_file``), freezing the other GPU's in-flight
+    denoise for the remainder of its step. Wrapping the torch entry point makes every Python
+    caller inherit the policy. (Torch-internal C++ callers — e.g. MIOpen's chooseAlgorithm
+    workspace-OOM fallback — bypass Python entirely and remain out of reach.)
+
+    Installed once at startup via ``apply_monkeypatches``. Single-GPU installs never have an
+    "other" busy device, so the wrapper is a pass-through there.
+    """
+    if getattr(torch.cuda.empty_cache, _PEER_AWARE_SENTINEL, False):
+        return
+    original_empty_cache = torch.cuda.empty_cache
+
+    @wraps(original_empty_cache)
+    def peer_aware_empty_cache() -> None:
+        if TorchDevice._another_generation_device_busy():
+            # Deferred, not dropped — see TorchDevice.empty_cache / flush_deferred_empty_cache.
+            TorchDevice._empty_cache_deferred.set()
+            InvokeAILogger.get_logger("TorchDevice").debug(
+                "Deferring torch.cuda.empty_cache: another generation device is mid-session."
+            )
+            return
+        TorchDevice._empty_cache_deferred.clear()
+        original_empty_cache()
+
+    setattr(peer_aware_empty_cache, _PEER_AWARE_SENTINEL, True)
+    torch.cuda.empty_cache = peer_aware_empty_cache
+
+
+def disable_conv_benchmark_empty_cache() -> None:
+    """Stop torch's conv algorithm search from calling global emptyCache() after each find.
+
+    When torch searches for a convolution algorithm (cuDNN benchmark mode; MIOpen on ROCm on
+    every algo-cache miss, benchmark flag or not), ``findAlgorithm`` ends the search with a
+    process-global ``CUDACachingAllocator::emptyCache()`` to release benchmarking workspace
+    (``aten/src/ATen/native/miopen/Conv_miopen.cpp``, likewise the cuDNN path). That call takes
+    every CUDA/HIP device's allocator mutex and frees their cached blocks — freezing a peer
+    GPU's worker mid-step exactly like the Python-level ``torch.cuda.empty_cache`` calls
+    handled by ``install_peer_aware_empty_cache``, but from C++, out of reach of that wrapper
+    (observed via py-spy on a dual-GPU ROCm rig: one worker inside
+    ``chooseAlgorithm -> emptyCache -> hipFree`` waiting out the other worker's 40-100 s
+    denoise step; each new conv shape in the process re-triggers it).
+
+    The call is gated on ``_cudnn_get_conv_benchmark_empty_cache()``, which torch exposes a
+    setter for. Disabling it leaves the benchmarking workspace blocks cached in the allocator
+    for reuse instead of returning them to the driver — the same trade the peer-aware skips
+    already make everywhere else. Called only on multi-GPU installs (see
+    ``DefaultSessionProcessor.start``); single-GPU installs keep torch's default behavior.
+
+    No-op on torch builds that lack the flag (e.g. CPU-only builds).
+    """
+    setter = getattr(torch._C, "_cudnn_set_conv_benchmark_empty_cache", None)
+    if setter is None:
+        return
+    setter(False)
+    InvokeAILogger.get_logger("TorchDevice").debug(
+        "Disabled torch's post-conv-algorithm-search global emptyCache (multi-GPU install)."
+    )

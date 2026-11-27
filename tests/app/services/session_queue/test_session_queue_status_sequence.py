@@ -4,21 +4,23 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation, TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
-    db = mock_invoker.services.board_records._db
-    queue = SqliteSessionQueue(db=db)
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
+    db = mock_sqlite_database
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     queue_id: str = "default",
     destination: str | None = None,
 ) -> int:
@@ -27,7 +29,7 @@ def _insert_queue_item(
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -51,7 +53,7 @@ def _insert_queue_item(
 
 
 def test_status_sequence_increments_for_queue_item_lifecycle(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     item_id = _insert_queue_item(session_queue)
 
@@ -77,7 +79,7 @@ def test_status_sequence_increments_for_queue_item_lifecycle(
     assert [event.status_sequence for event in status_events] == [1, 2]
 
 
-def test_status_sequence_increments_for_bulk_cancel_paths(session_queue: SqliteSessionQueue) -> None:
+def test_status_sequence_increments_for_bulk_cancel_paths(session_queue: SessionQueue) -> None:
     first_item_id = _insert_queue_item(session_queue)
     second_item_id = _insert_queue_item(session_queue)
 
@@ -90,7 +92,7 @@ def test_status_sequence_increments_for_bulk_cancel_paths(session_queue: SqliteS
     assert session_queue.get_queue_item(second_item_id).status_sequence == 1
 
 
-def test_status_sequence_continues_after_dequeue_then_cancel(session_queue: SqliteSessionQueue) -> None:
+def test_status_sequence_continues_after_dequeue_then_cancel(session_queue: SessionQueue) -> None:
     item_id = _insert_queue_item(session_queue)
 
     in_progress_item = session_queue.dequeue()

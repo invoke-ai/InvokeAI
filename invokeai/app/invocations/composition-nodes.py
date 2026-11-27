@@ -1417,7 +1417,8 @@ class InvokeImageDilateOrErodeInvocation(BaseInvocation, WithMetadata):
         else:
             raise ValueError("Invalid mode selected")
         image_out = expand_fn(image_out, kernel, iterations=1)
-        return Image.fromarray(image_out, mode=image_in.mode)
+        # Pillow 13 rejects mode="I;16" for a uint16 array, but infers it (and its byte order) from the dtype.
+        return Image.fromarray(image_out, mode=None if image_in.mode.startswith("I;16") else image_in.mode)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image_in = context.images.get_pil(self.image.image_name)
@@ -1460,7 +1461,7 @@ class InvokeImageDilateOrErodeInvocation(BaseInvocation, WithMetadata):
     title="Image Value Thresholds",
     tags=["image", "mask", "value", "threshold"],
     category="image",
-    version="1.2.0",
+    version="1.2.1",
 )
 class InvokeImageValueThresholdsInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Clip image to pure black/white past specified thresholds. Originally created by @dwringer"""
@@ -1523,7 +1524,7 @@ class InvokeImageValueThresholdsInvocation(BaseInvocation, WithMetadata, WithBoa
             image_out = image_in.convert("RGB")
             image_out = image_out.convert("LAB")
 
-            l_channel = image_resized_to_grid_as_tensor(image_out.getchannel("L"), normalize=False)
+            l_channel = image_resized_to_grid_as_tensor(image_out.getchannel("L"), normalize=False, multiple_of=1)
             l_channel = self.get_threshold_mask(l_channel)
             l_channel = pil_image_from_tensor(l_channel)
 
@@ -1536,7 +1537,7 @@ class InvokeImageValueThresholdsInvocation(BaseInvocation, WithMetadata, WithBoa
                     image_in.mode, tuple([image_out.getchannel(c) for c in image_mode] + [alpha_channel])
                 )
         else:
-            image_out = image_resized_to_grid_as_tensor(image_in, normalize=False)
+            image_out = image_resized_to_grid_as_tensor(image_in, normalize=False, multiple_of=1)
             image_out = self.get_threshold_mask(image_out)
             image_out = pil_image_from_tensor(image_out)
 

@@ -1,0 +1,270 @@
+# Builds the Windows ARM64 wheels that PyPI does not provide -- opencv-contrib-python, blake3 and tiktoken --
+# on GitHub's native ARM64 runner and publishes them, together with a flat index page, as assets of a
+# GitHub release. `pyproject.toml` resolves those three packages on Windows ARM64 from that page (the
+# `invoke-win-arm64-wheels` index), and the manual-install docs pass the same page to `--find-links`.
+#
+# Pull requests that change this workflow or its scripts build the wheels (a workflow only becomes dispatchable
+# once it is on the default branch, and a change to the recipe is exactly when a build should be proven) but
+# never publish them: the builds are not byte-reproducible, and the lockfile pins the published assets by hash,
+# so re-uploading over a tag would break every ARM64 install and `uv lock --locked` until the next re-lock.
+# Publishing is a deliberate act: dispatch the workflow with a NEW release tag (the input has no default), then
+# bump the tag in pyproject.toml's `invoke-win-arm64-wheels` index together with the matching `; sys_platform ==
+# 'win32' and platform_machine == 'ARM64'` pins and re-lock. Tags are immutable: every tagged Invoke release
+# locks the assets of the tag its pyproject named, so replacing an asset breaks those releases' installs. The
+# publish job never replaces one (scripts/win_arm64_wheels/plan_release_upload.py): it uploads only assets the
+# release lacks, skips ones already published with identical contents (so "Re-run failed jobs", which reuses this
+# run's build artifacts, can finish an interrupted upload), and fails on any other difference -- which a new
+# dispatch against a published tag always is, because the builds differ. An upload that dies mid-asset can leave
+# an asset GitHub reports without a digest; the publish job refuses that too, so delete the asset by hand before
+# re-running.
+#
+# This is the third answer to the Windows ARM64 lock gate (`required-environments` and
+# scripts/check_platform_locks.py), after pinning the last version with a win_arm64 wheel behind an ARM64 marker
+# and dropping an optional package there by marker.
+# The publish job runs in the `win-arm64-wheels` environment; maintainers should give that environment required
+# reviewers in the repository settings so a dispatch cannot publish without approval.
+name: build-win-arm64-wheels
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build-win-arm64-wheels.yml'
+      - 'scripts/win_arm64_wheels/**'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: NEW release tag that receives the wheels and index.html (a published tag is never overwritten)
+        type: string
+        required: true
+      opencv_python_ref:
+        description: opencv-python git tag to build (the tag number is the last component of the version, e.g. 86 -> 4.11.0.86)
+        type: string
+        default: '86'
+      blake3_version:
+        description: blake3 version to build from its sdist
+        type: string
+        default: 1.0.9
+      tiktoken_version:
+        description: tiktoken version to build from its sdist
+        type: string
+        default: 0.13.0
+
+permissions:
+  contents: read
+
+# Two runs must not race on the same release tag.
+concurrency:
+  group: build-win-arm64-wheels-${{ inputs.release_tag || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  # Keep in step with python-tests.yml and uv-lock-checks.yml.
+  UV_VERSION: '0.11.28'
+  # Dispatch inputs, with the same defaults for pull_request runs. The tag is only a placeholder there: pull
+  # request runs never publish.
+  RELEASE_TAG: ${{ inputs.release_tag || 'pull-request-build' }}
+  OPENCV_PYTHON_REF: ${{ inputs.opencv_python_ref || '86' }}
+  # uv installs an x86_64 CPython on Windows ARM64 unless the request names the architecture. The
+  # wheels must be built by, and are smoke-tested with, the native interpreter.
+  PYTHON_REQUEST: cpython-3.12-windows-aarch64-none
+
+jobs:
+  opencv:
+    name: opencv-contrib-python
+    runs-on: windows-11-arm
+    # A full contrib build took 16 minutes on the 4-vCPU runner; the margin covers a cold CMake dependency fetch.
+    timeout-minutes: 90
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts/win_arm64_wheels
+          persist-credentials: false
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_REQUEST }}
+
+      - name: fetch opencv-python
+        shell: pwsh
+        run: |
+          git clone --recursive --depth 1 --branch $env:OPENCV_PYTHON_REF https://github.com/opencv/opencv-python.git
+          uv run --no-project --python $env:PYTHON_REQUEST python scripts/win_arm64_wheels/patch_opencv_setup.py opencv-python/setup.py
+
+      - name: build wheel
+        shell: pwsh
+        env:
+          ENABLE_CONTRIB: '1'
+          # -DPYTHON3_LIMITED_API=ON: what upstream builds with. (The wheel still comes out tagged cp312, which is
+          #   fine: 3.12 is the only supported interpreter on Windows ARM64.)
+          # -DWITH_FFMPEG=OFF: OpenCV's ffmpeg wrapper DLL exists only for x86/x64; cv2.VideoCapture keeps the
+          #   Media Foundation backend, and the app decodes through imageio first anyway. (Media Foundation's frame
+          #   count comes from the container duration, so video_decode_worker counts packets with ffmpeg there.)
+          # -DBUILD_opencv_rgbd=OFF: rgbd links the x86 intrinsic _tzcnt_u32 on ARM64 (opencv_contrib#3767).
+          # -DCMAKE_SYSTEM_VERSION=10.0.22621.0: the 10.0.26100 SDK's wchar.h breaks NEON type aliasing under
+          #   MSVC for ARM64 (opencv/opencv#27401); the runner image carries both SDKs.
+          # -DCPU_BASELINE=NEON -DCPU_DISPATCH=NEON_DOTPROD: a native ARM64 build otherwise detects NEON_FP16 into
+          #   the baseline, and the DNN Winograd kernel then uses the `__fp16` type that MSVC does not have
+          #   (error C2065/C2146 in conv_winograd_f63.simd.hpp). Half-float paths fall back to conversion code.
+          CMAKE_ARGS: -DPYTHON3_LIMITED_API=ON -DWITH_FFMPEG=OFF -DBUILD_opencv_rgbd=OFF -DCMAKE_SYSTEM_VERSION=10.0.22621.0 -DCPU_BASELINE=NEON -DCPU_DISPATCH=NEON_DOTPROD
+          CMAKE_BUILD_PARALLEL_LEVEL: '4'
+        run: |
+          uv venv build-venv --python $env:PYTHON_REQUEST
+          $py = "build-venv\Scripts\python.exe"
+          & $py -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
+          uv pip install --python $py pip
+          & $py -m pip wheel ./opencv-python --wheel-dir dist --no-deps
+          Get-ChildItem dist
+
+      - name: smoke test
+        shell: pwsh
+        run: |
+          uv venv smoke --python $env:PYTHON_REQUEST
+          $py = "smoke\Scripts\python.exe"
+          uv pip install --python $py numpy (Get-ChildItem dist\*.whl).FullName
+          & $py -c "import cv2, cv2.ximgproc, cv2.aruco; print(cv2.__version__); print(cv2.getBuildInformation())"
+
+      - name: upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-opencv
+          path: dist/*.whl
+          if-no-files-found: error
+
+  rust-wheels:
+    name: ${{ matrix.package }}
+    runs-on: windows-11-arm
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: blake3
+            version: ${{ inputs.blake3_version || '1.0.9' }}
+            import: blake3
+          - package: tiktoken
+            version: ${{ inputs.tiktoken_version || '0.13.0' }}
+            import: tiktoken
+    steps:
+      - name: setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_REQUEST }}
+
+      - name: toolchain
+        shell: pwsh
+        run: |
+          rustc --version
+          cargo --version
+          rustc --print host-tuple
+
+      - name: build wheel
+        shell: pwsh
+        # Through env, not interpolated into the script: the version comes from a dispatch input.
+        env:
+          PACKAGE: ${{ matrix.package }}
+          PACKAGE_VERSION: ${{ matrix.version }}
+        run: |
+          uv venv build-venv --python $env:PYTHON_REQUEST
+          $py = "build-venv\Scripts\python.exe"
+          & $py -c "import platform; assert platform.machine() == 'ARM64', platform.machine()"
+          uv pip install --python $py pip
+          & $py -m pip wheel "$($env:PACKAGE)==$($env:PACKAGE_VERSION)" --no-binary :all: --no-deps --wheel-dir dist
+          Get-ChildItem dist
+
+      - name: smoke test
+        shell: pwsh
+        env:
+          IMPORT_NAME: ${{ matrix.import }}
+        run: |
+          uv venv smoke --python $env:PYTHON_REQUEST
+          $py = "smoke\Scripts\python.exe"
+          uv pip install --python $py (Get-ChildItem dist\*.whl).FullName
+          & $py -c "import importlib, os; m = importlib.import_module(os.environ['IMPORT_NAME']); print(getattr(m, '__version__', 'ok'))"
+
+      - name: upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.package }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  publish:
+    # Dispatch only, see the header: a pull_request build must never overwrite assets the lockfile pins by hash.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [opencv, rust-wheels]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: win-arm64-wheels
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts/win_arm64_wheels
+          persist-credentials: false
+
+      - name: download wheels
+        uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: write index.html
+        run: |
+          python3 scripts/win_arm64_wheels/make_flat_index.py --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" dist/*.whl > dist/index.html
+          cat dist/index.html
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: verify the wheels resolve before anything is published
+        # The same wheel selection uv applies to the published page, run against the local directory first, so a bad
+        # build never replaces good assets.
+        run: |
+          for whl in dist/*.whl; do
+            name=$(basename "$whl"); pkg=${name%%-*}; rest=${name#*-}; ver=${rest%%-*}
+            echo "${pkg//_/-}==${ver}" >> reqs.txt
+          done
+          cat reqs.txt
+          uv pip compile reqs.txt --no-build --no-deps --python-version 3.12 --python-platform aarch64-pc-windows-msvc \
+            --find-links dist/
+
+      - name: upload release assets
+        # Never --clobber: see the header. The plan fails the job before anything is uploaded if the release
+        # already holds different contents under any of these names.
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_exists=true
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > release.json
+          else
+            release_exists=false
+            echo '{"assets": []}' > release.json
+          fi
+          python3 scripts/win_arm64_wheels/plan_release_upload.py release.json dist/*.whl dist/index.html > upload.txt
+          if [ "$release_exists" = false ]; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest=false \
+              --title "Windows ARM64 wheels ($RELEASE_TAG)" \
+              --notes "Self-built win_arm64 wheels consumed by pyproject.toml's invoke-win-arm64-wheels index. Built by the build-win-arm64-wheels workflow; not a release of Invoke itself."
+          fi
+          if [ -s upload.txt ]; then
+            mapfile -t files < upload.txt
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${files[@]}"
+          fi
+
+      - name: verify the page resolves like the lock and the docs use it
+        # Cross-platform resolution against the published page, exactly as `uv lock` (flat index) and
+        # `uv pip install --find-links` (manual install) consume it. `--no-build` fails if any pin would
+        # need an sdist, i.e. if a wheel is missing from the page or the page is not being served as HTML.
+        run: |
+          uv pip compile reqs.txt --no-build --no-deps --python-version 3.12 --python-platform aarch64-pc-windows-msvc \
+            --find-links "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/index.html"

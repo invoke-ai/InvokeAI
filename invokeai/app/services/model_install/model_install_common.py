@@ -2,7 +2,7 @@ import re
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Set, Union
+from typing import TYPE_CHECKING, Literal, Optional, Set, Union
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
@@ -14,11 +14,26 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 
+if TYPE_CHECKING:
+    from invokeai.app.services.model_install.install_staging_ledger import InstallStaging
+
 
 class InvalidModelConfigException(Exception):
     """Raised when a model configuration is invalid."""
 
     pass
+
+
+class InstallCancellationConflictError(RuntimeError):
+    """The install cannot be cancelled safely in its current state."""
+
+
+class InstallDownloadConflictError(RuntimeError):
+    """A prior remote download still owns this install's staging directory."""
+
+
+class InstallRecoveryRequiredError(InstallCancellationConflictError):
+    """Install transfer could not be safely rolled back; preserve both recovery roots."""
 
 
 class InstallStatus(str, Enum):
@@ -198,10 +213,20 @@ class ModelInstallJob(BaseModel):
         default=None, description="On an error condition, this field will contain the exception traceback"
     )
     # internal flags and transitory settings
-    _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
+    # The install's staging directory, local source claim and recovery marks; the installer owns its lifecycle.
+    _staging: Optional["InstallStaging"] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
     _resume_metadata: Optional[dict] = PrivateAttr(default=None)
+    # Repository revision the download is pinned to, so a resume or retry cannot mix files from a newer commit.
+    _source_revision: Optional[str] = PrivateAttr(default=None)
+    # Direct HF file URLs retain the mirror that was trusted when their marker was written.
+    _source_hf_endpoint: Optional[str] = PrivateAttr(default=None)
+    # The pinned revision vanished and the staged files were given up: nothing of this job can be restarted.
+    _pinned_revision_vanished: bool = PrivateAttr(default=False)
+    _recovery_required: bool = PrivateAttr(default=False)
+    _cancel_requested: bool = PrivateAttr(default=False)
+    _install_phase: Optional[str] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""

@@ -1,0 +1,183 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
+import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
+import { addImageToBoardDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
+import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
+import {
+  selectAutoAddBoardId,
+  selectAutoAssignBoardOnClick,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import type { BoardDTO } from 'services/api/types';
+
+const _hover: SystemStyleObject = {
+  bg: 'base.850',
+};
+
+interface GalleryBoardProps {
+  board: BoardDTO;
+  isSelected: boolean;
+}
+
+const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const onClick = useCallback(() => {
+    if (selectedBoardId !== board.board_id) {
+      dispatch(boardIdSelected({ boardId: board.board_id }));
+    }
+    if (autoAssignBoardOnClick && autoAddBoardId !== board.board_id) {
+      dispatch(autoAddBoardIdChanged(board.board_id));
+    }
+  }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
+
+  const dndTargetData = useMemo<AddImageToBoardDndTargetData>(
+    () => addImageToBoardDndTarget.getData({ boardId: board.board_id }),
+    [board.board_id]
+  );
+
+  // The tooltip gets split counts so videos aren't mislabeled as images; the headline
+  // number below stays combined (images + videos) so a video-only board doesn't read
+  // as empty in the gallery list.
+  const boardCounts = useMemo(
+    () => ({
+      image_count: board.image_count,
+      video_count: board.video_count ?? 0,
+      asset_count: board.asset_count,
+    }),
+    [board]
+  );
+
+  const showOwner = currentUser?.is_admin && board.owner_username;
+
+  const { canWriteImages } = useBoardAccess(board);
+
+  return (
+    <Box position="relative" w="full" h={12}>
+      <BoardContextMenu board={board}>
+        {(ref) => (
+          <Tooltip
+            label={<BoardTooltip board={board} boardCounts={boardCounts} />}
+            openDelay={1000}
+            placement="right"
+            closeOnScroll
+            p={2}
+          >
+            <Flex
+              ref={ref}
+              onClick={onClick}
+              alignItems="center"
+              borderRadius="base"
+              cursor="pointer"
+              py={1}
+              ps={1}
+              pe={4}
+              gap={4}
+              bg={isSelected ? 'base.850' : undefined}
+              _hover={_hover}
+              w="full"
+              h="full"
+            >
+              <CoverImage board={board} />
+              <Flex flex={1} direction="column" minW={0}>
+                <BoardEditableTitle board={board} isSelected={isSelected} />
+                {showOwner && (
+                  <Text fontSize="xs" color="base.500" noOfLines={1}>
+                    {board.owner_username}
+                  </Text>
+                )}
+              </Flex>
+              {autoAddBoardId === board.board_id && <AutoAddBadge />}
+              {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+              {board.board_visibility === 'shared' && (
+                <Tooltip label={t('boards.visibilityBadgeShared')}>
+                  <span>
+                    <Icon as={PiShareNetworkBold} fill="blue.300" />
+                  </span>
+                </Tooltip>
+              )}
+              {board.board_visibility === 'public' && (
+                <Tooltip label={t('boards.visibilityBadgePublic')}>
+                  <span>
+                    <Icon as={PiGlobeBold} fill="green.300" />
+                  </span>
+                </Tooltip>
+              )}
+              <Flex justifyContent="flex-end">
+                <Text variant="subtext">
+                  {board.image_count + (board.video_count ?? 0)} | {board.asset_count}
+                </Text>
+              </Flex>
+            </Flex>
+          </Tooltip>
+        )}
+      </BoardContextMenu>
+      <DndDropTarget
+        dndTarget={addImageToBoardDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.move')}
+        isDisabled={!canWriteImages}
+      />
+    </Box>
+  );
+};
+
+export default memo(GalleryBoard);
+
+const CoverImage = ({ board }: { board: BoardDTO }) => {
+  // Backend picks a single cover — either an image or a video — so at most one of these
+  // queries fires (the other is `skipToken`). The video case takes precedence when set.
+  const { currentData: coverVideo } = useGetVideoDTOQuery(board.cover_video_name ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(
+    board.cover_video_name ? skipToken : (board.cover_image_name ?? skipToken)
+  );
+
+  const thumbnailUrl = coverVideo?.thumbnail_url ?? coverImage?.thumbnail_url;
+  const refreshedThumbnailUrl = useMediaUrl(thumbnailUrl);
+
+  // Also used as the Image's error fallback: thumbnail generation is best-effort on the
+  // backend (a video can exist whose thumbnail 404s), so a broken URL must degrade to
+  // the same icon as a missing one.
+  const fallbackIcon = (
+    <Flex w={10} h={10} justifyContent="center" alignItems="center">
+      <Icon boxSize={10} as={PiImageSquare} opacity={0.7} color="base.500" />
+    </Flex>
+  );
+
+  if (refreshedThumbnailUrl) {
+    return (
+      <Image
+        src={refreshedThumbnailUrl}
+        draggable={false}
+        objectFit="cover"
+        w={10}
+        h={10}
+        borderRadius="base"
+        borderBottomRadius="lg"
+        fallbackStrategy="onError"
+        fallback={fallbackIcon}
+      />
+    );
+  }
+
+  return fallbackIcon;
+};

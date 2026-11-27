@@ -52,6 +52,8 @@ def sum_controlnet_flux_outputs(
 ) -> ControlNetFluxOutput:
     controlnet_output_sum = ControlNetFluxOutput(single_block_residuals=None, double_block_residuals=None)
 
+    # TODO: summing residuals materializes tensors that may otherwise share references,
+    # increasing peak memory when several ControlNets are active.
     for controlnet_output in controlnet_outputs:
         controlnet_output_sum = add_controlnet_flux_outputs(controlnet_output_sum, controlnet_output)
 

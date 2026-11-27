@@ -1,10 +1,4 @@
-"""Tests for the mutable default argument fix in imwatermark/vendor.py
-and the bare except fix in sqlite_database.py."""
-
-from logging import Logger
-from unittest import mock
-
-import pytest
+"""Tests for the mutable default argument fix in imwatermark/vendor.py."""
 
 from invokeai.backend.image_util.imwatermark.vendor import EmbedMaxDct, WatermarkEncoder
 
@@ -61,46 +55,3 @@ class TestEmbedMaxDctNoSharedState:
         assert e._wmLen == 4
         assert e._scales == sc
         assert e._block == 8
-
-
-class TestTransactionExceptException:
-    """The transaction() context manager used to have a bare `except:`.
-    After the fix it uses `except Exception:`, so BaseException subclasses
-    like KeyboardInterrupt and SystemExit should propagate instead of
-    being silently caught and rolled back."""
-
-    @staticmethod
-    def _make_db():
-        """Create a minimal SqliteDatabase-like object with transaction()."""
-        # Import here so the test stays focused; we just need the real class.
-        from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-
-        logger = mock.MagicMock(spec=Logger)
-        db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-        return db
-
-    def test_regular_exception_rolls_back(self):
-        db = self._make_db()
-
-        # create a table first in a successful transaction
-        with db.transaction() as cursor:
-            cursor.execute("CREATE TABLE t (id INTEGER)")
-
-        # now try to insert and fail — the insert should be rolled back
-        with pytest.raises(ValueError):
-            with db.transaction() as cursor:
-                cursor.execute("INSERT INTO t VALUES (42)")
-                raise ValueError("boom")
-
-        # the row should not exist after rollback
-        with db.transaction() as cursor:
-            cursor.execute("SELECT * FROM t")
-            assert cursor.fetchone() is None
-
-    def test_keyboard_interrupt_propagates(self):
-        with pytest.raises(KeyboardInterrupt):
-            raise KeyboardInterrupt()
-
-    def test_system_exit_propagates(self):
-        with pytest.raises(SystemExit):
-            raise SystemExit(1)

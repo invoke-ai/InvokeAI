@@ -10,6 +10,7 @@ from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, UN
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
+from invokeai.backend.util.devices import TorchDevice
 
 
 class StableDiffusionBackend:
@@ -44,7 +45,9 @@ class StableDiffusionBackend:
         # ext: preview[pre_denoise_loop, priority=low]
         ext_manager.run_callback(ExtensionCallbackType.PRE_DENOISE_LOOP, ctx)
 
-        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.inputs.timesteps)):  # noqa: B020
+        for ctx.step_index, ctx.timestep in enumerate(  # noqa: B020
+            tqdm(ctx.inputs.timesteps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
+        ):
             # ext: inpaint (apply mask to latents on non-inpaint models)
             ext_manager.run_callback(ExtensionCallbackType.PRE_STEP, ctx)
 
@@ -139,4 +142,8 @@ class StableDiffusionBackend:
         return noise_pred
 
     def _unet_forward(self, **kwargs) -> torch.Tensor:
-        return self.unet(**kwargs).sample
+        # First three args should be positional, not keywords, so torch hooks can see them.
+        sample = kwargs.pop("sample")
+        timestep = kwargs.pop("timestep")
+        encoder_hidden_states = kwargs.pop("encoder_hidden_states")
+        return self.unet(sample, timestep, encoder_hidden_states, **kwargs).sample

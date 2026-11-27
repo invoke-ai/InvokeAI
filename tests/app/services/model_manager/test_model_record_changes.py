@@ -1,0 +1,931 @@
+"""Model record edits and re-identification through the model manager: they write the record and drop cached
+instances of the model exactly when the change affects how it loads. The load fence these changes announce
+themselves to is covered by `tests/app/services/model_load/test_stale_model_load_fence.py`."""
+
+import gc
+import json
+import re
+import threading
+import time
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Iterator, Optional
+
+import pytest
+import torch
+from safetensors.torch import save_file
+
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadQueueService
+from invokeai.app.services.model_install import ModelInstallService
+from invokeai.app.services.model_load import ModelLoadService
+from invokeai.app.services.model_manager import ModelManagerService
+from invokeai.app.services.model_records import (
+    InvalidModelException,
+    ModelRecordChanges,
+    ModelRecordServiceSQL,
+    UnknownModelException,
+)
+from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Checkpoint_L_Config
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_InvokeAI_SD1_Config
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config, Main_Checkpoint_SDXL_Config
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import ModelRoleError, view_as
+from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    Qwen3VariantType,
+    Qwen35VariantType,
+    SubModelType,
+)
+from invokeai.backend.tiny_autoencoder.checkpoint import (
+    TAELTX2_3,
+    TAEW2_1,
+    TAEW2_2,
+    TaehvLayout,
+    TinyAutoencoderLayout,
+)
+from invokeai.backend.util.logging import InvokeAILogger
+from tests.backend.model_manager.load.state_dicts import (
+    clip_g_comfy_keys,
+    clip_l_comfy_keys,
+    flux3_pup_int8_convrot_keys,
+)
+from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+from tests.fixtures.model_roles import text_llm_file
+from tests.fixtures.spandrel_models import write_compact_upscaler
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.fixtures.tiny_autoencoders import (
+    TAEF2,
+    TAEQI2_1,
+    TAESD,
+    TAESD3,
+    diffusers_weights,
+    native_weights,
+    taehv_weights,
+)
+
+KEY = "model-key"
+MODEL_PATH = "sd-1/main/model.safetensors"
+
+
+class _RecordingLoader(ModelLoader):
+    """Builds a tiny module and records the config class each construction was built from."""
+
+    built_from: list[str] = []
+
+    def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
+        self.built_from.append(type(config).__name__)
+        return torch.nn.Linear(2, 2)
+
+
+class _Registry:
+    @classmethod
+    def get_implementation(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]):
+        return _RecordingLoader, config, submodel_type
+
+
+class _NoEvents:
+    def emit_model_load_started(self, *_args) -> None:
+        pass
+
+    def emit_model_load_complete(self, *_args) -> None:
+        pass
+
+
+class _Harness:
+    def __init__(self, models_path: Path) -> None:
+        self.models_path = models_path
+        app_config = InvokeAIAppConfig(use_memory_db=True, models_dir=models_path)
+        logger = InvokeAILogger.get_logger()
+        self.store = ModelRecordServiceSQL(create_mock_sqlite_database(app_config, logger), logger)
+        self.caches = [
+            ModelCache(
+                execution_device_working_mem_gb=1.0,
+                enable_partial_loading=False,
+                keep_ram_copy_of_weights=True,
+                max_ram_cache_size_gb=1.0,
+                max_vram_cache_size_gb=0.0,
+                execution_device="cpu",
+                logger=logger,
+                # Keep the process-global weight store out of it, so no other test's model can be adopted.
+                shared_cpu_weights=None,
+            )
+            for _ in range(2)
+        ]
+        load = ModelLoadService(
+            app_config=app_config,
+            ram_cache=self.caches[0],
+            registry=_Registry,  # type: ignore[arg-type]
+            ram_caches={"cpu": self.caches[0], "cpu:1": self.caches[1]},
+        )
+        install = ModelInstallService(
+            app_config=app_config, record_store=self.store, download_queue=DownloadQueueService()
+        )
+        self.manager = ModelManagerService(store=self.store, install=install, load=load)
+        # Only the load service is started: it reads the record through the invoker, and the installer's start
+        # would scan the models directory.
+        load.start(SimpleNamespace(services=SimpleNamespace(model_manager=self.manager, events=_NoEvents())))  # type: ignore[arg-type]
+
+    def cache_model(self, key: str = KEY) -> None:
+        """Put a model and one of its submodels into every device cache, beside an unrelated model."""
+        for cache in self.caches:
+            cache.put(key, torch.ones(2))
+            cache.put(f"{key}:vae", torch.ones(2))
+            cache.put("other-model", torch.ones(2))
+
+    def is_cached(self, key: str = KEY) -> bool:
+        """Whether the model is cached, failing the test if the device caches or its entries disagree."""
+        states = {entry in cache._cached_models for cache in self.caches for entry in (key, f"{key}:vae")}
+        assert len(states) == 1, "the change dropped only some of the model's entries"
+        assert all("other-model" in cache._cached_models for cache in self.caches)
+        return states.pop()
+
+
+@pytest.fixture(autouse=True)
+def _collect_only_this_tests_objects():
+    """Every drop runs gc.collect(), and a full collection walks the worker's whole heap. Freezing what existed
+    before the test leaves each collection to the objects the test created."""
+    gc.freeze()
+    yield
+    gc.unfreeze()
+
+
+@pytest.fixture
+def harness(tmp_path: Path) -> Iterator[_Harness]:
+    _RecordingLoader.built_from = []
+    models_path = tmp_path / "models"
+    models_path.mkdir()
+    harness = _Harness(models_path)
+    yield harness
+    for cache in harness.caches:
+        cache.shutdown()
+
+
+def _sd1_record(**fields) -> Main_Checkpoint_SD1_Config:
+    defaults = {
+        "key": KEY,
+        "path": MODEL_PATH,
+        "name": "model",
+        "hash": "hash",
+        "file_size": 1,
+        "source": "local-source",
+        "source_type": ModelSourceType.Path,
+        "prediction_type": "epsilon",
+        "variant": ModelVariantType.Normal,
+    }
+    return Main_Checkpoint_SD1_Config(**{**defaults, **fields})
+
+
+def _write_sd_checkpoint(path: Path, base: BaseModelType) -> Path:
+    """The few keys SD checkpoint identification reads, at the widths that tell SD-1 from SDXL."""
+    cross_attention = {
+        BaseModelType.StableDiffusion1: ("model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2", 768),
+        BaseModelType.StableDiffusionXL: ("model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2", 2048),
+    }
+    prefix, width = cross_attention[base]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    save_file(
+        {
+            f"{prefix}.to_k.weight": torch.zeros(1, width),
+            "model.diffusion_model.input_blocks.0.0.weight": torch.zeros(1, 4, 1, 1),
+        },
+        path,
+    )
+    return path
+
+
+def _identify(model_file: Path, overrides: Optional[dict[str, object]] = None, /, **record_fields) -> AnyModelConfig:
+    """The record an install of `model_file` would have written, with `record_fields` then set on it."""
+    config = ModelConfigFactory.from_model_on_disk(
+        model_file,
+        {"source": "local-source", "source_type": ModelSourceType.Path, **(overrides or {})},
+        allow_unknown=False,
+    ).config
+    assert config is not None
+    for field, value in record_fields.items():
+        setattr(config, field, value)
+    return config
+
+
+@pytest.mark.parametrize(
+    ("changes", "load_affecting"),
+    [
+        pytest.param(ModelRecordChanges(name="renamed"), False, id="name"),
+        pytest.param(ModelRecordChanges(description="described"), False, id="description"),
+        pytest.param(ModelRecordChanges(source_urls=["https://example.com/model"]), False, id="source_urls"),
+        pytest.param(ModelRecordChanges(trigger_phrases={"a phrase"}), False, id="trigger_phrases"),
+        pytest.param(
+            ModelRecordChanges(default_settings=MainModelDefaultSettings(steps=12)), False, id="generation_default"
+        ),
+        pytest.param(
+            ModelRecordChanges(default_settings=MainModelDefaultSettings(fp8_storage=True)), True, id="fp8_storage"
+        ),
+        pytest.param(ModelRecordChanges(default_settings=MainModelDefaultSettings(cpu_only=True)), True, id="cpu_only"),
+        pytest.param(ModelRecordChanges(variant=ModelVariantType.Inpaint), True, id="variant"),
+        pytest.param(ModelRecordChanges(base=BaseModelType.StableDiffusionXL), True, id="config_class"),
+        pytest.param(ModelRecordChanges(path="sd-1/main/other.safetensors"), True, id="other_file"),
+    ],
+)
+def test_update_drops_cached_instances_only_when_the_change_affects_loading(
+    harness: _Harness, changes: ModelRecordChanges, load_affecting: bool
+) -> None:
+    harness.store.add_model(_sd1_record())
+    harness.cache_model()
+
+    updated = harness.manager.update_model_record(KEY, changes)
+
+    assert harness.is_cached() is not load_affecting
+    assert harness.store.get_model(KEY) == updated
+    for field in changes.model_fields_set:
+        assert getattr(updated, field) == getattr(changes, field)
+
+
+def test_update_rewriting_a_path_to_the_same_file_in_absolute_form_keeps_cached_instances(harness: _Harness) -> None:
+    """The load fence resolves paths against the models directory, so a models-relative path and the absolute path
+    of the same file load the same model. The edit must compare them the same way, or it evicts a model it did not
+    change and rejects the loads that overlapped it."""
+    harness.store.add_model(_sd1_record())
+    harness.cache_model()
+
+    harness.manager.update_model_record(KEY, ModelRecordChanges(path=str(harness.models_path / MODEL_PATH)))
+
+    assert harness.is_cached()
+
+
+def test_cached_instances_are_dropped_under_the_model_load_write_lock(harness: _Harness) -> None:
+    """Holding the construction lock across the drop keeps a concurrent load from re-registering state it built
+    from the previous record."""
+    harness.store.add_model(_sd1_record())
+    harness.cache_model()
+    drops_under_write_lock: list[bool] = []
+    for cache in harness.caches:
+        cache.on_cache_models_cleared(lambda **_: drops_under_write_lock.append(MODEL_LOAD_LOCK._writer_active))
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges(default_settings=MainModelDefaultSettings(cpu_only=True))
+    )
+
+    assert drops_under_write_lock == [True, True]
+
+
+def test_update_round_trips_default_components_from_a_request_body(harness: _Harness) -> None:
+    """A PATCH body that carries `components` parses as main-model settings and survives the record store."""
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(vae="vae-key", steps=20)))
+    body = {"default_settings": {"vae": "vae-key", "steps": 20, "components": {"t5_encoder": "t5-key"}}}
+
+    changes = ModelRecordChanges.model_validate(body)
+    assert isinstance(changes.default_settings, MainModelDefaultSettings)
+    harness.manager.update_model_record(KEY, changes)
+
+    stored = harness.store.get_model(KEY)
+    assert stored.default_settings == MainModelDefaultSettings(
+        vae="vae-key", steps=20, components={"t5_encoder": "t5-key"}
+    )
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"vae": "vae-key", "steps": 20, "components": {}}})
+    )
+    cleared = harness.store.get_model(KEY).default_settings
+    assert cleared is not None and cleared.components is None
+
+
+def test_a_body_with_only_components_resolves_to_main_model_settings() -> None:
+    changes = ModelRecordChanges.model_validate({"default_settings": {"components": {"t5_encoder": "t5-key"}}})
+
+    assert isinstance(changes.default_settings, MainModelDefaultSettings)
+    assert changes.default_settings.components == {"t5_encoder": "t5-key"}
+
+
+def test_a_request_body_with_an_invalid_default_component_is_rejected() -> None:
+    with pytest.raises(ValueError, match="`vae` field"):
+        ModelRecordChanges.model_validate({"default_settings": {"components": {"vae": "x"}}})
+
+
+def test_update_that_the_store_rejects_changes_nothing(harness: _Harness) -> None:
+    record = _sd1_record()
+    harness.store.add_model(record)
+    harness.cache_model()
+
+    with pytest.raises(ValueError, match="at most"):
+        harness.manager.update_model_record(KEY, ModelRecordChanges(path="x" * 800))
+
+    assert harness.store.get_model(KEY) == record
+    assert harness.is_cached()
+
+
+def test_update_of_an_unknown_model_raises_and_drops_nothing(harness: _Harness) -> None:
+    harness.cache_model()
+
+    with pytest.raises(UnknownModelException):
+        harness.manager.update_model_record(KEY, ModelRecordChanges(name="renamed"))
+
+    assert harness.is_cached()
+
+
+@pytest.mark.parametrize("cpu_only", [True, False, None])
+@pytest.mark.parametrize("fp8_storage", [True, False, None])
+def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
+    harness: _Harness, cpu_only: Optional[bool], fp8_storage: Optional[bool]
+) -> None:
+    """Re-identification replaces what the files decide (here SD-1 becomes SDXL, a load-affecting change) and keeps
+    the user's fields. False and None are user choices too: probe defaults must not replace them."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    harness.store.add_model(
+        _sd1_record(
+            name="My model",
+            description="mine",
+            cover_image="cover.webp",
+            source_urls=["https://example.com/model", "https://example.com/quantized"],
+            trigger_phrases={"a phrase"},
+            default_settings=MainModelDefaultSettings(cpu_only=cpu_only, fp8_storage=fp8_storage, steps=12),
+        )
+    )
+    harness.cache_model()
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Main_Checkpoint_SDXL_Config)
+    assert harness.store.get_model(KEY) == updated
+    assert (updated.key, updated.path, updated.name, updated.description) == (KEY, MODEL_PATH, "My model", "mine")
+    assert updated.trigger_phrases == {"a phrase"}
+    assert updated.cover_image == "cover.webp"
+    assert updated.source_urls == ["https://example.com/model", "https://example.com/quantized"]
+    assert (updated.source, updated.source_type) == ("local-source", ModelSourceType.Path)
+    assert updated.default_settings is not None
+    assert (updated.default_settings.cpu_only, updated.default_settings.fp8_storage) == (cpu_only, fp8_storage)
+    # Other defaults are the architecture's: only the load preferences are the user's to keep.
+    assert updated.default_settings.width == 1024
+    assert not harness.is_cached()
+    # The probe hands out an architecture's shared defaults; the kept preferences must not leak into them.
+    later_install = _identify(harness.models_path / MODEL_PATH)
+    assert later_install.default_settings is not None
+    assert (later_install.default_settings.cpu_only, later_install.default_settings.fp8_storage) == (None, None)
+
+
+def test_reidentify_keeps_the_default_vae_and_default_components_while_the_base_is_unchanged(
+    harness: _Harness,
+) -> None:
+    """The default VAE and component models are the user's choice; the probe cannot derive them, and the
+    recommended generation parameters (steps) are still replaced."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    components = {"t5_encoder": "t5-key", "clip_embed": "clip-key"}
+    harness.store.add_model(
+        _sd1_record(default_settings=MainModelDefaultSettings(vae="vae-key", components=components, steps=12))
+    )
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert updated.default_settings is not None
+    assert updated.default_settings.vae == "vae-key"
+    assert updated.default_settings.components == components
+    assert updated.default_settings.steps != 12
+    assert harness.store.get_model(KEY).default_settings == updated.default_settings
+
+
+def test_reidentify_into_another_base_drops_the_default_vae_and_components_but_keeps_load_preferences(
+    harness: _Harness,
+) -> None:
+    """The keys name models of the old base, which the new base cannot use."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    harness.store.add_model(
+        _sd1_record(
+            default_settings=MainModelDefaultSettings(cpu_only=True, vae="vae-key", components={"t5_encoder": "t5-key"})
+        )
+    )
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Main_Checkpoint_SDXL_Config)
+    assert updated.default_settings is not None
+    assert (updated.default_settings.vae, updated.default_settings.components) == (None, None)
+    assert updated.default_settings.cpu_only is True
+
+
+def test_reidentify_whose_probe_has_no_defaults_keeps_the_curated_fields(
+    harness: _Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    harness.store.add_model(
+        _sd1_record(
+            default_settings=MainModelDefaultSettings(
+                fp8_storage=True, vae="vae-key", components={"t5_encoder": "t5-key"}, steps=12
+            )
+        )
+    )
+    from_model_on_disk = ModelConfigFactory.from_model_on_disk
+
+    def without_defaults(*args, **kwargs):
+        result = from_model_on_disk(*args, **kwargs)
+        assert result.config is not None
+        result.config.default_settings = None
+        return result
+
+    monkeypatch.setattr(ModelConfigFactory, "from_model_on_disk", without_defaults)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert updated.default_settings == MainModelDefaultSettings(
+        fp8_storage=True, vae="vae-key", components={"t5_encoder": "t5-key"}
+    )
+
+
+def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(harness: _Harness) -> None:
+    """A CLIP-G without the projection SD 3 needs is recognised and refused as unusable; the record is not touched."""
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    (harness.models_path / MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(harness.models_path / MODEL_PATH, keys)
+    record = _sd1_record()
+    harness.store.add_model(record)
+
+    with pytest.raises(InvalidModelException, match="Unable to identify model format: .*text_projection"):
+        harness.manager.reidentify_model(KEY)
+
+    assert harness.store.get_model(KEY) == record
+
+
+def test_reidentify_while_a_load_of_the_old_record_is_queued_rebuilds_it_from_the_new_record(
+    harness: _Harness,
+) -> None:
+    """A load that checked the SD-1 record and queued for the construction lock while re-identification files the
+    model as SDXL must not build from the record it read: re-identification is announced to loads from before its
+    commit until after its cache drop."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    harness.store.add_model(_sd1_record())
+    stale = harness.store.get_model(KEY)
+    loads: list[object] = []
+    errors: list[BaseException] = []
+
+    def load() -> None:
+        try:
+            loads.append(harness.manager.load.load_model(stale))
+        except BaseException as e:
+            loads.append(e)
+
+    def reidentify() -> None:
+        try:
+            harness.manager.reidentify_model(KEY)
+        except BaseException as e:
+            errors.append(e)
+
+    # Daemon threads: a regression that deadlocks must fail the test, not hang it.
+    loader = threading.Thread(target=load, daemon=True)
+    editor = threading.Thread(target=reidentify, daemon=True)
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader.start()
+        deadline = time.monotonic() + 10
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            assert time.monotonic() < deadline, "loader never queued for the construction lock"
+            time.sleep(0.001)
+        editor.start()
+        # Until re-identification has committed and waits to drop the model, or has ended without dropping it.
+        while MODEL_LOAD_LOCK._writers_waiting < 2 and editor.is_alive():
+            assert time.monotonic() < deadline + 10, "re-identification neither finished nor reached its drop"
+            time.sleep(0.001)
+    editor.join(timeout=10)
+    loader.join(timeout=10)
+
+    assert not editor.is_alive() and not errors
+    assert not loader.is_alive() and len(loads) == 1
+    assert isinstance(loads[0], LoadedModel) and isinstance(loads[0].config, Main_Checkpoint_SDXL_Config)
+    assert _RecordingLoader.built_from == ["Main_Checkpoint_SDXL_Config"]
+
+
+def test_reidentify_that_changes_nothing_that_loads_keeps_cached_instances(harness: _Harness) -> None:
+    path = _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    installed = _identify(path, key=KEY, path=MODEL_PATH, name="My model")
+    harness.store.add_model(installed)
+    harness.cache_model()
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert updated == installed
+    assert harness.is_cached()
+
+
+@pytest.mark.parametrize("cpu_only", [True, False])
+def test_reidentify_keeps_a_cpu_only_choice_held_on_the_config_itself(harness: _Harness, cpu_only: bool) -> None:
+    """Text encoders keep `cpu_only` beside their other fields rather than in default settings."""
+    path = write_header_only_safetensors(harness.models_path / "clip-l.safetensors", clip_l_comfy_keys.state_dict_keys)
+    installed = _identify(path, key=KEY, path="clip-l.safetensors", name="CLIP-L")
+    assert isinstance(installed, CLIPEmbed_Checkpoint_L_Config)
+    installed.cpu_only = cpu_only
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, CLIPEmbed_Checkpoint_L_Config)
+    assert updated.cpu_only is cpu_only
+
+
+_COMFY_MOSS_INT8_URL = (
+    "https://huggingface.co/Comfy-Org/MOSS-Image/resolve/main/text_encoders/qwen3.5_9b_int8_convrot.safetensors"
+)
+
+
+def _write_moss_int8_encoder(path: Path) -> Path:
+    """Comfy-Org's int8 MOSS-Image encoder: the key set of the FLUX.3 prompt upsampler, a Text LLM by its weights."""
+    return write_header_only_safetensors(
+        path, flux3_pup_int8_convrot_keys.state_dict_keys, flux3_pup_int8_convrot_keys.markers
+    )
+
+
+def test_reidentify_keeps_a_local_qwen3_5_encoder_an_encoder(harness: _Harness) -> None:
+    """The weights cannot tell the encoder from the upsampler, so the type it was installed with stays; the file
+    gains the Text LLM role."""
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    installed = _identify(
+        path,
+        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        key=KEY,
+        path="encoder.safetensors",
+        name="Qwen3.5 9B (int8)",
+    )
+    assert isinstance(installed, Qwen35Encoder_Checkpoint_Config)
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert updated.variant is Qwen35VariantType.Qwen35_9B
+    assert [role.type for role in updated.roles] == [ModelType.TextLLM]
+
+
+def test_reidentify_keeps_a_text_llm_from_comfy_orgs_encoder_url_a_text_llm_serving_as_the_encoder(
+    harness: _Harness,
+) -> None:
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    installed = _identify(path, key=KEY, path="encoder.safetensors", name="encoder")
+    assert isinstance(installed, TextLLM_Checkpoint_Config)
+    installed.source, installed.source_type = _COMFY_MOSS_INT8_URL, ModelSourceType.Url
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, TextLLM_Checkpoint_Config)
+    assert updated.source == _COMFY_MOSS_INT8_URL
+    assert [(role.type, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen35Encoder, Qwen35VariantType.Qwen35_9B)
+    ]
+
+
+def test_reidentify_gives_a_record_stored_without_roles_the_roles_of_its_files(harness: _Harness) -> None:
+    """Records written before roles existed carry none; Re-identify is how they gain them."""
+    path = _write_moss_int8_encoder(harness.models_path / "encoder.safetensors")
+    llm = _identify(path, key=KEY, path="encoder.safetensors", name="llm")
+    assert isinstance(llm, TextLLM_Checkpoint_Config)
+    llm.roles = []
+    harness.store.add_model(llm)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert [(role.type, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen35Encoder, Qwen35VariantType.Qwen35_9B)
+    ]
+    harness.store.del_model(KEY)
+
+    encoder = _identify(
+        path,
+        {"type": ModelType.Qwen35Encoder, "variant": Qwen35VariantType.Qwen35_9B},
+        key=KEY,
+        path="encoder.safetensors",
+        name="encoder",
+    )
+    encoder.roles = []
+    harness.store.add_model(encoder)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Qwen35Encoder_Checkpoint_Config)
+    assert [role.type for role in updated.roles] == [ModelType.TextLLM]
+
+
+def test_reidentify_gives_a_qwen3_folder_stored_without_roles_its_encoder_role(harness: _Harness) -> None:
+    folder = harness.models_path / "qwen3-4b"
+    folder.mkdir()
+    (folder / "config.json").write_text(json.dumps({"architectures": ["Qwen3ForCausalLM"], "hidden_size": 2560}))
+    (folder / "tokenizer.json").write_text("{}")
+    installed = _identify(folder, key=KEY, path="qwen3-4b", name="Qwen3 4B")
+    assert isinstance(installed, TextLLM_Diffusers_Config)
+    installed.roles = []
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, TextLLM_Diffusers_Config)
+    assert [(role.type, role.format, role.variant) for role in updated.roles] == [
+        (ModelType.Qwen3Encoder, ModelFormat.Qwen3Encoder, Qwen3VariantType.Qwen3_4B)
+    ]
+
+
+def test_reidentify_keeps_an_ip_adapter_encoder_override_its_files_leave_blank(harness: _Harness) -> None:
+    model_path = harness.models_path / "ip-adapter"
+    model_path.mkdir()
+    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.zeros(1, 768)}}, model_path / "ip_adapter.bin")
+    (model_path / "image_encoder.txt").write_text("  \n", encoding="utf-8")
+    installed = _identify(
+        model_path, {"image_encoder_model_id": "custom/image-encoder"}, key=KEY, path="ip-adapter", name="IP-Adapter"
+    )
+    assert isinstance(installed, IPAdapter_InvokeAI_SD1_Config)
+    harness.store.add_model(installed)
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, IPAdapter_InvokeAI_SD1_Config)
+    assert updated.image_encoder_model_id == "custom/image-encoder"
+
+
+def test_reidentify_records_the_scale_of_an_upscaler_installed_before_it_was_recorded(harness: _Harness) -> None:
+    """The recorded scale is part of the record, so the rewrite counts as load-affecting: a cached instance built
+    from the scale-less record is dropped."""
+    path = write_compact_upscaler(harness.models_path / "4x-compact.safetensors", 4)
+    installed = _identify(path, key=KEY, path="4x-compact.safetensors", scale=None)
+    assert isinstance(installed, Spandrel_Checkpoint_Config)
+    harness.store.add_model(installed)
+    harness.cache_model()
+
+    updated = harness.manager.reidentify_model(KEY)
+
+    assert isinstance(updated, Spandrel_Checkpoint_Config) and updated.scale == 4
+    assert harness.store.get_model(KEY) == updated
+    assert not harness.is_cached()
+
+
+def test_reidentify_keeps_a_backbone_only_the_install_source_names(harness: _Harness) -> None:
+    """A 16-channel VAE is FLUX.1's or SD3's by its name alone. Copied into the models folder it keeps a generic
+    file name in a folder named for its key, and only the Hugging Face source still says SD3."""
+    path = harness.models_path / "7c1f9d2e" / "diffusion_pytorch_model.safetensors"
+    path.parent.mkdir()
+    save_file(
+        {"encoder.conv_in.weight": torch.zeros(8, 3, 3, 3), "decoder.conv_in.weight": torch.zeros(8, 16, 3, 3)}, path
+    )
+    installed = ModelConfigFactory.from_model_on_disk(
+        path,
+        {
+            "key": KEY,
+            "source": "stabilityai/stable-diffusion-3.5-large::vae/diffusion_pytorch_model.safetensors",
+            "source_type": ModelSourceType.HFRepoID,
+        },
+        allow_unknown=False,
+    ).config
+    assert installed is not None and installed.base is BaseModelType.StableDiffusion3
+    harness.store.add_model(installed)
+
+    assert harness.manager.reidentify_model(KEY).base is BaseModelType.StableDiffusion3
+
+
+def _write_tae(path: Path, layout: TinyAutoencoderLayout, combined: bool = True) -> None:
+    """A TAESD file in the combined or native layout, or a TAEHV file (which has only one)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(layout, TaehvLayout):
+        save_file(taehv_weights(layout, dtype=torch.float16), path)
+        return
+    native = native_weights(layout, dtype=torch.float16)
+    save_file(diffusers_weights(native) if combined else native, path)
+
+
+# The Tiny AutoEncoders whose weights do not say which they are, so only a name can: the four that share their latent
+# space with another base, and the two whose network is also published as an unsupported twin.
+_NAME_AMBIGUOUS_TAES = [
+    pytest.param("taesd", TAESD, False, BaseModelType.StableDiffusion1, id="taesd"),
+    pytest.param("taesdxl", TAESD, False, BaseModelType.StableDiffusionXL, id="taesdxl"),
+    pytest.param("taesd3", TAESD3, True, BaseModelType.StableDiffusion3, id="taesd3"),
+    pytest.param("taef1", TAESD3, True, BaseModelType.Flux, id="taef1"),
+    pytest.param("taew2_1", TAEW2_1, True, BaseModelType.Wan, id="taew2_1"),
+    pytest.param("taeltx2_3", TAELTX2_3, True, BaseModelType.LTX2, id="taeltx2_3"),
+]
+
+
+@pytest.mark.parametrize(("folder", "layout", "combined", "base"), _NAME_AMBIGUOUS_TAES)
+def test_reidentify_keeps_the_base_a_local_install_read_off_the_folder_it_came_from(
+    harness: _Harness, folder: str, layout: TinyAutoencoderLayout, combined: bool, base: BaseModelType
+) -> None:
+    """The install moves the file into a folder named for its key and keeps its generic name. The folder that named the
+    TAE survives only in the recorded source path."""
+    source = harness.models_path.parent / "downloads" / folder / "diffusion_pytorch_model.safetensors"
+    _write_tae(source, layout, combined)
+
+    key = harness.manager.install.install_path(source)
+
+    installed = harness.store.get_model(key)
+    assert installed.base is base
+    assert Path(installed.path) == Path(key) / "diffusion_pytorch_model.safetensors"
+    assert harness.manager.reidentify_model(key).base is base
+
+
+_TAE_STARTERS = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+
+# What each published TAE's file holds, by the TAE's name.
+_PUBLISHED_TAE_LAYOUTS: dict[str, tuple[TinyAutoencoderLayout, bool]] = {
+    "taesd": (TAESD, False),
+    "taesdxl": (TAESD, False),
+    "taesd3": (TAESD3, True),
+    "taef1": (TAESD3, True),
+    "taef2": (TAEF2, True),
+    "taeqi2_1": (TAEQI2_1, True),
+    "taew2_1": (TAEW2_1, True),
+    "taew2_2": (TAEW2_2, True),
+    "taeltx2_3": (TAELTX2_3, True),
+}
+
+
+def _tae_name(starter: StarterModel) -> str:
+    """The TAE's name: its Hugging Face repo, or its file in the TAEHV GitHub repo."""
+    match = re.search(r"madebyollin/(?:taehv/raw/[0-9a-f]+/safetensors/)?(?P<name>\w+)", starter.source)
+    assert match is not None, starter.source
+    return match["name"]
+
+
+@pytest.mark.parametrize("starter", _TAE_STARTERS, ids=_tae_name)
+def test_reidentify_keeps_the_base_of_a_tiny_autoencoder_starter(harness: _Harness, starter: StarterModel) -> None:
+    """A starter downloads to a file named like its URL, filed under the base the starter sets, then moved into a folder
+    named for its key. TAESD3 and TAEF1 publish the same generic file name; their URLs name them."""
+    path = harness.models_path / KEY / starter.source.rsplit("/", 1)[-1]
+    _write_tae(path, *_PUBLISHED_TAE_LAYOUTS[_tae_name(starter)])
+    installed = ModelConfigFactory.from_model_on_disk(
+        path,
+        {
+            "key": KEY,
+            "base": starter.base,
+            "type": starter.type,
+            "format": starter.format,
+            "name": starter.name,
+            "source": starter.source,
+            "source_type": ModelSourceType.Url,
+        },
+        allow_unknown=False,
+    ).config
+    assert installed is not None and installed.base is starter.base
+    harness.store.add_model(installed)
+
+    assert harness.manager.reidentify_model(KEY).base is starter.base
+
+
+def test_a_tiny_autoencoders_cpu_only_switch_is_stored_and_drops_its_cached_instances(harness: _Harness) -> None:
+    """Toggling "Decode previews on CPU" must reach the next preview: the cached decoder was built for the old device and dtype."""
+    path = harness.models_path / KEY / "taesdxl.safetensors"
+    _write_tae(path, TAESD, combined=False)
+    harness.store.add_model(_identify(path, {"key": KEY}))
+    harness.cache_model()
+
+    updated = harness.manager.update_model_record(KEY, ModelRecordChanges(cpu_only=True))
+
+    assert updated.cpu_only is True and harness.store.get_model(KEY).cpu_only is True
+    assert not harness.is_cached()
+
+    harness.cache_model()
+    harness.manager.update_model_record(KEY, ModelRecordChanges(cpu_only=None))
+    assert harness.store.get_model(KEY).cpu_only is None
+    assert not harness.is_cached()
+
+
+def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harness: _Harness) -> None:
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    write_header_only_safetensors(harness.models_path / "clip-g.safetensors", keys)
+    record = _sd1_record(path="clip-g.safetensors")
+    harness.store.add_model(record)
+    harness.cache_model()
+
+    with pytest.raises(InvalidModelException):
+        harness.manager.reidentify_model(KEY)
+
+    assert harness.store.get_model(KEY) == record
+    assert harness.is_cached()
+
+
+def test_reidentify_of_an_unknown_model_raises(harness: _Harness) -> None:
+    with pytest.raises(UnknownModelException):
+        harness.manager.reidentify_model(KEY)
+
+
+def test_a_save_of_a_client_that_does_not_know_components_keeps_the_stored_ones(harness: _Harness) -> None:
+    """A form that edits only the fields it knows posts the whole settings object back without `components`."""
+    harness.store.add_model(
+        _sd1_record(default_settings=MainModelDefaultSettings(steps=20, components={"t5_encoder": "t5-key"}))
+    )
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 30, "cfg_scale": 5}})
+    )
+
+    assert harness.store.get_model(KEY).default_settings == MainModelDefaultSettings(
+        steps=30, cfg_scale=5, components={"t5_encoder": "t5-key"}
+    )
+
+
+@pytest.mark.parametrize("cleared", [None, {}])
+def test_an_explicit_null_or_empty_components_still_clears_them(harness: _Harness, cleared: dict | None) -> None:
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(components={"t5_encoder": "t5-key"})))
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 20, "components": cleared}})
+    )
+
+    default_settings = harness.store.get_model(KEY).default_settings
+    assert default_settings is not None and default_settings.components is None
+    assert default_settings.steps == 20
+
+
+def test_an_in_place_update_keeps_the_stored_components_too(harness: _Harness) -> None:
+    """The store's update without a class change takes the same rule as the manager's."""
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(components={"t5_encoder": "t5-key"})))
+
+    harness.store.update_model(KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 30}}))
+    kept = harness.store.get_model(KEY).default_settings
+    assert kept is not None and kept.components == {"t5_encoder": "t5-key"}
+
+    harness.store.update_model(KEY, ModelRecordChanges.model_validate({"default_settings": {"components": None}}))
+    cleared = harness.store.get_model(KEY).default_settings
+    assert cleared is not None and cleared.components is None
+
+
+# A record that serves as another type loads through that type's config class and cache entry.
+
+
+def _add_text_llm(harness: _Harness) -> None:
+    """A Text LLM record serving as the Qwen3.5 encoder, with the files the loader checks for."""
+    for name in (KEY, "other.safetensors"):
+        (harness.models_path / "llm").mkdir(exist_ok=True)
+        (harness.models_path / "llm" / name).write_bytes(b"")
+    harness.store.add_model(text_llm_file(KEY))
+
+
+def _cached_entries(harness: _Harness) -> set[str]:
+    return set(harness.caches[0]._cached_models)
+
+
+def test_a_role_view_loads_through_the_role_class_into_its_own_cache_entry(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    record = harness.store.get_model(KEY)
+
+    as_encoder = harness.manager.load.load_model(view_as(record, ModelType.Qwen35Encoder))
+    as_llm = harness.manager.load.load_model(record)
+
+    assert isinstance(as_encoder.config, Qwen35Encoder_Checkpoint_Config)
+    assert isinstance(as_llm.config, TextLLM_Checkpoint_Config)
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config", "TextLLM_Checkpoint_Config"]
+    assert _cached_entries(harness) == {KEY, f"{KEY}:as_qwen3_5_encoder"}
+
+
+def test_a_role_view_of_an_unchanged_record_is_current_and_loads_once(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+
+    first = harness.manager.load.load_model(view)
+    second = harness.manager.load.load_model(view)
+
+    assert first.model is second.model
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config"]
+
+
+def test_a_load_affecting_update_drops_the_primary_and_role_entries(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    record = harness.store.get_model(KEY)
+    for config in (record, view_as(record, ModelType.Qwen35Encoder)):
+        # Used and released, as a node does. A wrapper dropped unused releases its first-use hold on the cache's
+        # worker thread, and an update that runs before that thread only marks the entry stale.
+        with harness.manager.load.load_model(config):
+            pass
+    assert len(_cached_entries(harness)) == 2
+
+    harness.manager.update_model_record(KEY, ModelRecordChanges(path="llm/other.safetensors"))
+
+    assert _cached_entries(harness) == set()
+
+
+def test_a_view_loaded_after_the_record_moved_is_rebuilt_from_the_moved_record_in_its_role(harness: _Harness) -> None:
+    _add_text_llm(harness)
+    stale_view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+    harness.manager.update_model_record(KEY, ModelRecordChanges(path="llm/other.safetensors"))
+
+    loaded = harness.manager.load.load_model(stale_view)
+
+    assert isinstance(loaded.config, Qwen35Encoder_Checkpoint_Config)
+    assert loaded.config.path.endswith("other.safetensors")
+    assert _RecordingLoader.built_from == ["Qwen35Encoder_Checkpoint_Config"]
+
+
+def test_a_record_that_lost_the_role_meanwhile_fails_with_a_role_error_instead_of_loading_as_another_type(
+    harness: _Harness,
+) -> None:
+    _add_text_llm(harness)
+    view = view_as(harness.store.get_model(KEY), ModelType.Qwen35Encoder)
+    harness.store.replace_model(KEY, text_llm_file(KEY, serves_encoder=None))
+
+    with pytest.raises(ModelRoleError):
+        harness.manager.load.load_model(view)
+
+    assert _RecordingLoader.built_from == []

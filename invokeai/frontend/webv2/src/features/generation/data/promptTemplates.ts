@@ -1,0 +1,189 @@
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { AccountScope } from '@platform/state/accountLifecycle';
+import type { QueryClient } from '@tanstack/react-query';
+
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { apiFetch, apiFetchJson } from '@platform/transport/http';
+import { queryOptions } from '@tanstack/react-query';
+
+const PROMPT_TEMPLATES_BASE = '/api/v1/style_presets';
+
+interface PromptTemplateDTO {
+  id: string;
+  name: string;
+  type: 'default' | 'user';
+  is_public: boolean;
+  user_id: string;
+  image: string | null;
+  preset_data: { positive_prompt: string; negative_prompt: string };
+}
+
+export interface PromptTemplateRecord extends PromptTemplateSnapshot {
+  isDefault: boolean;
+  hasImage: boolean;
+  isPublic: boolean;
+  userId: string;
+}
+
+export const toPromptTemplateSnapshot = ({
+  id,
+  name,
+  negativePrompt,
+  positivePrompt,
+}: PromptTemplateSnapshot): PromptTemplateSnapshot => ({ id, name, negativePrompt, positivePrompt });
+
+interface PromptTemplateDraftFields {
+  name: string;
+  negativePrompt: string;
+  positivePrompt: string;
+}
+
+export interface PromptTemplateCreateDraft extends PromptTemplateDraftFields {
+  image: Blob | null;
+}
+
+export type PromptTemplateImageUpdate = { kind: 'preserve' } | { kind: 'remove' } | { blob: Blob; kind: 'replace' };
+
+export interface PromptTemplateUpdateDraft extends PromptTemplateDraftFields {
+  image: PromptTemplateImageUpdate;
+}
+
+export const promptTemplateKeys = {
+  all: ['generation', 'promptTemplates'] as const,
+  image: (id: string) => [...promptTemplateKeys.all, 'image', id] as const,
+  list: () => [...promptTemplateKeys.all, 'list'] as const,
+};
+
+const mapPromptTemplate = (dto: PromptTemplateDTO): PromptTemplateRecord => ({
+  hasImage: dto.image !== null,
+  id: dto.id,
+  isDefault: dto.type === 'default',
+  isPublic: dto.is_public,
+  name: dto.name,
+  negativePrompt: dto.preset_data.negative_prompt,
+  positivePrompt: dto.preset_data.positive_prompt,
+  userId: dto.user_id,
+});
+
+export const promptTemplatesQueryOptions = () =>
+  (() => {
+    const owner = captureAccountScope();
+
+    return queryOptions({
+      queryFn: async ({ signal }): Promise<PromptTemplateRecord[]> => {
+        const requestSignal = AbortSignal.any([signal, owner.signal]);
+        const templates = await apiFetchJson<PromptTemplateDTO[]>(`${PROMPT_TEMPLATES_BASE}/`, {
+          signal: requestSignal,
+        });
+
+        assertAccountScopeCurrent(owner);
+        return templates.map(mapPromptTemplate);
+      },
+      queryKey: promptTemplateKeys.list(),
+      staleTime: 30_000,
+    });
+  })();
+
+const toFormData = (draft: PromptTemplateDraftFields): FormData => {
+  const body = new FormData();
+
+  body.append(
+    'data',
+    JSON.stringify({
+      is_public: false,
+      name: draft.name,
+      negative_prompt: draft.negativePrompt,
+      positive_prompt: draft.positivePrompt,
+      type: 'user',
+    })
+  );
+
+  return body;
+};
+
+export const createPromptTemplate = async (draft: PromptTemplateCreateDraft): Promise<PromptTemplateRecord> => {
+  const body = toFormData(draft);
+
+  if (draft.image) {
+    body.append('image', draft.image);
+  }
+
+  return mapPromptTemplate(
+    await apiFetchJson<PromptTemplateDTO>(`${PROMPT_TEMPLATES_BASE}/`, { body, method: 'POST' })
+  );
+};
+
+export const updatePromptTemplate = async (
+  id: string,
+  draft: PromptTemplateUpdateDraft
+): Promise<PromptTemplateRecord> => {
+  const body = toFormData(draft);
+
+  if (draft.image.kind === 'preserve') {
+    body.append('preserve_image', 'true');
+  } else if (draft.image.kind === 'replace') {
+    body.append('image', draft.image.blob);
+  }
+
+  return mapPromptTemplate(
+    await apiFetchJson<PromptTemplateDTO>(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}`, {
+      body,
+      method: 'PATCH',
+    })
+  );
+};
+
+export const fetchPromptTemplateImage = async (id: string, signal?: AbortSignal): Promise<Blob> => {
+  const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}/image`, { signal });
+
+  return await response.blob();
+};
+
+export const promptTemplateImageQueryOptions = (id: string) =>
+  (() => {
+    const owner = captureAccountScope();
+
+    return queryOptions({
+      queryFn: ({ signal }): Promise<Blob> =>
+        fetchPromptTemplateImage(id, AbortSignal.any([signal, owner.signal])).then((image) => {
+          assertAccountScopeCurrent(owner);
+          return image;
+        }),
+      queryKey: promptTemplateKeys.image(id),
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+  })();
+
+export const deletePromptTemplate = async (id: string): Promise<void> => {
+  await apiFetch(`${PROMPT_TEMPLATES_BASE}/i/${encodeURIComponent(id)}`, { method: 'DELETE' });
+};
+
+export const importPromptTemplates = async (file: File, owner: AccountScope): Promise<void> => {
+  const body = new FormData();
+
+  body.append('file', file);
+  assertAccountScopeCurrent(owner);
+  await apiFetch(`${PROMPT_TEMPLATES_BASE}/import`, { body, method: 'POST', signal: owner.signal });
+  assertAccountScopeCurrent(owner);
+};
+
+export const exportPromptTemplates = async (owner: AccountScope): Promise<Blob> => {
+  const response = await apiFetch(`${PROMPT_TEMPLATES_BASE}/export`, { signal: owner.signal });
+  assertAccountScopeCurrent(owner);
+  const blob = await response.blob();
+
+  assertAccountScopeCurrent(owner);
+  return blob;
+};
+
+export const invalidatePromptTemplates = async (queryClient: QueryClient, id?: string): Promise<void> => {
+  const invalidations: Promise<void>[] = [
+    queryClient.invalidateQueries({ queryKey: promptTemplateKeys.list(), exact: true }),
+  ];
+
+  if (id) {
+    invalidations.push(queryClient.invalidateQueries({ queryKey: promptTemplateKeys.image(id), exact: true }));
+  }
+
+  await Promise.all(invalidations);
+};

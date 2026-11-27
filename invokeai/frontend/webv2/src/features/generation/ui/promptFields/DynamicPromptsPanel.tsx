@@ -1,0 +1,309 @@
+import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
+import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
+
+import { Badge, HStack, Menu, NumberInput, Portal, Stack, Text } from '@chakra-ui/react';
+import {
+  createDynamicPromptsSampleSeed,
+  describeDynamicPromptsFailure,
+  DYNAMIC_PROMPTS_MAX_PROMPTS,
+  DYNAMIC_PROMPTS_MIN_PROMPTS,
+  sanitizeMaxPrompts,
+} from '@features/generation/core/dynamicPrompts';
+import { describeGenerationIssue } from '@features/generation/core/generationIssues';
+import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
+import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
+import { GenerateToggleSwitch } from '@features/generation/ui/shared/GenerateToggleSwitch';
+import { Button, IconButton } from '@platform/ui/Button';
+import { Field } from '@platform/ui/Field';
+import { MenuContent } from '@platform/ui/Menu';
+import { Row } from '@platform/ui/Row';
+import { Scrollable } from '@platform/ui/Scrollable';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { ChevronDownIcon, ShuffleIcon } from 'lucide-react';
+import { useCallback, useId, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+/** Rendering every row of a 10,000-prompt expansion would cost more than it tells the user. */
+const MAX_PREVIEW_ROWS = 200;
+const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
+// Use a hover fill distinct from the popover's muted surface.
+const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.hover' } as const;
+// Keep preview text readable while interactions are disabled.
+const DISABLED_PROMPT_ROW_PROPS = { cursor: 'default', opacity: 1 } as const;
+const NO_HOVER_PROPS = { bg: 'transparent' } as const;
+const MENU_POSITIONING = { placement: 'bottom-start' } as const;
+
+export interface DynamicPromptsFieldConfig extends DynamicPromptsConfig {
+  /** A fixed seed applies to every image, so per-image sharing has nothing left to decide. */
+  isSeedFixed: boolean;
+  onChange: (patch: Partial<DynamicPromptsConfig>) => void;
+}
+
+export const DynamicPromptsPanel = ({
+  batchCount,
+  config,
+  expansion,
+  onUsePrompt,
+  showSyntaxHighlighting,
+}: {
+  batchCount: number;
+  config: DynamicPromptsFieldConfig;
+  expansion: DynamicPromptsExpansion;
+  showSyntaxHighlighting: boolean;
+  onUsePrompt: (prompt: string) => void;
+}) => {
+  const { t } = useTranslation();
+  const { onChange } = config;
+  const modeFieldId = useId();
+  const modeTriggerId = useId();
+  // aria-labelledby combines the field label and value for the composite trigger's accessible name.
+  const modeLabelledBy = `${modeFieldId}-label ${modeTriggerId}`;
+  const modeMenuIds = useMemo(() => ({ trigger: modeTriggerId }), [modeTriggerId]);
+  const visiblePrompts = expansion.prompts.slice(0, MAX_PREVIEW_ROWS);
+  const hiddenPromptCount = expansion.prompts.length - visiblePrompts.length;
+
+  const handleModeChange = useCallback(
+    (event: { value: string }) => onChange({ combinatorial: event.value !== 'random' }),
+    [onChange]
+  );
+  const handleMaxPromptsChange = useCallback(
+    ({ valueAsNumber }: { valueAsNumber: number }) => {
+      if (Number.isFinite(valueAsNumber)) {
+        onChange({ maxPrompts: sanitizeMaxPrompts(valueAsNumber) });
+      }
+    },
+    [onChange]
+  );
+  const handleSeedBehaviourChange = useCallback(
+    (checked: boolean) => onChange({ seedBehaviour: checked ? 'per-image' : 'per-iteration' }),
+    [onChange]
+  );
+  const handleResampleChange = useCallback((resample: boolean) => onChange({ resample }), [onChange]);
+  const handleEnabledChange = useCallback((enabled: boolean) => onChange({ enabled }), [onChange]);
+  // The same words the notice under the prompt and the Invoke button use.
+  const failure = describeDynamicPromptsFailure(expansion);
+  const handleShuffle = useCallback(() => onChange({ sampleSeed: createDynamicPromptsSampleSeed() }), [onChange]);
+
+  const modeItems = useMemo(
+    () => [
+      { label: t('widgets.generate.dynamicPrompts.allCombinations'), value: 'all' },
+      { label: t('widgets.generate.dynamicPrompts.randomSample'), value: 'random' },
+    ],
+    [t]
+  );
+  const mode = config.combinatorial ? 'all' : 'random';
+  const modeLabel = modeItems.find((item) => item.value === mode)?.label ?? '';
+  const maxPromptsLabel = config.combinatorial
+    ? t('widgets.generate.dynamicPrompts.maxPrompts')
+    : t('widgets.generate.dynamicPrompts.numberOfPrompts');
+
+  const enabledSwitch = (
+    <GenerateToggleSwitch
+      checked={config.enabled}
+      helpText={
+        config.enabled
+          ? t('widgets.generate.dynamicPrompts.enabledHelp')
+          : t('widgets.generate.dynamicPrompts.disabledHelp')
+      }
+      label={t('widgets.generate.dynamicPrompts.enabled')}
+      onCheckedChange={handleEnabledChange}
+    />
+  );
+
+  if (!config.enabled) {
+    return (
+      <Stack gap="2.5">
+        <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.title')} />
+        {enabledSwitch}
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack gap="2.5">
+      <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.title')}>
+        {/* Use a literal multiplication sign and tabular figures. */}
+        <Badge
+          color="fg.muted"
+          css={TABULAR_NUMS}
+          fontFamily="mono"
+          fontSize="xs"
+          fontWeight="500"
+          h={PANEL_HEADER_CONTROL_HEIGHT}
+          px="1.5"
+          variant="subtle"
+        >
+          {expansion.isLoading
+            ? t('widgets.generate.dynamicPrompts.expanding')
+            : t('widgets.generate.dynamicPrompts.summary', {
+                generations: expansion.count * batchCount,
+                iterations: batchCount,
+                prompts: expansion.count,
+              })}
+        </Badge>
+      </PromptPanelHeader>
+
+      {enabledSwitch}
+
+      <HStack align="end" gap="2">
+        <Field id={modeFieldId} label={t('widgets.generate.dynamicPrompts.mode')}>
+          {/* Use a menu to avoid Select's hidden-native synchronization failure. */}
+          <Menu.Root ids={modeMenuIds} positioning={MENU_POSITIONING}>
+            <Menu.Trigger asChild>
+              <Button
+                aria-labelledby={modeLabelledBy}
+                justifyContent="space-between"
+                minW="0"
+                variant="outline"
+                w="full"
+              >
+                <Text as="span" truncate>
+                  {modeLabel}
+                </Text>
+                <ChevronDownIcon />
+              </Button>
+            </Menu.Trigger>
+            <Portal>
+              <Menu.Positioner>
+                <MenuContent minW="10rem" py="1">
+                  <Menu.RadioItemGroup value={mode} onValueChange={handleModeChange}>
+                    {modeItems.map((item) => (
+                      <Menu.RadioItem key={item.value} value={item.value}>
+                        <Menu.ItemText>{item.label}</Menu.ItemText>
+                        <Menu.ItemIndicator />
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioItemGroup>
+                </MenuContent>
+              </Menu.Positioner>
+            </Portal>
+          </Menu.Root>
+        </Field>
+        {/* Fixed width and no shrink: the mode field takes the slack instead. */}
+        <Field flex="0 0 auto" label={maxPromptsLabel} w="6.5rem">
+          <NumberInput.Root
+            allowMouseWheel
+            max={DYNAMIC_PROMPTS_MAX_PROMPTS}
+            min={DYNAMIC_PROMPTS_MIN_PROMPTS}
+            value={String(config.maxPrompts)}
+            onValueChange={handleMaxPromptsChange}
+          >
+            <NumberInput.Control />
+            <NumberInput.Input paddingStart="2" />
+          </NumberInput.Root>
+        </Field>
+        {/* Always rendered, merely hidden, so switching modes cannot reflow the row. */}
+        <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
+          <IconButton
+            aria-label={t('widgets.generate.dynamicPrompts.shuffle')}
+            variant="ghost"
+            visibility={config.combinatorial ? 'hidden' : 'visible'}
+            onClick={handleShuffle}
+          >
+            <ShuffleIcon />
+          </IconButton>
+        </Tooltip>
+      </HStack>
+
+      {config.combinatorial ? null : (
+        <GenerateToggleSwitch
+          checked={config.resample}
+          label={t('widgets.generate.dynamicPrompts.newSampleEveryInvoke')}
+          onCheckedChange={handleResampleChange}
+        />
+      )}
+
+      <GenerateToggleSwitch
+        checked={config.seedBehaviour === 'per-image'}
+        disabled={config.isSeedFixed}
+        helpText={config.isSeedFixed ? t('widgets.generate.dynamicPrompts.seedHeldForEveryImage') : undefined}
+        label={t('widgets.generate.dynamicPrompts.newSeedPerImage')}
+        onCheckedChange={handleSeedBehaviourChange}
+      />
+
+      {failure ? (
+        <HStack alignItems="flex-start" gap="1.5" justify="space-between">
+          <Text color="fg.error" fontSize="xs" textWrap="pretty" wordBreak="break-word">
+            {describeGenerationIssue(t, failure)}
+          </Text>
+          {expansion.isError ? (
+            <Button flexShrink={0} loading={expansion.isRetrying} size="xs" variant="outline" onClick={expansion.retry}>
+              {t('common.retry')}
+            </Button>
+          ) : null}
+        </HStack>
+      ) : null}
+
+      {expansion.prompts.length > 1 ? (
+        <Text color="fg.subtle" fontSize="xs">
+          {t('widgets.generate.dynamicPrompts.selectToUse')}
+        </Text>
+      ) : null}
+      <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.promptsPreview')}>
+        <Stack gap="0">
+          {visiblePrompts.map((prompt, index) => (
+            <DynamicPromptRow
+              key={`${index}-${prompt}`}
+              index={index}
+              // A single unchanged expansion is read-only because applying it is a no-op.
+              isDisabled={expansion.prompts.length === 1}
+              prompt={prompt}
+              showSyntaxHighlighting={showSyntaxHighlighting}
+              onUsePrompt={onUsePrompt}
+            />
+          ))}
+          {hiddenPromptCount > 0 ? (
+            <Text color="fg.subtle" fontSize="xs" px="2" py="1.5">
+              {t('widgets.generate.dynamicPrompts.andMore', { count: hiddenPromptCount })}
+            </Text>
+          ) : null}
+        </Stack>
+      </Scrollable>
+    </Stack>
+  );
+};
+
+const DynamicPromptRow = ({
+  index,
+  isDisabled,
+  onUsePrompt,
+  prompt,
+  showSyntaxHighlighting,
+}: {
+  index: number;
+  isDisabled: boolean;
+  prompt: string;
+  showSyntaxHighlighting: boolean;
+  onUsePrompt: (prompt: string) => void;
+}) => {
+  const handleClick = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
+
+  return (
+    <Row
+      alignItems="start"
+      asChild
+      borderColor="transparent"
+      borderWidth="1px"
+      fontWeight="medium"
+      gap="2"
+      h="auto"
+      justifyContent="start"
+      px="2"
+      py="1.5"
+      textStyle="md"
+      whiteSpace="nowrap"
+      _disabled={DISABLED_PROMPT_ROW_PROPS}
+      _hover={isDisabled ? NO_HOVER_PROPS : PROMPT_ROW_HOVER_PROPS}
+    >
+      <button disabled={isDisabled} type="button" onClick={handleClick}>
+        <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="xs">
+          {index + 1}
+        </Text>
+        <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">
+          {/* Expanded prompts highlight attention/embeddings only; dynamic syntax has already been consumed. */}
+          <HighlightedPrompt enabled={showSyntaxHighlighting} prompt={prompt} />
+        </Text>
+      </button>
+    </Row>
+  );
+};

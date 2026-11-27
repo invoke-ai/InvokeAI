@@ -1,0 +1,501 @@
+import { Flex, Spinner, Text } from '@chakra-ui/react';
+import { FontsRuntimeProvider } from '@features/fonts/react';
+import {
+  AuthSessionUnavailableError,
+  AuthUnavailableScreen,
+  ensureReadyAuthSession,
+  getAuthSession,
+  getCapabilities,
+  LoginScreen,
+  readLoginReturnPath,
+  SessionExpiryNotice,
+  SetupScreen,
+  subscribeAuthSession,
+  useAuthSession,
+  useCapabilities,
+  type Capabilities,
+} from '@features/identity';
+import {
+  CalibrationGraphCompilerProvider,
+  ModelInstallRuntime,
+  ModelsUiProvider,
+  type CalibrationGraphCompiler,
+  type ModelsUiAdapter,
+  type ModelDefaultsRulesSource,
+  type ModelDefaultsRulesState,
+} from '@features/models';
+import { createLogger } from '@platform/logging/logger';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { createListenerChannel } from '@platform/state/externalStoreCore';
+import { toaster } from '@platform/ui/toaster';
+import {
+  createHashHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  type ErrorComponentProps,
+  lazyRouteComponent,
+  Navigate,
+  Outlet,
+  redirect,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router';
+import { WorkbenchSplashScreen } from '@workbench/components/WorkbenchSplashScreen';
+import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
+import { Launchpad } from '@workbench/launchpad/Launchpad';
+import { StayOnLaunchpadButton } from '@workbench/launchpad/StayOnLaunchpadButton';
+import { listProjects } from '@workbench/projects/api';
+import { ProjectFileOptionsProvider } from '@workbench/projects/components/ProjectFileOptionsProvider';
+import { getProjectLibrary, seedProjectLibrary } from '@workbench/projects/library';
+import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
+import {
+  loadWorkbenchSettings,
+  patchWorkbenchPreferences,
+  useWorkbenchPreferenceSelector,
+} from '@workbench/settings/store';
+import { loadAppVersion } from '@workbench/shell/whatsNewStore';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
+import i18next from 'i18next';
+import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type * as DefaultsRulesModule from './modelDefaultsRulesReader';
+
+import { RouterErrorScreen } from './RouterErrorScreen';
+import { SocketHubRuntime } from './SocketHubRuntime';
+import { createStartupRedirects } from './startupRedirect';
+
+/** Lazy /app keeps editor code out of the Launchpad; hash history needs no server deep-path fallback. */
+
+const routerLogger = createLogger({ area: 'router', namespace: 'app' });
+
+const RouterError = ({ error, reset }: ErrorComponentProps) => {
+  'use no memo';
+  // Skip compiler memoization on this cold path; retry tests and build budgets guard it.
+  const router = useRouter();
+  // Home has its own loaders, so leaving the failed route and clearing the boundary is a real way back.
+  const goHome = useCallback(() => void router.navigate({ to: '/' }).then(reset), [reset, router]);
+
+  return error instanceof AuthSessionUnavailableError ? (
+    <AuthUnavailableScreen onRetry={router.invalidate} />
+  ) : (
+    <RouterErrorScreen error={error} onGoHome={goHome} />
+  );
+};
+
+const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
+
+const DEFAULTS_RULES_LOADING: ModelDefaultsRulesState = { status: 'loading' };
+const DEFAULTS_RULES_UNAVAILABLE: ModelDefaultsRulesState = { status: 'unavailable' };
+let defaultsRulesState: ModelDefaultsRulesState = DEFAULTS_RULES_LOADING;
+let defaultsRulesModule: Promise<typeof DefaultsRulesModule> | null = null;
+const defaultsRulesChannel = createListenerChannel();
+
+const publishDefaultsRules = (next: ModelDefaultsRulesState): void => {
+  defaultsRulesState = next;
+  defaultsRulesChannel.notify();
+};
+
+/** The defaults rules and Models' architecture table arrive with the first Default settings section, not at startup. */
+const defaultsRulesSource: ModelDefaultsRulesSource = {
+  getSnapshot: () => defaultsRulesState,
+  load: () => {
+    if (!defaultsRulesModule) {
+      if (defaultsRulesState.status === 'unavailable') {
+        publishDefaultsRules(DEFAULTS_RULES_LOADING);
+      }
+      defaultsRulesModule = import('./modelDefaultsRulesReader').then((rules) => {
+        rules.startModelDefaultsRulesReader(publishDefaultsRules);
+        return rules;
+      });
+    }
+    // Asked on every load: it retries a failed table, and an account change clears the table.
+    defaultsRulesModule
+      .then((rules) => rules.ensureDefaultsRulesLoaded())
+      .catch(() => {
+        // The rules' chunk failed to load; the next load (Retry, or another section) imports it again.
+        defaultsRulesModule = null;
+        publishDefaultsRules(DEFAULTS_RULES_UNAVAILABLE);
+      });
+  },
+  subscribe: defaultsRulesChannel.subscribe,
+};
+
+const setInstallInPlace = (installInPlace: boolean) => void patchWorkbenchPreferences({ installInPlace });
+const NO_ACTIVE_PROJECT = () => false;
+
+/** Composed here because a new module would enter the Launchpad's startup graph. */
+export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) => {
+  const enableModelDescriptions = useWorkbenchPreferenceSelector((value) => value.enableModelDescriptions);
+  const installInPlace = useWorkbenchPreferenceSelector((value) => value.installInPlace);
+  const galleryValues = useWorkbenchPreferenceSelector((value) =>
+    getResolvedProjectWidgetValues(undefined, 'gallery', value.scopedDefaults)
+  );
+  const { canManageModels } = useCapabilities();
+  const adapter = useMemo<ModelsUiAdapter>(
+    () => ({
+      canManageModels,
+      enableModelDescriptions,
+      galleryValues,
+      installInPlace,
+      isProjectActive: NO_ACTIVE_PROJECT,
+      managerProjectId: null,
+      defaultsRules: defaultsRulesSource,
+      setInstallInPlace,
+    }),
+    [canManageModels, enableModelDescriptions, galleryValues, installInPlace]
+  );
+
+  return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
+};
+
+const NO_SEARCH = {};
+const returnToSearch = (returnTo: string) => ({ returnTo });
+const isLoginHref = (href: string): boolean => href === '/login' || href.startsWith('/login?');
+
+const AccountPending = ({ messageKey }: { messageKey: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" bg="bg" color="fg.muted" gap="2" justify="center" minH="100dvh">
+      <Spinner />
+      <Text fontSize="md" role="status">
+        {t(messageKey)}
+      </Text>
+    </Flex>
+  );
+};
+
+/** Only this child follows the location, so navigation never re-renders the layout's providers. */
+const SignedOutRedirect = ({ sessionExpired }: { sessionExpired: boolean }) => {
+  const href = useRouterState({ select: (state) => state.location.href });
+  const loginReturnTo = useRouterState({
+    select: (state) =>
+      isLoginHref(state.location.href) ? (state.location.search as { returnTo?: string }).returnTo : undefined,
+  });
+  // It can render again on the way to the login screen; it keeps the way back it already chose.
+  const returnTo = isLoginHref(href) ? loginReturnTo : sessionExpired ? href : undefined;
+
+  return <Navigate replace search={returnTo === undefined ? NO_SEARCH : returnToSearch(returnTo)} to="/login" />;
+};
+
+/** A sign-in by the expired account, here or in another tab, returns to `returnTo`. */
+const AuthenticatedLayout = () => {
+  'use no memo';
+  // Account transitions are infrequent; provider composition does not need a memo cache.
+  const session = useAuthSession();
+
+  if (session.phase !== 'ready') {
+    return <AccountPending messageKey="splash.loadingApplication" />;
+  }
+
+  if (session.switchingAccount) {
+    return <AccountPending messageKey="auth.switchingAccount" />;
+  }
+
+  if (session.multiuserEnabled && session.user === null) {
+    return <SignedOutRedirect sessionExpired={session.sessionExpired} />;
+  }
+
+  return (
+    <>
+      {session.multiuserEnabled ? <SessionExpiryNotice /> : null}
+      <Fragment key={session.accountEpoch}>
+        <SocketHubRuntime />
+        <ModelInstallRuntime />
+        <FontsRuntimeProvider>
+          <ProjectFileOptionsProvider>
+            <AccountModelsUiProvider>
+              <Outlet />
+            </AccountModelsUiProvider>
+          </ProjectFileOptionsProvider>
+        </FontsRuntimeProvider>
+      </Fragment>
+    </>
+  );
+};
+
+/** Captures the initial load before history starts; only most-recent-project accounts pay for the peek. */
+const startupRedirects = createStartupRedirects(
+  {
+    hash: window.location.hash,
+    navigationType: (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type,
+  },
+  {
+    loadProjectLibrary: async () => {
+      const owner = captureAccountScope();
+
+      try {
+        seedProjectLibrary(await listProjects(owner.signal), owner);
+      } catch {
+        // The library stays unloaded, so the launch stays on the Launchpad, whose Home lists projects again.
+      }
+
+      return getProjectLibrary();
+    },
+    peekOpenProjectIds,
+    preloadEditor: () => void import('./WorkbenchApp'),
+    reportSkippedLaunch: () =>
+      toaster.create({
+        description: i18next.t('splash.launchSkippedDescription'),
+        title: i18next.t('splash.launchSkippedTitle'),
+        type: 'info',
+      }),
+  }
+);
+
+const authenticatedRoute = createRoute({
+  beforeLoad: async ({ location, preload }) => {
+    const session = await ensureReadyAuthSession();
+
+    if (session.multiuserEnabled) {
+      if (session.setupRequired) {
+        throw redirect({ to: '/setup' });
+      }
+
+      if (session.user === null) {
+        throw redirect({ search: session.sessionExpired ? { returnTo: location.href } : {}, to: '/login' });
+      }
+    }
+
+    // What's New compares this with the account's last-seen version; it never holds up the route.
+    void loadAppVersion();
+    const preferences = await loadWorkbenchSettings();
+
+    const startup = await startupRedirects.take(
+      { pathname: location.pathname, preload },
+      preferences.startupDestination
+    );
+
+    if (startup) {
+      throw redirect(startup);
+    }
+  },
+  component: AuthenticatedLayout,
+  getParentRoute: () => rootRoute,
+  id: 'authenticated',
+});
+
+/** A page the account may not use opens Projects instead, and says why; a hover preload says nothing. */
+const requireLaunchpadCapability = async (
+  capability: keyof Capabilities,
+  sectionKey: string,
+  preload: boolean
+): Promise<void> => {
+  const session = await ensureReadyAuthSession();
+
+  if (!getCapabilities(session)[capability]) {
+    if (!preload) {
+      toaster.create({
+        description: i18next.t('launchpad.redirects.noAccessDescription'),
+        id: `launchpad-no-access:${sectionKey}`,
+        title: i18next.t('launchpad.redirects.noAccess', { section: i18next.t(sectionKey) }),
+        type: 'info',
+      });
+    }
+    throw redirect({ replace: true, to: '/projects' });
+  }
+};
+
+const compileCalibrationGraphs: CalibrationGraphCompiler = (cases, models, signal) =>
+  import('./calibrationGraphs').then((module) => module.compileCalibrationGraphs(cases, models, signal));
+
+const LaunchpadRoute = () => (
+  <CalibrationGraphCompilerProvider compile={compileCalibrationGraphs}>
+    <Launchpad />
+  </CalibrationGraphCompilerProvider>
+);
+
+const launchpadRouteOptions = {
+  component: LaunchpadRoute,
+  getParentRoute: () => authenticatedRoute,
+};
+
+const homeRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: '/',
+});
+
+const projectsHomeRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'projects',
+});
+
+const modelsHomeRoute = createRoute({
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageModels', 'launchpad.sections.models', preload),
+  ...launchpadRouteOptions,
+  path: 'models',
+  validateSearch: (search: Record<string, unknown>): { project?: string } => ({
+    project: typeof search.project === 'string' && search.project.length > 0 ? search.project : undefined,
+  }),
+});
+
+const nodesHomeRoute = createRoute({
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageNodes', 'launchpad.sections.nodes', preload),
+  ...launchpadRouteOptions,
+  path: 'nodes',
+});
+
+const usersHomeRoute = createRoute({
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageUsers', 'launchpad.sections.users', preload),
+  ...launchpadRouteOptions,
+  path: 'users',
+});
+
+const fontsHomeRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'fonts',
+});
+
+const validatePreferencesSearch = (search: Record<string, unknown>): { setting?: string } => ({
+  setting: typeof search.setting === 'string' && search.setting.length > 0 ? search.setting : undefined,
+});
+
+const preferencesHomeRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'preferences',
+  validateSearch: validatePreferencesSearch,
+});
+
+const preferencesSectionRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'preferences/$section',
+  validateSearch: validatePreferencesSearch,
+});
+
+/** An address no page answers opens Home, and says so once; a hover preload says nothing. */
+const notFoundRoute = createRoute({
+  beforeLoad: ({ preload }) => {
+    if (!preload) {
+      toaster.create({
+        description: i18next.t('launchpad.redirects.notFoundDescription'),
+        id: 'launchpad-not-found',
+        title: i18next.t('launchpad.redirects.notFound'),
+        type: 'info',
+      });
+    }
+    throw redirect({ replace: true, to: '/' });
+  },
+  getParentRoute: () => authenticatedRoute,
+  path: '$',
+});
+
+const workbenchRoute = createRoute({
+  beforeLoad: async ({ cause, search }) => {
+    // Preload the editor during the session peek; the module loader deduplicates the lazy-route import.
+    void import('./WorkbenchApp');
+
+    // Only entries: search changes can precede autosave, and hover preloads must not fetch the session.
+    if (cause !== 'enter' || search.project || search.new || startupRedirects.takeOpenSessionProof()) {
+      return;
+    }
+
+    const openProjectIds = await peekOpenProjectIds();
+
+    if (openProjectIds !== null && openProjectIds.length === 0) {
+      throw redirect({ to: '/' });
+    }
+  },
+  component: lazyRouteComponent(() => import('./WorkbenchApp'), 'WorkbenchApp'),
+  getParentRoute: () => authenticatedRoute,
+  path: '/app',
+  validateSearch: (search: Record<string, unknown>): WorkbenchSearch => ({
+    intent: isLaunchpadIntentId(search.intent) ? search.intent : undefined,
+    new: search.new === true || search.new === 'true' || search.new === 1 ? true : undefined,
+    project: typeof search.project === 'string' && search.project.length > 0 ? search.project : undefined,
+  }),
+});
+
+const loginRoute = createRoute({
+  beforeLoad: async () => {
+    const session = await ensureReadyAuthSession();
+
+    if (session.multiuserEnabled && session.setupRequired) {
+      throw redirect({ to: '/setup' });
+    }
+
+    if (!session.multiuserEnabled || session.user !== null) {
+      throw redirect({ to: '/' });
+    }
+  },
+  component: LoginScreen,
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  validateSearch: (search: Record<string, unknown>): { returnTo?: string } => ({
+    returnTo: readLoginReturnPath(search.returnTo),
+  }),
+});
+
+const setupRoute = createRoute({
+  beforeLoad: async () => {
+    const session = await ensureReadyAuthSession();
+
+    if (!session.multiuserEnabled || !session.setupRequired) {
+      throw redirect({ to: '/' });
+    }
+  },
+  component: SetupScreen,
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+});
+
+const STAY_ON_LAUNCHPAD = <StayOnLaunchpadButton />;
+const RouterPending = () => <WorkbenchSplashScreen action={STAY_ON_LAUNCHPAD} messageKey="splash.loadingApplication" />;
+
+export const router = createRouter({
+  // Unknown addresses are the splat route's (with its notice); this answers only a `notFound()` a route throws.
+  defaultNotFoundComponent: () => <Navigate to="/" />,
+  defaultOnCatch: (error, errorInfo) =>
+    routerLogger.error({
+      context: errorInfo?.componentStack ? { componentStack: errorInfo.componentStack } : undefined,
+      error,
+      message: 'Route rendering failed',
+      name: 'app.route-failed',
+    }),
+  defaultPendingComponent: RouterPending,
+  defaultPreload: 'intent',
+  history: createHashHistory(),
+  routeTree: rootRoute.addChildren([
+    authenticatedRoute.addChildren([
+      homeRoute,
+      projectsHomeRoute,
+      modelsHomeRoute,
+      nodesHomeRoute,
+      usersHomeRoute,
+      fontsHomeRoute,
+      preferencesHomeRoute,
+      preferencesSectionRoute,
+      workbenchRoute,
+      notFoundRoute,
+    ]),
+    loginRoute,
+    setupRoute,
+  ]),
+});
+
+/** Following another tab's sign-in to a different account lands on Home; the old page belonged to the old account. */
+let wasSwitchingAccount = false;
+const unsubscribeAccountSwitchLanding = subscribeAuthSession(() => {
+  const { switchingAccount, user } = getAuthSession();
+
+  if (switchingAccount) {
+    wasSwitchingAccount = true;
+    return;
+  }
+
+  if (wasSwitchingAccount) {
+    wasSwitchingAccount = false;
+    if (user !== null) {
+      void router.navigate({ replace: true, to: '/' });
+    }
+  }
+});
+// A hot update of this module subscribes again; the replaced module's listener must go with it.
+import.meta.hot?.dispose(unsubscribeAccountSwitchLanding);
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}

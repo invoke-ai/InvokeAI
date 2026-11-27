@@ -1,0 +1,37 @@
+---
+title: Patchmatch
+---
+
+PatchMatch is an algorithm used to infill images. It can greatly improve outpainting results. PyPatchMatch is a python wrapper around a C++ implementation of the algorithm.
+
+It uses the image data around the target area as a reference to generate new image data of a similar character and quality.
+
+## Why Use PatchMatch
+
+In the context of image generation, "outpainting" refers to filling in a transparent area using AI-generated image data. But the AI can't generate without some initial data. We need to first fill in the transparent area with _something_.
+
+The first step in "outpainting" then, is to fill in the transparent area with something. Generally, you get better results when that initial infill resembles the rest of the image.
+
+Because PatchMatch generates image data so similar to the rest of the image, it works very well as the first step in outpainting, typically producing better results than other infill methods supported by Invoke (e.g. LaMA, cv2 infill, random tiles).
+
+### Performance Caveat
+
+PatchMatch is CPU-bound, and the amount of time it takes increases proportionally as the infill area increases. While the numbers certainly vary depending on system specs, you can expect a noticeable slowdown once you start infilling areas around 512x512 pixels. 1024x1024 pixels can take several seconds to infill.
+
+## Installation
+
+PyPatchMatch is installed with Invoke. Its wheels include the prebuilt library for Windows (x64 and ARM64), macOS 11 or later (Intel and Apple silicon) and Linux (x86_64 and aarch64, glibc 2.28 or later), so there is nothing to compile and nothing is downloaded when Invoke starts. PatchMatch works offline.
+
+To check that it loaded, run this in the Python environment Invoke uses:
+
+```sh
+python -c "from patchmatch import patch_match; print(patch_match.patchmatch_available)"
+```
+
+It prints `True` when the `patchmatch` infill method is available.
+
+On any other platform, PyPatchMatch is built from source when it is installed. That needs a C++ compiler, CMake and OpenCV. If the build fails, the package installs without its library and the `patchmatch` infill method is unavailable. Install the missing tools, then reinstall it without the cache:
+
+```sh
+pip install --force-reinstall --no-deps --no-cache-dir pypatchmatch
+```

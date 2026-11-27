@@ -12,6 +12,7 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
 )
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     common_config_paths,
     get_config_dict_or_raise,
@@ -21,7 +22,9 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
     state_dict_has_any_keys_starting_with,
 )
+from invokeai.backend.model_manager.configs.main import _bare_sd_unet_base, _has_ggml_tensors
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -171,8 +174,9 @@ class ControlNet_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     @classmethod
     def _validate_looks_like_controlnet(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
         if not state_dict_has_any_keys_starting_with(
-            mod.load_state_dict(),
+            state_dict,
             {
                 "controlnet",
                 "control_model",
@@ -186,6 +190,11 @@ class ControlNet_Checkpoint_Config_Base(Checkpoint_Config_Base):
             },
         ):
             raise NotAMatchError("state dict does not look like a ControlNet checkpoint")
+
+        # A bare SD UNet in GGUF has `input_blocks.*` keys too. The main-model configs refuse it with their reason;
+        # claimed here, it would install as a ControlNet that fails to load.
+        if _bare_sd_unet_base(state_dict) is not None and _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict is a GGUF Stable Diffusion UNet, not a ControlNet")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -278,6 +287,149 @@ class ControlNet_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _has_z_image_control_keys(state_dict):
             raise NotAMatchError("state dict does not look like a Z-Image Control model")
+
+
+# `control_img_in` takes 132 packed channels into Qwen-Image's 3072-wide stream. The Qwen-Image-2.1 Fun branch
+# takes 129 into 4096 and the FLUX.2 one 260 into 6144, so the shape alone tells the three apart.
+_QWEN_IMAGE_FUN_CONTROL_IMG_IN_SHAPE = (3072, 132)
+
+
+def _has_qwen_image_fun_control_keys(state_dict: dict) -> bool:
+    """Check if state dict is a Qwen-Image Fun-ControlNet branch (alibaba-pai's VACE-style union adapter).
+
+    The branch is `control_img_in` plus `control_blocks.N`, copies of Qwen-Image's dual-stream
+    `QwenImageTransformerBlock` with `before_proj`/`after_proj` taps. Its siblings reuse the naming, so the
+    fingerprint is the projection shape and the dual-stream `img_mod`, which the single-stream Qwen-Image-2.1
+    branch lacks.
+    """
+    control_img_in = state_dict.get("control_img_in.weight")
+    shape = getattr(control_img_in, "shape", None)
+    if shape is None or tuple(shape) != _QWEN_IMAGE_FUN_CONTROL_IMG_IN_SHAPE:
+        return False
+    return "control_blocks.0.img_mod.1.weight" in state_dict
+
+
+QwenImageControlArchitecture = Literal["fun_union", "instantx_union"]
+"""The two Qwen-Image ControlNet designs, which share a config and a loader but not a recipe.
+
+`fun_union` is alibaba-pai's branch hooked into the transformer's blocks, conditioned on control and inpaint latents;
+`instantx_union` is InstantX's five-block copy of the transformer run beside it, conditioned on control latents only.
+"""
+
+# InstantX's `controlnet_x_embedder` projects the 64 packed features of a 16-channel latent into Qwen-Image's
+# 3072-wide stream; its inpainting sibling adds the 4 packed features of a mask (68).
+_QWEN_IMAGE_INSTANTX_WIDTH = 3072
+_QWEN_IMAGE_INSTANTX_CONTROL_FEATURES = 64
+
+
+def _qwen_image_instantx_control_features(state_dict: dict) -> int | None:
+    """The features per token an InstantX-layout Qwen-Image ControlNet takes, or None when it is not one.
+
+    The key signature is shared with the probes that have to refuse the file (`qwen_image_controlnet_keys.py`); the
+    width is what makes it a ControlNet for this base.
+    """
+    if not is_qwen_image_instantx_controlnet(state_dict):
+        return None
+    shape = getattr(state_dict["controlnet_x_embedder.weight"], "shape", None)
+    if shape is None or len(shape) != 2 or shape[0] != _QWEN_IMAGE_INSTANTX_WIDTH:
+        return None
+    return int(shape[1])
+
+
+class ControlNet_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Qwen-Image ControlNet models (Safetensors checkpoint), in either of two designs.
+
+    alibaba-pai's Fun-ControlNet-Union is a control branch (control_img_in, control_blocks) hooked into the base
+    Qwen-Image transformer. Supports Canny, HED, Depth, Pose, MLSD, Scribble, Gray and inpainting; recommended
+    control_context_scale 0.70-0.95.
+
+    InstantX's ControlNet-Union is a five-block copy of the transformer (controlnet_x_embedder, transformer_blocks,
+    controlnet_blocks) whose block outputs are added to the base image stream. Supports Canny, Soft Edge, Depth and
+    Pose; recommended control_context_scale 0.80-1.00 on the original Qwen Image it was trained on, about 1.5-2.0 on
+    Qwen Image 2512. It takes no inpainting condition.
+    """
+
+    type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+    default_settings: ControlAdapterDefaultSettings | None = Field(None)
+    control_architecture: QwenImageControlArchitecture = Field(
+        default="fun_union",
+        description="Which Qwen-Image ControlNet design the file holds: 'fun_union' (alibaba-pai Fun-ControlNet-Union, "
+        "control and inpainting) or 'instantx_union' (InstantX ControlNet-Union, control only). Records written "
+        "before the field existed are Fun-ControlNets.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        architecture = cls._get_control_architecture_or_raise(mod.load_state_dict())
+        return cls(**{**override_fields, "control_architecture": architecture})
+
+    @classmethod
+    def _get_control_architecture_or_raise(cls, state_dict: dict) -> QwenImageControlArchitecture:
+        if _has_qwen_image_fun_control_keys(state_dict):
+            return "fun_union"
+        features = _qwen_image_instantx_control_features(state_dict)
+        if features is None:
+            raise NotAMatchError("state dict does not look like a Qwen-Image Fun or InstantX ControlNet")
+        if features != _QWEN_IMAGE_INSTANTX_CONTROL_FEATURES:
+            # Recognised and refused, so the installer shows why instead of registering a model nothing can run.
+            raise InvalidMatchError(
+                "This is the InstantX Qwen-Image inpainting ControlNet, which Invoke does not support yet. Install the "
+                "InstantX Qwen-Image ControlNet Union instead."
+            )
+        return "instantx_union"
+
+
+# `control_img_in` takes 260 packed channels into FLUX.2 [dev]'s 6144-wide stream. Klein is 3072 or 4096 wide, so
+# no Klein branch could carry this shape.
+_FLUX2_FUN_CONTROL_IMG_IN_SHAPE = (6144, 260)
+
+
+def _has_flux2_fun_control_keys(state_dict: dict) -> bool:
+    """Check if state dict is a FLUX.2 Fun-ControlNet branch (alibaba-pai's VACE-style union adapter).
+
+    The branch is `control_img_in` plus `control_transformer_blocks.N`, copies of FLUX.2's double-stream
+    `Flux2TransformerBlock` with `before_proj`/`after_proj` taps. The Qwen-Image siblings name their blocks
+    `control_blocks`, so the fingerprint is the projection shape and block 0's `before_proj` under the FLUX.2 name.
+    """
+    control_img_in = state_dict.get("control_img_in.weight")
+    shape = getattr(control_img_in, "shape", None)
+    if shape is None or tuple(shape) != _FLUX2_FUN_CONTROL_IMG_IN_SHAPE:
+        return False
+    return "control_transformer_blocks.0.before_proj.weight" in state_dict
+
+
+class ControlNet_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for FLUX.2 [dev] Fun-ControlNet adapter models (Safetensors checkpoint).
+
+    FLUX.2 Fun-ControlNets are standalone adapters containing only the control branch
+    (control_img_in, control_transformer_blocks) that extends the FLUX.2 [dev] transformer with
+    spatial conditioning capabilities. Klein transformers are narrower and cannot take it.
+
+    Supports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.
+    Recommended control_context_scale: 0.65-0.80.
+    """
+
+    type: Literal[ModelType.ControlNet] = Field(default=ModelType.ControlNet)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    default_settings: ControlAdapterDefaultSettings | None = Field(None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if not _has_flux2_fun_control_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a FLUX.2 Fun-ControlNet")
+
+        return cls(**override_fields)
 
 
 def _has_anima_lllite_keys(state_dict: dict) -> bool:

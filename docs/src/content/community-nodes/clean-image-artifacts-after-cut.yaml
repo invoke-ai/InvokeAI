@@ -1,0 +1,9 @@
+title: Clean Image Artifacts After Cut
+author: VeyDlin
+repo: https://github.com/VeyDlin/clean-artifact-after-cut-node
+summary: Remove the artifacts left after an image is cut from its background.
+categories: [masks]
+thumbnail: ./clean-image-artifacts-after-cut.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/clean-artifact-after-cut-node/master/.readme/node.png
+    alt: The Clean Image Artifacts After Cut node

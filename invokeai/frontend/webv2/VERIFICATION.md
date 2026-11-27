@@ -1,0 +1,49 @@
+# Verifying user flows
+
+Paths and commands are relative to this package. This map links user vocabulary to owners and reproducible checks; it is not a full feature inventory. Read the owner contract before choosing a scenario. Commands and completion gates: [AGENTS.md](AGENTS.md#performance-and-validation).
+
+## Start from a known state
+
+- Manual and visual checks: `pnpm dev:mock` ([browser verification](AGENTS.md#browser-verification)). The [mock backend](scripts/mock-backend.mjs) owns reset and fault controls; [fixtures](scripts/mock-backend-fixtures.mjs) own the representative and empty profiles. Reset between scenarios.
+- Model seeds: `POST /__models` with `{"set": "<name>"}` adds a named set, `{"models": [...]}` whole records; an unknown set returns 400. `/__reset` drops them.
+  - `anima-lllite`, `spandrel`: adapters and upscalers installed before their channels or scale were recorded; re-identify fills those fields.
+  - `control-sdxl`: SDXL ControlNets naming their preprocessor in both id forms, a Union, an unpurposed model, and a T2I-Adapter.
+  - `control-flux`: FLUX dev with a depth Control LoRA and a Union ControlNet.
+  - `control-krea2`: Krea-2 Turbo with a depth Control LoRA.
+  - `model-roles`: single-file MOSS-Image and Z-Image mains with VAEs, a Text LLM that is also the Qwen3.5 9B encoder, a Qwen3.5 9B encoder that is also a Text LLM, and a Qwen3 4B Text LLM folder that is also the Qwen3 encoder (`roles`).
+- The mock serves in-memory HTTP without Socket.IO. It proves nothing about real authorization, persistence, or model execution.
+- Production-build journeys start and stop their own preview and backend. Run their package commands; do not write a new driver. Their setup, fault injection, and selectors are working examples. Focused runs use a spare port and respect the one-performance-gate-per-machine rule.
+
+## Bounded local verification
+
+Shared development machine: cap Vitest at two workers. Run from this package in a POSIX shell, with the `.nvmrc` Node, pnpm 10, frozen dependencies, and the locked Chromium/Firefox/WebKit engines ([install](AGENTS.md#performance-and-validation)):
+
+```sh
+VITEST_MAX_WORKERS=2 pnpm check:release
+```
+
+- The cap limits unit and browser test workers only, not total memory or other subprocesses. Tests, assertions, budgets, and CI stay unchanged.
+- Exclusive-machine rules and ports: [performance guide](performance/README.md#running), [lifecycle smoke](performance/README.md#browser-lifecycle-smoke). Never kill an unrelated process to free a port.
+
+Keep the command, revision, environment, exit status, and original diagnostics with the run's ignored artifacts or task scratch. Classify failures:
+
+- **Assertion or budget failure:** report the failing behavior and investigate. A retry does not erase the first result. Never reduce coverage or relax limits to pass.
+- **Process termination:** report the exit code or signal and the interrupted stage. Exit 137 alone does not prove out-of-memory; check resource diagnostics first. A bounded retry keeps the same checks.
+- **Setup failure:** missing engines or dependencies, or occupied ports, leave checks unavailable, not passed. Repair the environment and rerun the affected command.
+- **Unrun stages:** `check:release` stops at its first failure; name later stages as not run. If `lint:code` passed and its inputs are unchanged, resume with `VITEST_MAX_WORKERS=2 pnpm check:release:tests`; otherwise rerun completion. Report both commands and outcomes.
+
+## Feature and evidence map
+
+| User flow and entry point                                                                                                                    | Owner                                                                                                                      | Reproduction and evidence                                                                                                                                                                                                                                                                                                                                                                | Does not establish                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep a prompt edit across leaving or reloading the editor. Open `/#/app?project=fixture-project-002`, edit **Positive prompt**.              | [Project persistence](src/workbench/projects/README.md): document and draft lifetimes.                                     | `pnpm test:browser:smoke`: [the journey](scripts/run-browser-smoke.mjs) holds a save, edits the prompt, leaves, checks the real unload journal, and reopens. Engines and artifacts: [lifecycle guide](performance/README.md#browser-lifecycle-smoke).                                                                                                                                    | Browser/OS crashes, power loss, storage failures, real Safari, untested browsers. A history reload is not BFCache restoration.                |
+| Resolve a save conflict instead of overwriting another revision. Use the conflict/recovery controls when a save reports changed server data. | [Project persistence](src/workbench/projects/README.md): durable persistence owns revision policy and conflict resolution. | [durableSyncedPersistence.test.ts](src/workbench/projects/durableSyncedPersistence.test.ts): conflict, deletion, account-expiry, and lock-failure scenarios. [ProjectConflictBanner.browser.test.tsx](src/workbench/shell/ProjectConflictBanner.browser.test.tsx): conflict choices on a controlled project fixture.                                                                     | Real cross-tab locking or database concurrency.                                                                                               |
+| Export, import, or duplicate a project with its media. Project switcher **Export**, or the Launchpad import flow.                            | [Project files and recovery](src/workbench/projects/README.md): project file/actions owner.                                | `pnpm test:project-files`: [the journey](scripts/run-project-file-journey.mjs) owns fixture setup, archive round trip, duplication, second-origin checks, and failure scenarios.                                                                                                                                                                                                         | Every historical archive, all partial-failure paths. A download alone does not prove the archive restores.                                    |
+| Invoke generation and recover a result after a lost confirmation. Inspect the **Queue** and the Canvas staging result.                       | [Queue](src/features/queue/README.md): run reconciliation. Workbench: durable run records and project integration.         | [runtime.test.ts](src/features/queue/runtime.test.ts) scripts backend outcomes. [runtimeRecovery.browser.test.ts](src/features/queue/runtimeRecovery.browser.test.ts): lost-confirmation staging and native listener cleanup, with test backend/history ports. [queueRunJournal.browser.test.ts](src/workbench/queue-integration/queueRunJournal.browser.test.ts): real browser storage. | Real HTTP admission/idempotency. Changed admission: pair with backend queue tests.                                                            |
+| Sign out, expire a session, or follow sign-in from another tab. Account menu or login screen.                                                | [Identity](src/features/identity/README.md): credentials and sessions. App: routing and composition.                       | [credentialSync.browser.test.ts](src/features/identity/credentialSync.browser.test.ts), [session.test.ts](src/features/identity/session.test.ts), [LoginScreen.browser.test.tsx](src/features/identity/ui/LoginScreen.browser.test.tsx): isolated credential, session, and UI fixtures.                                                                                                  | Every downstream stale-response fence. Changing account boundaries: exercise the domain owner's late-result path and backend isolation tests. |
+
+## Choose and report evidence
+
+- Owner test: `pnpm test <path>` or `pnpm test:browser <path>`. Uncovered failure: extend the existing fixture at its owning interface. A nearby test's name is not coverage.
+- Report per the root [evidence rule](../../../AGENTS.md#review-and-readiness), plus the fixture or setup. Example: held-prompt recovery passed in the recorded Chromium build with real IndexedDB; process crashes and full storage were not exercised. Artifacts stay in their ignored output directories.
+- Performance claims: [performance guide](performance/README.md). Routine resource observations are not timing measurements.

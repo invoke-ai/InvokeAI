@@ -1,7 +1,9 @@
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction
 from invokeai.app.services.session_processor.workflow_call_batch import (
     build_child_workflow_session_results,
     build_child_workflow_sessions,
@@ -110,6 +112,89 @@ def _call_frame() -> WorkflowCallFrame:
         workflow_id="workflow-batch",
         depth=1,
     )
+
+
+@pytest.mark.parametrize(
+    "account", [SimpleNamespace(is_admin=True, is_active=False), None], ids=["deactivated", "deleted"]
+)
+def test_a_deactivated_or_deleted_callers_expansion_reads_no_board(account: Any) -> None:
+    """The expansion resolves the queue user as execution will: an account that is deactivated, or no longer there,
+    is refused before the board is even asked about."""
+    from invokeai.app.services.session_processor.workflow_call_batch import (
+        UnsupportedWorkflowNodeError,
+        _assert_user_can_access_board,
+    )
+
+    asked: list[str] = []
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(multiuser=True),
+        users=SimpleNamespace(get=lambda user_id: account),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args[0])),
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="does not have access"):
+        _assert_user_can_access_board("board", services, "caller-1")
+    assert asked == []
+
+
+def test_a_failing_account_lookup_refuses_the_expansion_as_the_board_being_unreachable() -> None:
+    """A lookup that raises is reported like a raising access check: the board could not be read, which is not the
+    caller's lack of access and not a crash of the expansion."""
+    from invokeai.app.services.session_processor.workflow_call_batch import (
+        UnsupportedWorkflowNodeError,
+        _assert_user_can_access_board,
+    )
+
+    def failing_get(user_id: str) -> Any:
+        raise RuntimeError("accounts unavailable")
+
+    asked: list[str] = []
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(multiuser=True),
+        users=SimpleNamespace(get=failing_get),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args[0])),
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="could not access board 'board'") as refused:
+        _assert_user_can_access_board("board", services, "caller-1")
+    assert isinstance(refused.value.__cause__, RuntimeError)
+    assert asked == []
+
+
+def test_in_single_user_mode_the_expansion_reads_boards_as_an_admin_without_an_account() -> None:
+    """Single-user mode has no accounts to consult: the queue user is an admin viewer, as at execution time."""
+    from invokeai.app.services.session_processor.workflow_call_batch import _assert_user_can_access_board
+
+    asked: list[tuple[Any, ...]] = []
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(multiuser=False),
+        users=SimpleNamespace(get=lambda user_id: pytest.fail("single-user mode must not look the account up")),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args)),
+    )
+
+    _assert_user_can_access_board("board", services, "caller-1")
+
+    assert asked == [("board", "caller-1", True, BoardAction.Read)]
+
+
+def _multiuser_account_services() -> dict[str, Any]:
+    """Multiuser mode with an ordinary, active caller: what an expansion's board read is decided against."""
+    return {
+        "configuration": SimpleNamespace(multiuser=True),
+        "users": SimpleNamespace(get=lambda user_id: SimpleNamespace(is_admin=False, is_active=True)),
+    }
+
+
+def _board_access(allows_read: bool) -> Any:
+    """The board access service, answering every read as given: the expansion's part is asking it."""
+
+    def require(board_id: str, user_id: str, is_admin: bool, action: BoardAction) -> None:
+        # The callers in these tests are ordinary accounts; an expansion must ask as one, for a read.
+        assert (is_admin, action) == (False, BoardAction.Read)
+        if not allows_read:
+            raise BoardAccessDeniedError(board_id, action)
+
+    return SimpleNamespace(require=require)
 
 
 def test_build_child_workflow_sessions_expands_direct_integer_batch() -> None:
@@ -305,24 +390,8 @@ def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_boar
                     )
                 },
             )(),
-            "board_records": type(
-                "BoardRecords",
-                (),
-                {
-                    "get": staticmethod(
-                        lambda board_id: type(
-                            "BoardRecord",
-                            (),
-                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "private"},
-                        )()
-                    )
-                },
-            )(),
-            "users": type(
-                "Users",
-                (),
-                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
-            )(),
+            "board_access": _board_access(allows_read=False),
+            **_multiuser_account_services(),
         },
     )()
 
@@ -403,24 +472,8 @@ def test_build_child_workflow_sessions_allows_shared_image_generator_board() -> 
                     )
                 },
             )(),
-            "board_records": type(
-                "BoardRecords",
-                (),
-                {
-                    "get": staticmethod(
-                        lambda board_id: type(
-                            "BoardRecord",
-                            (),
-                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "shared"},
-                        )()
-                    )
-                },
-            )(),
-            "users": type(
-                "Users",
-                (),
-                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
-            )(),
+            "board_access": _board_access(allows_read=True),
+            **_multiuser_account_services(),
         },
     )()
 
@@ -1402,7 +1455,9 @@ def test_build_child_workflow_sessions_supports_image_generator_from_board() -> 
                         lambda board_id, categories, is_intermediate: ["img-a", "img-b"]
                     )
                 },
-            )()
+            )(),
+            "board_access": _board_access(allows_read=True),
+            **_multiuser_account_services(),
         },
     )()
 

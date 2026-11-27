@@ -4,20 +4,31 @@ wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
 
+import os
+import shutil
+import tempfile
+import threading
 from pathlib import Path
 
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from huggingface_hub import snapshot_download
 from PIL import Image, ImageFilter
 from transformers import AutoImageProcessor
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 repo_id = "CompVis/stable-diffusion-safety-checker"
 CHECKER_PATH = "core/convert/stable-diffusion-safety-checker"
+
+# Serializes the lazy init below. Lock ordering: this is acquired BEFORE
+# MODEL_LOAD_LOCK, never after (see _ModelLoadReadWriteLock), matching the
+# service-lock -> MODEL_LOAD_LOCK order used by ImageIndexService.
+_INIT_LOCK = threading.Lock()
 
 
 class SafetyChecker:
@@ -33,19 +44,73 @@ class SafetyChecker:
         if cls.safety_checker is not None and cls.feature_extractor is not None:
             return
 
+        # Serialize the whole lazy init. Without this, two session workers both fall
+        # through the check above and race in three ways: they duplicate the download
+        # and the construction, they run save_pretrained() into the same directory
+        # concurrently, and — because the first thread's mkdir + feature-extractor save
+        # makes model_path exist before the weights land — the second can take the
+        # "already downloaded" branch below, fail on the missing weights, and leave
+        # safety_checker as None, which has_nsfw_concept() reports as "not NSFW".
+        with _INIT_LOCK:
+            # Re-check now that we hold the lock: another worker may have finished
+            # while we waited. (Same double-checked pattern as ModelLoader._load_and_cache
+            # and ModelLoadService.load_remote_model.)
+            if cls.safety_checker is not None and cls.feature_extractor is not None:
+                return
+
+            try:
+                model_path = get_config().models_path / CHECKER_PATH
+                if model_path.exists():
+                    cls.feature_extractor = AutoImageProcessor.from_pretrained(model_path)
+                    # Torch module construction is not thread-safe process-wide (see
+                    # _ModelLoadReadWriteLock); serialize with the model-load machinery.
+                    with MODEL_LOAD_LOCK.write_lock():
+                        cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(model_path)
+                else:
+                    # Download before constructing: from_pretrained(repo_id) would
+                    # otherwise hold the process-wide load lock across a multi-GB
+                    # network transfer, stalling every other model load.
+                    download_path = snapshot_download(repo_id)
+                    feature_extractor = AutoImageProcessor.from_pretrained(download_path)
+                    # Torch module construction is not thread-safe process-wide (see
+                    # _ModelLoadReadWriteLock); serialize with the model-load machinery.
+                    with MODEL_LOAD_LOCK.write_lock():
+                        safety_checker = StableDiffusionSafetyChecker.from_pretrained(download_path)
+                    # Publish the in-memory objects before persisting them: failing to
+                    # cache the checker on disk must not leave this run without one.
+                    cls.feature_extractor = feature_extractor
+                    cls.safety_checker = safety_checker
+                    try:
+                        cls._persist_checker(feature_extractor, safety_checker, model_path)
+                    except Exception as e:
+                        logger.warning(f"Could not cache NSFW checker to {model_path}: {str(e)}")
+            except Exception as e:
+                logger.warning(f"Could not load NSFW checker: {str(e)}")
+
+    @classmethod
+    def _persist_checker(cls, feature_extractor, safety_checker, model_path: Path) -> None:
+        """Write the checker into `model_path` atomically.
+
+        `save_pretrained()` creates its own destination, so writing the two objects
+        straight into `model_path` would make that directory exist as soon as the FIRST
+        save lands. Any later failure — a raising construction, a full disk, a killed
+        process — would then leave a weightless directory that the `model_path.exists()`
+        branch of `_load_safety_checker` trusts forever: the image processor loads, the
+        checker doesn't, the exception is swallowed, and `has_nsfw_concept()` reports a
+        missing checker as "not NSFW", so every image ships unblurred and the download is
+        never retried. Staging into a sibling directory and renaming makes the install
+        either complete or absent, never half-present.
+        """
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        staging = Path(tempfile.mkdtemp(dir=model_path.parent, prefix=f".{model_path.name}.tmp-"))
         try:
-            model_path = get_config().models_path / CHECKER_PATH
-            if model_path.exists():
-                cls.feature_extractor = AutoImageProcessor.from_pretrained(model_path)
-                cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(model_path)
-            else:
-                model_path.mkdir(parents=True, exist_ok=True)
-                cls.feature_extractor = AutoImageProcessor.from_pretrained(repo_id)
-                cls.feature_extractor.save_pretrained(model_path)
-                cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(repo_id)
-                cls.safety_checker.save_pretrained(model_path)
-        except Exception as e:
-            logger.warning(f"Could not load NSFW checker: {str(e)}")
+            feature_extractor.save_pretrained(staging)
+            safety_checker.save_pretrained(staging)
+            # Atomic on a single filesystem, and staging is a sibling of the target.
+            os.replace(staging, model_path)
+        except Exception:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
 
     @classmethod
     def has_nsfw_concept(cls, image: Image.Image) -> bool:

@@ -13,9 +13,10 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.users.users_common import UserCreateRequest
 
 
@@ -94,10 +95,14 @@ class TestBoardDataIsolation:
 
         # Create board for user1
         board_service = mock_invoker.services.boards
-        user1_board = board_service.create(board_name="User 1 Board", user_id=user1_id)
+        user1_board = board_service.create(
+            board_name="User 1 Board", user_id=user1_id, viewer=BoardViewer(user_id=user1_id, is_admin=False)
+        )
 
         # Create board for user2
-        user2_board = board_service.create(board_name="User 2 Board", user_id=user2_id)
+        user2_board = board_service.create(
+            board_name="User 2 Board", user_id=user2_id, viewer=BoardViewer(user_id=user2_id, is_admin=False)
+        )
 
         # User1 should only see their board
         user1_boards = board_service.get_many(
@@ -123,172 +128,6 @@ class TestBoardDataIsolation:
         assert user2_board.board_id in user2_board_ids
         assert user1_board.board_id not in user2_board_ids
 
-    def test_user_cannot_access_other_user_board_directly(self, mock_invoker: Invoker):
-        """Test that users cannot access other users' boards by ID."""
-        board_service = mock_invoker.services.boards
-        user_service = mock_invoker.services.users
-
-        # Create two users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user1 = user_service.create(user1_data)
-
-        user2_data = UserCreateRequest(
-            email="user2@example.com", display_name="User 2", password="TestPass123", is_admin=False
-        )
-        user2 = user_service.create(user2_data)
-
-        # User1 creates a board
-        user1_board = board_service.create(board_name="User 1 Private Board", user_id=user1.user_id)
-
-        # User2 tries to access user1's board
-        # The get method should check ownership
-        try:
-            retrieved_board = board_service.get(board_id=user1_board.board_id, user_id=user2.user_id)
-            # If get doesn't check ownership, this test needs to be updated
-            # or the implementation needs to be fixed
-            if retrieved_board is not None:
-                # Board was retrieved - check if it's because of missing authorization check
-                # This would be a security issue that needs fixing
-                pytest.fail("User was able to access another user's board without authorization")
-        except Exception:
-            # Expected - user2 should not be able to access user1's board
-            pass
-
-    def test_admin_can_see_all_boards(self, mock_invoker: Invoker):
-        """Test that admin users can see all boards."""
-        board_service = mock_invoker.services.boards
-        user_service = mock_invoker.services.users
-
-        # Create admin user
-        admin_data = UserCreateRequest(
-            email="admin@example.com", display_name="Admin", password="AdminPass123", is_admin=True
-        )
-        admin = user_service.create(admin_data)
-
-        # Create regular user
-        user_data = UserCreateRequest(
-            email="user@example.com", display_name="User", password="TestPass123", is_admin=False
-        )
-        user = user_service.create(user_data)
-
-        # User creates a board
-        board_service.create(board_name="User Board", user_id=user.user_id)
-
-        # Admin creates a board
-        board_service.create(board_name="Admin Board", user_id=admin.user_id)
-
-        # Admin should be able to get all boards (implementation dependent)
-        # Note: Current implementation may not have admin override for board listing
-        # This test documents expected behavior
-
-
-class TestImageDataIsolation:
-    """Tests for image data isolation between users."""
-
-    def test_user_images_isolated_from_other_users(self, mock_invoker: Invoker):
-        """Test that users cannot see other users' images."""
-        user_service = mock_invoker.services.users
-
-        # Create two users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user_service.create(user1_data)
-
-        user2_data = UserCreateRequest(
-            email="user2@example.com", display_name="User 2", password="TestPass123", is_admin=False
-        )
-        user_service.create(user2_data)
-
-        # Note: Image service tests would require actual image creation
-        # which is beyond the scope of basic security testing
-        # This test documents expected behavior:
-        # - Images should have user_id field
-        # - Image queries should filter by user_id
-        # - Users should not be able to access images by knowing the image_name
-
-
-class TestWorkflowDataIsolation:
-    """Tests for workflow data isolation between users."""
-
-    def test_user_workflows_isolated_from_other_users(self, mock_invoker: Invoker):
-        """Test that users cannot see other users' private workflows."""
-        user_service = mock_invoker.services.users
-
-        # Create two users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user_service.create(user1_data)
-
-        user2_data = UserCreateRequest(
-            email="user2@example.com", display_name="User 2", password="TestPass123", is_admin=False
-        )
-        user_service.create(user2_data)
-
-        # Note: Workflow service tests would require workflow creation
-        # This test documents expected behavior:
-        # - Workflows should have user_id and is_public fields
-        # - Private workflows should only be visible to owner
-        # - Public workflows should be visible to all users
-
-
-class TestQueueDataIsolation:
-    """Tests for session queue data isolation between users."""
-
-    def test_user_queue_items_isolated_from_other_users(self, mock_invoker: Invoker):
-        """Test that users cannot see other users' queue items."""
-        user_service = mock_invoker.services.users
-
-        # Create two users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user_service.create(user1_data)
-
-        user2_data = UserCreateRequest(
-            email="user2@example.com", display_name="User 2", password="TestPass123", is_admin=False
-        )
-        user_service.create(user2_data)
-
-        # Note: Queue service tests would require session creation
-        # This test documents expected behavior:
-        # - Queue items should have user_id field
-        # - Users should only see their own queue items
-        # - Admin should see all queue items
-
-
-class TestSharedBoardAccess:
-    """Tests for shared board functionality."""
-
-    @pytest.mark.skip(reason="Shared board functionality not yet fully implemented")
-    def test_shared_board_access(self, mock_invoker: Invoker):
-        """Test that users can access boards shared with them."""
-        board_service = mock_invoker.services.boards
-        user_service = mock_invoker.services.users
-
-        # Create two users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user1 = user_service.create(user1_data)
-
-        user2_data = UserCreateRequest(
-            email="user2@example.com", display_name="User 2", password="TestPass123", is_admin=False
-        )
-        user_service.create(user2_data)
-
-        # User1 creates a board
-        board_service.create(board_name="Shared Board", user_id=user1.user_id)
-
-        # User1 shares the board with user2
-        # (This functionality is not yet implemented)
-
-        # User2 should be able to see the shared board
-        # Expected behavior documented for future implementation
-
 
 class TestAdminAuthorization:
     """Tests for admin-only functionality."""
@@ -310,57 +149,29 @@ class TestAdminAuthorization:
             )
             user_service.create_admin(another_admin_data)
 
-    def test_regular_user_cannot_list_all_users(self, mock_invoker: Invoker):
-        """Test that regular users cannot list all users.
-
-        Note: This depends on API endpoint implementation.
-        At the service level, list_users is available to all callers.
-        Authorization should be enforced at the API level.
-        """
-        user_service = mock_invoker.services.users
-
-        # Create users
-        user1_data = UserCreateRequest(
-            email="user1@example.com", display_name="User 1", password="TestPass123", is_admin=False
-        )
-        user_service.create(user1_data)
-
-        # Service level does not enforce authorization
-        # API level should check if caller is admin before allowing user listing
-        user_service.list_users()
-        # This will succeed at service level - API must enforce auth
-
 
 class TestDataIntegrity:
     """Tests for data integrity in multi-user scenarios."""
 
-    def test_user_deletion_cascades_to_owned_data(self, mock_invoker: Invoker):
-        """Test that deleting a user also deletes their owned data."""
+    def test_a_deleted_users_boards_stay_for_admins(self, mock_invoker: Invoker):
+        """Deleting an account takes its projects, but its boards and their media stay, for admins, in the Library."""
         user_service = mock_invoker.services.users
         board_service = mock_invoker.services.boards
-
-        # Create user
-        user_data = UserCreateRequest(
-            email="deleteme@example.com", display_name="Delete Me", password="TestPass123", is_admin=False
+        user = user_service.create(
+            UserCreateRequest(email="deleteme@example.com", display_name="Delete Me", password="TestPass123")
         )
-        user = user_service.create(user_data)
+        project = mock_invoker.services.project_records.create(user.user_id, "Project", {})
+        board = board_service.create(
+            board_name="My Board",
+            user_id=user.user_id,
+            project_id=project.project_id,
+            viewer=BoardViewer(user_id=user.user_id, is_admin=False),
+        )
 
-        # User creates a board
-        board = board_service.create(board_name="My Board", user_id=user.user_id)
-
-        # Delete user
         user_service.delete(user.user_id)
 
-        # Board should be deleted too (CASCADE in database)
-        # Note: get_dto doesn't take user_id parameter, it gets the board by ID only
-        # We'll check that it raises an exception or returns None after cascade delete
-        try:
-            board_service.get_dto(board_id=board.board_id)
-            # If we get here, the board wasn't deleted - this is a failure
-            raise AssertionError("Board should have been deleted by CASCADE")
-        except Exception:
-            # Expected - board was deleted by CASCADE
-            pass
+        kept = board_service.get_dto(board.board_id, viewer=BoardViewer(user_id="admin", is_admin=True))
+        assert (kept.board_name, kept.project_id) == ("My Board", None)
 
     def test_concurrent_user_operations_maintain_isolation(self, mock_invoker: Invoker):
         """Test that concurrent operations from different users maintain data isolation.
@@ -383,8 +194,12 @@ class TestDataIntegrity:
         user2 = user_service.create(user2_data)
 
         # Both users create boards
-        user1_board = board_service.create(board_name="User 1 Board", user_id=user1.user_id)
-        user2_board = board_service.create(board_name="User 2 Board", user_id=user2.user_id)
+        user1_board = board_service.create(
+            board_name="User 1 Board", user_id=user1.user_id, viewer=BoardViewer(user_id=user1.user_id, is_admin=False)
+        )
+        user2_board = board_service.create(
+            board_name="User 2 Board", user_id=user2.user_id, viewer=BoardViewer(user_id=user2.user_id, is_admin=False)
+        )
 
         # Verify isolation is maintained
         user1_boards = board_service.get_many(

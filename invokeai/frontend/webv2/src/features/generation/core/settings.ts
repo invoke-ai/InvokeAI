@@ -1,0 +1,1246 @@
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+import { isSeedMode } from '@platform/core/seed';
+
+import type { DynamicPromptsConfig } from './dynamicPrompts';
+import type {
+  AspectRatioId,
+  ComponentModelConfig,
+  DynamicPromptsSettings,
+  GenerateLora,
+  GenerateModelConfig,
+  GenerateReferenceImage,
+  GenerateReferenceImageAsset,
+  GenerateReferenceImageConfig,
+  GenerateSettings,
+  FluxDypePreset,
+  GenerateWidgetValues,
+  Ideogram4SamplerPreset,
+  LoraModelConfig,
+  MainModelConfig,
+  ModelIdentifierConfig,
+  QwenImageEncoderQuantization,
+  VaeModelConfig,
+  VaePrecision,
+  WanLoraTarget,
+} from './types';
+
+import { sanitizeBatchCount } from './batch';
+import {
+  DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+  DEFAULT_KREA2_REBALANCE_WEIGHTS,
+  isValidKrea2RebalanceWeights,
+  KREA2_REBALANCE_WEIGHT_COUNT,
+} from './conditioningRebalance';
+import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
+import {
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  isDynamicPromptsSeedBehaviour,
+  sanitizeMaxPrompts,
+  sanitizeSampleSeed,
+} from './dynamicPrompts';
+import {
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+} from './externalProvider';
+import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
+import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
+import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
+import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  isRefinerModel,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './sdxlRefiner';
+
+/** Preset ratios, with the preset to switch to when dimensions are swapped. */
+export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioId, 'Free'>, { ratio: number; inverseId: AspectRatioId }> = {
+  '8:1': { inverseId: '1:8', ratio: 8 / 1 },
+  '4:1': { inverseId: '1:4', ratio: 4 / 1 },
+  '21:9': { inverseId: '9:21', ratio: 21 / 9 },
+  '16:9': { inverseId: '9:16', ratio: 16 / 9 },
+  '3:2': { inverseId: '2:3', ratio: 3 / 2 },
+  '5:4': { inverseId: '4:5', ratio: 5 / 4 },
+  '4:3': { inverseId: '3:4', ratio: 4 / 3 },
+  '1:1': { inverseId: '1:1', ratio: 1 },
+  '3:4': { inverseId: '4:3', ratio: 3 / 4 },
+  '4:5': { inverseId: '5:4', ratio: 4 / 5 },
+  '2:3': { inverseId: '3:2', ratio: 2 / 3 },
+  '9:16': { inverseId: '16:9', ratio: 9 / 16 },
+  '1:4': { inverseId: '4:1', ratio: 1 / 4 },
+  '9:21': { inverseId: '21:9', ratio: 9 / 21 },
+  '1:8': { inverseId: '8:1', ratio: 1 / 8 },
+};
+
+export const ASPECT_RATIO_OPTIONS: AspectRatioId[] = [
+  'Free',
+  '21:9',
+  '16:9',
+  '3:2',
+  '4:3',
+  '1:1',
+  '3:4',
+  '2:3',
+  '9:16',
+  '9:21',
+];
+
+export const isAspectRatioId = (value: unknown): value is AspectRatioId =>
+  value === 'Free' || (typeof value === 'string' && value in ASPECT_RATIO_MAP);
+
+export const DIMENSION_GRID = 8;
+
+export const getDynamicPromptsConfig = (settings: DynamicPromptsSettings): DynamicPromptsConfig => ({
+  combinatorial: settings.dynamicPromptsCombinatorial,
+  enabled: settings.dynamicPromptsEnabled,
+  maxPrompts: settings.dynamicPromptsMaxPrompts,
+  resample: settings.dynamicPromptsResample,
+  sampleSeed: settings.dynamicPromptsSampleSeed,
+  seedBehaviour: settings.dynamicPromptsSeedBehaviour,
+});
+
+const DYNAMIC_PROMPT_SETTING_KEYS = {
+  combinatorial: 'dynamicPromptsCombinatorial',
+  enabled: 'dynamicPromptsEnabled',
+  maxPrompts: 'dynamicPromptsMaxPrompts',
+  resample: 'dynamicPromptsResample',
+  sampleSeed: 'dynamicPromptsSampleSeed',
+  seedBehaviour: 'dynamicPromptsSeedBehaviour',
+} as const satisfies Record<keyof DynamicPromptsConfig, keyof DynamicPromptsSettings>;
+
+export const getDynamicPromptsSettingsPatch = (patch: Partial<DynamicPromptsConfig>): Partial<DynamicPromptsSettings> =>
+  Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => [DYNAMIC_PROMPT_SETTING_KEYS[key as keyof DynamicPromptsConfig], value])
+  );
+
+/** Each field a stored record lacks reads as its default: Generate's unless the surface gives its own. */
+export const normalizeDynamicPromptsSettings = (
+  values: Partial<Record<keyof DynamicPromptsSettings, unknown>>,
+  defaults: Readonly<DynamicPromptsSettings> = DEFAULT_DYNAMIC_PROMPTS_SETTINGS
+): DynamicPromptsSettings => ({
+  dynamicPromptsCombinatorial:
+    typeof values.dynamicPromptsCombinatorial === 'boolean'
+      ? values.dynamicPromptsCombinatorial
+      : defaults.dynamicPromptsCombinatorial,
+  dynamicPromptsEnabled:
+    typeof values.dynamicPromptsEnabled === 'boolean' ? values.dynamicPromptsEnabled : defaults.dynamicPromptsEnabled,
+  dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts, defaults.dynamicPromptsMaxPrompts),
+  dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
+  dynamicPromptsResample:
+    typeof values.dynamicPromptsResample === 'boolean'
+      ? values.dynamicPromptsResample
+      : defaults.dynamicPromptsResample,
+  dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
+    ? values.dynamicPromptsSeedBehaviour
+    : defaults.dynamicPromptsSeedBehaviour,
+});
+
+export const MIN_NEGATIVE_PROMPT_HEIGHT_PX = 56;
+export const MAX_NEGATIVE_PROMPT_HEIGHT_PX = 240;
+export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
+export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
+export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
+export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
+export const DEFAULT_HIDIFFUSION_T1_RATIO = null;
+export const DEFAULT_HIDIFFUSION_T2_RATIO = null;
+export const MIN_HIDIFFUSION_T1_RATIO = 0;
+export const MAX_HIDIFFUSION_RATIO = 1;
+/** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
+export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
+export const MIN_ANIMA_INPAINT_ADAPTER_WEIGHT = -10;
+export const MAX_ANIMA_INPAINT_ADAPTER_WEIGHT = 10;
+
+/** Persisted and recalled weights share this clamp, so an out-of-range value never blocks canvas validation. */
+export const clampAnimaInpaintAdapterWeight = (weight: number): number =>
+  Math.min(Math.max(weight, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT), MAX_ANIMA_INPAINT_ADAPTER_WEIGHT);
+
+export const DEFAULT_LORA_WEIGHT_CONFIG = {
+  coarseStep: 0.05,
+  initial: 0.75,
+  numberInputMax: 10,
+  numberInputMin: -10,
+  sliderMax: 2,
+  sliderMin: -1,
+};
+
+export const clampDimension = (value: number, grid = DIMENSION_GRID): number =>
+  Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, Math.round(value / grid) * grid));
+
+/** Fits the ratio into about this area on the grid; past 64:1 the long side caps and the short side holds. */
+export const calculateNewSize = (
+  ratio: number,
+  area: number,
+  grid = DIMENSION_GRID
+): { width: number; height: number } => {
+  const exactWidth = Math.sqrt(area * ratio);
+  const exactHeight = exactWidth / ratio;
+  const larger = Math.max(exactWidth, exactHeight);
+  const smaller = Math.min(exactWidth, exactHeight);
+  const scale = larger > MAX_DIMENSION ? MAX_DIMENSION / larger : smaller < MIN_DIMENSION ? MIN_DIMENSION / smaller : 1;
+
+  return { height: clampDimension(exactHeight * scale, grid), width: clampDimension(exactWidth * scale, grid) };
+};
+
+/** A preset ratio implies the lock; Free holds its ratio only while the lock is on. */
+export const isAspectRatioLocked = (
+  settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
+): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
+/** The ratio a lock enforces, preferring the stored value and falling back to the current dimensions. */
+export const getActiveAspectRatio = (
+  settings: Pick<GenerateSettings, 'aspectRatioValue' | 'height' | 'width'>
+): number =>
+  settings.aspectRatioValue > 0
+    ? settings.aspectRatioValue
+    : settings.height > 0
+      ? settings.width / settings.height
+      : 1;
+
+export const ASPECT_RATIO_TOLERANCE = 0.0001;
+
+export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
+  if (height <= 0) {
+    return 'Free';
+  }
+
+  const ratio = width / height;
+
+  for (const [id, entry] of Object.entries(ASPECT_RATIO_MAP)) {
+    if (Math.abs(entry.ratio - ratio) < ASPECT_RATIO_TOLERANCE) {
+      return id as AspectRatioId;
+    }
+  }
+
+  return 'Free';
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
+
+const hasFiniteNumber = (record: Record<string, unknown>, key: string): boolean =>
+  typeof record[key] === 'number' && Number.isFinite(record[key]);
+
+const getClampedNumber = (record: Record<string, unknown>, key: string, min: number, max: number, fallback: number) =>
+  hasFiniteNumber(record, key) ? Math.min(Math.max(record[key] as number, min), max) : fallback;
+
+export const isMainModelConfig = (value: unknown): value is MainModelConfig =>
+  isRecord(value) &&
+  typeof value.key === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.base === 'string' &&
+  value.type === 'main';
+
+export const isExternalImageGeneratorModelConfig = (value: unknown): value is GenerateModelConfig =>
+  isRecord(value) &&
+  typeof value.key === 'string' &&
+  typeof value.name === 'string' &&
+  value.base === 'external' &&
+  value.type === 'external_image_generator';
+
+export const isGenerateModelConfig = (value: unknown): value is GenerateModelConfig =>
+  isMainModelConfig(value) || isExternalImageGeneratorModelConfig(value);
+
+export const isModelIdentifierConfig = (value: unknown): value is ComponentModelConfig =>
+  isRecord(value) &&
+  typeof value.key === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.base === 'string' &&
+  typeof value.type === 'string';
+
+export const isVaeModelConfig = (value: unknown): value is VaeModelConfig =>
+  isRecord(value) &&
+  typeof value.key === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.base === 'string' &&
+  value.type === 'vae';
+
+export const isLoraModelConfig = (value: unknown): value is LoraModelConfig =>
+  isRecord(value) &&
+  typeof value.key === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.base === 'string' &&
+  value.type === 'lora';
+
+const getModelIdentifierOrNull = (value: unknown): ComponentModelConfig | null =>
+  isModelIdentifierConfig(value) ? value : null;
+
+const getMainModelOrNull = (value: unknown): MainModelConfig | null => (isMainModelConfig(value) ? value : null);
+
+/** Only a refiner-family model may persist in the slot; anything else stored there is dropped. */
+const getRefinerModelOrNull = (value: unknown): MainModelConfig | null =>
+  isMainModelConfig(value) && isRefinerModel(value) ? value : null;
+
+const isVaePrecision = (value: unknown): value is VaePrecision => value === 'fp16' || value === 'fp32';
+
+/** Mirror `invokeai/backend/ideogram4/sampler_configs.py`. Guidance describes the main phase before the polish tail. */
+export const IDEOGRAM4_SAMPLER_PRESETS: Record<Ideogram4SamplerPreset, { guidanceScale: number; steps: number }> = {
+  V4_QUALITY_48: { guidanceScale: 7, steps: 48 },
+  V4_DEFAULT_20: { guidanceScale: 7, steps: 20 },
+  V4_TURBO_12: { guidanceScale: 7, steps: 12 },
+};
+export const DEFAULT_IDEOGRAM4_SAMPLER_PRESET: Ideogram4SamplerPreset = 'V4_QUALITY_48';
+
+export const getEffectiveIdeogram4Sampling = (
+  settings: Pick<GenerateSettings, 'ideogram4SamplerPreset' | 'ideogram4GuidanceScale' | 'ideogram4Steps'>
+) => {
+  const preset = IDEOGRAM4_SAMPLER_PRESETS[settings.ideogram4SamplerPreset];
+  return {
+    guidanceScale: settings.ideogram4GuidanceScale ?? preset.guidanceScale,
+    steps: settings.ideogram4Steps ?? preset.steps,
+  };
+};
+/** Ideogram guidance_scale bounds live on the numeric anyOf branch, outside the shared capability-table slider. */
+export const IDEOGRAM4_GUIDANCE_MIN = 1;
+export const IDEOGRAM4_GUIDANCE_MAX = 20;
+/** `steps` is `ge=2`: the node keeps a polish step and a main step, so 1 is not a schedule. */
+export const IDEOGRAM4_STEPS_MIN = 2;
+export const IDEOGRAM4_STEPS_MAX = 100;
+/** `mu` is `ge=-4, le=4`. A negative shift spends more of the schedule at low noise. */
+export const IDEOGRAM4_MU_MIN = -4;
+export const IDEOGRAM4_MU_MAX = 4;
+export const DEFAULT_KREA2_SEED_VARIANCE_STRENGTH = 0.1;
+export const MAX_KREA2_SEED_VARIANCE_STRENGTH = 2;
+export const DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+/** `krea2_style_reference.style_strength` is `ge=0, le=2`; 1 is the recommended setting. */
+export const DEFAULT_KREA2_STYLE_STRENGTH = 1;
+export const MAX_KREA2_STYLE_STRENGTH = 2;
+/** `flux_denoise.dype_scale` is `le=8` and `dype_exponent` `le=1000`; both default to 2 under the manual preset. */
+export const FLUX_DYPE_PRESETS: FluxDypePreset[] = ['off', 'manual', 'auto', 'area', '4k'];
+export const DEFAULT_FLUX_DYPE_SCALE = 2;
+export const MAX_FLUX_DYPE_SCALE = 8;
+export const DEFAULT_FLUX_DYPE_EXPONENT = 2;
+export const MAX_FLUX_DYPE_EXPONENT = 1000;
+/** Lightning's value. Nodes accept 0, but Qwen-Image takes its log and fails, and Z-Image's schedule collapses. */
+export const DEFAULT_TIMESTEP_SHIFT = 3;
+export const MIN_TIMESTEP_SHIFT = 0.1;
+export const MAX_TIMESTEP_SHIFT = 10;
+/** `z_image_seed_variance_enhancer`: strength `le=2`, randomize percent `ge=1, le=100`. */
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH = 0.1;
+export const MAX_ZIMAGE_SEED_VARIANCE_STRENGTH = 2;
+export const MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 1;
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+export const QWEN_IMAGE_ENCODER_QUANTIZATIONS: QwenImageEncoderQuantization[] = ['none', 'int8', 'nf4'];
+/** `moss_image_denoise.uncond_skip_layers` defaults to block 22, as the reference pipeline does. */
+export const DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS: readonly number[] = [22];
+/** MOSS-Image has 42 transformer blocks. The node checks the list against the loaded model's count again. */
+export const MAX_MOSS_IMAGE_SKIP_LAYER = 41;
+
+const toUniqueAscending = (values: readonly number[]): number[] =>
+  [...new Set(values)].sort((left, right) => left - right);
+
+/** Unique and ascending, empty entries ignored; null for a non-integer entry. Range is checked separately. */
+export const parseMossImageSkipLayers = (text: string): number[] | null => {
+  const entries = text
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+
+  return entries.every((entry) => /^\d+$/.test(entry)) ? toUniqueAscending(entries.map(Number)) : null;
+};
+
+export const isValidMossImageSkipLayers = (layers: readonly number[]): boolean =>
+  layers.every((layer) => Number.isInteger(layer) && layer >= 0 && layer <= MAX_MOSS_IMAGE_SKIP_LAYER);
+
+/** Keeps out-of-range blocks so validation names them rather than the list changing silently. */
+export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
+  Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
+
+export const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
+  typeof value === 'string' && Object.hasOwn(IDEOGRAM4_SAMPLER_PRESETS, value);
+
+export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
+  FLUX_DYPE_PRESETS.includes(value as FluxDypePreset);
+
+export const isQwenImageEncoderQuantization = (value: unknown): value is QwenImageEncoderQuantization =>
+  QWEN_IMAGE_ENCODER_QUANTIZATIONS.includes(value as QwenImageEncoderQuantization);
+
+/** Out of bounds means auto (null), not a clamp, which would turn auto recipes into fixed ones. */
+const getTimestepShift = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= MIN_TIMESTEP_SHIFT && value <= MAX_TIMESTEP_SHIFT
+    ? value
+    : null;
+
+const getOptionalNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const getStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+
+export {
+  DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+  DEFAULT_KREA2_REBALANCE_WEIGHTS,
+  isValidKrea2RebalanceWeights,
+  KREA2_REBALANCE_WEIGHT_COUNT,
+};
+
+export const isWanLoraTarget = (value: unknown): value is WanLoraTarget =>
+  value === 'high' || value === 'low' || value === 'both';
+
+export const isGenerateLora = (value: unknown): value is GenerateLora => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return false;
+  }
+
+  if (value.target !== undefined && !isWanLoraTarget(value.target)) {
+    return false;
+  }
+
+  if (value.lowNoiseWeight !== undefined && (value.target !== 'both' || !hasFiniteNumber(value, 'lowNoiseWeight'))) {
+    return false;
+  }
+
+  return true;
+};
+
+export const normalizeGenerateLora = (value: unknown): GenerateLora | null => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return null;
+  }
+
+  const target = isWanLoraTarget(value.target) ? value.target : undefined;
+  const lowNoiseWeight =
+    target === 'both' && hasFiniteNumber(value, 'lowNoiseWeight') ? (value.lowNoiseWeight as number) : undefined;
+
+  return {
+    isEnabled: value.isEnabled,
+    model: value.model,
+    weight: value.weight as number,
+    ...(target !== undefined ? { target } : {}),
+    ...(lowNoiseWeight !== undefined ? { lowNoiseWeight } : {}),
+  };
+};
+
+export const DEFAULT_REFERENCE_IMAGE_LIMIT = 5;
+
+// Keyed by kind, so a new kind fails to compile until the reader below handles it.
+const REFERENCE_IMAGE_CONFIG_TYPES: Record<GenerateReferenceImageConfig['type'], true> = {
+  external_reference_image: true,
+  flux2_reference_image: true,
+  flux_kontext_reference_image: true,
+  flux_redux: true,
+  ip_adapter: true,
+  krea2_edit_reference_image: true,
+  krea2_reference_image: true,
+  qwen_image_reference_image: true,
+  qwen_image_2_1_reference_image: true,
+};
+
+const isReferenceImageConfigType = (value: unknown): value is GenerateReferenceImageConfig['type'] =>
+  typeof value === 'string' && Object.hasOwn(REFERENCE_IMAGE_CONFIG_TYPES, value);
+
+const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
+  value === 'ViT-H' || value === 'ViT-G' || value === 'ViT-L';
+
+const isIPAdapterMethod = (
+  value: unknown
+): value is 'full' | 'style' | 'composition' | 'style_strong' | 'style_precise' =>
+  value === 'full' ||
+  value === 'style' ||
+  value === 'composition' ||
+  value === 'style_strong' ||
+  value === 'style_precise';
+
+const isFluxReduxImageInfluence = (value: unknown): value is 'lowest' | 'low' | 'medium' | 'high' | 'highest' =>
+  value === 'lowest' || value === 'low' || value === 'medium' || value === 'high' || value === 'highest';
+
+const normalizeReferenceImageAsset = (value: unknown): GenerateReferenceImageAsset | null =>
+  value === null ? null : normalizeCroppableImage(value);
+
+const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageConfig | null => {
+  if (!isRecord(value) || !isReferenceImageConfigType(value.type)) {
+    return null;
+  }
+
+  const image = normalizeReferenceImageAsset(value.image);
+
+  if (value.image !== null && image === null) {
+    return null;
+  }
+
+  switch (value.type) {
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
+    case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
+      return { image, type: value.type };
+    case 'flux_kontext_reference_image':
+      return { image, model: getMainModelOrNull(value.model), type: value.type };
+    case 'krea2_reference_image':
+      return {
+        image,
+        styleStrength: getClampedNumber(
+          value,
+          'styleStrength',
+          0,
+          MAX_KREA2_STYLE_STRENGTH,
+          DEFAULT_KREA2_STYLE_STRENGTH
+        ),
+        type: value.type,
+      };
+    case 'flux_redux':
+      return {
+        image,
+        imageInfluence: isFluxReduxImageInfluence(value.imageInfluence) ? value.imageInfluence : 'highest',
+        model: getModelIdentifierOrNull(value.model),
+        type: value.type,
+      };
+    case 'ip_adapter':
+      return {
+        beginEndStepPct:
+          Array.isArray(value.beginEndStepPct) &&
+          value.beginEndStepPct.length === 2 &&
+          value.beginEndStepPct.every((item) => typeof item === 'number' && Number.isFinite(item))
+            ? [value.beginEndStepPct[0], value.beginEndStepPct[1]]
+            : [0, 1],
+        clipVisionModel: isClipVisionModel(value.clipVisionModel) ? value.clipVisionModel : 'ViT-H',
+        image,
+        method: isIPAdapterMethod(value.method) ? value.method : 'full',
+        model: getModelIdentifierOrNull(value.model),
+        type: value.type,
+        weight: hasFiniteNumber(value, 'weight') ? (value.weight as number) : 1,
+      };
+  }
+};
+
+/** Long enough for a descriptive label, short enough to stay one line in metadata and recall notices. */
+export const MAX_REFERENCE_IMAGE_NAME_LENGTH = 80;
+
+/** A reference's stored name: trimmed and capped by code point; empty or not a string is no name. */
+export const normalizeReferenceImageName = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const characters = Array.from(value.trim());
+  const name = (
+    characters.length > MAX_REFERENCE_IMAGE_NAME_LENGTH
+      ? characters.slice(0, MAX_REFERENCE_IMAGE_NAME_LENGTH).join('')
+      : characters.join('')
+  ).trim();
+
+  return name.length > 0 ? name : undefined;
+};
+
+/** A name reading as any positional default stores none, so no row borrows another's. No change: same array. */
+export const renameReferenceImage = (
+  referenceImages: readonly GenerateReferenceImage[],
+  id: string,
+  name: string,
+  isDefaultName: (name: string) => boolean
+): readonly GenerateReferenceImage[] => {
+  const normalized = normalizeReferenceImageName(name);
+  const next = normalized === undefined || isDefaultName(normalized) ? undefined : normalized;
+  const index = referenceImages.findIndex((referenceImage) => referenceImage.id === id);
+  const current = referenceImages[index];
+
+  if (!current || current.name === next) {
+    return referenceImages;
+  }
+
+  const { name: _previous, ...unnamed } = current;
+  const renamed: GenerateReferenceImage = next === undefined ? unnamed : { ...unnamed, name: next };
+
+  return referenceImages.map((referenceImage, position) => (position === index ? renamed : referenceImage));
+};
+
+export const normalizeReferenceImages = (value: unknown): GenerateReferenceImage[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const images: GenerateReferenceImage[] = [];
+
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.id !== 'string') {
+      continue;
+    }
+
+    const config = normalizeReferenceImageConfig(item.config);
+
+    if (!config) {
+      continue;
+    }
+
+    const name = normalizeReferenceImageName(item.name);
+
+    images.push({ config, id: item.id, isEnabled: item.isEnabled !== false, ...(name === undefined ? {} : { name }) });
+  }
+
+  return images;
+};
+
+const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): GenerateReferenceImageConfig => {
+  switch (config.type) {
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
+    case 'krea2_reference_image':
+    case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
+      return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
+    case 'flux_kontext_reference_image':
+      return {
+        ...config,
+        image: config.image ? cloneCroppableImage(config.image) : null,
+        model: config.model ? { ...config.model } : null,
+      };
+    case 'flux_redux':
+    case 'ip_adapter':
+      return {
+        ...config,
+        image: config.image ? cloneCroppableImage(config.image) : null,
+        model: config.model ? { ...config.model } : null,
+      };
+  }
+};
+
+export const cloneReferenceImages = (
+  referenceImages: readonly GenerateReferenceImage[] = []
+): GenerateReferenceImage[] =>
+  referenceImages.map((referenceImage) => ({
+    ...referenceImage,
+    config: cloneReferenceImageConfig(referenceImage.config),
+  }));
+
+/** Array order is conditioning order; no-op reorders return the same array. */
+export const moveReferenceImage = (
+  referenceImages: readonly GenerateReferenceImage[],
+  id: string,
+  direction: -1 | 1
+): readonly GenerateReferenceImage[] => {
+  const index = referenceImages.findIndex((referenceImage) => referenceImage.id === id);
+  const target = index + direction;
+
+  if (index === -1 || target < 0 || target >= referenceImages.length) {
+    return referenceImages;
+  }
+
+  const next = [...referenceImages];
+  const [entry] = next.splice(index, 1);
+
+  if (!entry) {
+    return referenceImages;
+  }
+
+  next.splice(target, 0, entry);
+
+  return next;
+};
+
+export const getDefaultLoraWeight = (model: LoraModelConfig): number => {
+  const weight = model.default_settings?.weight;
+
+  return Number.isFinite(weight) && weight !== null && weight !== undefined
+    ? weight
+    : DEFAULT_LORA_WEIGHT_CONFIG.initial;
+};
+
+/** The weight slider's track; an unset bound falls back like the backend's effective-range validator. */
+export const getLoraWeightSliderRange = (model: LoraModelConfig): { max: number; min: number } => ({
+  max: model.default_settings?.weight_max ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMax,
+  min: model.default_settings?.weight_min ?? DEFAULT_LORA_WEIGHT_CONFIG.sliderMin,
+});
+
+const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) {
+    return true;
+  }
+
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+};
+
+const hasSameModelKind = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
+/** A reinstall keeps the hash but changes the key; type, base and any saved variant must agree too. */
+export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  Boolean(saved.hash) && candidate.hash === saved.hash && hasSameModelKind(candidate, saved);
+
+/** Match an existing installation, comparing the file hashes when both are available. */
+export const isSameInstalledModel = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.key === saved.key &&
+  hasSameModelKind(candidate, saved) &&
+  (!candidate.hash || !saved.hash || candidate.hash === saved.hash);
+
+/** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
+export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
+  const modelsByKey = new Map<string, LoraModelConfig>();
+
+  for (const model of models) {
+    if (isLoraModelConfig(model)) {
+      modelsByKey.set(model.key, model);
+    }
+  }
+
+  // Two removed concepts with the same file must not both claim one reinstalled concept.
+  const claimedKeys = new Set(loras.map((lora) => lora.model.key));
+  const findReinstalled = (saved: LoraModelConfig): LoraModelConfig | undefined => {
+    for (const model of modelsByKey.values()) {
+      if (isSameModelFile(model, saved) && !claimedKeys.has(model.key)) {
+        claimedKeys.add(model.key);
+        return model;
+      }
+    }
+
+    return undefined;
+  };
+
+  let didSync = false;
+  const syncedLoras = loras.map((lora) => {
+    const currentModel = modelsByKey.get(lora.model.key) ?? findReinstalled(lora.model);
+
+    if (!currentModel || areModelSnapshotsEqual(currentModel, lora.model)) {
+      return lora;
+    }
+
+    didSync = true;
+    return { ...lora, model: currentModel };
+  });
+
+  return didSync ? syncedLoras : loras;
+};
+
+const syncModelIdentifierWithModels = <T extends ComponentModelConfig | null>(
+  value: T,
+  modelsByKey: Map<string, unknown>
+): T => {
+  if (!value) {
+    return value;
+  }
+
+  const currentModel = modelsByKey.get(value.key);
+
+  return isModelIdentifierConfig(currentModel) && !areModelSnapshotsEqual(currentModel, value)
+    ? (currentModel as T)
+    : value;
+};
+
+export const cloneGenerateWidgetValues = (
+  values: GenerateWidgetValues
+): GenerateWidgetValues & Record<string, unknown> => ({
+  ...values,
+  clipEmbedModel: values.clipEmbedModel ? { ...values.clipEmbedModel } : null,
+  clipGEmbedModel: values.clipGEmbedModel ? { ...values.clipGEmbedModel } : null,
+  clipLEmbedModel: values.clipLEmbedModel ? { ...values.clipLEmbedModel } : null,
+  componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
+  loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
+  model: { ...values.model },
+  mistralEncoderModel: values.mistralEncoderModel ? { ...values.mistralEncoderModel } : null,
+  promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
+  qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
+  qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
+  qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
+  qwen3VLVisionTowerModel: values.qwen3VLVisionTowerModel ? { ...values.qwen3VLVisionTowerModel } : null,
+  qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
+  animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
+  flux3PromptUpsamplerModel: values.flux3PromptUpsamplerModel ? { ...values.flux3PromptUpsamplerModel } : null,
+  wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
+  wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
+  ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
+  refinerModel: values.refinerModel ? { ...values.refinerModel } : null,
+  ideogram4ColorPalette: [...values.ideogram4ColorPalette],
+  mossImageUncondSkipLayers: [...values.mossImageUncondSkipLayers],
+  referenceImages: cloneReferenceImages(values.referenceImages),
+  t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
+  vae: values.vae ? { ...values.vae } : null,
+});
+
+const syncReferenceImageConfigWithModels = (
+  config: GenerateReferenceImageConfig,
+  modelsByKey: Map<string, unknown>
+): GenerateReferenceImageConfig => {
+  switch (config.type) {
+    case 'flux_kontext_reference_image': {
+      const boundModel = config.model;
+      const model = syncModelIdentifierWithModels(boundModel, modelsByKey);
+      // Keep the original binding if the catalog record points to a different model.
+      if (
+        !boundModel ||
+        model === boundModel ||
+        !isMainModelConfig(model) ||
+        !isSameInstalledModel(model, boundModel)
+      ) {
+        return config;
+      }
+
+      return { ...config, model };
+    }
+    case 'flux_redux':
+    case 'ip_adapter': {
+      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+
+      return model === config.model ? config : { ...config, model };
+    }
+    case 'external_reference_image':
+    case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
+    case 'krea2_reference_image':
+    case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
+      return config;
+  }
+};
+
+export const syncReferenceImagesWithModels = (
+  referenceImages: GenerateReferenceImage[],
+  models: readonly unknown[]
+): GenerateReferenceImage[] => {
+  const modelsByKey = new Map<string, unknown>();
+
+  for (const model of models) {
+    if (isModelIdentifierConfig(model)) {
+      modelsByKey.set(model.key, model);
+    }
+  }
+
+  let didSync = false;
+  const synced = referenceImages.map((referenceImage) => {
+    const config = syncReferenceImageConfigWithModels(referenceImage.config, modelsByKey);
+
+    if (config === referenceImage.config) {
+      return referenceImage;
+    }
+
+    didSync = true;
+    return { ...referenceImage, config };
+  });
+
+  return didSync ? synced : referenceImages;
+};
+
+export const syncGenerateWidgetValuesWithModels = (
+  values: GenerateWidgetValues,
+  models: readonly unknown[]
+): GenerateWidgetValues => {
+  const modelsByKey = new Map<string, unknown>();
+
+  for (const model of models) {
+    if (isModelIdentifierConfig(model)) {
+      modelsByKey.set(model.key, model);
+    }
+  }
+
+  const currentModel = modelsByKey.get(values.model.key);
+  const model =
+    isGenerateModelConfig(currentModel) && !areModelSnapshotsEqual(currentModel, values.model)
+      ? currentModel
+      : values.model;
+  const vae = syncModelIdentifierWithModels(values.vae, modelsByKey);
+  const componentSourceModel = syncModelIdentifierWithModels(values.componentSourceModel, modelsByKey);
+  const refinerModel = syncModelIdentifierWithModels(values.refinerModel, modelsByKey);
+  const nextValues: GenerateWidgetValues = {
+    ...values,
+    clipEmbedModel: syncModelIdentifierWithModels(values.clipEmbedModel, modelsByKey),
+    clipGEmbedModel: syncModelIdentifierWithModels(values.clipGEmbedModel, modelsByKey),
+    clipLEmbedModel: syncModelIdentifierWithModels(values.clipLEmbedModel, modelsByKey),
+    componentSourceModel: isMainModelConfig(componentSourceModel) ? componentSourceModel : values.componentSourceModel,
+    loras: syncGenerateLorasWithModels(values.loras, models),
+    model,
+    modelKey: model.key,
+    mistralEncoderModel: syncModelIdentifierWithModels(values.mistralEncoderModel, modelsByKey),
+    qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
+    qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
+    qwen3VLEncoderModel: syncModelIdentifierWithModels(values.qwen3VLEncoderModel, modelsByKey),
+    qwen3VLVisionTowerModel: syncModelIdentifierWithModels(values.qwen3VLVisionTowerModel, modelsByKey),
+    qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
+    animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
+    flux3PromptUpsamplerModel: syncModelIdentifierWithModels(values.flux3PromptUpsamplerModel, modelsByKey),
+    referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
+    refinerModel: isMainModelConfig(refinerModel) ? refinerModel : values.refinerModel,
+    t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
+    vae: isVaeModelConfig(vae) ? vae : values.vae,
+  };
+
+  return nextValues.model === values.model &&
+    nextValues.loras === values.loras &&
+    nextValues.vae === values.vae &&
+    nextValues.t5EncoderModel === values.t5EncoderModel &&
+    nextValues.clipEmbedModel === values.clipEmbedModel &&
+    nextValues.clipLEmbedModel === values.clipLEmbedModel &&
+    nextValues.clipGEmbedModel === values.clipGEmbedModel &&
+    nextValues.mistralEncoderModel === values.mistralEncoderModel &&
+    nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
+    nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
+    nextValues.qwen3VLEncoderModel === values.qwen3VLEncoderModel &&
+    nextValues.qwen3VLVisionTowerModel === values.qwen3VLVisionTowerModel &&
+    nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
+    nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
+    nextValues.flux3PromptUpsamplerModel === values.flux3PromptUpsamplerModel &&
+    nextValues.referenceImages === values.referenceImages &&
+    nextValues.componentSourceModel === values.componentSourceModel &&
+    nextValues.refinerModel === values.refinerModel &&
+    nextValues.modelKey === values.modelKey
+    ? values
+    : nextValues;
+};
+
+export const isLoraCompatibleWithModel = (
+  loraModel: Pick<LoraModelConfig, 'base' | 'variant'>,
+  mainModel: Pick<GenerateModelConfig, 'base' | 'variant'>
+): boolean => {
+  if (mainModel.base === 'flux2') {
+    if (loraModel.base !== 'flux2') {
+      return false;
+    }
+
+    return !mainModel.variant || !loraModel.variant || loraModel.variant === mainModel.variant;
+  }
+
+  if (loraModel.base !== mainModel.base) {
+    return false;
+  }
+
+  if (mainModel.base === 'wan') {
+    return isWanLoraTargetingMain(loraModel.variant, mainModel.variant);
+  }
+
+  if (mainModel.base === 'sd-3') {
+    // Records from before the variant existed stay permissive; the denoise node checks them at run time.
+    return !mainModel.variant || !loraModel.variant || loraModel.variant === mainModel.variant;
+  }
+
+  return true;
+};
+
+/** Map main/LoRA families explicitly; unknown variants remain permissive for backend validation. */
+const WAN_LORA_VARIANT_MAIN_VARIANTS: Record<string, readonly string[]> = {
+  '5b': ['ti2v_5b'],
+  a14b: ['t2v_a14b', 'i2v_a14b'],
+};
+
+export const isWanLoraTargetingMain = (
+  loraVariant: string | null | undefined,
+  mainVariant: string | null | undefined
+): boolean => {
+  if (!loraVariant || !mainVariant) {
+    return true;
+  }
+
+  const compatibleMainVariants = WAN_LORA_VARIANT_MAIN_VARIANTS[loraVariant];
+
+  return compatibleMainVariants ? compatibleMainVariants.includes(mainVariant) : true;
+};
+
+/** Tool model picks: widget preferences that presets and whole-form replacements leave alone. */
+export const GENERATE_TOOL_MODEL_PICK_KEYS = [
+  'expandPromptModelKey',
+  'imageToPromptModelKey',
+] as const satisfies readonly (keyof GenerateSettings)[];
+
+/** Only keys the change touched, so Undo keeps later edits; batch count is never reverted. */
+export const getGenerateValuesRevertPatch = (before: object, after: object): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  const beforeValues = before as Readonly<Record<string, unknown>>;
+  const afterValues = after as Readonly<Record<string, unknown>>;
+
+  for (const key of new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])) {
+    if (key !== 'batchCount' && !areJsonValuesStructurallyEqual(beforeValues[key], afterValues[key])) {
+      patch[key] = beforeValues[key];
+    }
+  }
+
+  return patch;
+};
+
+/** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
+export const GENERATE_UI_STATE_KEYS = {
+  aspectRatioIsLocked: true,
+  batchCount: true,
+  expandPromptModelKey: true,
+  imageToPromptModelKey: true,
+  negativePromptHeightPx: true,
+  positivePromptHeightPx: true,
+  promptTemplateViewMode: true,
+} satisfies Partial<Record<keyof GenerateSettings, true>>;
+
+export const normalizeGenerateSettings = (values: unknown): GenerateSettings | null => {
+  if (!isRecord(values)) {
+    return null;
+  }
+
+  const isCoreShapeValid =
+    typeof values.modelKey === 'string' &&
+    typeof values.positivePrompt === 'string' &&
+    typeof values.negativePrompt === 'string' &&
+    typeof values.scheduler === 'string' &&
+    (isSeedMode(values.seedMode) || typeof values.shouldRandomizeSeed === 'boolean') &&
+    ['width', 'height', 'steps', 'cfgScale', 'cfgRescaleMultiplier', 'seed'].every((key) =>
+      hasFiniteNumber(values, key)
+    );
+
+  if (!isCoreShapeValid) {
+    return null;
+  }
+
+  const manualHiDiffusion =
+    hasFiniteNumber(values, 'hiDiffusionT1Ratio') || hasFiniteNumber(values, 'hiDiffusionT2Ratio');
+  const width = values.width as number;
+  const height = values.height as number;
+
+  const promptTemplate = isCanonicalPromptTemplateSnapshot(values.promptTemplate)
+    ? values.promptTemplate
+    : sanitizePromptTemplateSnapshot(values.promptTemplate);
+
+  return {
+    aspectRatioId: isAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : deriveAspectRatioId(width, height),
+    aspectRatioIsLocked: typeof values.aspectRatioIsLocked === 'boolean' ? values.aspectRatioIsLocked : false,
+    aspectRatioValue:
+      hasFiniteNumber(values, 'aspectRatioValue') && (values.aspectRatioValue as number) > 0
+        ? (values.aspectRatioValue as number)
+        : height > 0
+          ? width / height
+          : 1,
+    batchCount: sanitizeBatchCount(values.batchCount),
+    cfgRescaleMultiplier: values.cfgRescaleMultiplier as number,
+    cfgScale: values.cfgScale as number,
+    clipSkip: hasFiniteNumber(values, 'clipSkip') ? (values.clipSkip as number) : 0,
+    colorCompensation: typeof values.colorCompensation === 'boolean' ? values.colorCompensation : false,
+    hiDiffusionEnabled: typeof values.hiDiffusionEnabled === 'boolean' ? values.hiDiffusionEnabled : false,
+    hiDiffusionRauNetEnabled:
+      typeof values.hiDiffusionRauNetEnabled === 'boolean' ? values.hiDiffusionRauNetEnabled : true,
+    hiDiffusionWindowAttentionEnabled:
+      typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' ? values.hiDiffusionWindowAttentionEnabled : true,
+    ...(Object.hasOwn(values, 'hiDiffusionManualRatios')
+      ? {
+          hiDiffusionManualRatios: {
+            t1: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't1',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0.4
+            ),
+            t2: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't2',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0
+            ),
+          },
+        }
+      : {}),
+    hiDiffusionT1Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0),
+    hiDiffusionT2Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
+    ...normalizeDynamicPromptsSettings(values),
+    height,
+    loras: Array.isArray(values.loras) ? values.loras.flatMap((entry) => normalizeGenerateLora(entry) ?? []) : [],
+    modelKey: values.modelKey as string,
+    negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
+    negativePrompt: values.negativePrompt as string,
+    negativePromptHeightPx: getClampedNumber(
+      values,
+      'negativePromptHeightPx',
+      MIN_NEGATIVE_PROMPT_HEIGHT_PX,
+      MAX_NEGATIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX
+    ),
+    positivePrompt: values.positivePrompt as string,
+    positivePromptHeightPx: getClampedNumber(
+      values,
+      'positivePromptHeightPx',
+      MIN_POSITIVE_PROMPT_HEIGHT_PX,
+      MAX_POSITIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
+    ),
+    expandPromptModelKey: typeof values.expandPromptModelKey === 'string' ? values.expandPromptModelKey : null,
+    imageToPromptModelKey: typeof values.imageToPromptModelKey === 'string' ? values.imageToPromptModelKey : null,
+    // Preserve canonical object identity to avoid false Object.is changes and reconciliation loops.
+    promptTemplate,
+    promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,
+    referenceImages: normalizeReferenceImages(values.referenceImages),
+    scheduler: values.scheduler as string,
+    seamlessXAxis: typeof values.seamlessXAxis === 'boolean' ? values.seamlessXAxis : false,
+    seamlessYAxis: typeof values.seamlessYAxis === 'boolean' ? values.seamlessYAxis : false,
+    seed: values.seed as number,
+    // Values saved before seed modes carry the random toggle instead.
+    seedMode: isSeedMode(values.seedMode) ? values.seedMode : values.shouldRandomizeSeed ? 'random' : 'fixed',
+    steps: values.steps as number,
+    vae: isVaeModelConfig(values.vae) ? values.vae : null,
+    vaePrecision: isVaePrecision(values.vaePrecision) ? values.vaePrecision : 'fp32',
+    t5EncoderModel: getModelIdentifierOrNull(values.t5EncoderModel),
+    clipEmbedModel: getModelIdentifierOrNull(values.clipEmbedModel),
+    clipLEmbedModel: getModelIdentifierOrNull(values.clipLEmbedModel),
+    clipGEmbedModel: getModelIdentifierOrNull(values.clipGEmbedModel),
+    mistralEncoderModel: getModelIdentifierOrNull(values.mistralEncoderModel),
+    qwen3EncoderModel: getModelIdentifierOrNull(values.qwen3EncoderModel),
+    qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
+    qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
+    qwen3VLVisionTowerModel: getModelIdentifierOrNull(values.qwen3VLVisionTowerModel),
+    qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
+    animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    flux3PromptUpsamplerEnabled: values.flux3PromptUpsamplerEnabled === true,
+    flux3PromptUpsamplerModel: getModelIdentifierOrNull(values.flux3PromptUpsamplerModel),
+    // Projects saved before the toggle existed wired the adapter whenever one was selected.
+    animaInpaintAdapterEnabled: values.animaInpaintAdapterEnabled !== false,
+    animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
+      hasFiniteNumber(values, 'animaInpaintAdapterWeight')
+        ? (values.animaInpaintAdapterWeight as number)
+        : DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT
+    ),
+    wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
+    wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),
+    ideogram4UnconditionalModel: getMainModelOrNull(values.ideogram4UnconditionalModel),
+    componentSourceModel: getMainModelOrNull(values.componentSourceModel),
+    wanGuidanceScaleLowNoise: getOptionalNumber(values.wanGuidanceScaleLowNoise),
+    ideogram4SamplerPreset: isIdeogram4SamplerPreset(values.ideogram4SamplerPreset)
+      ? values.ideogram4SamplerPreset
+      : DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
+    ideogram4Steps: getOptionalNumber(values.ideogram4Steps),
+    ideogram4GuidanceScale: getOptionalNumber(values.ideogram4GuidanceScale),
+    ideogram4Mu: getOptionalNumber(values.ideogram4Mu),
+    ideogram4ColorPalette: getStringArray(values.ideogram4ColorPalette),
+    krea2RebalanceEnabled: values.krea2RebalanceEnabled === true,
+    krea2RebalanceMultiplier: hasFiniteNumber(values, 'krea2RebalanceMultiplier')
+      ? (values.krea2RebalanceMultiplier as number)
+      : DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+    krea2RebalanceWeights:
+      typeof values.krea2RebalanceWeights === 'string' ? values.krea2RebalanceWeights : DEFAULT_KREA2_REBALANCE_WEIGHTS,
+    krea2SeedVarianceEnabled: values.krea2SeedVarianceEnabled === true,
+    krea2SeedVarianceStrength: getClampedNumber(
+      values,
+      'krea2SeedVarianceStrength',
+      0,
+      MAX_KREA2_SEED_VARIANCE_STRENGTH,
+      DEFAULT_KREA2_SEED_VARIANCE_STRENGTH
+    ),
+    krea2SeedVarianceRandomizePercent: getClampedNumber(
+      values,
+      'krea2SeedVarianceRandomizePercent',
+      0,
+      100,
+      DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
+    ),
+    krea2ReferenceKvCache: values.krea2ReferenceKvCache === true,
+    fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
+    fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
+    fluxDypeExponent: getClampedNumber(
+      values,
+      'fluxDypeExponent',
+      0,
+      MAX_FLUX_DYPE_EXPONENT,
+      DEFAULT_FLUX_DYPE_EXPONENT
+    ),
+    zImageShift: getTimestepShift(values.zImageShift),
+    zImageSeedVarianceEnabled: values.zImageSeedVarianceEnabled === true,
+    zImageSeedVarianceStrength: getClampedNumber(
+      values,
+      'zImageSeedVarianceStrength',
+      0,
+      MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH
+    ),
+    zImageSeedVarianceRandomizePercent: getClampedNumber(
+      values,
+      'zImageSeedVarianceRandomizePercent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT
+    ),
+    qwenImageShift: getTimestepShift(values.qwenImageShift),
+    qwenImageEncoderQuantization: isQwenImageEncoderQuantization(values.qwenImageEncoderQuantization)
+      ? values.qwenImageEncoderQuantization
+      : 'none',
+    mossImageUncondSkipLayers: normalizeMossImageSkipLayers(values.mossImageUncondSkipLayers) ?? [
+      ...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
+    ],
+    pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
+    pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
+    gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
+    pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
+    externalImageSize:
+      typeof values.externalImageSize === 'string' && values.externalImageSize !== '' ? values.externalImageSize : null,
+    openaiQuality: isOpenAIImageQuality(values.openaiQuality) ? values.openaiQuality : 'auto',
+    openaiBackground: isOpenAIImageBackground(values.openaiBackground) ? values.openaiBackground : 'auto',
+    openaiInputFidelity: isOpenAIInputFidelity(values.openaiInputFidelity) ? values.openaiInputFidelity : null,
+    geminiTemperature:
+      hasFiniteNumber(values, 'geminiTemperature') &&
+      (values.geminiTemperature as number) >= GEMINI_TEMPERATURE_MIN &&
+      (values.geminiTemperature as number) <= GEMINI_TEMPERATURE_MAX
+        ? (values.geminiTemperature as number)
+        : null,
+    geminiThinkingLevel: isGeminiThinkingLevel(values.geminiThinkingLevel) ? values.geminiThinkingLevel : null,
+    seedreamWatermark: values.seedreamWatermark === true,
+    seedreamOptimizePrompt: values.seedreamOptimizePrompt === true,
+    refinerModel: getRefinerModelOrNull(values.refinerModel),
+    refinerSteps: hasFiniteNumber(values, 'refinerSteps')
+      ? Math.max(MIN_REFINER_STEPS, Math.round(values.refinerSteps as number))
+      : DEFAULT_REFINER_STEPS,
+    refinerCfgScale: hasFiniteNumber(values, 'refinerCfgScale')
+      ? Math.max(MIN_REFINER_CFG_SCALE, values.refinerCfgScale as number)
+      : DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: typeof values.refinerScheduler === 'string' ? values.refinerScheduler : DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: getClampedNumber(
+      values,
+      'refinerPositiveAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE
+    ),
+    refinerNegativeAestheticScore: getClampedNumber(
+      values,
+      'refinerNegativeAestheticScore',
+      MIN_REFINER_AESTHETIC_SCORE,
+      MAX_REFINER_AESTHETIC_SCORE,
+      DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE
+    ),
+    refinerStart: getClampedNumber(values, 'refinerStart', MIN_REFINER_START, MAX_REFINER_START, DEFAULT_REFINER_START),
+    width,
+  };
+};
+
+export const normalizeGenerateWidgetValues = (values: unknown): GenerateWidgetValues | null => {
+  const settings = normalizeGenerateSettings(values);
+
+  if (!settings || !isRecord(values) || !isGenerateModelConfig(values.model)) {
+    return null;
+  }
+
+  return { ...settings, model: values.model };
+};
+
+/** Canonical values normalize to the same identity so newly defaulted fields cannot bypass migration. */
+export const isGenerateSettings = (values: unknown): values is GenerateSettings => {
+  const normalized = normalizeGenerateSettings(values);
+
+  if (!normalized || !isRecord(values)) {
+    return false;
+  }
+
+  return Object.entries(normalized).every(([key, value]) => areJsonValuesStructurallyEqual(values[key], value));
+};
+
+export const isGenerateWidgetValues = (values: unknown): values is GenerateWidgetValues =>
+  isGenerateSettings(values) && isGenerateModelConfig((values as unknown as Record<string, unknown>).model);

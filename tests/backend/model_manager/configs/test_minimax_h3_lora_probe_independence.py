@@ -1,0 +1,268 @@
+"""MiniMax H3 LoRA probe tests, including mutual exclusivity with Wan / Anima / Krea-2.
+
+``Config_Base.CONFIG_CLASSES`` is a set, so probe order is non-deterministic across
+process restarts — every architecture pair must be mutually exclusive at the
+per-config level. H3's native key layout shares the ``blocks.N.`` shape with Wan and
+Anima (and carries ``blocks.N.mlp.fc1``, which Wan's Anima anti-pattern matches), so
+each test feeds one fixed state dict to every probe individually and asserts exactly
+the right one accepts.
+"""
+
+import atexit
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock
+
+import pytest
+import torch
+
+from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.lora import (
+    LoRA_LyCORIS_Anima_Config,
+    LoRA_LyCORIS_Krea2_Config,
+    LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_Wan_Config,
+)
+from invokeai.backend.model_manager.taxonomy import BaseModelType
+
+
+def _z(*shape: int) -> torch.Tensor:
+    """A zero tensor with the real layout but a single element of storage.
+
+    The probes under test read key names and shapes, never an element. Materializing these LoRA
+    widths costs GBs across the file, which parallel CI test processes cannot hold at once.
+    """
+    return torch.zeros((), dtype=torch.float32).expand(shape)
+
+
+def _make_mod(path: Path, sd: dict) -> MagicMock:
+    mod = MagicMock()
+    mod.path = path
+    mod.load_state_dict.return_value = sd
+    return mod
+
+
+def _overrides(p: Path, name: str) -> dict:
+    return {
+        "hash": "test-hash",
+        "path": str(p),
+        "file_size": 0,
+        "name": name,
+        "source": str(p),
+        "source_type": "path",
+    }
+
+
+_TMP_DIR = TemporaryDirectory()
+atexit.register(_TMP_DIR.cleanup)
+
+
+def _probe(cls, sd: dict, name: str = "test-lora"):
+    # The probes require a real file on disk (raise_if_not_file); contents are irrelevant
+    # because the state dict is mocked.
+    path = Path(_TMP_DIR.name) / f"{name}.safetensors"
+    path.touch()
+    try:
+        return True, cls.from_model_on_disk(_make_mod(path, sd), _overrides(path, name))
+    except NotAMatchError as e:
+        return False, e
+
+
+def _h3_turbo_keys(prefix: str = "") -> dict[str, torch.Tensor]:
+    """Realistic key shape from larryvrh/MiniMax-H3-Turbo-Lora (rank 64 backbone,
+    rank 16 AdaLN, PEFT lora_A/lora_B, no alpha tensors)."""
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        base = f"{prefix}blocks.{block}"
+        sd[f"{base}.attn.qkv_proj.lora_A.weight"] = _z(64, 5376)
+        sd[f"{base}.attn.qkv_proj.lora_B.weight"] = _z(3 * 5376, 64)
+        sd[f"{base}.attn.out_proj.lora_A.weight"] = _z(64, 7168)
+        sd[f"{base}.attn.out_proj.lora_B.weight"] = _z(5376, 64)
+        sd[f"{base}.mlp.fc1.lora_A.weight"] = _z(64, 5376)
+        sd[f"{base}.mlp.fc1.lora_B.weight"] = _z(2 * 14336, 64)
+        sd[f"{base}.mlp.fc2.lora_A.weight"] = _z(64, 14336)
+        sd[f"{base}.mlp.fc2.lora_B.weight"] = _z(5376, 64)
+        sd[f"{base}.adaln_proj.linear.lora_A.weight"] = _z(16, 2688)
+        sd[f"{base}.adaln_proj.linear.lora_B.weight"] = _z(96768, 16)
+    sd[f"{prefix}token_refiner.blocks.0.attn.qkv_proj.lora_A.weight"] = _z(64, 5376)
+    sd[f"{prefix}token_refiner.blocks.0.attn.qkv_proj.lora_B.weight"] = _z(3 * 5376, 64)
+    sd[f"{prefix}final_layer.adaln_proj.linear.lora_A.weight"] = _z(16, 2688)
+    sd[f"{prefix}final_layer.adaln_proj.linear.lora_B.weight"] = _z(10752, 16)
+    return sd
+
+
+def _h3_kohya_keys() -> dict[str, torch.Tensor]:
+    """Realistic key shape of a kohya / musubi-tuner H3 LoRA (flattened ``lora_unet_`` paths,
+    ``lora_down``/``lora_up`` plus ``.alpha``; attention + MLP only)."""
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        for module, out_features, in_features in (
+            ("attn_qkv_proj", 21504, 5376),
+            ("attn_out_proj", 5376, 7168),
+            ("mlp_fc1", 28672, 5376),
+            ("mlp_fc2", 5376, 14336),
+        ):
+            base = f"lora_unet_blocks_{block}_{module}"
+            sd[f"{base}.lora_down.weight"] = _z(16, in_features)
+            sd[f"{base}.lora_up.weight"] = _z(out_features, 16)
+            sd[f"{base}.alpha"] = torch.tensor(16.0)
+    return sd
+
+
+def _wan_native_keys() -> dict[str, torch.Tensor]:
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        for sub in ("self_attn", "cross_attn"):
+            for proj in ("q", "k", "v", "o"):
+                base = f"diffusion_model.blocks.{block}.{sub}.{proj}"
+                sd[f"{base}.lora_down.weight"] = _z(64, 5120)
+                sd[f"{base}.lora_up.weight"] = _z(5120, 64)
+    return sd
+
+
+def _anima_kohya_keys() -> dict[str, torch.Tensor]:
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        sd[f"lora_unet_blocks_{block}_cross_attn_q_proj.lora_down.weight"] = _z(16, 2048)
+        sd[f"lora_unet_blocks_{block}_cross_attn_q_proj.lora_up.weight"] = _z(2048, 16)
+        sd[f"lora_unet_blocks_{block}_mlp_layer1.lora_down.weight"] = _z(16, 2048)
+        sd[f"lora_unet_blocks_{block}_mlp_layer1.lora_up.weight"] = _z(8192, 16)
+    return sd
+
+
+@pytest.mark.parametrize("prefix", ["", "diffusion_model."])
+@pytest.mark.parametrize("with_alpha", [False, True], ids=["no-alpha", "per-layer-alpha"])
+def test_h3_lora_identifies_as_h3(prefix: str, with_alpha: bool):
+    sd = _h3_turbo_keys(prefix)
+    if with_alpha:
+        # ComfyUI-format H3 LoRAs: dotted lora_A/lora_B plus a per-layer alpha.
+        for key in [k for k in sd if k.endswith(".lora_A.weight")]:
+            sd[key.removesuffix("lora_A.weight") + "alpha"] = torch.tensor(8.0)
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert accepted, f"H3 probe rejected its own layout (prefix={prefix!r}): {result}"
+    assert result.base is BaseModelType.MiniMaxH3
+
+
+def test_h3_kohya_lora_identifies_as_h3():
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, _h3_kohya_keys())
+    assert accepted, f"H3 probe rejected the kohya layout: {result}"
+    assert result.base is BaseModelType.MiniMaxH3
+
+
+def test_h3_lora_rejected_by_other_probes():
+    for sd in (_h3_turbo_keys(), _h3_kohya_keys()):
+        for cls in (LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Krea2_Config):
+            accepted, result = _probe(cls, sd)
+            assert not accepted, f"{cls.__name__} wrongly accepted an H3 LoRA: {result}"
+
+
+def test_wan_lora_rejected_by_h3_probe():
+    sd = _wan_native_keys()
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted a Wan LoRA: {result}"
+    accepted, result = _probe(LoRA_LyCORIS_Wan_Config, sd)
+    assert accepted, f"Wan probe rejected its own layout: {result}"
+
+
+def test_anima_lora_rejected_by_h3_probe():
+    sd = _anima_kohya_keys()
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted an Anima LoRA: {result}"
+    accepted, result = _probe(LoRA_LyCORIS_Anima_Config, sd)
+    assert accepted, f"Anima probe rejected its own layout: {result}"
+
+
+def test_h3_probe_requires_lora_suffixes():
+    # A base-model checkpoint fragment (plain weights, no LoRA suffixes) must not probe as a LoRA.
+    sd = {
+        "blocks.0.attn.qkv_proj.weight": _z(3 * 5376, 5376),
+        "blocks.0.adaln_proj.linear.weight": _z(96768, 2688),
+    }
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted a non-LoRA state dict: {result}"
+
+
+def test_h3_probe_rejects_lycoris_variants():
+    # LoKR/LoHA/DoRA cannot be applied across H3's fused qkv/SwiGLU tensors — admitting them
+    # would install a model that crashes (or silently corrupts) at generation time.
+    lokr = {
+        "blocks.0.attn.qkv_proj.lokr_w1": _z(64, 64),
+        "blocks.0.attn.qkv_proj.lokr_w2": _z(252, 84),
+    }
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, lokr)
+    assert not accepted, f"H3 probe wrongly accepted a LoKR file: {result}"
+
+    dora = _h3_turbo_keys()
+    dora["blocks.0.attn.qkv_proj.dora_scale"] = _z(3 * 5376, 1)
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, dora)
+    assert not accepted, f"H3 probe wrongly accepted a DoRA file: {result}"
+
+
+def test_h3_probe_rejects_nested_prefixes():
+    # A nested prefix (diffusion_model.transformer.blocks...) survives the converter's single
+    # prefix-strip as a nonexistent module path — the LoRA would apply zero layers. Detection
+    # is anchored so such files are rejected instead of silently no-opping.
+    sd = _h3_turbo_keys("diffusion_model.transformer.")
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted nested-prefix keys: {result}"
+
+
+def test_h3_probe_rejects_already_diffusers_keys():
+    # v1 supports the published native layout only; diffusers-style transformer_blocks keys
+    # are deliberately rejected rather than half-converted.
+    sd = {
+        "transformer_blocks.0.attn.to_q.lora_A.weight": _z(64, 5376),
+        "transformer_blocks.0.attn.to_q.lora_B.weight": _z(5376, 64),
+    }
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe wrongly accepted diffusers-naming keys: {result}"
+
+
+def _malformed_h3_cases() -> list[tuple[str, dict[str, torch.Tensor]]]:
+    """Files with H3 keys whose layers the converter cannot apply as one complete low-rank pair."""
+    kohya_down_only = _h3_kohya_keys()
+    del kohya_down_only["lora_unet_blocks_0_attn_out_proj.lora_up.weight"]
+
+    dotted_a_only = _h3_turbo_keys()
+    del dotted_a_only["blocks.1.mlp.fc2.lora_B.weight"]
+
+    duplicate_spellings = _h3_turbo_keys()
+    duplicate_spellings["diffusion_model.blocks.0.attn.qkv_proj.lora_A.weight"] = _z(64, 5376)
+    duplicate_spellings["diffusion_model.blocks.0.attn.qkv_proj.lora_B.weight"] = _z(3 * 5376, 64)
+
+    dotted_and_kohya = _h3_kohya_keys()
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_down.weight"] = _z(16, 5376)
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_up.weight"] = _z(21504, 16)
+
+    mixed_spellings = _h3_turbo_keys()
+    mixed_spellings["lora_unet_blocks_0_attn_qkv_proj.lora_down.weight"] = _z(64, 5376)
+    mixed_spellings["lora_unet_blocks_0_attn_qkv_proj.lora_up.weight"] = _z(3 * 5376, 64)
+
+    peft_dora = _h3_turbo_keys()
+    peft_dora["blocks.0.attn.out_proj.lora_magnitude_vector.weight"] = _z(5376)
+
+    return [
+        ("kohya lora_down without lora_up", kohya_down_only),
+        ("dotted lora_A without lora_B", dotted_a_only),
+        ("layer with and without a PEFT prefix", duplicate_spellings),
+        ("layer both dotted and kohya-flattened", dotted_and_kohya),
+        ("layer with lora_A/lora_B and lora_down/lora_up", mixed_spellings),
+        ("PEFT DoRA magnitude", peft_dora),
+    ]
+
+
+@pytest.mark.parametrize(("case", "sd"), _malformed_h3_cases(), ids=[c for c, _ in _malformed_h3_cases()])
+def test_h3_probe_rejects_malformed_lora(case: str, sd: dict[str, torch.Tensor]):
+    # Each of these used to install as H3 and then fail (or silently drop tensors) at conversion.
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert not accepted, f"H3 probe accepted a malformed file ({case}): {result}"
+    assert "malformed MiniMax H3 LoRA" in str(result)
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_MiniMaxH3_Config._get_base_or_raise(_make_mod(Path(_TMP_DIR.name), sd))
+
+
+def test_h3_probe_accepts_kohya_pairs_with_and_without_alpha():
+    sd = _h3_kohya_keys()
+    del sd["lora_unet_blocks_0_attn_qkv_proj.alpha"]
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, sd)
+    assert accepted, f"H3 probe rejected a kohya file where only some layers carry alpha: {result}"

@@ -1,0 +1,187 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
+import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
+import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading } from '@invoke-ai/ui-library';
+import { getStore } from 'app/store/nanostores/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { getFocusedRegion } from 'common/hooks/focus';
+import { isVideoFile } from 'common/util/uploadMediaAccept';
+import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
+import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import { zUploadFile } from 'features/dnd/fullscreenDropzoneAccept';
+import type { DndTargetState } from 'features/dnd/types';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { uploadImages } from 'services/api/endpoints/images';
+import { uploadVideos } from 'services/api/endpoints/videos';
+import { useBoardName } from 'services/api/hooks/useBoardName';
+import type { UploadImageArg, UploadVideoArg } from 'services/api/types';
+import { z } from 'zod';
+
+const sx = {
+  position: 'absolute',
+  top: 2,
+  right: 2,
+  bottom: 2,
+  left: 2,
+  '&[data-dnd-state="idle"]': {
+    pointerEvents: 'none',
+  },
+} satisfies SystemStyleObject;
+
+export const FullscreenDropzone = memo(() => {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const [dndState, setDndState] = useState<DndTargetState>('idle');
+  const activeTab = useAppSelector(selectActiveTab);
+
+  const validateAndUploadFiles = useCallback(
+    (files: File[]) => {
+      const { getState } = getStore();
+      const parseResult = z.array(zUploadFile).safeParse(files);
+
+      if (!parseResult.success) {
+        // The fullscreen surface accepts videos too, so its invalid-upload message must
+        // mention MP4 (unlike image-only upload fields, which keep the image-only text).
+        const description = t('toast.uploadFailedInvalidMediaUploadDesc');
+
+        toast({
+          id: 'UPLOAD_FAILED',
+          title: t('toast.uploadFailed'),
+          description,
+          status: 'error',
+        });
+        return;
+      }
+
+      const focusedRegion = getFocusedRegion();
+
+      // While on the canvas tab and when pasting a single image (not a video — the canvas can't
+      // host videos), canvas may want to create a new layer. Let it handle the paste event.
+      const [firstFile] = files;
+      if (
+        focusedRegion === 'canvas' &&
+        activeTab === 'canvas' &&
+        files.length === 1 &&
+        firstFile &&
+        !isVideoFile(firstFile)
+      ) {
+        setFileToPaste(firstFile);
+        return;
+      }
+
+      const autoAddBoardId = selectAutoAddBoardId(getState());
+      const boardId = autoAddBoardId === 'none' ? undefined : autoAddBoardId;
+
+      // Split files by media type so each batch goes through its own uploader. Image and video
+      // uploaders are independent — they each update their own RTK cache + invalidate the gallery.
+      const imageFiles = files.filter((f) => !isVideoFile(f));
+      const videoFiles = files.filter((f) => isVideoFile(f));
+
+      if (imageFiles.length > 0) {
+        const imageUploadArgs: UploadImageArg[] = imageFiles.map((file, i) => ({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadImages(imageUploadArgs);
+      }
+
+      if (videoFiles.length > 0) {
+        const videoUploadArgs: UploadVideoArg[] = videoFiles.map((file, i) => ({
+          file,
+          video_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadVideos(videoUploadArgs);
+      }
+    },
+    [activeTab, t]
+  );
+
+  const onPaste = useCallback(
+    (e: ClipboardEvent) => {
+      if (!e.clipboardData?.files) {
+        return;
+      }
+      const files = Array.from(e.clipboardData.files);
+      validateAndUploadFiles(files);
+    },
+    [validateAndUploadFiles]
+  );
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+
+    return combine(
+      dropTargetForExternal({
+        element,
+        canDrop: containsFiles,
+        onDrop: ({ source }) => {
+          const files = getFiles({ source });
+          validateAndUploadFiles(files);
+        },
+        onDragEnter: () => {
+          setDndState('over');
+        },
+        onDragLeave: () => {
+          setDndState('idle');
+        },
+      }),
+      monitorForExternal({
+        canMonitor: containsFiles,
+        onDragStart: () => {
+          setDndState('potential');
+          preventUnhandled.start();
+        },
+        onDrop: () => {
+          setDndState('idle');
+          preventUnhandled.stop();
+        },
+      })
+    );
+  }, [validateAndUploadFiles]);
+
+  useEffect(() => {
+    window.addEventListener('paste', onPaste);
+
+    return () => {
+      window.removeEventListener('paste', onPaste);
+    };
+  }, [onPaste]);
+
+  return (
+    <Box ref={ref} data-dnd-state={dndState} sx={sx}>
+      <DndDropOverlay dndState={dndState} label={<DropLabel />} />
+    </Box>
+  );
+});
+
+FullscreenDropzone.displayName = 'FullscreenDropzone';
+
+const DropLabel = memo(() => {
+  const { t } = useTranslation();
+  const boardId = useAppSelector(selectAutoAddBoardId);
+  const boardName = useBoardName(boardId);
+
+  return (
+    <Flex flexDir="column" gap={4} color="base.100" alignItems="center">
+      <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
+      <Heading size="md">{t('toast.itemsWillBeAddedTo', { boardName })}</Heading>
+    </Flex>
+  );
+});
+
+DropLabel.displayName = 'DropLabel';

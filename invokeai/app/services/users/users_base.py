@@ -1,6 +1,7 @@
 """Abstract base class for user service."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from invokeai.app.services.users.users_common import UserCreateRequest, UserDTO, UserUpdateRequest
 
@@ -38,6 +39,18 @@ class UserServiceBase(ABC):
         pass
 
     @abstractmethod
+    def get_many(self, user_ids: Sequence[str]) -> dict[str, UserDTO]:
+        """Get several users at once.
+
+        Args:
+            user_ids: The user IDs to look up. Duplicates are collapsed.
+
+        Returns:
+            A dict keyed by user_id; ids with no matching user are absent.
+        """
+        pass
+
+    @abstractmethod
     def get_by_email(self, email: str) -> UserDTO | None:
         """Get user by email.
 
@@ -64,6 +77,8 @@ class UserServiceBase(ABC):
 
         Raises:
             ValueError: If user not found or (when strict) password is weak
+            LastAdministratorError: If demoting or deactivating this user would leave the
+                instance with no active administrator
         """
         pass
 
@@ -76,6 +91,8 @@ class UserServiceBase(ABC):
 
         Raises:
             ValueError: If user not found
+            LastAdministratorError: If deleting this user would leave the instance with no
+                active administrator
         """
         pass
 
@@ -137,6 +154,15 @@ class UserServiceBase(ABC):
 
         Returns:
             Email address of the first active admin, or None if no admin exists
+        """
+        pass
+
+    @abstractmethod
+    def has_single_user_work(self) -> bool:
+        """Whether work made in single-user mode exists that no signed-in account sees.
+
+        Returns:
+            True if the internal `system` account owns a project, wildcard, private template or private font
         """
         pass
 

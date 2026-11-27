@@ -1,3 +1,4 @@
+import os
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,6 +19,10 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
 
 _ZIP_STREAM_CHUNK_SIZE = 1024 * 1024  # 1 MiB copy buffer for streaming remote objects into the zip
+# Board names may be far longer than a filename allows. The archive name is "<board name>_<uuid>.zip", which must stay
+# within the 255-byte filename limit and, on Windows without long paths, MAX_PATH including the temp-dir prefix. The
+# uuid keeps truncated names unique.
+MAX_BOARD_NAME_BYTES = 100
 
 
 class BulkDownloadService(BulkDownloadBase):
@@ -37,6 +42,7 @@ class BulkDownloadService(BulkDownloadBase):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        uncategorized_owner_id: Optional[str] = None,
     ) -> None:
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
         bulk_download_item_id = bulk_download_item_id or uuid_string()
@@ -51,7 +57,7 @@ class BulkDownloadService(BulkDownloadBase):
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                image_dtos = self._board_handler(board_id)
+                image_dtos = self._board_handler(board_id, uncategorized_owner_id)
             elif image_names:
                 image_dtos = self._image_handler(image_names)
             else:
@@ -74,11 +80,14 @@ class BulkDownloadService(BulkDownloadBase):
     def _image_handler(self, image_names: list[str]) -> list[ImageDTO]:
         return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
-    def _board_handler(self, board_id: str) -> list[ImageDTO]:
+    def _board_handler(self, board_id: str, uncategorized_owner_id: Optional[str]) -> list[ImageDTO]:
+        # "none" spans every account's uncategorized images, so it is scoped to the owner. A real board was
+        # authorized as a whole, so a shared board keeps every contributor's images.
         image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(
             board_id,
             categories=None,
             is_intermediate=None,
+            user_id=uncategorized_owner_id if board_id == "none" else None,
         )
         return self._image_handler(image_names)
 
@@ -89,7 +98,9 @@ class BulkDownloadService(BulkDownloadBase):
         if board_id == "none":
             return "Uncategorized"
 
-        return self._clean_string_to_path_safe(self._invoker.services.board_records.get(board_id).board_name)
+        clean_name = self._clean_string_to_path_safe(self._invoker.services.board_records.get(board_id).board_name)
+        # Cut by UTF-8 bytes (the filesystem limit) without splitting a character; a cut can leave trailing spaces.
+        return clean_name.encode("utf-8")[:MAX_BOARD_NAME_BYTES].decode("utf-8", "ignore").rstrip()
 
     def _create_zip_file(self, image_dtos: list[ImageDTO], bulk_download_item_id: str) -> str:
         """
@@ -101,29 +112,35 @@ class BulkDownloadService(BulkDownloadBase):
         zip_file_name = bulk_download_item_id + ".zip"
         zip_file_path = self._bulk_downloads_folder / (zip_file_name)
 
+        # Clients poll for the final name, so it must only appear once the archive is complete. The ".partial" name
+        # fails get_path's ".zip" check, and the rename within the same folder is atomic. The temp name is short and
+        # independent of the item id, so it never adds to the archive name's length.
+        partial_path = self._bulk_downloads_folder / f"{uuid_string()}.zip.partial"
         image_files = self._invoker.services.image_files
-        with ZipFile(zip_file_path, "w") as zip_file:
-            for image_dto in image_dtos:
-                image_zip_path = Path(image_dto.image_category.value) / image_dto.image_name
-                # POSIX form so zip entry names use "/" on every platform (on Windows
-                # str(Path) would otherwise yield backslashes, which are non-portable).
-                arcname = image_zip_path.as_posix()
-                local_path = image_files.get_local_path(image_dto.image_name, image_subfolder=image_dto.image_subfolder)
-                # get_local_path() does not verify existence, so confirm the file is
-                # really present before ZipFile.write() (which would raise
-                # FileNotFoundError); otherwise fall through to the streaming path.
-                if local_path is not None and local_path.is_file():
-                    # Local backend (disk): stream the file straight into the zip.
-                    zip_file.write(local_path, arcname=arcname)
-                else:
-                    # Remote backend (e.g. S3), or a disk path whose file is missing:
-                    # stream the object into the zip in chunks instead of buffering.
-                    src = image_files.open_stream(image_dto.image_name, image_subfolder=image_dto.image_subfolder)
-                    try:
-                        with zip_file.open(arcname, "w") as dst:
-                            shutil.copyfileobj(src, dst, length=_ZIP_STREAM_CHUNK_SIZE)
-                    finally:
-                        src.close()
+        try:
+            with ZipFile(partial_path, "w") as zip_file:
+                for image_dto in image_dtos:
+                    image_zip_path = Path(image_dto.image_category.value) / image_dto.image_name
+                    # POSIX form so zip entry names use "/" on every platform.
+                    arcname = image_zip_path.as_posix()
+                    local_path = image_files.get_local_path(
+                        image_dto.image_name, image_subfolder=image_dto.image_subfolder
+                    )
+                    if local_path is not None and local_path.is_file():
+                        zip_file.write(local_path, arcname=arcname)
+                    else:
+                        # Remote backend (e.g. S3), or a disk path whose file is missing: stream the object into the
+                        # zip in chunks instead of buffering it.
+                        src = image_files.open_stream(image_dto.image_name, image_subfolder=image_dto.image_subfolder)
+                        try:
+                            with zip_file.open(arcname, "w") as dst:
+                                shutil.copyfileobj(src, dst, length=_ZIP_STREAM_CHUNK_SIZE)
+                        finally:
+                            src.close()
+            os.replace(partial_path, zip_file_path)
+        except BaseException:
+            partial_path.unlink(missing_ok=True)
+            raise
 
         return str(zip_file_name)
 

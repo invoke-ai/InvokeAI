@@ -20,8 +20,9 @@ class BoardImagesServiceABC(ABC):
     def remove_image_from_board(
         self,
         image_name: str,
-    ) -> None:
-        """Removes an image from a board."""
+        board_id: str,
+    ) -> int:
+        """Removes an image from the given board. Returns the number of rows removed."""
         pass
 
     @abstractmethod
@@ -30,8 +31,13 @@ class BoardImagesServiceABC(ABC):
         board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
+        user_id: Optional[str] = None,
     ) -> list[str]:
-        """Gets all board images for a board, as a list of the image names."""
+        """Gets all board images for a board, as a list of the image names.
+
+        When ``user_id`` is provided, results are restricted to images owned by that user;
+        pass ``None`` for the admin path (no per-user restriction).
+        """
         pass
 
     @abstractmethod

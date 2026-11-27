@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from PIL import Image
 from PIL.Image import Image as PILImageType
@@ -41,9 +42,10 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
         except Exception as e:
             raise WorkflowThumbnailFileSaveException from e
 
-    def get_path(self, workflow_id: str, with_hash: bool = True) -> Path:
-        workflow = self._invoker.services.workflow_records.get(workflow_id).workflow
-        if workflow.meta.category is WorkflowCategory.Default:
+    def get_path(self, workflow_id: str, with_hash: bool = True, category: Optional[WorkflowCategory] = None) -> Path:
+        if category is None:
+            category = self._invoker.services.workflow_records.get(workflow_id).workflow.meta.category
+        if category == WorkflowCategory.Default:
             default_thumbnails_dir = Path(__file__).parent / Path("default_workflow_thumbnails")
             path = default_thumbnails_dir / (workflow_id + ".png")
         else:
@@ -51,8 +53,10 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
 
         return path
 
-    def get_url(self, workflow_id: str, with_hash: bool = True) -> str | None:
-        path = self.get_path(workflow_id)
+    def get_url(
+        self, workflow_id: str, with_hash: bool = True, category: Optional[WorkflowCategory] = None
+    ) -> str | None:
+        path = self.get_path(workflow_id, category=category)
         if not self._validate_path(path):
             return
 

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln Stein (https://github.com/lstein) and the InvokeAI Development Team
-
 """
 Base class for the InvokeAI configuration system.
 It defines a type of pydantic BaseSettings object that

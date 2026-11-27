@@ -5,10 +5,16 @@ import torch
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.param_shape_utils import get_param_shape
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 class CustomModuleMixin:
     """A mixin class for custom modules that enables device autocasting of module parameters."""
+
+    # Whether a partially loaded model may leave this module's weights in RAM and stream them per forward. A
+    # wrapper that exists for its sidecar patches can opt out; its weights then stay required on the device,
+    # as they were before it was wrapped.
+    streams_weights: bool = True
 
     def __init__(self):
         self._device_autocasting_enabled = False
@@ -57,6 +63,8 @@ class CustomModuleMixin:
             elif type(param) is GGMLTensor:
                 # Move to device and dequantize here. Doing it in the patch layer can result in redundant casts /
                 # dequantizations.
+                orig_params[param_name] = param.to(device=device).get_dequantized_tensor()
+            elif type(param) is SDNQTensor:
                 orig_params[param_name] = param.to(device=device).get_dequantized_tensor()
             else:
                 orig_params[param_name] = torch.empty(get_param_shape(param), device="meta")

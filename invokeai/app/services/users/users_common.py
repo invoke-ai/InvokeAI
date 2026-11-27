@@ -5,6 +5,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
+# The longest address SMTP carries (RFC 5321), and the longest email-validator accepts.
+MAX_EMAIL_LENGTH = 254
+
 
 def validate_email_with_special_domains(email: str) -> str:
     """Validate email address, allowing special-use domains like .local for testing.
@@ -55,6 +58,13 @@ def validate_email_with_special_domains(email: str) -> str:
                     "Email address must have both local and domain parts",
                 )
 
+            # email-validator stops before its length check when it refuses the domain.
+            if len(email) > MAX_EMAIL_LENGTH:
+                raise PydanticCustomError(
+                    "value_error",
+                    f"Email address must be at most {MAX_EMAIL_LENGTH} characters",
+                )
+
             # Allow localhost and domains with dots
             if domain == "localhost" or "." in domain:
                 return email
@@ -82,6 +92,9 @@ class UserDTO(BaseModel):
     created_at: datetime = Field(description="When the user was created")
     updated_at: datetime = Field(description="When the user was last updated")
     last_login_at: datetime | None = Field(default=None, description="When user last logged in")
+    token_epoch: int = Field(
+        default=0, description="Revocation epoch; tokens minted before the current value are rejected"
+    )
 
     @field_validator("email")
     @classmethod
@@ -112,3 +125,32 @@ class UserUpdateRequest(BaseModel):
     password: str | None = Field(default=None, description="New password")
     is_admin: bool | None = Field(default=None, description="Whether user should have admin privileges")
     is_active: bool | None = Field(default=None, description="Whether user account should be active")
+
+
+LAST_ADMIN_DETAIL = "Cannot remove the last administrator"
+
+
+class LastAdministratorError(ValueError):
+    """Raised when a change would leave the instance with no active administrator.
+
+    Subclasses :class:`ValueError` so that callers which already map service-layer
+    ``ValueError`` to a 400 keep working unchanged.
+    """
+
+
+# Owner of everything that predates multiuser support (created by migration_27). Not a
+# login account: it is seeded with an empty password hash, `UserService.authenticate`
+# refuses it outright whatever the row holds, `resolve_authorized_user` refuses any token
+# already carrying it, and it is hidden from the user list.
+SYSTEM_USER_ID = "system"
+SYSTEM_USER_PROTECTED_DETAIL = (
+    "The system user cannot be deleted, deactivated, promoted to administrator, or given a password"
+)
+
+
+class SystemUserProtectedError(ValueError):
+    """Raised when a change would delete, disable, or weaponize the ``system`` account.
+
+    Subclasses :class:`ValueError` for the same reason as
+    :class:`LastAdministratorError`.
+    """

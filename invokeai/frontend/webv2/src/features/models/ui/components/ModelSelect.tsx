@@ -1,0 +1,664 @@
+/* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
+import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { PickerGroup, PickerOptionState, PickerStatus } from '@platform/ui/Picker';
+import type { ReactNode } from 'react';
+
+import {
+  Badge,
+  Box,
+  HStack,
+  Icon,
+  Image,
+  Popover,
+  Portal,
+  Spacer,
+  Stack,
+  Text,
+  useFieldContext,
+  VisuallyHidden,
+} from '@chakra-ui/react';
+import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
+import { getModelPickerGroups, getQualifyingType, hasModelPickerCandidates } from '@features/models/core/library';
+import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
+import { getModelImageUrl } from '@features/models/data/api';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
+import { openModelManager } from '@features/models/ui/openModelManager';
+import { setPickerBaseFilters, setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
+import { formatBytes } from '@platform/i18n/languages';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { areArraysEqual } from '@platform/state/selectors';
+import { Button, CloseButton, IconButton, PopoverContent, Tooltip } from '@platform/ui';
+import { FieldInsideLabel, INSIDE_LABEL_INSET, useFieldLabelId, useInsideFieldLabel } from '@platform/ui/Field';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Picker } from '@platform/ui/Picker';
+import { Link } from '@tanstack/react-router';
+import { dropdownContent } from '@theme/recipes';
+import {
+  BoxIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
+  LinkIcon,
+  RotateCcwIcon,
+  XIcon,
+} from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const EMPTY_BASES: ReadonlySet<string> = new Set();
+const EMPTY_BASE_LIST: readonly string[] = [];
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
+
+const getOptionId = (model: ModelConfig): string => model.key;
+
+/** Load and subscribe to relationships only when the picker opens to keep it outside the editor's initial graph. */
+const useLazyRelatedModelKeys = (modelKey: string | null): readonly string[] | null => {
+  const [relatedKeys, setRelatedKeys] = useState<readonly string[] | null>(null);
+
+  useEffect(() => {
+    if (modelKey === null) {
+      // eslint-disable-next-line react/set-state-in-effect
+      setRelatedKeys(null);
+      return;
+    }
+
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+
+    void import('@features/models/data/relationshipsStore').then((relationships) => {
+      if (disposed) {
+        return;
+      }
+
+      const read = (): void => {
+        const entry = relationships.getRelationshipsSnapshot().relatedKeysByModelKey[modelKey] ?? null;
+        setRelatedKeys((previous) =>
+          previous !== null && entry !== null && areArraysEqual(previous, entry) ? previous : entry
+        );
+      };
+
+      unsubscribe = relationships.subscribeToRelationships(read);
+      read();
+      // A missing relationship list is not worth surfacing; the picker just loses its pinning.
+      relationships.ensureRelatedModelKeysLoaded(modelKey).catch(() => {});
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+      setRelatedKeys(null);
+    };
+  }, [modelKey]);
+
+  return relatedKeys;
+};
+
+export const ModelSelect = ({
+  className,
+  disabled,
+  excludeKeys,
+  filter,
+  id,
+  installAction = false,
+  invalid,
+  isClearable = false,
+  missingLabel,
+  modelTypes,
+  onChange,
+  onOpen,
+  onPickerClose,
+  pendingCandidates,
+  pickerHeader,
+  placeholder,
+  relatedTo = null,
+  scopeLabel: scopeLabelOverride,
+  showManagerButton = true,
+  size = 'md',
+  value,
+}: {
+  className?: string;
+  disabled?: boolean;
+  excludeKeys?: ReadonlySet<string>;
+  filter?: (model: ModelConfig) => boolean;
+  id?: string;
+  /**
+   * With nothing of `modelTypes` installed, offer the way to install one under the picker: the Model Manager filtered
+   * to the first type, or, for users who cannot manage models, who to ask. For pickers a form cannot run without.
+   */
+  installAction?: boolean;
+  invalid?: boolean;
+  isClearable?: boolean;
+  /**
+   * Shown instead of the placeholder when `value` names a model the library does not hold (deleted since it was
+   * saved), so a broken selection reads differently from an empty one; it stays clearable.
+   */
+  missingLabel?: string;
+  modelTypes: readonly ModelTaxonomyType[];
+  onChange: (model: ModelConfig | null) => void;
+  /** Called as the picker opens, e.g. to load what `filter` reads. */
+  onOpen?: () => void;
+  onPickerClose?: () => void;
+  /**
+   * Candidates `filter` cannot decide yet, e.g. while the data it reads loads or after that load failed. Keeps the
+   * trigger usable with no decided candidate, and shows this status in the list.
+   */
+  pendingCandidates?: PickerStatus;
+  pickerHeader?: ReactNode;
+  placeholder?: string;
+  /** Key of the model whose links rank this picker: its related models come first and carry a link icon. */
+  relatedTo?: string | null;
+  /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
+  scopeLabel?: string;
+  showManagerButton?: boolean;
+  size?: 'md' | 'lg' | 'xl';
+  value: string | null;
+}) => {
+  const { t } = useTranslation();
+  const { enableModelDescriptions } = useModelsUi();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  const loadError = useModelsSelector((snapshot) => snapshot.error);
+  const loadStatus = useModelsSelector((snapshot) => snapshot.status);
+  const [isOpen, setIsOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
+  const field = useFieldContext();
+  const insideLabel = useInsideFieldLabel();
+  const fieldLabelId = useFieldLabelId() ?? insideLabel?.id ?? null;
+  const valueTextId = useId();
+  const isDisabled = Boolean(disabled || field?.disabled);
+  const isInvalid = Boolean(invalid || field?.invalid);
+  const [lastDisabled, setLastDisabled] = useState(isDisabled);
+
+  const pickerId = id ?? `models:${modelTypes.join('+')}`;
+  const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
+  const rememberedBases = useModelsUiSelector((snapshot) => snapshot.pickerBaseFilters[pickerId] ?? EMPTY_BASE_LIST);
+  const selectedBases = useMemo<ReadonlySet<string>>(() => new Set(rememberedBases), [rememberedBases]);
+  const setSelectedBases = useCallback(
+    (bases: ReadonlySet<string>) => setPickerBaseFilters(pickerId, [...bases]),
+    [pickerId]
+  );
+  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? relatedTo : null);
+  const relatedToName = useModelsSelector((snapshot) =>
+    relatedTo === null ? null : (snapshot.modelsByKey.get(relatedTo)?.name ?? null)
+  );
+  const relatedKeys = useMemo<ReadonlySet<string>>(
+    () => (relatedKeyList ? new Set(relatedKeyList) : EMPTY_KEYS),
+    [relatedKeyList]
+  );
+
+  useMountEffect(() => {
+    void ensureModelsLoaded();
+  });
+
+  // Disable empty-library triggers after loading; preserve clearing for stale selections.
+  const hasCandidates = useMemo(
+    () =>
+      loadStatus !== 'loaded' ||
+      pendingCandidates !== undefined ||
+      hasModelPickerCandidates(models, { excludeKeys, filter, modelTypes }),
+    [excludeKeys, filter, loadStatus, modelTypes, models, pendingCandidates]
+  );
+  const isEmpty = !hasCandidates && !value;
+  // Every compatible model is already chosen elsewhere, which is not the same as none being installed.
+  const isAllExcluded = useMemo(
+    () => isEmpty && Boolean(excludeKeys?.size) && hasModelPickerCandidates(models, { filter, modelTypes }),
+    [excludeKeys, filter, isEmpty, modelTypes, models]
+  );
+  const isInert = isDisabled || isEmpty;
+
+  // Disabling closes an open picker. Running out of candidates does not: the list says so, and the user closes it, so
+  // a load that admits nothing never snaps the popup shut under them.
+  if (isDisabled !== lastDisabled) {
+    setLastDisabled(isDisabled);
+
+    if (isDisabled) {
+      setIsOpen(false);
+    }
+  }
+
+  const { availableBases, candidates, groups } = useMemo(
+    () =>
+      isOpen
+        ? getModelPickerGroups(models, {
+            baseFilter: selectedBases,
+            excludeKeys,
+            filter,
+            modelTypes,
+            relatedKeys,
+          })
+        : { availableBases: [], candidates: [], groups: [] },
+    [excludeKeys, filter, isOpen, modelTypes, models, relatedKeys, selectedBases]
+  );
+
+  const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
+  // The type a candidate qualifies as in this picker: its primary type, else the first role type asked for.
+  const effectiveType = useCallback((model: ModelConfig) => getQualifyingType(model, modelTypes), [modelTypes]);
+  const hasMixedTypes = useMemo(() => new Set(candidates.map(effectiveType)).size > 1, [candidates, effectiveType]);
+  const scopeLabel =
+    scopeLabelOverride ??
+    (modelTypes.length === 1
+      ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase()
+      : t('models.scopeModels'));
+  const listLabel = t('models.scopeAvailable', { scope: scopeLabel });
+  const emptyMessage = isAllExcluded
+    ? t('models.scopeAllAdded', { scope: scopeLabel })
+    : t('models.scopeNoCompatibleInstalled', { scope: scopeLabel });
+
+  const pickerGroups = useMemo<PickerGroup<ModelConfig>[]>(
+    () =>
+      groups.map((group) => ({
+        colorPalette: getModelBaseColorPalette(group.base),
+        getCountLabel: (count) => t('models.modelCount', { count }),
+        id: group.key,
+        name: getModelBaseLongLabel(group.base),
+        options: group.models,
+        shortName: getModelBaseLabel(group.base),
+      })),
+    [groups, t]
+  );
+
+  const toggleBase = (base: string) => {
+    const next = new Set(selectedBases);
+
+    if (next.has(base)) {
+      next.delete(base);
+    } else {
+      next.add(base);
+    }
+
+    setSelectedBases(next);
+  };
+  const selectModel = (model: ModelConfig) => {
+    onChange(model);
+    setIsOpen(false);
+    onPickerClose?.();
+  };
+  const canClear = isClearable && Boolean(value);
+  // A model whose files are gone is listed but cannot be used: where a label is given, it shows that instead.
+  const missingText =
+    value && loadStatus === 'loaded' && (!selectedModel || selectedModel.is_missing) ? missingLabel : undefined;
+
+  const renderOption = useCallback(
+    (model: ModelConfig, state: PickerOptionState) => (
+      <ModelOptionContent
+        enableDescription={enableModelDescriptions}
+        isRelated={relatedKeys.has(model.key)}
+        relatedToName={relatedToName}
+        model={model}
+        showType={hasMixedTypes}
+        state={state}
+        type={effectiveType(model)}
+      />
+    ),
+    [effectiveType, enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
+  );
+
+  return (
+    <Box className={className} minW="0" w="full">
+      <Popover.Root
+        initialFocusEl={() => contentRef.current?.querySelector<HTMLInputElement>('input[role="combobox"]') ?? null}
+        ids={id ? { trigger: id } : undefined}
+        // Like Select: closed pickers hold no list, virtualizer or observers, and each open starts a fresh search.
+        lazyMount
+        open={isOpen}
+        positioning={{
+          fitViewport: true,
+          gutter: 4,
+          hideWhenDetached: true,
+          overflowPadding: 8,
+          placement: 'bottom-start',
+          sameWidth: true,
+          strategy: 'fixed',
+        }}
+        unmountOnExit
+        onOpenChange={(event) => {
+          if (event.open && isInert) {
+            setIsOpen(false);
+            return;
+          }
+
+          if (event.open) {
+            onOpen?.();
+          }
+
+          setIsOpen(event.open);
+          if (!event.open) {
+            onPickerClose?.();
+          }
+        }}
+      >
+        <Box minW="0" position="relative" w="full">
+          <Popover.Trigger asChild>
+            <Button
+              aria-describedby={field?.ariaDescribedby}
+              aria-haspopup="listbox"
+              aria-invalid={isInvalid || undefined}
+              // As on Select's trigger: the field label names the control, and the current choice follows as its value.
+              aria-labelledby={fieldLabelId ? `${fieldLabelId} ${valueTextId}` : undefined}
+              className={className}
+              borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
+              colorPalette={isInvalid ? 'red' : 'gray'}
+              // Opening it puts the caret in a search box, so it points like a combobox's input does.
+              cursor={isInert ? undefined : 'text'}
+              // An open picker keeps its trigger enabled so it can show why nothing is left to pick.
+              disabled={isInert && !isOpen}
+              // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its
+              // own.
+              fontWeight={insideLabel ? 'normal' : undefined}
+              justifyContent="space-between"
+              minW="0"
+              pe={canClear ? '7' : '2'}
+              ps={insideLabel ? INSIDE_LABEL_INSET : '2'}
+              size={size}
+              transitionDuration="fast"
+              transitionProperty="border-color, background"
+              variant="outline"
+              w="full"
+              _hover={{
+                bg: 'transparent',
+                borderColor: isInvalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
+              }}
+            >
+              {insideLabel ? <FieldInsideLabel label={insideLabel} /> : null}
+              {selectedModel && !missingText ? (
+                <ModelButtonContent id={valueTextId} isEndAligned={Boolean(insideLabel)} model={selectedModel} />
+              ) : (
+                <Text
+                  as="span"
+                  id={valueTextId}
+                  color={missingText ? 'fg.warning' : 'fg.muted'}
+                  flex={insideLabel ? '1' : undefined}
+                  minW="0"
+                  textAlign={insideLabel ? 'end' : undefined}
+                  title={missingText}
+                  truncate
+                >
+                  {missingText ??
+                    (isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel })))}
+                </Text>
+              )}
+              {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
+            </Button>
+          </Popover.Trigger>
+          {canClear ? (
+            <CloseButton
+              aria-label={t('models.clearSelectedModel')}
+              disabled={isDisabled}
+              insetEnd="1"
+              position="absolute"
+              size="sm"
+              top="50%"
+              transform="translateY(-50%)"
+              zIndex="1"
+              onClick={(event) => {
+                event.stopPropagation();
+                onChange(null);
+                setIsOpen(false);
+              }}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <XIcon />
+            </CloseButton>
+          ) : null}
+        </Box>
+        <Portal>
+          <Popover.Positioner>
+            <PopoverContent
+              ref={contentRef}
+              aria-label={listLabel}
+              css={dropdownContent}
+              maxH="min(24rem, var(--available-height))"
+              maxW="min(26rem, calc(100vw - 1rem))"
+              minW="min(20rem, calc(100vw - 1rem))"
+              overflow="hidden"
+              p="0"
+              showArrow={false}
+            >
+              {pickerHeader}
+              <Picker<ModelConfig>
+                emptyMessage={emptyMessage}
+                getOptionId={getOptionId}
+                groups={pickerGroups}
+                isCompact={isCompact}
+                isMatch={matchesModel}
+                listLabel={listLabel}
+                pending={pendingCandidates}
+                noMatchesMessage={
+                  selectedBases.size > 0
+                    ? t('models.scopeNoMatchBases', { scope: scopeLabel })
+                    : t('models.scopeNoMatchSearch', { scope: scopeLabel })
+                }
+                renderOption={renderOption}
+                searchPlaceholder={t('models.scopeSearch', { scope: scopeLabel })}
+                searchSlot={
+                  <>
+                    <CompactViewToggle isCompact={isCompact} pickerId={pickerId} />
+                    {showManagerButton ? <ModelManagerLinkButton /> : null}
+                  </>
+                }
+                selectedId={value}
+                status={
+                  loadStatus === 'idle' || loadStatus === 'loading'
+                    ? { message: t('models.loadingModels') }
+                    : loadStatus === 'error'
+                      ? {
+                          isError: true,
+                          message: loadError ?? t('models.failedToLoadModels'),
+                          onRetry: () => void ensureModelsLoaded(),
+                        }
+                      : undefined
+                }
+                toolbarSlot={
+                  availableBases.length >= 2 ? (
+                    <HStack alignItems="center" flexWrap="wrap" gap="1">
+                      {availableBases.map((base) => (
+                        <BaseChip key={base} base={base} isSelected={selectedBases.has(base)} onToggle={toggleBase} />
+                      ))}
+                      <Spacer />
+                      <IconButton
+                        aria-label={t('models.resetBaseFilters')}
+                        flexShrink={0}
+                        opacity={selectedBases.size === 0 ? 0.5 : undefined}
+                        pointerEvents={selectedBases.size === 0 ? 'none' : undefined}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setSelectedBases(EMPTY_BASES)}
+                      >
+                        <Icon as={RotateCcwIcon} boxSize="3" />
+                      </IconButton>
+                    </HStack>
+                  ) : null
+                }
+                onSelect={selectModel}
+              />
+            </PopoverContent>
+          </Popover.Positioner>
+        </Portal>
+      </Popover.Root>
+      {installAction && isEmpty && !isAllExcluded && loadStatus === 'loaded' && modelTypes[0] ? (
+        <ModelInstallAction modelType={modelTypes[0]} />
+      ) : null}
+    </Box>
+  );
+};
+
+/** Whether any installed model fits a picker with these options; null until the library has loaded. */
+export const useHasModelPickerCandidates = (
+  options: Pick<Parameters<typeof hasModelPickerCandidates>[1], 'filter' | 'modelTypes'>
+): boolean | null =>
+  useModelsSelector((snapshot) =>
+    snapshot.status === 'loaded' ? hasModelPickerCandidates(snapshot.models, options) : null
+  );
+
+const ModelInstallAction = ({ modelType }: { modelType: ModelTaxonomyType }) => {
+  const { t } = useTranslation();
+  const { canManageModels, managerProjectId } = useModelsUi();
+
+  if (!canManageModels) {
+    return (
+      <Text color="fg.muted" fontSize="xs" mt="1.5">
+        {t('models.askAdminToInstall')}
+      </Text>
+    );
+  }
+
+  const openManager = () => openModelManager({ modelType, projectId: managerProjectId });
+
+  return (
+    <Button mt="1.5" size="sm" variant="outline" onClick={openManager}>
+      <Icon as={DownloadIcon} boxSize="3.5" />
+      {t('models.installAModel')}
+    </Button>
+  );
+};
+
+const matchesModel = (model: ModelConfig, searchTerm: string): boolean => {
+  const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = `${model.name} ${model.base} ${model.type} ${model.description ?? ''}`.toLowerCase();
+
+  return terms.every((term) => haystack.includes(term));
+};
+
+const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; pickerId: string }) => {
+  const { t } = useTranslation();
+  const label = isCompact ? t('models.fullRows') : t('models.compactRows');
+  const handleClick = useCallback(() => setPickerCompactView(pickerId, !isCompact), [isCompact, pickerId]);
+
+  return (
+    <Tooltip content={label} showArrow>
+      <IconButton aria-label={label} aria-pressed={isCompact} flexShrink={0} variant="ghost" onClick={handleClick}>
+        <Icon as={isCompact ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3.5" />
+      </IconButton>
+    </Tooltip>
+  );
+};
+
+const ModelManagerLinkButton = () => {
+  const { t } = useTranslation();
+  const { managerProjectId } = useModelsUi();
+  const search = useMemo(() => ({ project: managerProjectId ?? undefined }), [managerProjectId]);
+
+  return (
+    <Tooltip content={t('models.manageModels')} showArrow>
+      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} variant="ghost">
+        <Link search={search} to="/models">
+          <BoxIcon />
+        </Link>
+      </IconButton>
+    </Tooltip>
+  );
+};
+
+const BaseChip = ({
+  base,
+  isSelected,
+  onToggle,
+}: {
+  base: string;
+  isSelected: boolean;
+  onToggle: (base: string) => void;
+}) => (
+  <Badge
+    aria-pressed={isSelected}
+    colorPalette={getModelBaseColorPalette(base)}
+    fontSize="xs"
+    role="button"
+    size="lg"
+    tabIndex={0}
+    userSelect="none"
+    variant={isSelected ? 'solid' : 'surface'}
+    onClick={(event) => {
+      event.stopPropagation();
+      onToggle(base);
+    }}
+    onKeyDown={(event) => {
+      event.stopPropagation();
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onToggle(base);
+      }
+    }}
+  >
+    {getModelBaseLabel(base)}
+  </Badge>
+);
+
+const ModelButtonContent = ({ id, isEndAligned, model }: { id: string; isEndAligned: boolean; model: ModelConfig }) => (
+  <HStack as="span" id={id} flex="1" gap="2" justify={isEndAligned ? 'flex-end' : undefined} minW="0">
+    <MiddleTruncate as="span" minW="0" text={model.name} />
+    <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
+      {getModelBaseLabel(model.base)}
+    </Badge>
+  </HStack>
+);
+
+const ModelOptionContent = ({
+  enableDescription,
+  isRelated,
+  model,
+  relatedToName,
+  showType,
+  state,
+  type,
+}: {
+  enableDescription: boolean;
+  isRelated: boolean;
+  model: ModelConfig;
+  relatedToName: string | null;
+  showType: boolean;
+  state: PickerOptionState;
+  type: ModelTaxonomyType;
+}) => {
+  const { t } = useTranslation();
+  const linkedLabel =
+    relatedToName === null ? t('models.linkedModel') : t('models.linkedToModel', { name: relatedToName });
+  const showDetail = !state.isCompact;
+
+  return (
+    <HStack gap="2" minW="0" textAlign="left" w="full">
+      <Icon
+        as={CheckIcon}
+        aria-hidden
+        boxSize="3"
+        color="accent.solid"
+        flexShrink={0}
+        opacity={state.isSelected ? 1 : 0}
+      />
+      {showDetail && model.cover_image ? (
+        <Image alt="" boxSize="8" flexShrink={0} objectFit="cover" rounded="sm" src={getModelImageUrl(model.key)} />
+      ) : null}
+      <Stack flex="1" gap="0" minW="0">
+        <HStack gap="1.5" minW="0">
+          {isRelated ? (
+            <Tooltip content={linkedLabel}>
+              <Icon as={LinkIcon} aria-hidden boxSize="3" color="accent.solid" flexShrink={0} />
+            </Tooltip>
+          ) : null}
+          <MiddleTruncate fontSize="md" minW="0" text={model.name} />
+          {/* Options take their accessible name from their text, and focus stays in the search field, so the tooltip
+              alone never reaches screen readers or keyboard users. */}
+          {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
+          {showType ? (
+            <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
+              {getModelTypeLabel(type)}
+            </Badge>
+          ) : null}
+        </HStack>
+        {showDetail && enableDescription && model.description ? (
+          <Text color="fg.subtle" fontSize="xs" lineClamp={2}>
+            {model.description}
+          </Text>
+        ) : null}
+      </Stack>
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontStyle="italic">
+        {formatBytes(model.file_size)}
+      </Text>
+    </HStack>
+  );
+};

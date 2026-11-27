@@ -1,0 +1,319 @@
+import { FloatFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInput';
+import { FloatFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInputAndSlider';
+import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldSlider';
+import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
+import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
+import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
+import { ImageGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorFieldComponent';
+import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
+import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
+import { LoRAFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoRAFieldCollectionInputComponent';
+import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
+import SavedWorkflowFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/SavedWorkflowFieldInputComponent';
+import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
+import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
+import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
+import { IntegerFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInputAndSlider';
+import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldSlider';
+import { VideoFrameIndexFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/VideoFrameIndexFieldInput';
+import { StringFieldDropdown } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldDropdown';
+import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
+import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
+import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import {
+  isBoardFieldInputInstance,
+  isBoardFieldInputTemplate,
+  isBooleanFieldInputInstance,
+  isBooleanFieldInputTemplate,
+  isColorFieldInputInstance,
+  isColorFieldInputTemplate,
+  isEnumFieldInputInstance,
+  isEnumFieldInputTemplate,
+  isFloatFieldCollectionInputInstance,
+  isFloatFieldCollectionInputTemplate,
+  isFloatFieldInputInstance,
+  isFloatFieldInputTemplate,
+  isFloatGeneratorFieldInputInstance,
+  isFloatGeneratorFieldInputTemplate,
+  isImageFieldCollectionInputInstance,
+  isImageFieldCollectionInputTemplate,
+  isImageFieldInputInstance,
+  isImageFieldInputTemplate,
+  isImageGeneratorFieldInputInstance,
+  isImageGeneratorFieldInputTemplate,
+  isIntegerFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputTemplate,
+  isIntegerFieldInputInstance,
+  isIntegerFieldInputTemplate,
+  isIntegerGeneratorFieldInputInstance,
+  isIntegerGeneratorFieldInputTemplate,
+  isLoRAFieldCollectionInputInstance,
+  isLoRAFieldCollectionInputTemplate,
+  isModelIdentifierFieldInputInstance,
+  isModelIdentifierFieldInputTemplate,
+  isSavedWorkflowFieldInputInstance,
+  isSavedWorkflowFieldInputTemplate,
+  isSchedulerFieldInputInstance,
+  isSchedulerFieldInputTemplate,
+  isStringFieldCollectionInputInstance,
+  isStringFieldCollectionInputTemplate,
+  isStringFieldInputInstance,
+  isStringFieldInputTemplate,
+  isStringGeneratorFieldInputInstance,
+  isStringGeneratorFieldInputTemplate,
+  isStylePresetFieldInputInstance,
+  isStylePresetFieldInputTemplate,
+  isSystemPromptFieldInputInstance,
+  isSystemPromptFieldInputTemplate,
+  isVideoFieldInputInstance,
+  isVideoFieldInputTemplate,
+} from 'features/nodes/types/field';
+import type { NodeFieldElement } from 'features/nodes/types/workflow';
+import { memo } from 'react';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
+
+import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
+import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
+import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
+import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
+import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
+import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
+import StylePresetFieldInputComponent from './inputs/StylePresetFieldInputComponent';
+import SystemPromptFieldInputComponent from './inputs/SystemPromptFieldInputComponent';
+import VideoFieldInputComponent from './inputs/VideoFieldInputComponent';
+
+type Props = {
+  nodeId: string;
+  fieldName: string;
+  settings?: NodeFieldElement['data']['settings'];
+};
+
+export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) => {
+  const field = useInputFieldInstance(fieldName);
+  const template = useInputFieldTemplateOrThrow(fieldName);
+
+  // When deciding which component to render, first we check the type of the template, which is more efficient than the
+  // instance type check. The instance type check uses zod and is slower.
+
+  if (isStringFieldCollectionInputTemplate(template)) {
+    if (!isStringFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <StringFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isLoRAFieldCollectionInputTemplate(template)) {
+    if (!isLoRAFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <LoRAFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isStringFieldInputTemplate(template)) {
+    if (!isStringFieldInputInstance(field)) {
+      return null;
+    }
+    if (!settings || settings.type !== 'string-field-config') {
+      if (template.ui_component === 'textarea') {
+        return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
+      } else {
+        return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+      }
+    }
+    if (settings.component === 'input') {
+      return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (settings.component === 'textarea') {
+      return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (settings.component === 'dropdown') {
+      return <StringFieldDropdown nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    } else {
+      assert<Equals<never, typeof settings>>(false, 'Unexpected settings');
+    }
+  }
+
+  if (isBooleanFieldInputTemplate(template)) {
+    if (!isBooleanFieldInputInstance(field)) {
+      return null;
+    }
+    return <BooleanFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isIntegerFieldInputTemplate(template)) {
+    if (!isIntegerFieldInputInstance(field)) {
+      return null;
+    }
+    // The ``video-frame-index`` ui_component bolts a frame thumbnail + scrubber slider
+    // onto the standard integer input. It's a per-field widget rather than a node-body
+    // widget so it works in both the workflow editor and the Form Builder (both of
+    // which dispatch through this same renderer).
+    if (template.ui_component === 'video-frame-index') {
+      return <VideoFrameIndexFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
+    if (!settings || settings.type !== 'integer-field-config') {
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
+
+    if (settings.component === 'number-input') {
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'slider') {
+      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'number-input-and-slider') {
+      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');
+  }
+
+  if (isFloatFieldInputTemplate(template)) {
+    if (!isFloatFieldInputInstance(field)) {
+      return null;
+    }
+
+    if (!settings || settings.type !== 'float-field-config') {
+      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
+
+    if (settings.component === 'number-input') {
+      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'slider') {
+      return <FloatFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'number-input-and-slider') {
+      return <FloatFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');
+  }
+
+  if (isIntegerFieldCollectionInputTemplate(template)) {
+    if (!isIntegerFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <IntegerFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isFloatFieldCollectionInputTemplate(template)) {
+    if (!isFloatFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <FloatFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isEnumFieldInputTemplate(template)) {
+    if (!isEnumFieldInputInstance(field)) {
+      return null;
+    }
+    return <EnumFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isImageFieldCollectionInputTemplate(template)) {
+    if (!isImageFieldCollectionInputInstance(field)) {
+      return null;
+    }
+    return <ImageFieldCollectionInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isImageFieldInputTemplate(template)) {
+    if (!isImageFieldInputInstance(field)) {
+      return null;
+    }
+    return <ImageFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isVideoFieldInputTemplate(template)) {
+    if (!isVideoFieldInputInstance(field)) {
+      return null;
+    }
+    return <VideoFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isBoardFieldInputTemplate(template)) {
+    if (!isBoardFieldInputInstance(field)) {
+      return null;
+    }
+    return <BoardFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isStylePresetFieldInputTemplate(template)) {
+    if (!isStylePresetFieldInputInstance(field)) {
+      return null;
+    }
+    return <StylePresetFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSystemPromptFieldInputTemplate(template)) {
+    if (!isSystemPromptFieldInputInstance(field)) {
+      return null;
+    }
+    return <SystemPromptFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isModelIdentifierFieldInputTemplate(template)) {
+    if (!isModelIdentifierFieldInputInstance(field)) {
+      return null;
+    }
+    return <ModelIdentifierFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSavedWorkflowFieldInputTemplate(template)) {
+    if (!isSavedWorkflowFieldInputInstance(field)) {
+      return null;
+    }
+    return <SavedWorkflowFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isColorFieldInputTemplate(template)) {
+    if (!isColorFieldInputInstance(field)) {
+      return null;
+    }
+    return <ColorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSchedulerFieldInputTemplate(template)) {
+    if (!isSchedulerFieldInputInstance(field)) {
+      return null;
+    }
+    return <SchedulerFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isFloatGeneratorFieldInputTemplate(template)) {
+    if (!isFloatGeneratorFieldInputInstance(field)) {
+      return null;
+    }
+    return <FloatGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isIntegerGeneratorFieldInputTemplate(template)) {
+    if (!isIntegerGeneratorFieldInputInstance(field)) {
+      return null;
+    }
+    return <IntegerGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isStringGeneratorFieldInputTemplate(template)) {
+    if (!isStringGeneratorFieldInputInstance(field)) {
+      return null;
+    }
+    return <StringGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isImageGeneratorFieldInputTemplate(template)) {
+    if (!isImageGeneratorFieldInputInstance(field)) {
+      return null;
+    }
+    return <ImageGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  return null;
+});
+
+InputFieldRenderer.displayName = 'InputFieldRenderer';

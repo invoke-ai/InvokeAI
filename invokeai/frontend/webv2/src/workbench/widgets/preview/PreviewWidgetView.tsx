@@ -1,0 +1,1167 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
+import type { QueueActiveSession, QueueItem } from '@features/queue/contracts';
+import type { WidgetViewProps } from '@workbench/widgetContracts';
+
+import { Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import {
+  galleryImages,
+  type GalleryBoard,
+  type GalleryImageItem,
+  type GalleryItem,
+  type GalleryItemKey,
+  type GalleryItemRef,
+} from '@features/gallery';
+import {
+  getGalleryCompareImage,
+  getGalleryPage,
+  getGallerySelectedImageQuery,
+  getGallerySemanticImageQuery,
+  getGalleryListingBoardId,
+  getGallerySettings,
+  getSelectedGalleryItemFromValues,
+  getBoundedRecentImages,
+  galleryImageItemToGalleryImage,
+  isGalleryImageItem,
+  legacyGeneratedImageToGalleryItem,
+  normalizeGalleryImage,
+  requestGalleryItemReveal,
+  toGalleryItemKey,
+  toGalleryMediaKind,
+  toGalleryItemRef,
+} from '@features/gallery/contracts';
+import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
+import { useGalleryImageRecovery, useHostGalleryBoards } from '@features/gallery/react';
+import { createGenerateFormValuesSelector } from '@features/generation/react';
+import {
+  consumeQueueItemSwapProgressImage,
+  useQueueItemProgress,
+  useQueueItemProgressImage,
+  useQueueItemSwapProgressImage,
+} from '@features/queue/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { Button, IconButton } from '@platform/ui/Button';
+import {
+  imageUrlToStreamingSource,
+  progressImageToStreamingSource,
+  type StreamingImageSource,
+} from '@platform/ui/streaming-image/streamingImageSource';
+import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
+import { useQuery } from '@tanstack/react-query';
+import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
+import {
+  ImageContextMenu,
+  useDeletionConfirmation,
+  useImageActions,
+  type ImageContextMenuTarget,
+  type ImageContextMenuVariant,
+} from '@workbench/image-actions';
+import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWidgetValuesSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
+import { ImagesIcon, XIcon } from 'lucide-react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { PreviewLoupeControls } from './usePreviewLoupe';
+import type { PreviewSwipeNavigation } from './usePreviewSwipe';
+
+import { useLivePreviewFollow } from './livePreviewFollow';
+import { PreviewCompare } from './PreviewCompare';
+import { resolvePreviewCompareDrop } from './previewCompareDnd';
+import { usePreviewDensity, type PreviewDensity } from './previewDensity';
+import { PreviewDropSurface } from './PreviewDropSurface';
+import { PreviewFilmstrip } from './PreviewFilmstrip';
+import {
+  PreviewFrame,
+  type PreviewMediaSource,
+  type PreviewVideoFrameController,
+  type PreviewVideoFrameCopyResult,
+} from './PreviewFrame';
+import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
+import { PREVIEW_NAV_STAGE_CSS, PreviewNavButtons } from './PreviewNavButtons';
+import {
+  getPreviewComparisonMode,
+  getPreviewFilmstripVisible,
+  getPreviewMetadataOpen,
+  getPreviewVideoLoop,
+  type PreviewComparisonMode,
+} from './previewSettings';
+import { getPreviewStagePadding } from './PreviewStage';
+import { usePreviewNavigation } from './usePreviewNavigation';
+
+/** For the live footer's Details slot, which renders disabled and never fires. */
+const VIDEO_FRAME_COPY_FAILURE_KEYS = {
+  'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
+  'draw-failed': 'widgets.preview.copyCurrentFrameDrawFailed',
+  'encode-failed': 'widgets.preview.copyCurrentFrameEncodeFailed',
+  'not-ready': 'widgets.preview.copyCurrentFrameNotReady',
+  stale: 'widgets.preview.copyCurrentFrameStale',
+  unsupported: 'widgets.preview.copyCurrentFrameUnsupported',
+} as const;
+
+export const getVideoFrameCopyNotice = (
+  result: PreviewVideoFrameCopyResult,
+  translate: (key: string) => string
+): { kind: 'error' | 'success'; title: string } =>
+  result.ok
+    ? { kind: 'success', title: translate('widgets.preview.copyCurrentFrameSuccess') }
+    : { kind: 'error', title: translate(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]) };
+
+const EMPTY_BOARDS: GalleryBoard[] = [];
+
+const fallbackBoards: GalleryBoard[] = [
+  {
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id: 'none',
+    imageCount: 0,
+    isInbox: false,
+    kind: 'uncategorized',
+    name: '',
+    projectId: null,
+    videoCount: 0,
+  },
+];
+
+const getLocalGalleryItems = (values: Record<string, unknown>, queueItems: QueueItem[]): GalleryImageItem[] => {
+  const queueBoardIds = new Map(queueItems.map((item) => [item.id, item.snapshot.galleryBoardId ?? 'none'] as const));
+
+  return getBoundedRecentImages(values.recentImages).map((image) =>
+    legacyGeneratedImageToGalleryItem(normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)))
+  );
+};
+
+/** Preview shows the gallery selection only: a cleared selection shows the empty state, not the newest result. */
+const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryImageItem[]): GalleryItem | null => {
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  if (!selectedItem) {
+    return null;
+  }
+
+  const selectedItemKey = toGalleryItemKey(selectedItem);
+  return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
+};
+
+const getBoardName = (
+  boards: GalleryBoard[],
+  boardId: string,
+  uncategorizedLabel: string,
+  unknownBoardLabel: string
+): string =>
+  boardId === 'none' ? uncategorizedLabel : (boards.find((board) => board.id === boardId)?.name ?? unknownBoardLabel);
+
+const selectGenerateRecallValues = createGenerateFormValuesSelector();
+
+/** Pinned to the floating window body's top edge, under the title bar's divider. */
+const FLOATING_RAIL_SX: SystemStyleObject = {
+  display: 'flex',
+  gap: '1px',
+  height: '3px',
+  insetInline: 0,
+  pointerEvents: 'none',
+  position: 'absolute',
+  top: 0,
+  zIndex: 3,
+};
+
+const getFocusedElement = (): HTMLElement | null => {
+  const { activeElement } = document;
+
+  return activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
+};
+
+export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const previewValues = useWidgetValuesSelector('preview', (values) => values);
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
+  const livePreview = useLivePreviewFollow();
+  const { gallery, notifications, widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const { density, rootRef } = usePreviewDensity(region, previewStageStore.setDensity);
+  const recentImages = galleryValues.recentImages;
+  const localItems = useMemo(() => getLocalGalleryItems({ recentImages }, queueItems), [queueItems, recentImages]);
+  const selectedItem = useMemo(() => getSelectedItem(galleryValues, localItems), [galleryValues, localItems]);
+  const compareImage = getGalleryCompareImage(galleryValues);
+  const comparisonMode = getPreviewComparisonMode(previewValues);
+  const displayBoardId = selectedItem?.boardId ?? 'none';
+  const hasSelectedItem = selectedItem !== null;
+  const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
+  // Memoize parsed ranking by raw value so unrelated Gallery updates do not rebuild navigation.
+  const gallerySemanticQuery = useMemo(
+    () => getGallerySemanticImageQuery({ semanticImageQuery: galleryValues.semanticImageQuery }),
+    [galleryValues.semanticImageQuery]
+  );
+  const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
+  // With nothing selected to keep showing, a session that has not produced a frame yet is still the thing to show.
+  const activeGalleryPlaceholder =
+    livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ??
+    (selectedItem === null ? livePreview.startingSession : null);
+  const shouldFollowLive = activeGalleryPlaceholder !== null;
+  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
+  const isComparing =
+    !shouldFollowLive && selectedItem?.kind === 'image' && compareImage !== null && compareImageKey !== selectedItemKey;
+  // Select for compare on the shown image: the comparison image is the selection itself until a second one is picked.
+  const isCompareArmed = !shouldFollowLive && selectedItem?.kind === 'image' && compareImageKey === selectedItemKey;
+  // The session the stage says is starting: one shown before its first frame, or one the shown result waits on.
+  const startingCueSession = activeGalleryPlaceholder
+    ? activeGalleryPlaceholder.hasOwnFrame
+      ? null
+      : activeGalleryPlaceholder
+    : selectedItem && !isComparing && !isCompareArmed
+      ? livePreview.startingSession
+      : null;
+  const { i18n, t } = useTranslation();
+  const navigationBoundaryRef = useRef<HTMLDivElement | null>(null);
+  const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
+  // The header's zoom commands close over the controls ref, so they are stable per mount; the readout itself streams
+  // through `previewStageStore`.
+  const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
+  const zoomCommands = useMemo<PreviewZoomCommands>(
+    () => ({
+      reset: () => loupeControlsRef.current?.reset(),
+      zoomTo: (actualZoom: number) => loupeControlsRef.current?.zoomTo(actualZoom),
+    }),
+    []
+  );
+  const [copyAvailableItemKey, setCopyAvailableItemKey] = useState<GalleryItemKey | null>(null);
+
+  const boardsQuery = useQuery({
+    ...galleryBoardsOptions(),
+    enabled: hasSelectedItem,
+  });
+  // A ranked filmstrip mirrors the grid, which ranks within the board it resolves; share the grid's board list.
+  const gallerySettings = getGallerySettings(galleryValues);
+  const galleryBoardsQuery = useQuery({
+    ...galleryBoardsOptions(getGalleryListingBoardsQuery(gallerySettings)),
+    enabled: gallerySemanticQuery !== null,
+  });
+  const galleryBoardId = getGalleryListingBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
+  const hostBoards = useHostGalleryBoards(boardsQuery.data);
+  const boards = boardsQuery.data === undefined ? fallbackBoards : hostBoards;
+  const boardName = getBoardName(
+    boards,
+    displayBoardId,
+    t('widgets.gallery.uncategorized'),
+    t('widgets.gallery.unknownBoard')
+  );
+
+  const selectGalleryItemAtPage = useCallback(
+    (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => {
+      gallery.selectItem(item, undefined, selectionPage, true);
+      // Deliberate navigation: the grid follows it, unlike auto-selection.
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal, absoluteIndex);
+    },
+    [gallery]
+  );
+  const {
+    boardItems,
+    getNavigatedPage,
+    getSelectionPage,
+    isLoadingBoard,
+    loadOrderedRefs,
+    navigate,
+    navigationQueryKey,
+    neighbors,
+    position,
+    selectPreviewItem,
+    stripItemCount,
+  } = usePreviewNavigation({
+    followedSessionId: activeGalleryPlaceholder?.id ?? null,
+    followSession: livePreview.follow,
+    isComparing,
+    localItems,
+    progressSessions: livePreview.gallerySessions,
+    queueItems,
+    selectGalleryItem: selectGalleryItemAtPage,
+    selectedImageQuery,
+    selectedItem,
+    galleryBoardId,
+    galleryMediaKind: toGalleryMediaKind(gallerySettings.mediaFilter) ?? null,
+    galleryPage: getGalleryPage(galleryValues),
+    galleryPaginationMode: gallerySettings.paginationMode,
+    selectedItemKey,
+    semanticQuery: gallerySemanticQuery,
+  });
+
+  const swipeNavigation = useMemo<PreviewSwipeNavigation>(
+    () => ({ neighbors, onNavigate: navigate }),
+    [navigate, neighbors]
+  );
+
+  const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
+  // The header's ⋮ beside its Edit and Use menus opens without their groups; every other opening shows them all.
+  const [contextMenuVariant, setContextMenuVariant] = useState<ImageContextMenuVariant>('full');
+  const getItemActionContext = useCallback(
+    () => ({
+      filterIdentity: navigationQueryKey,
+      getItemSelectionPage: getSelectionPage,
+      items: boardItems,
+      loadOrderedRefs,
+      selectedItemKey,
+    }),
+    [boardItems, getSelectionPage, loadOrderedRefs, navigationQueryKey, selectedItemKey]
+  );
+  const projectId = useActiveProjectId();
+  const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
+  const imageActions = useImageActions({
+    boards,
+    generateValues,
+    getItemActionContext,
+    projectId,
+    requestDeletionConfirmation,
+  });
+  const contextMenuItem = useMemo<GalleryItem | null>(() => {
+    if (!selectedItem) {
+      return null;
+    }
+
+    return boardItems.find((item) => toGalleryItemKey(item) === selectedItemKey) ?? selectedItem;
+  }, [boardItems, selectedItem, selectedItemKey]);
+  const exitCompare = useCallback(() => gallery.setCompareItem(null), [gallery]);
+  // Remember the comparison item's original page for swap-back, but only within its original query and board.
+  const swappedOutRef = useRef<{ boardId: string; key: GalleryItemKey; page: number; queryKey: string } | null>(null);
+  const swapCompareImages = useCallback(() => {
+    if (selectedItem?.kind === 'image' && compareImage) {
+      const compareItem = legacyGeneratedImageToGalleryItem(compareImage);
+      const swappedOut = swappedOutRef.current;
+
+      swappedOutRef.current = {
+        boardId: selectedItem.boardId,
+        key: toGalleryItemKey(selectedItem),
+        // The page in the listing Preview navigates, which a ranked filmstrip can hold apart from the stamp's.
+        page: getNavigatedPage(selectedItem),
+        queryKey: navigationQueryKey,
+      };
+      if (
+        swappedOut &&
+        swappedOut.key === toGalleryItemKey(compareItem) &&
+        swappedOut.queryKey === navigationQueryKey &&
+        swappedOut.boardId === compareItem.boardId
+      ) {
+        selectGalleryItemAtPage(compareItem, swappedOut.page);
+      } else {
+        selectPreviewItem(compareItem);
+      }
+      gallery.setCompareItem(selectedItem);
+    }
+  }, [
+    compareImage,
+    gallery,
+    getNavigatedPage,
+    navigationQueryKey,
+    selectGalleryItemAtPage,
+    selectPreviewItem,
+    selectedItem,
+  ]);
+  const isItemCurrent = useCallback(
+    (itemKey: GalleryItemKey) => {
+      const currentValues = getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery');
+      const currentItem = getSelectedGalleryItemFromValues(currentValues);
+
+      return currentItem !== null && toGalleryItemKey(currentItem) === itemKey;
+    },
+    [queries]
+  );
+  const setComparisonMode = useCallback(
+    (comparisonMode: PreviewComparisonMode) => widgets.patchValues('preview', { comparisonMode }),
+    [widgets]
+  );
+  const openVideoDetails = useCallback(() => widgets.patchValues('preview', { metadataOpen: true }), [widgets]);
+  const isVideoLooping = getPreviewVideoLoop(previewValues);
+  const setVideoLoop = useCallback((videoLoop: boolean) => widgets.patchValues('preview', { videoLoop }), [widgets]);
+  const handleVideoCopyAvailabilityChange = useCallback((itemKey: GalleryItemKey, isAvailable: boolean) => {
+    setCopyAvailableItemKey((current) => (isAvailable ? itemKey : current === itemKey ? null : current));
+  }, []);
+  const isVideoFrameCopyAvailable =
+    contextMenuItem?.kind === 'video' && copyAvailableItemKey === toGalleryItemKey(contextMenuItem);
+  const copyCurrentVideoFrame = useCallback(() => {
+    const run = async (): Promise<void> => {
+      const controller = videoControllerRef.current;
+      let result: PreviewVideoFrameCopyResult;
+
+      if (
+        contextMenuItem?.kind !== 'video' ||
+        !controller ||
+        controller.itemKey !== toGalleryItemKey(contextMenuItem)
+      ) {
+        result = { ok: false, reason: 'stale' };
+      } else {
+        try {
+          result = await controller.copyCurrentFrame();
+        } catch {
+          result = { ok: false, reason: 'clipboard-failed' };
+        }
+      }
+
+      notifications.add(getVideoFrameCopyNotice(result, t));
+    };
+
+    void run();
+  }, [contextMenuItem, notifications, t]);
+  const previewVideoContextActions = useMemo(
+    () =>
+      contextMenuItem?.kind === 'video'
+        ? {
+            isCopyCurrentFrameAvailable: isVideoFrameCopyAvailable,
+            itemKey: toGalleryItemKey(contextMenuItem),
+            onCopyCurrentFrame: copyCurrentVideoFrame,
+            onOpenDetails: openVideoDetails,
+          }
+        : undefined,
+    [contextMenuItem, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openVideoDetails]
+  );
+  const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
+
+  // Hydrate dropped image names before arming comparison with a complete item contract.
+  const handleCompareDrop = useCallback(
+    (event: DragEndEvent) => {
+      if (selectedItem?.kind !== 'image') {
+        return;
+      }
+
+      const resolution = resolvePreviewCompareDrop(
+        event.active.data.current,
+        event.over?.data.current ?? null,
+        selectedItem.name
+      );
+
+      if (!resolution) {
+        return;
+      }
+
+      // Prefer images we already hold (board context includes fresh local generations that would 404 on a backend
+      // by-name fetch).
+      const localImageItem = boardItems.find((item) => item.kind === 'image' && item.name === resolution.imageName);
+
+      if (localImageItem?.kind === 'image') {
+        gallery.setCompareItem(localImageItem);
+        return;
+      }
+
+      galleryImages
+        .resolve(resolution.imageName)
+        .then((image) => gallery.setCompareImage(image))
+        .catch((error: unknown) => {
+          notifications.reportError({
+            area: 'preview-compare-drop',
+            message: error instanceof Error ? error.message : String(error),
+            namespace: 'gallery',
+          });
+        });
+    },
+    [boardItems, gallery, notifications, selectedItem]
+  );
+  useDndMonitor({ onDragEnd: handleCompareDrop });
+  // The menu opens at a point, with no trigger to hand focus back to: Preview remembers what had focus instead.
+  const contextMenuOpenerRef = useRef<HTMLElement | null>(null);
+  const showContextMenu = useCallback((target: ImageContextMenuTarget, variant: ImageContextMenuVariant) => {
+    contextMenuOpenerRef.current = getFocusedElement();
+    setContextMenuVariant(variant);
+    setContextMenuTarget(target);
+  }, []);
+  const getNavigationBoundary = useCallback(() => navigationBoundaryRef.current, []);
+  // Resolved when focus returns, from the menu or from a deletion confirmation it opened: the opener while it is still
+  // there, else Preview itself, so its keys keep working; a point opening had no opener. An opener a deletion takes
+  // away only after focus is back on it (the item's filmstrip thumb, the video, the header's ⋮) hands focus to Preview
+  // itself as it goes, so the target never has to wait for that render.
+  const getContextMenuReturnFocus = useCallback((): HTMLElement | null => {
+    const opener = contextMenuOpenerRef.current;
+
+    return opener?.isConnected ? opener : getNavigationBoundary();
+  }, [getNavigationBoundary]);
+  const openFilmstripItemContextMenu = useCallback(
+    (item: GalleryItem, x: number, y: number) =>
+      showContextMenu({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }, 'full'),
+    [showContextMenu]
+  );
+  const { selectForCompare } = imageActions;
+  const compareFilmstripItem = useCallback(
+    (item: GalleryItem) => {
+      if (isGalleryImageItem(item)) {
+        selectForCompare(galleryImageItemToGalleryImage(item));
+      }
+    },
+    [selectForCompare]
+  );
+  const openItemContextMenu = useCallback(
+    (x: number, y: number, variant: ImageContextMenuVariant = 'full') => {
+      if (contextMenuItem) {
+        showContextMenu({ itemRefs: [toGalleryItemRef(contextMenuItem)], items: [contextMenuItem], x, y }, variant);
+      }
+    },
+    [contextMenuItem, showContextMenu]
+  );
+  const closeContextMenu = useCallback(() => {
+    // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps it
+    // there.
+    if (document.activeElement?.closest('[role="menu"]')) {
+      getContextMenuReturnFocus()?.focus({ preventScroll: true });
+    }
+
+    setContextMenuTarget(null);
+  }, [getContextMenuReturnFocus]);
+  const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
+
+  // Publish selection/actions to hoisted chrome through an external store; clear on unmount to prevent stale headers.
+  const filmstrip = useMemo<PreviewFilmstripProps | null>(
+    () =>
+      isFilmstripVisible && density !== 'minimal'
+        ? {
+            followedSessionId: livePreview.followedSessionId,
+            isSessionPinned: livePreview.pinnedSessionId !== null,
+            items: boardItems,
+            leadingItemCount: stripItemCount,
+            onCompare: compareFilmstripItem,
+            onContextMenu: openFilmstripItemContextMenu,
+            onFollowSession: livePreview.follow,
+            onSelect: selectPreviewItem,
+            onUnpinSession: livePreview.showAll,
+            sessions: livePreview.gallerySessions,
+            shouldAntialiasLiveImage: antialiasProgressImages,
+          }
+        : null,
+    [
+      antialiasProgressImages,
+      boardItems,
+      compareFilmstripItem,
+      density,
+      isFilmstripVisible,
+      livePreview.follow,
+      livePreview.followedSessionId,
+      livePreview.gallerySessions,
+      livePreview.pinnedSessionId,
+      livePreview.showAll,
+      stripItemCount,
+      openFilmstripItemContextMenu,
+      selectPreviewItem,
+    ]
+  );
+  const hasHeaderItem = !shouldFollowLive && contextMenuItem !== null;
+  useEffect(() => {
+    previewHeaderStore.set({
+      actionItem: shouldFollowLive ? null : contextMenuItem,
+      actions: shouldFollowLive ? null : imageActions,
+      boardName: headerItemName === null ? null : boardName,
+      cancelCompare: isCompareArmed ? exitCompare : null,
+      copyCurrentVideoFrame: !shouldFollowLive && contextMenuItem?.kind === 'video' ? copyCurrentVideoFrame : null,
+      getRegion: getNavigationBoundary,
+      isVideoFrameCopyAvailable: !shouldFollowLive && isVideoFrameCopyAvailable,
+      itemName: headerItemName,
+      openItemMenu: shouldFollowLive ? null : openItemContextMenu,
+      position: hasHeaderItem
+        ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
+        : null,
+      // Only the single image frame carries a loupe: videos have none and compare has its own synced pair.
+      zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
+    });
+  }, [
+    boardName,
+    contextMenuItem,
+    copyCurrentVideoFrame,
+    exitCompare,
+    getNavigationBoundary,
+    hasHeaderItem,
+    headerItemName,
+    imageActions,
+    isCompareArmed,
+    isComparing,
+    isLoadingBoard,
+    isVideoFrameCopyAvailable,
+    openItemContextMenu,
+    position,
+    shouldFollowLive,
+    zoomCommands,
+  ]);
+
+  useEffect(
+    () => () => {
+      previewHeaderStore.clear();
+      previewStageStore.clear();
+    },
+    []
+  );
+
+  const executeViewerHotkey = useEffectEvent((commandId: string) => {
+    if (commandId === 'viewer.swapImages' && selectedItem?.kind === 'image' && compareImage) {
+      swapCompareImages();
+      return;
+    }
+
+    if (commandId === 'viewer.deleteImage' && selectedItem && !shouldFollowLive) {
+      void imageActions.deleteItems([toGalleryItemRef(selectedItem)]);
+      return;
+    }
+
+    if (commandId === 'viewer.zoomToActual' && selectedItem?.kind === 'image') {
+      loupeControlsRef.current?.zoomToActual();
+      return;
+    }
+
+    if (commandId === 'viewer.zoomToFit' && selectedItem?.kind === 'image') {
+      loupeControlsRef.current?.reset();
+      return;
+    }
+
+    if (commandId === 'viewer.previousItem' || commandId === 'viewer.nextItem') {
+      void navigate(commandId === 'viewer.nextItem' ? 1 : -1);
+      return;
+    }
+
+    if (commandId === 'viewer.toggleFilmstrip') {
+      widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
+      return;
+    }
+
+    if (commandId === 'viewer.toggleMetadata') {
+      widgets.patchValues('preview', { metadataOpen: !getPreviewMetadataOpen(previewValues) });
+    }
+  });
+
+  useEffect(() => {
+    const hotkeys = [
+      ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
+      ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      ['viewer.toggleMetadata', t('widgets.preview.commands.toggleMetadata'), ['i']],
+      // Widget-scoped, so the arrows step wherever Preview holds the keys: focus inside it, or on the region it was
+      // just opened in. Comparison does not step saved images, so it leaves the arrows unclaimed.
+      ...(isComparing
+        ? []
+        : ([
+            ['viewer.previousItem', t('widgets.preview.commands.previousItem'), ['arrowleft']],
+            ['viewer.nextItem', t('widgets.preview.commands.nextItem'), ['arrowright']],
+          ] as const)),
+      ...(selectedItem?.kind === 'image'
+        ? ([
+            ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
+            ['viewer.zoomToActual', t('widgets.preview.commands.zoomToActual'), ['1']],
+            ['viewer.zoomToFit', t('widgets.preview.commands.zoomToFit'), ['f']],
+          ] as const)
+        : []),
+    ] as const;
+    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
+      runtime.commands.register({ handler: () => executeViewerHotkey(id), id, title }),
+      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+    ]);
+
+    return () => {
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [isComparing, runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
+
+  return (
+    <PreviewDropSurface
+      ref={rootRef}
+      isComparing={isComparing}
+      isFollowingLive={shouldFollowLive}
+      shownKind={selectedItem?.kind ?? null}
+    >
+      {/* Show progress beneath floating Preview's title bar when the main topbar may be out of view; overlay it without
+          reflow. */}
+      {region === 'floating' ? <QueueProgressRail css={FLOATING_RAIL_SX} /> : null}
+      {/* Single always-mounted focus target: DOM focus survives swaps between the live, selected, and compare branches,
+          so the keys stay with Preview across them. */}
+      <Stack
+        ref={navigationBoundaryRef}
+        aria-label={t('widgets.labels.preview')}
+        gap="0"
+        h="full"
+        minH="0"
+        outline="none"
+        role="region"
+        tabIndex={0}
+        w="full"
+      >
+        {/* Mounted throughout, so arming, or a gap before the next image's first frame, is announced once as its text
+            arrives, whatever the progress messages the hint shows meanwhile; the hints repeat it visually. */}
+        <Text aria-live="polite" role="status" srOnly>
+          {isCompareArmed
+            ? t('widgets.preview.compareArmedHint')
+            : startingCueSession
+              ? t('widgets.preview.startingAnnouncement')
+              : ''}
+        </Text>
+        {isComparing || isCompareArmed ? (
+          <PreviewExitCompareHotkey key={`${projectId}:${i18n.language}`} runtime={runtime} onExit={exitCompare} />
+        ) : null}
+        {shouldFollowLive && activeGalleryPlaceholder ? (
+          <LivePreview
+            density={density}
+            filmstrip={filmstrip}
+            placeholder={activeGalleryPlaceholder}
+            shouldAntialiasProgressImage={antialiasProgressImages}
+          />
+        ) : selectedItem ? (
+          isComparing && compareImage && selectedItem.kind === 'image' ? (
+            <PreviewCompare
+              baseImage={galleryImageItemToGalleryImage(selectedItem)}
+              compareImage={compareImage}
+              mode={comparisonMode}
+              runtime={runtime}
+              onExit={exitCompare}
+              onModeChange={setComparisonMode}
+              onSwap={swapCompareImages}
+            />
+          ) : selectedItem.kind === 'image' ? (
+            <SelectedImagePreview
+              density={density}
+              filmstrip={filmstrip}
+              isItemCurrent={isItemCurrent}
+              item={selectedItem}
+              loupeControlsRef={loupeControlsRef}
+              shouldAntialiasProgressImage={antialiasProgressImages}
+              startingSession={startingCueSession}
+              swipe={swipeNavigation}
+              onCancelCompare={isCompareArmed ? exitCompare : undefined}
+              onContextMenu={openItemContextMenu}
+            />
+          ) : (
+            <SelectedVideoPreview
+              density={density}
+              filmstrip={filmstrip}
+              isItemCurrent={isItemCurrent}
+              item={selectedItem}
+              startingSession={startingCueSession}
+              swipe={swipeNavigation}
+              videoControllerRef={videoControllerRef}
+              videoLoop={isVideoLooping}
+              onContextMenu={openItemContextMenu}
+              onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+              onVideoLoopChange={setVideoLoop}
+            />
+          )
+        ) : (
+          <EmptyPreview />
+        )}
+        {/* Outside the branches: the menu's open state is the target, which only the menu's own close clears. A
+            branch swap would unmount the menu without that close (deleting the shown item clears the selection
+            before the menu hears the click), and the leftover target would reopen it on the next item. */}
+        <ImageContextMenu
+          actions={imageActions}
+          boards={boards}
+          previewVideoActions={previewVideoContextActions}
+          returnFocus={getContextMenuReturnFocus}
+          target={contextMenuTarget}
+          variant={contextMenuVariant}
+          onClose={closeContextMenu}
+        />
+        {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
+            confirmation, nor cut its exit animation short. */}
+        {deletionConfirmationDialog}
+      </Stack>
+    </PreviewDropSurface>
+  );
+};
+
+const SelectedImagePreview = ({
+  item,
+  shouldAntialiasProgressImage,
+  ...props
+}: SelectedMediaPreviewProps & { item: GalleryImageItem; shouldAntialiasProgressImage: boolean }) => {
+  // An image move refuses full image reads too; the image reloads by itself once the gallery sees the move end.
+  const { onError: handleSourceError, src: fullImageSrc } = useGalleryImageRecovery(item.fullUrl);
+  const previewImage = useStreamingImageSource({
+    fallbackImage: imageUrlToStreamingSource({
+      alt: item.name,
+      height: item.height,
+      kind: 'fallback',
+      src: fullImageSrc,
+      width: item.width,
+    }),
+  });
+  const source = useMemo<PreviewMediaSource | null>(
+    () => (previewImage ? { itemKey: toGalleryItemKey(item), kind: 'image', source: previewImage } : null),
+    [item, previewImage]
+  );
+  // Bridge finished-image decoding with its run's final denoise frame so only pixels change at completion.
+  const swapProgressImage = useQueueItemSwapProgressImage(item.sourceQueueItemId, item.name);
+  const holdSource = useMemo(
+    () => progressImageToStreamingSource(swapProgressImage, item.name),
+    [item.name, swapProgressImage]
+  );
+  const sourceQueueItemId = item.sourceQueueItemId;
+  const handleSourceLoaded = useCallback(() => {
+    if (sourceQueueItemId) {
+      consumeQueueItemSwapProgressImage(sourceQueueItemId);
+    }
+  }, [sourceQueueItemId]);
+
+  return (
+    <SelectedMediaPreview
+      {...props}
+      dragItem={toGalleryItemRef(item)}
+      frameHeight={previewImage?.height ?? item.height}
+      frameWidth={previewImage?.width ?? item.width}
+      holdSource={holdSource}
+      item={item}
+      placeholderSrc={item.thumbnailUrl}
+      shouldAntialiasHoldImage={shouldAntialiasProgressImage}
+      source={source}
+      onSourceError={handleSourceError}
+      onSourceLoaded={handleSourceLoaded}
+    />
+  );
+};
+
+const SelectedVideoPreview = ({
+  item,
+  ...props
+}: SelectedMediaPreviewProps & { item: Extract<GalleryItem, { kind: 'video' }> }) => {
+  const { t } = useTranslation();
+  const source = useMemo<PreviewMediaSource>(
+    () => ({
+      ...(item.fps === undefined ? {} : { fps: item.fps }),
+      itemKey: toGalleryItemKey(item),
+      kind: 'video',
+      label: t('widgets.preview.videoLabel', { name: item.name }),
+      poster: item.thumbnailUrl,
+      src: item.fullUrl,
+    }),
+    [item, t]
+  );
+
+  return (
+    <SelectedMediaPreview
+      {...props}
+      dragItem={toGalleryItemRef(item)}
+      frameHeight={item.height}
+      frameWidth={item.width}
+      item={item}
+      source={source}
+    />
+  );
+};
+
+/** The filmstrip's inputs, or null when the strip is hidden. */
+type PreviewFilmstripProps = Omit<Parameters<typeof PreviewFilmstrip>[0], 'density' | 'selectedItemKey'>;
+
+interface SelectedMediaPreviewProps {
+  density: PreviewDensity;
+  filmstrip: PreviewFilmstripProps | null;
+  isItemCurrent: (itemKey: GalleryItemKey) => boolean;
+  item: GalleryItem;
+  loupeControlsRef?: Ref<PreviewLoupeControls>;
+  /** Set only while Select for compare waits for a second image: the stage shows the hint that cancels it. */
+  onCancelCompare?: () => void;
+  onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
+  onContextMenu: (x: number, y: number) => void;
+  /** A session starting without a frame yet, which the stage says it waits for while the selection stays shown. */
+  startingSession?: QueueActiveSession | null;
+  swipe?: PreviewSwipeNavigation;
+  videoControllerRef?: Ref<PreviewVideoFrameController>;
+  videoLoop?: boolean;
+  onVideoLoopChange?: (loop: boolean) => void;
+}
+
+/** One stage/filmstrip scaffold for live and finished media, so completion changes pixels, not geometry. */
+const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
+  <Flex direction="column" h="full" minH="0" position="relative" w="full">
+    {children}
+  </Flex>
+);
+
+const { setStageElement, setZoom: setZoomReadout } = previewStageStore;
+
+const SelectedMediaPreview = ({
+  density,
+  dragItem,
+  filmstrip,
+  frameHeight,
+  frameWidth,
+  holdSource,
+  isItemCurrent,
+  item,
+  loupeControlsRef,
+  onCancelCompare,
+  onCopyAvailabilityChange,
+  onSourceError,
+  onSourceLoaded,
+  placeholderSrc,
+  shouldAntialiasHoldImage,
+  source,
+  startingSession,
+  swipe,
+  onContextMenu,
+  videoControllerRef,
+  videoLoop,
+  onVideoLoopChange,
+}: SelectedMediaPreviewProps & {
+  dragItem?: GalleryItemRef;
+  frameHeight: number;
+  frameWidth: number;
+  holdSource?: StreamingImageSource | null;
+  onSourceError?: () => void;
+  onSourceLoaded?: (src: string) => void;
+  placeholderSrc?: string;
+  shouldAntialiasHoldImage?: boolean;
+  source: Parameters<typeof PreviewFrame>[0]['source'];
+}) => (
+  <PreviewMediaScaffold>
+    {/* The stage wrapper hosts the Details panel for images and videos
+        alike; the frame inside fills it, so their rects coincide. */}
+    <Flex ref={setStageElement} css={PREVIEW_NAV_STAGE_CSS} direction="column" flex="1" minH="0" position="relative">
+      <PreviewFrame
+        dragItem={dragItem}
+        frameHeight={frameHeight}
+        frameWidth={frameWidth}
+        holdSource={holdSource}
+        isItemCurrent={isItemCurrent}
+        isLive={false}
+        loupeControlsRef={loupeControlsRef}
+        onSourceError={onSourceError}
+        onSourceLoaded={onSourceLoaded}
+        onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
+        onZoomChange={setZoomReadout}
+        padding={getPreviewStagePadding(density)}
+        placeholderSrc={placeholderSrc}
+        shouldAntialiasLiveImage={shouldAntialiasHoldImage ?? true}
+        source={source}
+        swipe={swipe}
+        variant="framed"
+        videoControllerRef={videoControllerRef}
+        videoLoop={videoLoop}
+        onContextMenu={onContextMenu}
+        onVideoLoopChange={onVideoLoopChange}
+      />
+      {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
+      {onCancelCompare ? (
+        <PreviewCompareArmedHint density={density} onCancel={onCancelCompare} />
+      ) : startingSession ? (
+        <PreviewStartingCue density={density} session={startingSession} />
+      ) : null}
+    </Flex>
+    {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={toGalleryItemKey(item)} /> : null}
+  </PreviewMediaScaffold>
+);
+
+// Clear of the centre region's floating chrome, at the top of the stage: the Details panel pins to its right end.
+const COMPARE_HINT_TOP = 'calc(var(--wb-center-chrome-inset, 0px) + var(--chakra-spacing-2))';
+const COMPARE_HINT_MOTION_REDUCE = { animation: 'none' } as const;
+
+/** Says Select for compare is waiting, and how to call it off; text, then icon only, on narrow Preview. */
+const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensity; onCancel: () => void }) => {
+  const { t } = useTranslation();
+  const cancelLabel = t('widgets.preview.cancelCompare');
+  // Cancel removes the hint and itself with it; Preview keeps the keys.
+  const cancelRef = useCallback(
+    (node: HTMLButtonElement | null) => (node ? releaseFocusOnRemoval(node) : undefined),
+    []
+  );
+
+  return (
+    <Box
+      data-preview-compare-hint=""
+      display="flex"
+      insetInline="2"
+      justifyContent="center"
+      pointerEvents="none"
+      position="absolute"
+      top={COMPARE_HINT_TOP}
+      zIndex="1"
+    >
+      <HStack
+        animationDuration="fast"
+        animationName="fade-in"
+        bg="bg.panel"
+        borderColor="border.emphasized"
+        borderWidth="1px"
+        boxShadow="md"
+        gap="1.5"
+        maxW="full"
+        minW="0"
+        pointerEvents="auto"
+        ps={density === 'minimal' ? '1' : '2.5'}
+        pe="1"
+        py="0.5"
+        rounded="full"
+        _motionReduce={COMPARE_HINT_MOTION_REDUCE}
+      >
+        <Icon as={ImagesIcon} aria-hidden="true" boxSize="3.5" color="accent.fg" flexShrink={0} />
+        {density === 'minimal' ? null : (
+          // The status line announces it; read here too, it would be said twice.
+          <Text aria-hidden="true" color="fg" fontSize="md" minW="0" truncate>
+            {t('widgets.preview.compareArmedHint')}
+          </Text>
+        )}
+        {density === 'full' ? (
+          <Button ref={cancelRef} aria-label={cancelLabel} flexShrink={0} size="xs" variant="ghost" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+        ) : (
+          <IconButton
+            ref={cancelRef}
+            aria-label={cancelLabel}
+            flexShrink={0}
+            size="xs"
+            tooltip={cancelLabel}
+            variant="ghost"
+            onClick={onCancel}
+          >
+            <XIcon />
+          </IconButton>
+        )}
+      </HStack>
+    </Box>
+  );
+};
+
+const PREVIEW_EXIT_COMPARE_COMMAND = 'viewer.exitCompare';
+
+/** Mounted only while compare waits or is open, so Esc keeps its other meanings otherwise. */
+const PreviewExitCompareHotkey = ({ onExit, runtime }: { onExit: () => void; runtime: WidgetViewProps['runtime'] }) => {
+  const { t } = useTranslation();
+
+  // `onExit` clears the active project's comparison through the store's commands, the same for the mount's lifetime.
+  useMountEffect(() => {
+    const title = t('widgets.preview.commands.exitCompare');
+    const disposers = [
+      runtime.commands.register({ handler: onExit, id: PREVIEW_EXIT_COMPARE_COMMAND, title }),
+      runtime.hotkeys.register({
+        commandId: PREVIEW_EXIT_COMPARE_COMMAND,
+        defaultKeys: ['esc'],
+        id: PREVIEW_EXIT_COMPARE_COMMAND,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+
+  return null;
+};
+
+/** Match finished-frame geometry for live previews; saved-image navigation stays in the filmstrip. */
+const LivePreview = ({
+  density,
+  filmstrip,
+  placeholder,
+  shouldAntialiasProgressImage,
+}: {
+  density: PreviewDensity;
+  filmstrip: PreviewFilmstripProps | null;
+  placeholder: QueueActiveSession;
+  shouldAntialiasProgressImage: boolean;
+}) => {
+  // Use the followed slot's own frame so another slot's progress or release cannot replace it.
+  const progressImage = useQueueItemProgressImage(placeholder.queueItemId, placeholder.itemIndex);
+  const previewImage = useStreamingImageSource({ liveImage: progressImageToStreamingSource(progressImage) });
+  const source = useMemo<PreviewMediaSource | null>(
+    () =>
+      previewImage
+        ? {
+            itemKey: `image:live:${placeholder.id}`,
+            kind: 'image',
+            source: previewImage,
+          }
+        : null,
+    [placeholder.id, previewImage]
+  );
+
+  return (
+    <PreviewMediaScaffold>
+      <PreviewFrame
+        frameHeight={previewImage?.height ?? placeholder.height}
+        frameWidth={previewImage?.width ?? placeholder.width}
+        isLive
+        padding={getPreviewStagePadding(density)}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={source}
+        variant="framed"
+      />
+      {/* Followed before its first frame only when pinned, or with nothing else to show. */}
+      {placeholder.hasOwnFrame ? null : <PreviewStartingCue density={density} session={placeholder} />}
+      {filmstrip ? <PreviewFilmstrip {...filmstrip} density={density} selectedItemKey={null} /> : null}
+    </PreviewMediaScaffold>
+  );
+};
+
+/** What a frameless session is doing, from its run's progress message; model loads are not named. */
+const PreviewStartingCue = ({ density, session }: { density: PreviewDensity; session: QueueActiveSession }) => {
+  const { t } = useTranslation();
+  const label = useQueueItemProgress(session.queueItemId)?.message.trim() || t('widgets.preview.starting');
+
+  return (
+    <Box
+      data-preview-starting-cue=""
+      display="flex"
+      insetInline="2"
+      justifyContent="center"
+      pointerEvents="none"
+      position="absolute"
+      top={COMPARE_HINT_TOP}
+      zIndex="1"
+    >
+      <HStack
+        animationDuration="fast"
+        animationName="fade-in"
+        bg="bg.panel"
+        borderColor="border.subtle"
+        borderWidth="1px"
+        boxShadow="sm"
+        gap="1.5"
+        maxW="full"
+        minW="0"
+        px="2.5"
+        py="1"
+        rounded="full"
+        _motionReduce={COMPARE_HINT_MOTION_REDUCE}
+      >
+        <Spinner color="fg.muted" flexShrink={0} />
+        {/* A minimal Preview shows the spinner alone; the words stay for assistive technology. */}
+        <Text color="fg.muted" fontSize="md" minW="0" srOnly={density === 'minimal'} truncate>
+          {label}
+        </Text>
+      </HStack>
+    </Box>
+  );
+};
+
+const EmptyPreview = () => {
+  const { t } = useTranslation();
+  const openWidget = useOpenWorkbenchWidget();
+  const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
+  // Where the layout already has the Gallery, bring that one forward and focus it; opening it would move it.
+  const showGallery = useCallback(() => {
+    const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: 'gallery', widgets });
+
+    if (!revealed) {
+      openWidget('gallery');
+    } else if (revealed.kind === 'floating') {
+      focusFloating(revealed.instanceId);
+    } else {
+      focusRegion(revealed.region, 'gallery');
+    }
+  }, [focusFloating, focusRegion, openWidget, queries, widgets]);
+
+  return (
+    <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
+      <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
+        <Text fontSize="lg" fontWeight="800">
+          {t('widgets.preview.noGallerySelection')}
+        </Text>
+        <Text color="fg.muted" fontSize="md">
+          {t('widgets.preview.emptyDescription')}
+        </Text>
+        <Button size="sm" variant="outline" onClick={showGallery}>
+          {t('widgets.preview.showGallery')}
+        </Button>
+      </Stack>
+    </PreviewFrame>
+  );
+};

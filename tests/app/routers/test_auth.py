@@ -2,7 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,8 +12,17 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import set_jwt_secret
+from invokeai.app.services.fonts.fonts_common import FontScope
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.shared.database.queries.fonts import UploadedFont
+from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    PresetData,
+    PresetType,
+    StylePresetWithoutId,
+)
+from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
+from invokeai.app.services.users.users_common import SYSTEM_USER_ID, UserCreateRequest
+from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -97,6 +108,9 @@ def test_login_success(monkeypatch: Any, mock_invoker: Invoker, client: TestClie
     assert "expires_in" in json_response
     assert json_response["user"]["email"] == "test@example.com"
     assert json_response["user"]["is_admin"] is False
+    assert response.cookies.get("invokeai_media_token") == json_response["token"]
+    assert "HttpOnly" in response.headers["set-cookie"]
+    assert "Path=/api/v1" in response.headers["set-cookie"]
 
 
 def test_login_with_remember_me(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
@@ -278,6 +292,39 @@ def test_setup_admin_first_time(monkeypatch: Any, mock_invoker: Invoker, client:
     assert json_response["user"]["is_admin"] is True
 
 
+def test_delete_user_emits_revocation_when_font_cleanup_fails(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """A cleanup failure cannot leave the deleted user's live sessions authorized."""
+    dependencies = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", dependencies)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", dependencies)
+
+    setup_test_admin(mock_invoker, "delete-admin@example.com", "AdminPass123")
+    deleted_user_id = setup_test_user(mock_invoker, "delete-target@example.com", "TestPass123")
+    admin_token = client.post(
+        "/api/v1/auth/login",
+        json={"email": "delete-admin@example.com", "password": "AdminPass123", "remember_me": False},
+    ).json()["token"]
+
+    fonts = MagicMock()
+    fonts.prepare_user_cleanup.return_value = ()
+    fonts.cleanup_user.side_effect = OSError("storage unavailable")
+    mock_invoker.services.fonts = fonts
+    events = mock_invoker.services.events
+    events.emit_user_access_changed = MagicMock()
+
+    response = client.delete(
+        f"/api/v1/auth/users/{deleted_user_id}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == 204
+    assert mock_invoker.services.users.get(deleted_user_id) is None
+    events.emit_user_access_changed.assert_called_once_with(user_id=deleted_user_id, is_admin=False, is_active=False)
+    fonts.prepare_user_cleanup.assert_called_once_with(deleted_user_id)
+    fonts.cleanup_user.assert_called_once_with(deleted_user_id, ())
+
+
 def test_setup_admin_already_exists(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     """Test setup fails when admin already exists."""
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
@@ -354,3 +401,251 @@ def test_admin_user_token_has_admin_flag(monkeypatch: Any, mock_invoker: Invoker
     assert response.status_code == 200
     json_response = response.json()
     assert json_response["user"]["is_admin"] is True
+
+
+class TestRefreshMediaCookie:
+    """POST /api/v1/auth/media-cookie — self-healing for sessions that hold a valid
+    JWT but no media cookie (session predates the cookie, or the cookie was cleared).
+    Without it, every API call works but <video> requests 401 and the player renders
+    black (PR #9163 functional testing)."""
+
+    def _login(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient, email: str) -> str:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        # The media-cookie route authenticates via CurrentUserOrDefault, which reads
+        # ApiDependencies from the auth_dependencies module.
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, email, "TestPass123")
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "TestPass123", "remember_me": False},
+        )
+        assert response.status_code == 200
+        return response.json()["token"]
+
+    def test_reissues_cookie_from_bearer_token(
+        self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        token = self._login(monkeypatch, mock_invoker, client, "mediacookie@example.com")
+
+        # Simulate the stale-session state: valid JWT in hand, no cookie in the jar.
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.cookies.get("invokeai_media_token") == token
+        set_cookie = response.headers["set-cookie"]
+        assert "HttpOnly" in set_cookie
+        assert "Path=/api/v1" in set_cookie
+        # Cookie must not outlive the token: max-age is clamped to the remaining
+        # validity (1-day login here, minus the instants since).
+        max_age = int(set_cookie.split("Max-Age=")[1].split(";")[0])
+        assert 0 < max_age <= 24 * 3600
+
+    def test_requires_bearer_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        client.cookies.clear()
+        response = client.post("/api/v1/auth/media-cookie")
+        assert response.status_code == 401
+
+    def test_rejects_invalid_token(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": "Bearer not-a-jwt"})
+        assert response.status_code == 401
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_rejects_deactivated_user(self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+        """A still-valid token for a since-deactivated user must not mint a cookie —
+        the cookie grants media access, so it needs the same live-user check as
+        get_current_user."""
+        from invokeai.app.services.users.users_common import UserUpdateRequest
+
+        token = self._login(monkeypatch, mock_invoker, client, "deactivated@example.com")
+        user = mock_invoker.services.users.get_by_email("deactivated@example.com")
+        mock_invoker.services.users.update(user.user_id, UserUpdateRequest(is_active=False))
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 401
+        assert response.cookies.get("invokeai_media_token") is None
+
+    def test_single_user_mode_is_a_successful_noop(
+        self, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        """In single-user mode media routes don't require auth; the frontend may
+        still call this on load, so it must succeed without setting a cookie."""
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        mock_invoker.services.configuration.multiuser = False
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie")
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert response.cookies.get("invokeai_media_token") is None
+
+
+class TestMediaCookieBehindSubPathProxy:
+    """The media cookie must be scoped to the *public* path when the app is served
+    under a reverse-proxy sub-path — browsers match cookie paths against the URL
+    they requested, so a cookie scoped to `/api/v1` is never sent to
+    `/invoke/api/v1/videos/...`."""
+
+    BASE_PATH = "/invoke"
+
+    def _proxied_client(self, preserve: bool) -> TestClient:
+        from invokeai.app.api_app import SubPathASGIMiddleware
+
+        wrapped = SubPathASGIMiddleware(app, self.BASE_PATH)
+        root = f"http://testserver{self.BASE_PATH}" if preserve else "http://testserver"
+        return TestClient(wrapped, base_url=root)
+
+    def _login(self, client: TestClient, email: str) -> tuple[str, Any]:
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "TestPass123", "remember_me": False},
+        )
+        assert response.status_code == 200
+        return response.json()["token"], response
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_login_scopes_cookie_to_public_prefix(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-login-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+
+        _token, response = self._login(client, f"proxy-login-{preserve}@example.com")
+
+        assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_media_cookie_endpoint_scopes_cookie_to_public_prefix(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-media-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+        token, _ = self._login(client, f"proxy-media-{preserve}@example.com")
+        client.cookies.clear()
+
+        response = client.post("/api/v1/auth/media-cookie", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert f"Path={self.BASE_PATH}/api/v1" in response.headers["set-cookie"]
+
+    @pytest.mark.parametrize("preserve", [True, False], ids=["preserve", "strip"])
+    def test_logout_deletes_cookie_at_public_prefix_without_reminting(
+        self, preserve: bool, monkeypatch: Any, mock_invoker: Invoker
+    ) -> None:
+        """Logout must delete the cookie at the prefixed path, and the sliding-window
+        middleware must not mint a replacement token/cookie for the proxied logout URL."""
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+        setup_test_user(mock_invoker, f"proxy-logout-{preserve}@example.com", "TestPass123")
+        client = self._proxied_client(preserve)
+        token, _ = self._login(client, f"proxy-logout-{preserve}@example.com")
+
+        response = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert "X-Refreshed-Token" not in response.headers
+        set_cookies = response.headers.get_list("set-cookie")
+        assert len(set_cookies) == 1
+        assert 'invokeai_media_token=""' in set_cookies[0]
+        assert f"Path={self.BASE_PATH}/api/v1" in set_cookies[0]
+
+
+def _add_project(invoker: Invoker, user_id: str) -> None:
+    invoker.services.project_records.create(user_id, "Project", {})
+
+
+def _add_wildcard(invoker: Invoker, user_id: str) -> None:
+    invoker.services.wildcard_records.create(WildcardWithoutId(name="colors", values=["red"]), user_id)
+
+
+def _add_template(invoker: Invoker, user_id: str, *, is_public: bool = False) -> None:
+    template = StylePresetWithoutId(
+        name="Template",
+        preset_data=PresetData(positive_prompt="a {prompt}", negative_prompt=""),
+        type=PresetType.User,
+        is_public=is_public,
+    )
+    StylePresetRecordsStorage(invoker.services.database).create(template, user_id)
+
+
+def _add_font(invoker: Invoker, owner_id: str | None) -> None:
+    font_id = f"font_{uuid4().hex}"
+    invoker.services.database.queries.fonts.insert_upload(
+        UploadedFont(
+            id=font_id,
+            owner_id=owner_id,
+            scope=FontScope.PRIVATE if owner_id else FontScope.SHARED,
+            filename="Font.ttf",
+            storage_path=f"{font_id}.ttf",
+            family="Font",
+            label="Font Regular",
+            style="normal",
+            weight=400,
+            content_hash="0" * 64,
+            byte_size=1,
+            axes=(),
+            instances=(),
+        )
+    )
+
+
+class TestSingleUserWorkStatus:
+    @pytest.fixture(autouse=True)
+    def _dependencies(self, monkeypatch: Any, mock_invoker: Invoker) -> None:
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    @pytest.mark.parametrize(
+        "add_work",
+        [
+            _add_project,
+            _add_wildcard,
+            _add_template,
+            _add_font,
+        ],
+        ids=["project", "wildcard", "private_template", "private_font"],
+    )
+    def test_reported_during_setup_when_system_owns_private_work(
+        self, add_work: Callable[[Invoker, str], None], mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        add_work(mock_invoker, SYSTEM_USER_ID)
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is True
+        assert status["has_single_user_work"] is True
+
+    def test_not_reported_for_content_every_account_sees_or_another_account_owns(
+        self, mock_invoker: Invoker, client: TestClient
+    ) -> None:
+        # Bundled templates, a public template and a shared font upload stay visible after setup.
+        StylePresetRecordsStorage(mock_invoker.services.database).start(mock_invoker)
+        _add_template(mock_invoker, SYSTEM_USER_ID, is_public=True)
+        _add_font(mock_invoker, None)
+        _add_project(mock_invoker, setup_test_user(mock_invoker, "status-user@example.com"))
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is True
+        assert status["has_single_user_work"] is False
+
+    def test_not_reported_once_an_administrator_exists(self, mock_invoker: Invoker, client: TestClient) -> None:
+        _add_project(mock_invoker, SYSTEM_USER_ID)
+        setup_test_admin(mock_invoker, "status-admin@example.com")
+
+        status = client.get("/api/v1/auth/status").json()
+
+        assert status["setup_required"] is False
+        assert status["has_single_user_work"] is False

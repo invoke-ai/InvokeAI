@@ -20,6 +20,29 @@ class NotAMatchError(Exception):
         super().__init__(reason)
 
 
+class InvalidMatchError(Exception):
+    """Exception for when a config class recognises a model and then rejects it as unusable.
+
+    `NotAMatchError` means "this is not my kind of model": classification moves on to the remaining
+    config classes and, if none of them match either, falls back to `Unknown_Config` so the file is
+    still registered. That fallback is right for a file nobody recognises and wrong for one that was
+    recognised and found broken — a truncated checkpoint would be stored as a normal (if unknown)
+    model record and only fail once something tried to load it.
+
+    Raising this instead makes the rejection final: `ModelConfigFactory.from_model_on_disk` returns
+    no config regardless of `allow_unknown`, so nothing is written to the database.
+
+    Deliberately *not* a subclass of `NotAMatchError` — the factory catches that one per candidate
+    class and would swallow this along with it.
+
+    Args:
+        reason: Why the recognised model is unusable.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+
+
 def get_config_dict_or_raise(config_path: Path | set[Path]) -> dict[str, Any]:
     """Load the diffusers/transformers model config file and return it as a dictionary. The config file is expected
     to be in JSON format.
@@ -159,6 +182,46 @@ def state_dict_has_any_keys_ending_with(state_dict: dict[str | int, Any], suffix
     """Returns true if the state dict has any keys ending with any of the specified suffixes."""
     _suffixes = {suffixes} if isinstance(suffixes, str) else suffixes
     return any(any(key.endswith(suffix) for suffix in _suffixes) for key in state_dict.keys() if isinstance(key, str))
+
+
+def raise_if_quantized_beyond_fp8(
+    mod: ModelOnDisk, state_dict: dict[str | int, Any], what: str, supported_note: str
+) -> None:
+    """Refuse at install a single file quantized in a scheme a loader that only reads (scaled) fp8 cannot decode.
+
+    ComfyUI redistributes text encoders as int8 (convrot), nvfp4 and mxfp8 builds next to the fp16 and fp8
+    ones. Recognising such a file and registering it would leave a model that fails at its first use, so it is
+    an `InvalidMatchError`, worded for the caller's model. Identification has every dtype on the meta device but
+    no bytes, so the schemes are read from the weights' dtypes, nvfp4's second scale, and the header's
+    declarations (a header parse plus one seek per `.comfy_quant` marker).
+    """
+    import torch
+
+    if state_dict_has_any_keys_ending_with(state_dict, ".weight_scale_2"):
+        raise InvalidMatchError(f"This {what} is nvfp4-quantized, which is not supported. {supported_note}")
+
+    integer_weights = sorted(
+        key
+        for key, value in state_dict.items()
+        if isinstance(key, str)
+        and key.endswith(".weight")
+        and getattr(value, "dtype", None) in (torch.int8, torch.uint8)
+    )
+    if integer_weights:
+        raise InvalidMatchError(
+            f"This {what} carries {len(integer_weights)} integer-quantized weight(s) (e.g. '{integer_weights[0]}'), "
+            f"which are not supported. {supported_note}"
+        )
+
+    # Lazy: the loader package imports the config factory, which imports the configs calling this.
+    from invokeai.backend.model_manager.load.model_loaders._single_file_guards import (
+        reject_formats_declared_in_the_header,
+    )
+
+    try:
+        reject_formats_declared_in_the_header(mod.path, what, None, {"float8_e4m3fn"}, supported_note)
+    except ValueError as e:
+        raise InvalidMatchError(str(e)) from e
 
 
 def common_config_paths(path: Path) -> set[Path]:

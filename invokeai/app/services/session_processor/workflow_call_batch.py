@@ -10,7 +10,7 @@ from typing import Any
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 
 from invokeai.app.invocations.fields import ImageField
-from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
+from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction, queue_viewer
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -20,8 +20,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     create_session_nfv_tuples,
 )
+from invokeai.app.services.shared.execution_state_migration import load_execution_state
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.workflow_graph_builder import (
     UnsupportedWorkflowNodeError,
     apply_workflow_inputs_to_workflow,
@@ -312,52 +312,22 @@ def _assert_user_can_access_board(board_id: str, services: Any, user_id: str | N
     if not user_id:
         return
 
-    board_records = getattr(services, "board_records", None)
-    if board_records is None or not hasattr(board_records, "get"):
-        return
-
-    users = getattr(services, "users", None)
-    user = users.get(user_id) if users is not None and hasattr(users, "get") else None
-    is_admin = bool(user and getattr(user, "is_admin", False))
-    if is_admin:
-        return
-
+    denied = f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
     try:
-        board_record = board_records.get(board_id)
+        # The expansion reads the board as the queue user would at execution time: a deleted or deactivated account
+        # is refused, an active one brings its own admin flag, and single-user mode runs as an admin. A lookup or
+        # access check that fails is the board being unreachable, not a crash of the expansion.
+        viewer = queue_viewer(user_id, multiuser=services.configuration.multiuser, users=services.users)
+        if viewer is not None:
+            services.board_access.require(board_id, viewer.user_id, viewer.is_admin, BoardAction.Read)
+    except BoardAccessDeniedError as e:
+        raise UnsupportedWorkflowNodeError(denied) from e
     except Exception as e:
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow could not access board '{board_id}' for image generator expansion"
         ) from e
-
-    if getattr(board_record, "user_id", None) == user_id:
-        return
-
-    board_visibility = getattr(board_record, "board_visibility", BoardVisibility.Private)
-    if isinstance(board_visibility, str):
-        try:
-            board_visibility = BoardVisibility(board_visibility)
-        except ValueError:
-            board_visibility = BoardVisibility.Private
-    if board_visibility in {BoardVisibility.Shared, BoardVisibility.Public}:
-        return
-
-    if hasattr(board_records, "get_all"):
-        try:
-            accessible_boards = board_records.get_all(
-                user_id=user_id,
-                is_admin=False,
-                order_by=BoardRecordOrderBy.Name,
-                direction=SQLiteDirection.Ascending,
-                include_archived=True,
-            )
-        except Exception:
-            accessible_boards = []
-        if any(getattr(board, "board_id", None) == board_id for board in accessible_boards):
-            return
-
-    raise UnsupportedWorkflowNodeError(
-        f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
-    )
+    if viewer is None:
+        raise UnsupportedWorkflowNodeError(denied)
 
 
 def _resolve_image_generator(value: Mapping[str, Any], services: Any, user_id: str | None) -> list[ImageField]:
@@ -635,7 +605,7 @@ def build_batch_child_workflow_session_results(
 
     child_session_results: list[WorkflowCallChildSessionResult] = []
     for session_id, session_json, field_values_json in create_session_nfv_tuples(batch, maximum_children):
-        generated_session = GraphExecutionState.model_validate_json(session_json)
+        generated_session = load_execution_state(json.loads(session_json))
         child_session = parent_session.create_child_workflow_execution_state(generated_session.graph, call_frame)
         child_session.id = session_id
         field_values = [NodeFieldValue.model_validate(field_value) for field_value in json.loads(field_values_json)]

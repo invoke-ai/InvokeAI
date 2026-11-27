@@ -1,0 +1,22 @@
+name: Documentation issue
+description: Report a mistake or a gap on a documentation page
+title: '[docs]: '
+labels: ['documentation']
+
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The documentation page with the problem. The "Report an issue" link on each page fills this in.
+      placeholder: https://v7.invoke.ai/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Quote the passage if it helps, and tell us what you expected to find.
+    validations:
+      required: true

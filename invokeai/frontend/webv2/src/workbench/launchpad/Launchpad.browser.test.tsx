@@ -1,0 +1,367 @@
+/* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type * as SessionModule from '@features/identity/session';
+import type { ModelConfig } from '@features/models/core/types';
+import type * as ModelsApi from '@features/models/data/api';
+import type * as openProjects from '@workbench/projects/openProjects';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { closeModelDetail } from '@features/models/ui/uiStore';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { applyThemeToRoot } from '@theme/applyTheme';
+import { DEFAULT_THEME_ID, system } from '@theme/system';
+import { type ReactNode, act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
+
+const pending = vi.hoisted(() => () => new Promise<never>(() => {}));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values ? `${key}:${Object.values(values).map(String).join(',')}` : key,
+  }),
+}));
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useCapabilities: () => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }),
+  UsersPage: () => null,
+}));
+vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
+const auth = vi.hoisted(() => ({ session: null as SessionModule.AuthSession | null }));
+vi.mock('@features/identity/session', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionModule>();
+
+  return {
+    ...original,
+    useAuthSession: () => {
+      const session = original.useAuthSession();
+      return auth.session ?? session;
+    },
+  };
+});
+vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
+vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
+vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
+vi.mock('@features/models/data/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ModelsApi>()),
+  getExternalProviderConfigs: pending,
+  getFp8StorageSupport: pending,
+  getHFTokenStatus: pending,
+  getModelsDir: pending,
+  getStarterModels: pending,
+  listMissingModels: () => Promise.resolve([]),
+  listModelInstalls: pending,
+  listModels: pending,
+}));
+vi.mock('@features/models/data/relationshipsApi', () => ({
+  addModelRelationship: pending,
+  getRelatedModelKeys: () => Promise.resolve([]),
+  removeModelRelationship: pending,
+}));
+vi.mock('@workbench/settings/launchpad', () => ({ PreferencesPage: () => null }));
+vi.mock('@workbench/palette/LaunchpadCommandPalette', () => ({ LaunchpadCommandPalette: () => null }));
+vi.mock('./LaunchpadTopBar', () => ({ LaunchpadTopBar: () => <div style={{ flexShrink: 0, height: 48 }} /> }));
+vi.mock('./pages/HomePage', () => ({ HomePage: () => null }));
+vi.mock('./pages/ProjectsPage', () => ({ ProjectsPage: () => null }));
+vi.mock('./projects/ProjectActionsMenuHost', () => ({
+  ProjectActionsMenuProvider: ({ children }: { children: ReactNode }) => children,
+}));
+const projects = vi.hoisted(() => ({ open: ['one', 'two'] }));
+vi.mock('@workbench/projects/openProjects', () => ({
+  refreshOpenProjects: () => Promise.resolve(),
+  useOpenProjectsSelector: <T,>(select: (value: openProjects.OpenProjectsSnapshot) => T) =>
+    select({ activeId: 'one', ids: projects.open, status: 'ready' } as openProjects.OpenProjectsSnapshot),
+}));
+vi.mock('@workbench/projects/library', () => ({
+  useProjectLibrarySelector: <T,>(select: (value: { summaries: { id: string; name: string }[] }) => T) =>
+    select({
+      summaries: [
+        { id: 'one', name: 'First' },
+        { id: 'two', name: 'Second' },
+      ],
+    }),
+}));
+
+const { Launchpad } = await import('./Launchpad');
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const lora = (key: string): ModelConfig =>
+  ({
+    base: 'sdxl',
+    default_settings: null,
+    description: null,
+    file_size: 1024,
+    format: 'lycoris',
+    hash: `hash-${key}`,
+    key,
+    name: `Lora ${key}`,
+    path: `/models/${key}.safetensors`,
+    source: `/models/${key}.safetensors`,
+    source_type: 'path',
+    trigger_phrases: [],
+    type: 'lora',
+  }) as ModelConfig;
+
+let host: HTMLDivElement;
+let root: Root;
+let queryClient: QueryClient;
+
+const render = async () => {
+  const rootRoute = createRootRoute({ component: Launchpad });
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ['/models'] }),
+    routeTree: rootRoute.addChildren(
+      ['/', '/app', '/projects', '/models', '/nodes', '/fonts', '/users', '/preferences'].map((path) =>
+        createRoute({ getParentRoute: () => rootRoute, path })
+      )
+    ),
+  });
+
+  await act(async () => {
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      </QueryClientProvider>
+    );
+    await router.load();
+  });
+};
+
+const rail = () => page.getByRole('navigation', { name: 'launchpad.sectionsLabel' });
+
+const rect = (element: Element) => element.getBoundingClientRect();
+const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
+
+const isInView = (element: Element) => {
+  const bounds = rect(element);
+  const viewport = element.closest('[data-scope="scroll-area"][data-part="viewport"]');
+  const visible = viewport ? rect(viewport) : new DOMRect(0, 0, innerWidth, innerHeight);
+
+  return (
+    bounds.left >= Math.max(0, visible.left) &&
+    bounds.top >= Math.max(0, visible.top) &&
+    bounds.right <= Math.min(innerWidth, visible.right) &&
+    bounds.bottom <= Math.min(innerHeight, visible.bottom)
+  );
+};
+
+beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(['frontend-config'], { show_donation_link: false });
+  applyThemeToRoot(DEFAULT_THEME_ID);
+  accountLifecycle.activate('launchpad-shell-test', ':user:launchpad-shell-test');
+  setModelsSnapshotForTests({ models: [lora('a'), lora('b')], status: 'loaded' });
+  closeModelDetail();
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+});
+
+afterEach(async () => {
+  projects.open = ['one', 'two'];
+  auth.session = null;
+  await act(() => root.unmount());
+  queryClient.clear();
+  host.remove();
+  accountLifecycle.invalidate();
+  await page.viewport(1280, 900);
+});
+
+describe('Launchpad shell', () => {
+  it('retains selected model details across section deactivation', async () => {
+    await render();
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    await page.getByRole('link', { name: 'launchpad.sections.models' }).click();
+    await expect.element(page.getByRole('button', { name: 'common.edit', exact: true })).toBeVisible();
+    expect(host.textContent).toContain('Lora b');
+  });
+
+  it('keeps the model manager usable at 720×450 (a 1440×900 window at 200%) beside an icon rail', async () => {
+    await page.viewport(720, 450);
+    await render();
+
+    const main = document.querySelector('main')!;
+    await expect.element(rail()).toBeVisible();
+    expect(rect(rail().element()).width).toBeLessThan(64);
+    expect(rect(main).height).toBe(450 - 48);
+    expect(rect(main).left).toBeGreaterThanOrEqual(0);
+    expect(rect(main).right).toBeLessThanOrEqual(innerWidth);
+    expect(rect(main).bottom).toBeLessThanOrEqual(innerHeight);
+    await expect
+      .element(page.getByRole('link', { name: 'launchpad.sections.models' }))
+      .toHaveAttribute('aria-current', 'page');
+
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+
+    const back = page.getByRole('button', { name: 'models.backToList' });
+    await expect.element(back).toHaveFocus();
+    for (const name of ['common.edit', 'models.actions']) {
+      const control = page.getByRole('button', { name, exact: true });
+      await expect.element(control).toBeVisible();
+      expect(isInView(control.element())).toBe(true);
+    }
+    expect(isInView(page.getByRole('button', { name: /models.installQueue/ }).element())).toBe(true);
+    expect(await auditAccessibility(host)).toEqual([]);
+
+    await back.click();
+    await expect.element(page.getByRole('heading', { name: 'models.title' })).toBeVisible();
+    expect(document.activeElement).toBe(row('b'));
+  });
+
+  it('names every icon in the rail and marks the current project', async () => {
+    await page.viewport(720, 450);
+    await render();
+
+    const current = page.getByRole('link', { name: 'First · launchpad.openProjects.current' });
+    await expect.element(current).toHaveAttribute('data-current-project', '');
+    await expect
+      .element(page.getByRole('link', { name: 'Second', exact: true }))
+      .not.toHaveAttribute('data-current-project');
+
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('launchpad.sections.fonts');
+
+    await page.getByRole('button', { name: 'launchpad.help.label' }).click();
+    await expect.element(page.getByRole('menuitem', { name: 'launchpad.help.documentation' })).toBeVisible();
+    expect(await auditAccessibility(document.querySelector('[role="menu"]')!)).toEqual([]);
+    await userEvent.keyboard('{Escape}');
+    await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toHaveFocus();
+  });
+
+  it('puts the signed-in account at the foot of the rail and opens its menu beside it', async () => {
+    const name = 'Maximiliana Bartholomew-Featherstonehaugh of the Very Long Name';
+    auth.session = {
+      accountEpoch: 1,
+      expiredUserId: null,
+      hasSingleUserWork: false,
+      multiuserEnabled: true,
+      phase: 'ready',
+      sessionExpired: false,
+      setupRequired: false,
+      strictPasswordChecking: false,
+      switchingAccount: false,
+      user: {
+        created_at: '2026-01-01T00:00:00Z',
+        display_name: name,
+        email: 'max@example.com',
+        is_active: true,
+        is_admin: true,
+        last_login_at: null,
+        updated_at: '2026-01-01T00:00:00Z',
+        user_id: 'max',
+      },
+    };
+    const account = page.getByRole('button', { name: new RegExp(name) });
+    const help = page.getByRole('button', { name: 'launchpad.help.label' });
+    await page.viewport(1280, 900);
+    await render();
+
+    await expect.element(account).toBeVisible();
+    expect(rail().element().contains(account.element())).toBe(true);
+    expect(help.element().compareDocumentPosition(account.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rect(account.element()).top).toBeGreaterThan(rect(help.element()).bottom);
+    expect(rect(rail().element()).width).toBe(224);
+    expect(rect(account.element()).right).toBeLessThanOrEqual(rect(rail().element()).right);
+    const [nameLine, emailLine] = account.element().querySelectorAll('p');
+    expect(nameLine!.textContent).toBe(name);
+    expect(nameLine!.scrollWidth).toBeGreaterThan(nameLine!.clientWidth);
+    expect(emailLine!.textContent).toBe('max@example.com');
+    const chevron = [...account.element().querySelectorAll('svg')].at(-1)!;
+    expect(rect(chevron).right).toBeLessThanOrEqual(rect(account.element()).right);
+    expect(rect(chevron).left).toBeGreaterThan(rect(nameLine!).right);
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(1);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+
+    await account.click();
+    const menu = page.getByRole('menu');
+    await expect.element(page.getByRole('menuitem', { name: 'auth.accountSettings' })).toBeVisible();
+    expect(rect(menu.element()).left).toBeGreaterThan(rect(account.element()).right);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    expect(await auditAccessibility(menu.element())).toEqual([]);
+    await page.getByRole('menuitem', { name: 'users.manageUsers' }).click();
+    await expect
+      .element(page.getByRole('link', { name: 'launchpad.sections.users' }))
+      .toHaveAttribute('aria-current', 'page');
+
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(rail().element()).width).toBeLessThan(64);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+    await account.hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent(name);
+    await account.click();
+    await expect.element(page.getByRole('menuitem', { name: 'auth.signOut' })).toBeVisible();
+    await expect
+      .poll(() => [...document.querySelectorAll('[role="tooltip"]')].some((tip) => tip.checkVisibility()))
+      .toBe(false);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    await userEvent.keyboard('{Escape}');
+    await expect.element(account).toHaveFocus();
+  });
+
+  it('keeps the rail free of an account row and its separator in single-user mode', async () => {
+    await page.viewport(1280, 900);
+    await render();
+
+    await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toBeVisible();
+    expect(rail().element().querySelector('[data-scope="avatar"]')).toBeNull();
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(0);
+  });
+
+  it('squeezes the open projects list to one entry before the rail scrolls', async () => {
+    projects.open = ['one', 'two', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+    const viewportOf = (element: Element) => element.closest('[data-scope="scroll-area"][data-part="viewport"]')!;
+    const isScrollable = (viewport: Element) => viewport.scrollHeight > viewport.clientHeight;
+    const current = () => page.getByRole('link', { name: 'First · launchpad.openProjects.current' }).element();
+    const help = () => page.getByRole('button', { name: 'launchpad.help.label' }).element();
+
+    await page.viewport(1280, 900);
+    await render();
+    const fullList = viewportOf(page.getByRole('link', { name: /^First/ }).element());
+    // Twelve rem of entries plus the focus-ring inset.
+    await expect.poll(() => rect(fullList).height).toBe(200);
+    expect(isScrollable(fullList)).toBe(true);
+
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(viewportOf(current())).height).toBeLessThan(200);
+    expect(isScrollable(viewportOf(current()))).toBe(true);
+    expect(isScrollable(viewportOf(help()))).toBe(false);
+    expect(isInView(current())).toBe(true);
+
+    await page.viewport(720, 360);
+    await expect.poll(() => isScrollable(viewportOf(help()))).toBe(true);
+    expect(isInView(current())).toBe(true);
+    help().focus();
+    expect(isInView(help())).toBe(true);
+  });
+
+  it('shows the labelled rail and both panes when the window widens', async () => {
+    await page.viewport(720, 450);
+    await render();
+    await expect.element(page.getByRole('link', { name: 'launchpad.sections.models' })).toBeVisible();
+
+    await page.viewport(1280, 800);
+
+    await expect.poll(() => rect(rail().element()).width).toBe(224);
+    expect(page.getByRole('link', { name: 'launchpad.sections.models' }).element().textContent).toBe(
+      'launchpad.sections.models'
+    );
+    await expect.element(page.getByRole('heading', { name: 'models.title' })).toBeVisible();
+    await expect.element(page.getByRole('tablist')).toBeVisible();
+  });
+});

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from invokeai.app.invocations.cogview4_text_encoder import CogView4TextEncoderInvocation
+from invokeai.app.invocations.text_encoder.cogview4_text_encoder import CogView4TextEncoderInvocation
 
 
 class FakeGlmModel(torch.nn.Module):
@@ -37,9 +37,14 @@ class FakeTokenizer:
 
 
 class FakeLoadedModel:
-    def __init__(self, model):
+    def __init__(self, model, compute_device=torch.device("cpu")):
         self._model = model
         self.repair_calls = 0
+        self._compute_device = compute_device
+
+    @property
+    def compute_device(self) -> torch.device:
+        return self._compute_device
 
     @contextmanager
     def model_on_device(self):
@@ -67,7 +72,7 @@ def test_cogview4_text_encoder_repairs_model_before_forward(monkeypatch):
         glm_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace()),
     )
 
-    module_path = "invokeai.app.invocations.cogview4_text_encoder"
+    module_path = "invokeai.app.invocations.text_encoder.cogview4_text_encoder"
     monkeypatch.setattr(f"{module_path}.GlmModel", FakeGlmModel)
     monkeypatch.setattr(f"{module_path}.PreTrainedTokenizerFast", FakeTokenizer)
 

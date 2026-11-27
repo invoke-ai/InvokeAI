@@ -1,0 +1,81 @@
+---
+title: Community Nodes
+description: Node packs written by the InvokeAI community, and how to install them with the Nodes manager or Git.
+lastUpdated: 2026-10-26
+---
+
+import { Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import CommunityNodes from '@components/CommunityNodes.astro';
+
+Node packs add new nodes to the [Workflow Editor](/users-guide/workflows/introduction/). The packs below are written
+and maintained by members of the community.
+
+:::caution[Only install packs you trust]
+A node pack runs Python code on your machine with InvokeAI's permissions. Invoke doesn't review or guarantee community
+packs. Report problems with a pack to its author, on its repository.
+:::
+
+## Install a node pack
+
+<Tabs syncKey="node-install">
+<TabItem label="Nodes manager">
+
+<Steps>
+
+1. Open **Nodes** in the Launchpad, or **Nodes Manager** in the app menu. When multi-user mode is on, only
+   administrators see it.
+
+2. Click **Add Nodes**.
+
+3. Paste the pack's Git URL, which **Copy Git URL** on a card below puts on your clipboard, and click **Install**.
+
+   InvokeAI clones the repository into your nodes directory and loads its nodes without a restart. Workflows the pack
+   ships are added to your workflow library.
+
+4. If a **Dependencies required** notice appears, install the Python packages the pack's README lists into InvokeAI's
+   environment, then restart InvokeAI.
+
+</Steps>
+
+</TabItem>
+<TabItem label="Git">
+
+<Steps>
+
+1. Open a terminal in the `nodes` folder of your InvokeAI root directory. The **Add Nodes** view of the Nodes manager
+   shows its path under **Nodes Directory**; the `custom_nodes_dir` setting changes it.
+
+2. Clone the pack:
+
+   ```sh
+   git clone https://github.com/JPPhoto/cinematic-effects-pack.git
+   ```
+
+   To update it, run `git pull` in the pack's folder and restart InvokeAI.
+
+3. Click **Reload** in the Nodes manager, or restart InvokeAI.
+
+</Steps>
+
+You can also download a pack's source as a ZIP and extract it into its own folder in `nodes`. InvokeAI loads a folder
+only when it has an `__init__.py` at its top level.
+
+</TabItem>
+</Tabs>
+
+The [Custom Node Manager](/users-guide/workflows/custom-node-manager/) page covers browsing, reloading and uninstalling
+packs. A workflow that uses community nodes loads like any other: import its `.json` file into the workflow library.
+
+## Browse node packs
+
+<CommunityNodes />
+
+## Add your node pack
+
+Each pack on this page is one YAML file in
+[`docs/src/content/community-nodes/`](https://github.com/invoke-ai/InvokeAI/tree/main/docs/src/content/community-nodes).
+To list yours, add a file there in a pull request; the
+[README in that folder](https://github.com/invoke-ai/InvokeAI/blob/main/docs/src/content/community-nodes/README.md)
+lists the fields. [Creating Nodes](/development/guides/creating-nodes/) explains how to build a pack.
+
+For help with a pack, ask in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy).

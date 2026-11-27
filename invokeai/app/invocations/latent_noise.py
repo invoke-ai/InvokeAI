@@ -58,79 +58,17 @@ def generate_noise_tensor(
     dtype: torch.dtype,
     use_cpu: bool = True,
 ) -> torch.Tensor:
-    validate_noise_dimensions(noise_type, width, height)
+    shape = get_expected_noise_shape(noise_type, width, height)
     rand_device = "cpu" if use_cpu else device.type
-    rand_dtype = TorchDevice.choose_torch_dtype(device=device)
-
-    if noise_type == "SD":
-        return torch.randn(
-            1,
-            4,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            dtype=rand_dtype,
-            device=rand_device,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "FLUX":
-        return torch.randn(
-            1,
-            16,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=rand_dtype,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "FLUX.2":
-        return torch.randn(
-            1,
-            32,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=rand_dtype,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "SD3":
-        return torch.randn(
-            1,
-            16,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=rand_dtype,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "CogView4":
-        return torch.randn(
-            1,
-            16,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=rand_dtype,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "Z-Image":
-        return torch.randn(
-            1,
-            16,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=torch.float32,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    if noise_type == "Anima":
-        return torch.randn(
-            1,
-            16,
-            1,
-            height // LATENT_SCALE_FACTOR,
-            width // LATENT_SCALE_FACTOR,
-            device=rand_device,
-            dtype=torch.float32,
-            generator=torch.Generator(device=rand_device).manual_seed(seed),
-        ).to("cpu")
-    raise ValueError(f"Unsupported noise type: {noise_type}")
+    if noise_type in ("Z-Image", "Anima"):
+        output_dtype = rand_dtype = torch.float32
+    else:
+        # The tensor keeps the device precision it always had; only the dtype it is drawn in follows `noise_dtype`.
+        output_dtype = dtype
+        rand_dtype = TorchDevice.choose_noise_dtype(dtype)
+    return torch.randn(
+        *shape,
+        device=rand_device,
+        dtype=rand_dtype,
+        generator=torch.Generator(device=rand_device).manual_seed(seed),
+    ).to(device="cpu", dtype=output_dtype)

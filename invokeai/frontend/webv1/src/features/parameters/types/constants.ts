@@ -1,0 +1,93 @@
+import type { ComboboxOption } from '@invoke-ai/ui-library';
+import type { BaseModelType } from 'features/nodes/types/common';
+
+/**
+ * Mapping of base model to CLIP skip parameter constraints
+ */
+export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; markers: number[] } } = {
+  any: {
+    maxClip: 0,
+    markers: [],
+  },
+  'sd-1': {
+    maxClip: 12,
+    markers: [0, 1, 2, 3, 4, 8, 12],
+  },
+  'sd-2': {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  'sd-3': {
+    maxClip: 0,
+    markers: [],
+  },
+  sdxl: {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  'sdxl-refiner': {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  flux: {
+    maxClip: 0,
+    markers: [],
+  },
+  cogview4: {
+    maxClip: 0,
+    markers: [],
+  },
+  'qwen-image': {
+    maxClip: 0,
+    markers: [],
+  },
+  'z-image': {
+    maxClip: 0,
+    markers: [],
+  },
+  anima: {
+    maxClip: 0,
+    markers: [],
+  },
+  wan: {
+    maxClip: 0,
+    markers: [],
+  },
+};
+
+/**
+ * Mapping of schedulers to human readable name
+ */
+export const SCHEDULER_OPTIONS: ComboboxOption[] = [
+  { value: 'ddim', label: 'DDIM' },
+  { value: 'ddpm', label: 'DDPM' },
+  { value: 'deis', label: 'DEIS' },
+  { value: 'deis_k', label: 'DEIS Karras' },
+  { value: 'dpmpp_2s', label: 'DPM++ 2S' },
+  { value: 'dpmpp_2s_k', label: 'DPM++ 2S Karras' },
+  { value: 'dpmpp_2m', label: 'DPM++ 2M' },
+  { value: 'dpmpp_2m_k', label: 'DPM++ 2M Karras' },
+  { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
+  { value: 'dpmpp_2m_sde_k', label: 'DPM++ 2M SDE Karras' },
+  { value: 'dpmpp_3m', label: 'DPM++ 3M' },
+  { value: 'dpmpp_3m_k', label: 'DPM++ 3M Karras' },
+  { value: 'dpmpp_sde', label: 'DPM++ SDE' },
+  { value: 'dpmpp_sde_k', label: 'DPM++ SDE Karras' },
+  { value: 'er_sde', label: 'ER-SDE' },
+  { value: 'euler', label: 'Euler' },
+  { value: 'euler_k', label: 'Euler Karras' },
+  { value: 'euler_a', label: 'Euler Ancestral' },
+  { value: 'heun', label: 'Heun' },
+  { value: 'heun_k', label: 'Heun Karras' },
+  { value: 'kdpm_2', label: 'KDPM 2' },
+  { value: 'kdpm_2_k', label: 'KDPM 2 Karras' },
+  { value: 'kdpm_2_a', label: 'KDPM 2 Ancestral' },
+  { value: 'kdpm_2_a_k', label: 'KDPM 2 Ancestral Karras' },
+  { value: 'lcm', label: 'LCM' },
+  { value: 'lms', label: 'LMS' },
+  { value: 'lms_k', label: 'LMS Karras' },
+  { value: 'pndm', label: 'PNDM' },
+  { value: 'tcd', label: 'TCD' },
+  { value: 'unipc', label: 'UniPC' },
+  { value: 'unipc_k', label: 'UniPC Karras' },
+];

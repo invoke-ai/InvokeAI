@@ -1,0 +1,68 @@
+import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
+import type { Rect } from '@workbench/canvas-engine/types';
+
+import type { HistoryEntry } from './history';
+
+import { collectHistoryMediaRefs } from './history';
+
+export interface LayerPixelSnapshot {
+  layer: CanvasControlLayerContract | CanvasRasterLayerContractV2;
+  rect: Rect;
+  /** Null represents the exact pixel state of a zero-width or zero-height cache. */
+  pixels: ImageData | null;
+}
+
+/** Installs a snapshot; throws or rejects, leaving the layer unchanged, when it cannot land. */
+export type LayerPixelSnapshotApply = (snapshot: LayerPixelSnapshot) => void | Promise<void>;
+
+export interface CreateLayerSnapshotEntryOptions {
+  before: LayerPixelSnapshot;
+  after: LayerPixelSnapshot;
+  label: string;
+  apply: LayerPixelSnapshotApply;
+}
+
+const assertSnapshot = (snapshot: LayerPixelSnapshot, which: 'before' | 'after'): void => {
+  if (snapshot.rect.width === 0 || snapshot.rect.height === 0) {
+    if (snapshot.pixels !== null) {
+      throw new Error(`layerSnapshot: ${which} empty rect requires null pixels`);
+    }
+    return;
+  }
+  if (snapshot.pixels === null) {
+    throw new Error(`layerSnapshot: ${which} non-empty rect requires pixels`);
+  }
+  if (snapshot.pixels.width !== snapshot.rect.width || snapshot.pixels.height !== snapshot.rect.height) {
+    throw new Error(`layerSnapshot: ${which} pixels do not match rect`);
+  }
+};
+
+export const createLayerSnapshotEntry = ({
+  after,
+  apply,
+  before,
+  label,
+}: CreateLayerSnapshotEntryOptions): HistoryEntry => {
+  if (before.layer.id !== after.layer.id) {
+    throw new Error('layerSnapshot: before/after layer ids differ');
+  }
+  assertSnapshot(before, 'before');
+  assertSnapshot(after, 'after');
+  const beforeSnapshot: LayerPixelSnapshot = {
+    layer: structuredClone(before.layer),
+    pixels: before.pixels,
+    rect: { ...before.rect },
+  };
+  const afterSnapshot: LayerPixelSnapshot = {
+    layer: structuredClone(after.layer),
+    pixels: after.pixels,
+    rect: { ...after.rect },
+  };
+  return {
+    bytes: (before.pixels?.data.byteLength ?? 0) + (after.pixels?.data.byteLength ?? 0) + 256,
+    heldAssetRefs: collectHistoryMediaRefs(beforeSnapshot.layer, afterSnapshot.layer),
+    label,
+    redo: () => apply(afterSnapshot),
+    undo: () => apply(beforeSnapshot),
+  };
+};
