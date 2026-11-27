@@ -25,9 +25,13 @@ import torch
 import torch.nn as nn
 
 from invokeai.app.invocations.wan.wan_denoise import _ExpertSwapper
-from invokeai.backend.model_manager.taxonomy import ModelFormat
+from invokeai.backend.model_manager.taxonomy import ModelFormat, WanVariantType
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.wan.working_memory import estimate_wan_denoise_working_memory
+
+_LATENT_SHAPE = torch.Size((1, 16, 1, 8, 8))
 
 
 class _FakeModelOnDevice:
@@ -92,7 +96,7 @@ class _FakeInfo:
     def model(self) -> nn.Module:
         return self._model
 
-    def model_on_device(self, working_mem_bytes=None):
+    def model_on_device(self, working_mem_bytes=None, *, working_memory=None):
         return _FakeModelOnDevice(self._label, self._model, self._log)
 
     def unload_from_vram(self, _vram_bytes_to_free, keep_required_weights_in_vram=False):
@@ -193,6 +197,8 @@ def test_lifecycle_high_only():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=None,
         )
@@ -202,6 +208,8 @@ def test_lifecycle_high_only():
 
     assert log == [
         "models.load:high",
+        # Once before the lock, to size the LoRAs' working memory, and once for the patcher.
+        "lora-factory-call:HIGH",
         "device-enter:HIGH",
         "lora-factory-call:HIGH",
         "lora-enter",
@@ -233,6 +241,8 @@ def test_lifecycle_dual_expert_swap():
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -245,8 +255,9 @@ def test_lifecycle_dual_expert_swap():
         swapper.close()
 
     expected = [
-        # enter HIGH (models.load first, then device, then lora)
+        # enter HIGH (models.load first, the LoRAs sized for the reservation, then device, then lora)
         "models.load:high",
+        "lora-factory-call:HIGH",
         "device-enter:HIGH",
         "lora-factory-call:HIGH",
         "lora-enter",
@@ -257,6 +268,7 @@ def test_lifecycle_dual_expert_swap():
         "device-exit:HIGH",
         "full-unload:HIGH",
         "models.load:low",
+        "lora-factory-call:LOW",
         "device-enter:LOW",
         "lora-factory-call:LOW",
         "lora-enter",
@@ -294,6 +306,8 @@ def _sidecar_decisions(high: tuple[nn.Module, ModelFormat], low: tuple[nn.Module
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -341,6 +355,8 @@ def test_no_lora_factory_skips_lora_context():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=None,  # no LoRAs
             low_lora_factory=None,
         )
@@ -373,6 +389,8 @@ def test_repeat_get_same_label_is_a_no_op():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
         )
         swapper.get(_ExpertSwapper.HIGH)
@@ -415,6 +433,8 @@ def test_lazy_load_per_swap_not_upfront():
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -469,6 +489,8 @@ def test_empty_cache_called_on_swap():
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -515,6 +537,8 @@ def test_outgoing_expert_force_unloaded_from_vram():
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -567,6 +591,8 @@ def test_device_context_released_when_lora_enter_raises():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=None,
         )
@@ -605,6 +631,8 @@ def test_device_context_released_when_lora_exit_raises():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=None,
         )
@@ -645,6 +673,8 @@ def test_force_unload_failure_does_not_break_swap():
             high_model="high",
             low_model="low",
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=_make_factory(log, "LOW"),
         )
@@ -669,7 +699,7 @@ def test_slots_cleared_when_device_exit_raises():
             raise RuntimeError("device teardown blew up")
 
     class _ExitRaisingInfo(_FakeInfo):
-        def model_on_device(self, working_mem_bytes=None):
+        def model_on_device(self, working_mem_bytes=None, *, working_memory=None):
             return _ExitRaisingDeviceCtx(self._label, self._model, self._log)
 
     ctx = _FakeContext({"high": _ExitRaisingInfo("HIGH", high_nn, log)}, log)
@@ -683,6 +713,8 @@ def test_slots_cleared_when_device_exit_raises():
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=None,
         )
@@ -727,6 +759,8 @@ def test_outgoing_expert_is_collectable_when_the_next_expert_loads():
         high_model="high",
         low_model="low",
         inference_dtype=torch.bfloat16,
+        variant=WanVariantType.T2V_A14B,
+        latent_shape=_LATENT_SHAPE,
         high_lora_factory=None,
         low_lora_factory=None,
     )
@@ -749,9 +783,9 @@ def test_float8_weights_are_counted_in_the_working_memory_asked_for_the_expert()
     asked: list[int | None] = []
 
     class _RecordingInfo(_FakeInfo):
-        def model_on_device(self, working_mem_bytes=None):
-            asked.append(working_mem_bytes)
-            return super().model_on_device(working_mem_bytes)
+        def model_on_device(self, working_mem_bytes=None, *, working_memory=None):
+            asked.append(working_memory.reservation_bytes)
+            return super().model_on_device(working_mem_bytes, working_memory=working_memory)
 
     ctx = _FakeContext({"high": _RecordingInfo("HIGH", expert, log)}, log)
     stub, _calls = _stub_lora_context_manager(log)
@@ -761,11 +795,22 @@ def test_float8_weights_are_counted_in_the_working_memory_asked_for_the_expert()
             high_model="high",
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             high_lora_factory=_make_factory(log, "HIGH"),
             low_lora_factory=None,
         )
         swapper.get(_ExpertSwapper.HIGH)
         swapper.close()
 
-    # The scaled layer: two bf16 copies of 8 * 16 weights. The unscaled one (16 * 4) is smaller either way.
-    assert asked == [2 * 8 * 16 * torch.bfloat16.itemsize]
+    dense = estimate_wan_denoise_working_memory(
+        nn.Module(),
+        variant=WanVariantType.T2V_A14B,
+        latent_shape=_LATENT_SHAPE,
+        model_format=ModelFormat.Diffusers,
+        device=TorchDevice.choose_torch_device(),
+        dtype=torch.bfloat16,
+    ).reservation_bytes
+    # On top of the activations, the scaled layer: two bf16 copies of 8 * 16 weights. The unscaled one (16 * 4) is
+    # smaller either way.
+    assert asked == [dense + 2 * 8 * 16 * torch.bfloat16.itemsize]

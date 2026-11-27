@@ -15,7 +15,7 @@ from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import gguf
 import numpy as np
@@ -32,13 +32,16 @@ from invokeai.app.invocations.wan.wan_denoise import (
 )
 from invokeai.app.invocations.wan.wan_ref_image_encoder import WanRefImageEncoderInvocation
 from invokeai.app.invocations.wan.wan_video_denoise import WanVideoDenoiseInvocation
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, WanVariantType
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.wan.working_memory import estimate_wan_denoise_working_memory
 
 
 class _ZeroTransformer(nn.Module):
@@ -97,8 +100,51 @@ def _model_on_device_ctx(model: nn.Module):
 def _make_loaded_model(model: nn.Module) -> MagicMock:
     """Mock ``LoadedModel`` exposing only the methods the denoise loop touches."""
     loaded = MagicMock()
-    loaded.model_on_device = lambda working_mem_bytes=None: _model_on_device_ctx(model)
+    loaded.model_on_device = lambda working_mem_bytes=None, working_memory=None: _model_on_device_ctx(model)
     return loaded
+
+
+def _record_working_memory(context: MagicMock) -> list[int | None]:
+    """Collect the bytes every expert load of this context asks the cache for, as a count or an estimate."""
+    asked: list[int | None] = []
+    load = context.models.load.side_effect
+
+    def _recording_load(model_id) -> MagicMock:
+        loaded = load(model_id)
+        on_device = loaded.model_on_device
+        loaded.model_on_device = lambda working_mem_bytes=None, *, working_memory=None: (
+            asked.append(working_mem_bytes if working_memory is None else working_memory.reservation_bytes)
+            or on_device()
+        )
+        return loaded
+
+    context.models.load.side_effect = _recording_load
+    return asked
+
+
+_LATENT_SHAPE = torch.Size((1, 16, 1, 8, 8))
+"""A one-frame A14B latent, for the swapper tests that do not look at the activations."""
+
+
+def _reserved_for(
+    variant: WanVariantType,
+    latent_shape: tuple[int, ...],
+    *,
+    token_timesteps: bool = False,
+    dtype: torch.dtype | None = None,
+) -> int:
+    """What a dense expert without LoRAs reserves over `latent_shape` on this test's device, in `dtype` or, by
+    default, the one the nodes pick there."""
+    device = TorchDevice.choose_torch_device()
+    return estimate_wan_denoise_working_memory(
+        torch.nn.Module(),
+        variant=variant,
+        latent_shape=torch.Size(latent_shape),
+        token_timesteps=token_timesteps,
+        model_format=ModelFormat.Diffusers,
+        device=device,
+        dtype=dtype or TorchDevice.choose_bfloat16_safe_dtype(device),
+    ).reservation_bytes
 
 
 def _build_context(
@@ -250,8 +296,12 @@ class TestWanDenoiseShapes:
             steps=4,
             guidance_scale=1.0,  # disables CFG, so neg conditioning isn't required
         )
+        asked = _record_working_memory(ctx)
 
         latents = inv._run_diffusion(ctx)
+
+        # The expert is loaded with room for this latent's activations, not the cache's default.
+        assert asked == [_reserved_for(variant, (1, latent_channels, 1, height // scale, width // scale))]
 
         # Output is 4D [B, C, H/scale, W/scale] — temporal dim squeezed.
         assert latents.ndim == 4
@@ -309,6 +359,8 @@ class TestWanDenoiseShapes:
             high_model=MagicMock(),
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             working_mem_bytes=working_mem_bytes,
             max_resident_model_bytes=2 * 2**30,
         )
@@ -325,8 +377,8 @@ class TestWanDenoiseShapes:
 
     @pytest.mark.parametrize("packed", [True, False], ids=["gguf", "dense"])
     def test_expert_swapper_reserves_a_gguf_experts_dequant_transient(self, packed: bool) -> None:
-        """Without the aggressive budget there is no estimate, so a GGUF expert's per-forward
-        dequantization copy is the whole request; a dense expert asks for nothing beyond the default."""
+        """Without the aggressive budget the request is the forward's estimate: for a GGUF expert, its per-forward
+        dequantization copy on top of the activations a dense expert asks for."""
         transformer = _ZeroTransformer()
         linear = torch.nn.Linear(256, 512, bias=False)
         if packed:
@@ -351,6 +403,8 @@ class TestWanDenoiseShapes:
             high_model=MagicMock(),
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             working_mem_bytes=None,
             max_resident_model_bytes=2 * 2**30,
         )
@@ -361,12 +415,59 @@ class TestWanDenoiseShapes:
             swapper.close()
 
         ((), kwargs) = loaded.model_on_device.call_args
+        activations = _reserved_for(WanVariantType.T2V_A14B, tuple(_LATENT_SHAPE), dtype=torch.bfloat16)
         if packed:
             # At least the bfloat16 copy of the weight it dequantizes on every forward.
-            assert kwargs["working_mem_bytes"] > 512 * 256 * torch.bfloat16.itemsize
+            assert kwargs["working_memory"].reservation_bytes >= activations + 512 * 256 * torch.bfloat16.itemsize
         else:
-            # Zero, which the cache reads as its default working memory.
-            assert kwargs["working_mem_bytes"] == 0
+            assert kwargs["working_memory"].reservation_bytes == activations
+
+    def test_expert_swapper_reserves_a_gguf_experts_lora_sidecar(self) -> None:
+        """A GGUF expert runs its LoRA as a sidecar that adds a full-size output per patched Linear beside the
+        activations; that output, one row per token, has to be reserved on top of them."""
+        linear = torch.nn.Linear(256, 512, bias=False)
+        raw = gguf.quantize(np.zeros((512, 256), np.float32), gguf.GGMLQuantizationType.Q8_0)
+        linear.weight = torch.nn.Parameter(
+            GGMLTensor(torch.from_numpy(raw), gguf.GGMLQuantizationType.Q8_0, linear.weight.shape, torch.bfloat16),
+            requires_grad=False,
+        )
+        lora = ModelPatchRaw(
+            layers={"lora_transformer-0": LoRALayer(torch.zeros(512, 4), None, torch.zeros(4, 256), None, None)}
+        )
+        loaded = MagicMock()
+        loaded.model = torch.nn.Sequential(linear)
+        loaded.config.format = "gguf_quantized"
+        loaded.supports_partial_loading = True
+        loaded.hold_resident_bytes.return_value = 0
+        loaded.weight_bytes = 0
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, _ZeroTransformer())
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+
+        latent_shape = torch.Size((1, 16, 5, 80, 50))  # 5 * 40 * 25 = 5000 tokens
+
+        def requested(with_lora: bool) -> int:
+            swapper = _ExpertSwapper(
+                context=context,
+                high_model=MagicMock(),
+                low_model=None,
+                inference_dtype=torch.bfloat16,
+                variant=WanVariantType.T2V_A14B,
+                latent_shape=latent_shape,
+                high_lora_factory=(lambda: iter([(lora, 1.0, None)])) if with_lora else None,
+            )
+            with patch("invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches"):
+                try:
+                    swapper.get(_ExpertSwapper.HIGH)
+                finally:
+                    swapper.close()
+            return loaded.model_on_device.call_args.kwargs["working_memory"].reservation_bytes
+
+        # The LoRA's tensors and the sidecar's output update, one row of out_features + rank per token, in bf16.
+        lora_elements = 512 * 4 + 4 * 256
+        assert requested(True) - requested(False) == (5000 * (512 + 4) + lora_elements) * torch.bfloat16.itemsize
 
     def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(
         self, monkeypatch: pytest.MonkeyPatch
@@ -389,6 +490,8 @@ class TestWanDenoiseShapes:
             high_model=MagicMock(),
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             working_mem_bytes=working_mem_bytes,
             max_resident_model_bytes=2 * 2**30,
         )
@@ -417,6 +520,8 @@ class TestWanDenoiseShapes:
             high_model=MagicMock(),
             low_model=None,
             inference_dtype=torch.bfloat16,
+            variant=WanVariantType.T2V_A14B,
+            latent_shape=_LATENT_SHAPE,
             working_mem_bytes=22 * 2**30,
             max_resident_model_bytes=2 * 2**30,
         )
@@ -426,9 +531,12 @@ class TestWanDenoiseShapes:
         finally:
             swapper.close()
 
-        # Not the aggressive budget: without partial loading the expert asks only for its own (here zero)
-        # dequantization transient, which the cache reads as its default working memory.
-        loaded.model_on_device.assert_called_once_with(working_mem_bytes=0)
+        # Not the aggressive budget: without partial loading the expert asks for its forward's own estimate.
+        ((), kwargs) = loaded.model_on_device.call_args
+        assert kwargs["working_memory"].reservation_bytes == _reserved_for(
+            WanVariantType.T2V_A14B, tuple(_LATENT_SHAPE), dtype=torch.bfloat16
+        )
+        loaded.model_on_device.assert_called_once()
         loaded.hold_resident_bytes.assert_not_called()
         context.logger.warning.assert_called_once()
 
@@ -1389,11 +1497,13 @@ class TestWanVideoDenoiseMultiFrame:
             neg_cond=None,
         )
         inv = _make_video_invocation(num_frames=17, steps=3)
+        asked = _record_working_memory(ctx)
 
         latents = inv._run_diffusion(ctx)
 
         # 17 pixel frames -> (17 - 1) / 4 + 1 = 5 latent frames.
         h_lat, w_lat = 64 // scale, 64 // scale
+        assert asked == [_reserved_for(variant, (1, latent_channels, 5, h_lat, w_lat))]
         assert latents.shape == (1, latent_channels, 5, h_lat, w_lat)
         assert torch.isfinite(latents).all()
         assert len(transformer.calls) == 3
@@ -1411,8 +1521,12 @@ class TestWanVideoDenoiseMultiFrame:
             neg_cond=None,
         )
         inv = _make_video_invocation(num_frames=17, steps=4)
+        asked = _record_working_memory(ctx)
 
         latents = inv._run_diffusion(ctx)
+
+        # Room for all five latent frames' activations, not the cache's default.
+        assert asked == [_reserved_for(WanVariantType.T2V_A14B, (1, 16, 5, 8, 8))]
 
         from invokeai.backend.wan.sampling_utils import make_noise
 
@@ -1554,10 +1668,14 @@ class TestWanVideoDenoiseMultiFrame:
         ctx.tensors.load.return_value = condition
         ref = WanRefImageConditioningField(condition_tensor_name="condition", width=64, height=64, num_frames=1)
         inv = _make_video_invocation(ref_field=ref, num_frames=17, steps=3)
+        asked = _record_working_memory(ctx)
 
         latents = inv._run_diffusion(ctx)
 
         t_lat, h_lat, w_lat = 5, 4, 4
+        # Per-token timesteps keep a timestep projection per token through the forward: their own line.
+        assert asked == [_reserved_for(WanVariantType.TI2V_5B, (1, 48, t_lat, h_lat, w_lat), token_timesteps=True)]
+        assert asked != [_reserved_for(WanVariantType.TI2V_5B, (1, 48, t_lat, h_lat, w_lat))]
         tokens_per_frame = (h_lat // 2) * (w_lat // 2)
         assert len(transformer.calls) == 3
         for step_idx, (h_shape, t_shape, _ctx_shape) in enumerate(transformer.calls):

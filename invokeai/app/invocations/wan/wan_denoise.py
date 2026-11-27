@@ -54,15 +54,15 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantTyp
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
+from invokeai.backend.wan.working_memory import estimate_wan_denoise_working_memory
 
 # Type alias: a factory that produces a fresh iterator of LoRA patch specs each time it is called.
 # We need fresh iterators because the patcher
@@ -198,6 +198,10 @@ class _ExpertSwapper:
         low_lora_factory: LoRAIteratorFactory | None = None,
         working_mem_bytes: int | None = None,
         max_resident_model_bytes: int | None = None,
+        *,
+        variant: WanVariantType,
+        latent_shape: torch.Size,
+        token_timesteps: bool = False,
     ) -> None:
         self._context = context
         self._high_model = high_model
@@ -207,6 +211,9 @@ class _ExpertSwapper:
         self._low_lora_factory = low_lora_factory
         self._working_mem_bytes = working_mem_bytes
         self._max_resident_model_bytes = max_resident_model_bytes
+        self._variant = variant
+        self._latent_shape = latent_shape
+        self._token_timesteps = token_timesteps
         self._active_label: str | None = None
         self._active_info: Any | None = None
         self._active_device_ctx: Any | None = None
@@ -262,14 +269,21 @@ class _ExpertSwapper:
         model_id = self._high_model if label == self.HIGH else self._low_model
         info = self._context.models.load(model_id)
         supports_partial_loading = getattr(info, "supports_partial_loading", None)
+        lora_factory = self._high_lora_factory if label == self.HIGH else self._low_lora_factory
         if self._working_mem_bytes is None or supports_partial_loading is False:
-            # No estimate to add it to, so a quantized expert's per-forward dequantization transient (module-level
-            # schemes and GGUF, then the float8 widening of FP8 Storage and kept scaled fp8) is passed alone;
-            # the cache floors it at `device_working_mem_gb`, so zero asks for the default.
-            device_ctx = info.model_on_device(
-                working_mem_bytes=peak_dequant_transient_bytes(info.model, self._inference_dtype)
-                + peak_fp8_cast_transient_bytes(info.model, self._inference_dtype)
+            # This expert's forward, its quantization transients and LoRA sidecars included, read from the unlocked
+            # model; the cache floors it at `device_working_mem_gb`.
+            estimate = estimate_wan_denoise_working_memory(
+                info.model,
+                variant=self._variant,
+                latent_shape=self._latent_shape,
+                token_timesteps=self._token_timesteps,
+                loras=[] if lora_factory is None else [spec[0] for spec in lora_factory()],
+                model_format=info.config.format,
+                device=TorchDevice.choose_torch_device(),
+                dtype=self._inference_dtype,
             )
+            device_ctx = info.model_on_device(working_memory=estimate)
         else:
             device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
         cached_weights, model = device_ctx.__enter__()
@@ -300,7 +314,6 @@ class _ExpertSwapper:
         # Apply LoRA patches for this expert. Quantized transformers (GGUF, or an int8 checkpoint whose Linears
         # hold buffers instead of parameters) need sidecar patching since direct patching cannot write into
         # their weights. Decided on the loaded module tree, per expert: a pair may mix a quantized and a dense one.
-        lora_factory = self._high_lora_factory if label == self.HIGH else self._low_lora_factory
         lora_ctx: Any | None = None
         if lora_factory is not None:
             lora_ctx = LayerPatcher.apply_smart_model_patches(
@@ -693,6 +706,8 @@ class WanDenoiseInvocation(BaseInvocation, WithMetadata):
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
                 ),
+                variant=variant,
+                latent_shape=latents.shape,
             )
             exit_stack.callback(swapper.close)
             exit_stack.enter_context(sage_attention_scope())

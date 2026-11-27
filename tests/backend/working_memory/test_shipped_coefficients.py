@@ -83,6 +83,7 @@ OUT_OF_FIT = {
         "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
         "demand_peak",
     ): 5,
+    ((), "AMD Radeon Pro W7900 Dual Slot (gfx1100)", "demand_peak"): 1,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16 + 40,
     ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15 + 40,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA RTX 6000 Ada Generation", "demand_peak"): 12,
@@ -103,7 +104,8 @@ OUT_OF_FIT = {
     ): 16,
 }
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term, and the FLUX.3 and Krea-2 denoise checks.
+check the score-matrix term, the FLUX.3 and Krea-2 denoise checks, and the Wan denoise's 4-block forward on the W7900,
+which checks that 2 blocks hold the peak.
 
 The FLUX.3 checks are the real Klein's forwards on each card, which hold the 2-block lines to the released model from
 below, and on the W7900 the forced-math forward, which checks the score-matrix term, and the 4-block forward. That one

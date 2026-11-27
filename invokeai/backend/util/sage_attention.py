@@ -34,6 +34,7 @@ from typing import Any
 
 import torch
 
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.triton_kernels import (
@@ -67,6 +68,9 @@ _FIRST_CALL_MAX_ERROR = 0.5
 # tile is among them. A kernel that never ran garbles every row, so a slice catches what the whole output would; the
 # whole output costs ~14 bytes per element to compare -- about 5 GB for one call of Wan 2.2 14B at 720p.
 _FIRST_CALL_ROWS = 1024
+# Bytes SageAttention holds during a call per element of Q, K and V together: quantized copies at ~1 byte per element,
+# measured 1.7x that on an RTX 4090; rounded up.
+_QUANTIZED_BYTES_PER_ELEMENT = 2
 
 # The published page. The old GitHub Pages path under InvokeAI-7 returns 404.
 DOCS_URL = "https://v7.invoke.ai/configuration/optimization/sage-attention/"
@@ -232,6 +236,25 @@ def _ineligible(
     return None
 
 
+def _copies_fit(index: int, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> bool:
+    """Whether SageAttention's quantized copies fit the device's free VRAM plus the blocks torch has cached unused.
+
+    Free space inside partly used segments (inactive splits) is left out: it cannot hold a large contiguous copy.
+    One driver query per eligible call, against kernels that take milliseconds; the allocator's statistics, a dict of
+    every counter built in Python, only where the driver's free memory alone does not hold the copies."""
+    needed = _QUANTIZED_BYTES_PER_ELEMENT * (query.numel() + key.numel() + value.numel())
+    free, _ = TorchDevice.cuda_mem_get_info(torch.device("cuda", index))
+    if needed <= free:
+        return True
+    stats = torch.cuda.memory_stats(index)
+    cached = (
+        stats.get("reserved_bytes.all.current", 0)
+        - stats.get("allocated_bytes.all.current", 0)
+        - stats.get("inactive_split_bytes.all.current", 0)
+    )
+    return needed <= free + max(cached, 0)
+
+
 def _check_first_result(
     index: int,
     original: Callable[..., torch.Tensor],
@@ -363,6 +386,16 @@ def install_sage_attention() -> bool:
                 kernel = kernels.get(index) if index is not None and not _health.is_retired(index) else None
                 if index is None or kernel is None:
                     reason = "device"
+                elif not _copies_fit(index, query, key, value):
+                    # Windows moves an allocation that does not fit to shared system memory instead of raising OOM,
+                    # which makes the call far slower than SDPA rather than failing over to it. Per call: the next
+                    # one may fit.
+                    if not usage.fell_back["memory"]:
+                        logger.info(
+                            f"SageAttention's quantized copies do not fit in free VRAM on cuda:{index} for query "
+                            f"{tuple(query.shape)}; such calls use PyTorch SDPA."
+                        )
+                    reason = "memory"
                 else:
                     try:
                         with torch.cuda.device(index):

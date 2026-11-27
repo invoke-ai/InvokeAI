@@ -349,6 +349,9 @@ class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None
                 ),
+                variant=variant,
+                latent_shape=latents.shape,
+                token_timesteps=first_frame_mask is not None,
             )
             exit_stack.callback(swapper.close)
             exit_stack.enter_context(sage_attention_scope())
