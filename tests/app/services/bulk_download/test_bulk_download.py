@@ -2,6 +2,7 @@ import io
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from typing import Any, Optional
 from zipfile import ZipFile
 
@@ -183,7 +184,7 @@ def test_archive_is_not_downloadable_until_complete(
                 visible_while_writing.append(False)
         return disk_dir / name
 
-    monkeypatch.setattr(mock_invoker.services.image_files, "get_local_path", get_local_path)
+    monkeypatch.setattr(mock_invoker.services, "image_files", SimpleNamespace(get_local_path=get_local_path))
 
     service.handler(names, None, None)
 
@@ -265,8 +266,9 @@ def test_failed_archive_leaves_no_file_behind(
     def open_stream(name: str, thumbnail: bool = False, image_subfolder: str = "") -> io.BytesIO:
         raise FileNotFoundError(name)
 
-    monkeypatch.setattr(mock_invoker.services.image_files, "get_local_path", get_local_path)
-    monkeypatch.setattr(mock_invoker.services.image_files, "open_stream", open_stream)
+    monkeypatch.setattr(
+        mock_invoker.services, "image_files", SimpleNamespace(get_local_path=get_local_path, open_stream=open_stream)
+    )
 
     with pytest.raises(FileNotFoundError):
         service.handler(names, None, None)

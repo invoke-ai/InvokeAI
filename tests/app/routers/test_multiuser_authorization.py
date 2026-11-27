@@ -1066,8 +1066,8 @@ class TestImageReadAuth:
         _save_image(mock_invoker, "owned-image", user1.user_id)
         media_path = tmp_path / ("image.webp" if thumbnail else "image.png")
         media_path.write_bytes(b"media")
-        get_path = MagicMock(return_value=media_path)
-        monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+        get_local_path = MagicMock(return_value=media_path)
+        monkeypatch.setattr(mock_invoker.services.images, "get_local_path", get_local_path)
         client.cookies.clear()
         login = client.post(
             "/api/v1/auth/login",
@@ -1079,10 +1079,7 @@ class TestImageReadAuth:
 
         assert r.status_code == status.HTTP_200_OK
         assert r.headers["cache-control"] == "private, no-store"
-        if thumbnail:
-            get_path.assert_called_once_with("owned-image", thumbnail=True)
-        else:
-            get_path.assert_called_once_with("owned-image")
+        get_local_path.assert_called_once_with("owned-image", thumbnail)
 
     def test_non_owner_cannot_load_private_image_media(
         self,
@@ -2650,6 +2647,7 @@ class TestBulkDownloadAccessControl:
         """Request a board download, run the queued job, fetch the ZIP as the caller and list its images."""
         import io
         import zipfile
+        from types import SimpleNamespace
 
         from fastapi import BackgroundTasks
 
@@ -2658,12 +2656,12 @@ class TestBulkDownloadAccessControl:
             BackgroundTasks, "add_task", lambda _self, fn, *args, **kwargs: queued.append((fn, args, kwargs))
         )
 
-        def image_path(image_name: str, thumbnail: bool = False) -> str:
+        def image_path(image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
             path = tmp_path / image_name
             path.write_bytes(image_name.encode())
-            return str(path)
+            return path
 
-        monkeypatch.setattr(mock_invoker.services.images, "get_path", image_path)
+        monkeypatch.setattr(mock_invoker.services, "image_files", SimpleNamespace(get_local_path=image_path))
 
         r = client.post("/api/v1/images/download", json={"board_id": board_id}, headers=_auth(token))
         assert r.status_code == status.HTTP_202_ACCEPTED
