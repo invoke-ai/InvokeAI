@@ -2,8 +2,8 @@ from typing import Dict, Optional
 
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 class IA3Layer(LoRALayerBase):

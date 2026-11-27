@@ -20,7 +20,10 @@ export interface RgbaSample {
   a: number;
 }
 
-export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
+export type ColorSampleProviders = Pick<
+  CompositeOptions,
+  'adjustedSurface' | 'derivedSurfaces' | 'groupSurface' | 'showOverlayStacks'
+>;
 
 const RAW_PIXELS: ColorSampleProviders = {};
 

@@ -11,7 +11,7 @@ import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStac
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
-import type { CompositeOptions } from '@workbench/canvas-engine/render/compositor';
+import type { ColorSampleProviders } from '@workbench/canvas-engine/render/colorSample';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
@@ -111,7 +111,7 @@ export interface ToolContext {
   /** `commit` fires on pointer up only, so a structural commit in the continuation is not `gesture-active`. */
   resolveColorSample?(hex: string, phase: ColorSamplePhase): boolean;
   /** Absent samples raw cached pixels. */
-  sampleProviders?: Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
+  sampleProviders?: ColorSampleProviders;
   /** Layer-local, so moving the layer carries it; the engine forgets entries on replay, replacement and removal. */
   paintLineEnds?: PaintLineEnds;
   /** Ordinary pointermove does not reevaluate it. */

@@ -9,7 +9,7 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
@@ -69,6 +69,11 @@ export interface CompositeOptions {
   skipLayerId?: string | null;
   /** Null means direct solid fill; without a provider only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
+  /** The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. */
+  screenMask?: {
+    dpr: number;
+    getScratch: (width: number, height: number) => RasterSurface;
+  };
   /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
   /** Layer-local output bounds, drawn through the layer transform. */
@@ -292,29 +297,13 @@ const isMaskLayer = (
 ): layer is Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }> =>
   layer.type === 'regional_guidance' || layer.type === 'inpaint_mask';
 
-const drawMaskLayer = (
-  ctx: Ctx,
-  layer: Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }>,
-  surface: RasterSurface,
-  sourceVersion: number,
-  origin: Vec2,
-  opts: CompositeOptions
-): void => {
-  const fill = layer.mask.fill;
-  const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
-  const colorized = opts.derivedSurfaces
-    ? opts.derivedSurfaces.get({
-        create: (target) => colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile, target),
-        kind: 'mask-fill',
-        layerId: layer.id,
-        paramsKey: `${fill.style}:${fill.color}`,
-        source: surface,
-        sourceVersion,
-      })
-    : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
-  // The outer context already applies layer opacity.
-  ctx.drawImage(colorized.canvas, origin.x, origin.y);
-};
+type DrawMaskFill = (
+  layerId: string,
+  fill: CanvasMaskFillContract,
+  coverage: { surface: RasterSurface; rect: Rect; version: number },
+  matrix: Mat2d,
+  kind: 'mask-fill' | 'region-fill'
+) => void;
 
 const drawCachedLayer = (
   ctx: Ctx,
@@ -323,13 +312,15 @@ const drawCachedLayer = (
   entry: LayerCacheEntry,
   view: Mat2d,
   opts: CompositeOptions,
+  drawMaskFill: DrawMaskFill,
   alpha = 1
 ): void => {
   const { layer } = leaf;
   ctx.save();
   ctx.globalAlpha = layer.opacity * alpha;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
-  setTransformFromMat(ctx, multiply(view, matrix));
+  const screenMatrix = multiply(view, matrix);
+  setTransformFromMat(ctx, screenMatrix);
 
   const origin = { x: entry.rect.x, y: entry.rect.y };
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(layer.id) ?? null);
@@ -356,7 +347,7 @@ const drawCachedLayer = (
         : preview.surface;
     ctx.drawImage(displayPreview.canvas, preview.rect.x, preview.rect.y);
   } else if (isMaskLayer(layer)) {
-    drawMaskLayer(ctx, layer, entry.surface, entry.version, origin, opts);
+    drawMaskFill(layer.id, layer.mask.fill, entry, screenMatrix, 'mask-fill');
   } else if (layer.type === 'control' && layer.withTransparencyEffect) {
     const effect = opts.derivedSurfaces
       ? opts.derivedSurfaces.get({
@@ -376,42 +367,12 @@ const drawCachedLayer = (
   }
 
   if (opts.regionOverlays && layer.type === 'raster' && layer.inpaint?.isEnabled && !preview && !isIsolated(opts)) {
-    drawRegionCoverage(ctx, layer.id, layer.inpaint.fill, entry, opts);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = REGION_OVERLAY_ALPHA;
+    drawMaskFill(layer.id, layer.inpaint.fill, entry, screenMatrix, 'region-fill');
   }
 
   ctx.restore();
-};
-
-const drawRegionCoverage = (
-  ctx: Ctx,
-  layerId: string,
-  fill: CanvasMaskFillContract,
-  coverage: { surface: RasterSurface; rect: Rect; version: number },
-  opts: CompositeOptions
-): void => {
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = REGION_OVERLAY_ALPHA;
-  const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
-  const colorized = opts.derivedSurfaces
-    ? opts.derivedSurfaces.get({
-        create: (target) =>
-          colorizeMask(
-            opts.backend,
-            coverage.surface,
-            coverage.surface.width,
-            coverage.surface.height,
-            fill,
-            tile,
-            target
-          ),
-        kind: 'region-fill',
-        layerId,
-        paramsKey: `${fill.style}:${fill.color}`,
-        source: coverage.surface,
-        sourceVersion: coverage.version,
-      })
-    : colorizeMask(opts.backend, coverage.surface, coverage.surface.width, coverage.surface.height, fill, tile);
-  ctx.drawImage(colorized.canvas, coverage.rect.x, coverage.rect.y);
 };
 
 /** Drawn through the layer matrix then their own, never resampled into document space and back. */
@@ -485,6 +446,76 @@ export const compositeDocument = (
   const ctx = target.ctx;
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
+  const hatchPhases = new Map<string, number>();
+  if (opts.screenMask && opts.maskPatternTile) {
+    const nextPhase = new Map<CanvasMaskFillContract['style'], number>();
+    // Assign before culling so partial repaints use the same phases as full frames.
+    for (const { layer } of plan.leaves) {
+      const fill = isMaskLayer(layer)
+        ? layer.mask.fill
+        : opts.regionOverlays && !isIsolated(opts) && layer.type === 'raster' && layer.inpaint?.isEnabled
+          ? layer.inpaint.fill
+          : undefined;
+      if (!fill || fill.style === 'solid') {
+        continue;
+      }
+      const phase = nextPhase.get(fill.style) ?? 0;
+      hatchPhases.set(layer.id, phase);
+      nextPhase.set(fill.style, phase + 1);
+    }
+  }
+  const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
+    const { surface, rect, version } = coverage;
+    const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
+    if (tile && opts.screenMask) {
+      const { dpr, getScratch } = opts.screenMask;
+      const area = intersect(roundOut(transformBounds(matrix, rect)), repaint);
+      if (!area || isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
+        return;
+      }
+      const scratch = getScratch(area.width, area.height);
+      const stencil = scratch.ctx;
+      stencil.save();
+      identityTransform(stencil);
+      stencil.clearRect(0, 0, area.width, area.height);
+      // The retained scratch can be far larger than a small repaint; drawing the whole mask across it is the cost.
+      stencil.beginPath();
+      stencil.rect(0, 0, area.width, area.height);
+      stencil.clip();
+      stencil.globalCompositeOperation = 'source-over';
+      stencil.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
+      setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
+      stencil.drawImage(surface.canvas, rect.x, rect.y);
+
+      const phase = hatchPhases.get(layerId) ?? 0;
+      const offsetX = fill.style === 'horizontal' ? 0 : phase;
+      const offsetY = fill.style === 'horizontal' || fill.style === 'grid' ? phase : 0;
+      stencil.imageSmoothingEnabled = true;
+      stencil.setTransform(dpr, 0, 0, dpr, offsetX - area.x, offsetY - area.y);
+      stencil.globalCompositeOperation = 'source-in';
+      stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
+      stencil.fillRect((area.x - offsetX) / dpr, (area.y - offsetY) / dpr, area.width / dpr, area.height / dpr);
+      stencil.restore();
+
+      ctx.save();
+      identityTransform(ctx);
+      ctx.drawImage(scratch.canvas, 0, 0, area.width, area.height, area.x, area.y, area.width, area.height);
+      ctx.restore();
+      return;
+    }
+
+    const colorized = opts.derivedSurfaces
+      ? opts.derivedSurfaces.get({
+          create: (target) => colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile, target),
+          kind,
+          layerId,
+          paramsKey: `${fill.style}:${fill.color}`,
+          source: surface,
+          sourceVersion: version,
+        })
+      : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
+    ctx.drawImage(colorized.canvas, rect.x, rect.y);
+  };
 
   ctx.save();
   // Nested layer restores preserve it.
@@ -560,7 +591,7 @@ export const compositeDocument = (
     }
     // A float still draws over an emptied source: its pixels are detached.
     if (entry && entry.rect.width > 0 && entry.rect.height > 0 && controlView?.view !== 'original') {
-      drawCachedLayer(ctx, leaf, matrix, entry, view, opts, controlView ? CONTROL_OVERLAY_MAP_ALPHA : 1);
+      drawCachedLayer(ctx, leaf, matrix, entry, view, opts, drawMaskFill, controlView ? CONTROL_OVERLAY_MAP_ALPHA : 1);
       opts.diagnostics?.increment('layersDrawn');
     }
     if (float?.layerId === leaf.id) {
@@ -621,8 +652,11 @@ export const compositeDocument = (
         const memberEntry = caches.get(layer.id);
         if (memberEntry && memberEntry.rect.width > 0 && memberEntry.rect.height > 0) {
           ctx.save();
-          setTransformFromMat(ctx, multiply(view, matrices[member]!));
-          drawRegionCoverage(ctx, layer.id, layer.inpaint.fill, memberEntry, opts);
+          const matrix = multiply(view, matrices[member]!);
+          setTransformFromMat(ctx, matrix);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = REGION_OVERLAY_ALPHA;
+          drawMaskFill(layer.id, layer.inpaint.fill, memberEntry, matrix, 'region-fill');
           ctx.restore();
         }
       }

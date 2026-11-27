@@ -135,7 +135,7 @@ def _load(monkeypatch: pytest.MonkeyPatch, tmp_path, neighbour: str, fp8_storage
         "read_safetensors_metadata",
         lambda _path, _logger: {"_quantization_metadata": json.dumps({"layers": header_layers})},
     )
-    monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
     monkeypatch.setattr(krea2.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(krea2.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: COMPUTE_DTYPE)

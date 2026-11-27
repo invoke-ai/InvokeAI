@@ -22,10 +22,14 @@ import {
   type QueueWorkflowSeed,
 } from '@features/queue/core/promptBatch';
 import {
-  boundSubmissionRetryMessage,
-  QUEUE_SOURCE_RESULT_NODE_IDS,
-  shouldSubmitPendingQueueItem,
-} from '@features/queue/core/submissionRules';
+  createSubmissionRetry,
+  getSubmissionRetryDelayMs,
+  getSubmissionRetryWaitMs,
+  isRejectedSubmissionStatus,
+  isSubmissionRetryExhausted,
+  type QueueSubmissionFailure,
+} from '@features/queue/core/submissionRetry';
+import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
   buildQueueItemOrigin,
   isTerminalBackendStatus,
@@ -420,75 +424,17 @@ const getJournalSignature = (item: QueueItem): string =>
     item.submissionRetry,
   ]);
 
-/**
- * Enqueue 5xx usually means a bad request: fail after this many consecutive 500s spanning MIN_SERVER_ERROR_WINDOW_MS.
- * 502/503/504/408/429 stay transient.
- */
-const MAX_SERVER_ERROR_SUBMISSIONS = 3;
-const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
-/** Minutes, not retry delays: a hidden tab's timers may fire only once a minute and must not reset a 500 streak. */
-const SERVER_ERROR_STREAK_GAP_MS = 5 * 60_000;
-const UNAVAILABLE_STATUSES = [408, 429, 502, 503, 504];
-/**
- * Backoff from `failedAt`: 1 s doubling to 15 s; on reconnect waits shrink to a random share of RECONNECT_SPREAD_MS.
- * A wait never exceeds its delay, so a clock change delays a run at most once; exhaustion reads recorded times only.
- */
-const SUBMISSION_RETRY_BASE_MS = 1_000;
-const SUBMISSION_RETRY_MAX_MS = 15_000;
+// On reconnect, waiting runs submit at random within this spread so a restarting server is not hit all at once.
 const RECONNECT_SPREAD_MS = 2_000;
-const getSubmissionRetryDelayMs = (failureCount: number): number =>
-  Math.min(SUBMISSION_RETRY_BASE_MS * 2 ** Math.max(failureCount - 1, 0), SUBMISSION_RETRY_MAX_MS);
-const getSubmissionWaitMs = (retry: QueueSubmissionRetry, now: number): number => {
-  const delayMs = getSubmissionRetryDelayMs(retry.failureCount);
-  return Math.min(Math.max(retry.failedAt + delayMs - now, 0), delayMs);
-};
-const isDeterministicServerError = (error: unknown): error is ApiError =>
-  error instanceof ApiError && error.status >= 500 && !UNAVAILABLE_STATUSES.includes(error.status);
 /** `fetch` rejects with a TypeError when the request gets no answer, and a DOMException when it is aborted. */
 const isTransportFailure = (error: unknown): boolean =>
   error instanceof TypeError ||
   (error instanceof DOMException && ['AbortError', 'NetworkError', 'TimeoutError'].includes(error.name));
 
-const getRetryReason = (error: unknown): Exclude<QueueSubmissionRetry['reason'], 'server-error'> => {
-  if (error instanceof ApiError) {
-    return UNAVAILABLE_STATUSES.includes(error.status) ? 'unavailable' : 'error';
-  }
-  return isTransportFailure(error) ? 'unreachable' : 'error';
-};
-
-/** The streak gap is measured from the attempt's start, so a slow answer cannot reset its own streak. */
-const getSubmissionRetry = (
-  error: unknown,
-  previous: QueueSubmissionRetry | undefined,
-  { attemptStartedAt, now }: { attemptStartedAt: number; now: number }
-): QueueSubmissionRetry => {
-  const base = {
-    failedAt: now,
-    failureCount: (previous?.failureCount ?? 0) + 1,
-    message: boundSubmissionRetryMessage(toErrorMessage(error)),
-    status: error instanceof ApiError ? error.status : null,
-  };
-  if (!isDeterministicServerError(error)) {
-    return { ...base, reason: getRetryReason(error), serverErrorCount: 0, serverErrorSince: null };
-  }
-  const streak =
-    previous?.reason === 'server-error' && attemptStartedAt - previous.failedAt <= SERVER_ERROR_STREAK_GAP_MS
-      ? previous
-      : undefined;
-  const since = streak?.serverErrorSince ?? null;
-  return {
-    ...base,
-    reason: 'server-error',
-    serverErrorCount: (streak?.serverErrorCount ?? 0) + 1,
-    serverErrorSince: since !== null && since <= now ? since : now,
-  };
-};
-
-const isSubmissionRetryExhausted = (retry: QueueSubmissionRetry): boolean =>
-  retry.reason === 'server-error' &&
-  retry.serverErrorSince !== null &&
-  retry.serverErrorCount >= MAX_SERVER_ERROR_SUBMISSIONS &&
-  retry.failedAt - retry.serverErrorSince >= MIN_SERVER_ERROR_WINDOW_MS;
+const toSubmissionFailure = (error: unknown): QueueSubmissionFailure =>
+  error instanceof ApiError
+    ? { message: toErrorMessage(error), status: error.status, unanswered: false }
+    : { message: toErrorMessage(error), status: null, unanswered: isTransportFailure(error) };
 
 const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
 
@@ -567,7 +513,7 @@ export const createQueueRuntime = ({
   let reconcileRetryDelayMs = 100;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let submissionTimer: { dueAt: number; timer: ReturnType<typeof setTimeout> } | undefined;
-  /** Fixed when the failure is first seen and shortened on reconnect; see SUBMISSION_RETRY_BASE_MS. */
+  // Fixed when a failure is first seen, shortened on reconnect.
   const submissionDueTimes = new Map<string, { dueAt: number; failedAt: number }>();
   let sawDisconnect = false;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
@@ -2143,12 +2089,7 @@ export const createQueueRuntime = ({
           }
           return;
         }
-        if (
-          error instanceof ApiError &&
-          error.status >= 400 &&
-          error.status < 500 &&
-          ![408, 429].includes(error.status)
-        ) {
+        if (error instanceof ApiError && isRejectedSubmissionStatus(error.status)) {
           commands.setStatus({
             error: toErrorMessage(error),
             projectId: project.id,
@@ -2162,8 +2103,8 @@ export const createQueueRuntime = ({
         commands.recordSubmissionRetry({
           projectId: project.id,
           queueItemId: currentQueueItem.id,
-          retry: getSubmissionRetry(
-            error,
+          retry: createSubmissionRetry(
+            toSubmissionFailure(error),
             failedTarget?.project.id === project.id ? failedTarget.queueItem?.submissionRetry : undefined,
             { attemptStartedAt, now: Date.now() }
           ),
@@ -2315,8 +2256,8 @@ export const createQueueRuntime = ({
 
   const getRemainingSubmissionWaitMs = (key: string, retry: QueueSubmissionRetry, now: number): number => {
     let due = submissionDueTimes.get(key);
-    if (!due || due.failedAt !== retry.failedAt || due.dueAt - now > getSubmissionRetryDelayMs(retry.failureCount)) {
-      due = { dueAt: now + getSubmissionWaitMs(retry, now), failedAt: retry.failedAt };
+    if (!due || due.failedAt !== retry.failedAt || due.dueAt - now > getSubmissionRetryDelayMs(retry)) {
+      due = { dueAt: now + getSubmissionRetryWaitMs(retry, now), failedAt: retry.failedAt };
       submissionDueTimes.set(key, due);
     }
     return Math.max(due.dueAt - now, 0);

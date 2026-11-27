@@ -3,7 +3,11 @@ import type {
   GenerationModelTaxonomyType as ModelTaxonomyType,
   PromptHistoryItem,
 } from '@features/generation/core/contracts';
-import type { BaseGenerationConfig, GuidanceLabel } from '@features/generation/core/generationConfig';
+import type {
+  BaseGenerationConfig,
+  GuidanceLabel,
+  NegativePromptUsage,
+} from '@features/generation/core/generationConfig';
 
 import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import {
@@ -11,7 +15,7 @@ import {
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
-import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
+import { getArchitectureFeatures, hasArchitectureCapabilities, isFluxFillModel } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -355,6 +359,10 @@ export const coerceSchedulerForGraph = (
       return KNOWN_SCHEDULERS.has(scheduler) ? scheduler : config.defaults.scheduler;
   }
 };
+
+/** Whether a local model's denoise reads a negative prompt: always, only above CFG 1, or never. */
+export const getNegativePromptUsage = (model: GenerateModelConfig | undefined): NegativePromptUsage =>
+  getBaseGenerationConfig(model).negativePrompt.usage;
 
 export const getPromptPolicy = (
   model: GenerateModelConfig | undefined,
@@ -1108,7 +1116,7 @@ const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
 /** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
 export const getFlux2ComponentSource = (
   model: MainModelConfig,
-  settings: GenerateSettings
+  settings: Pick<GenerateSettings, 'componentSourceModel' | 'mistralEncoderModel' | 'qwen3EncoderModel'>
 ): MainModelConfig | undefined => {
   const source = settings.componentSourceModel;
 
@@ -1227,10 +1235,6 @@ const getBaseComponentSectionPolicy = (
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
-        rules: (ctx) =>
-          ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
-            ? ['FLUX Fill models do not support text-to-image generation.']
-            : [],
       };
     case 'flux2': {
       const isDev = model.variant === 'dev';
@@ -3293,6 +3297,24 @@ export const getGuidanceBoundReason = (
   return null;
 };
 
+const GUIDANCE_SLIDER_SPAN = 10;
+const GUIDANCE_INPUT_MAX = 100;
+
+/**
+ * Slider track for the guidance field. The input accepts values up to the architecture ceiling; the track spans
+ * `GUIDANCE_SLIDER_SPAN` above zero, or above the floor when the floor already reaches that span (FLUX Fill), so the
+ * track never collapses onto values the model refuses.
+ */
+export const getGuidanceSliderMax = (guidanceMin: number, guidanceMax: number | null): number => {
+  const inputMax = guidanceMax ?? GUIDANCE_INPUT_MAX;
+  const trackEnd = guidanceMin >= GUIDANCE_SLIDER_SPAN ? guidanceMin + GUIDANCE_SLIDER_SPAN : GUIDANCE_SLIDER_SPAN;
+
+  return Math.max(guidanceMin, Math.min(trackEnd, inputMax));
+};
+
+/** Upper bound of the typed input for the guidance field. */
+export const getGuidanceInputMax = (guidanceMax: number | null): number => guidanceMax ?? GUIDANCE_INPUT_MAX;
+
 /** Combinations the backend refuses only after queueing. */
 const getKrea2ReferenceValidationReasons = (
   settings: GenerateSettings
@@ -3438,11 +3460,19 @@ const getComponentValidationIssues = (model: GenerateModelConfig, settings: Gene
   ];
 };
 
-/** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
+/**
+ * What a validation answers for: the generation mode being compiled, or `canvasFrame` for Canvas readiness, where the
+ * mode is only known once the composite exists. Local models differ only for FLUX Fill, which edits an image.
+ */
+export type GenerationValidationMode = ExternalGenerationMode | 'outpaint' | 'canvasFrame';
+
+const FLUX_FILL_MODE_REASON =
+  'FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.';
+
 export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
-  mode: ExternalGenerationMode = 'txt2img'
+  mode: GenerationValidationMode = 'txt2img'
 ): GenerationIssue[] => {
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
@@ -3496,7 +3526,9 @@ export const getGenerationValidationIssues = (
   }
 
   if (model.type === 'external_image_generator') {
-    const modeReason = getExternalModeReason(model, mode);
+    // Canvas compiles reject outpainting themselves, and readiness asks providers by their own modes.
+    const providerMode: ExternalGenerationMode = mode === 'outpaint' || mode === 'canvasFrame' ? 'txt2img' : mode;
+    const modeReason = getExternalModeReason(model, providerMode);
 
     if (modeReason) {
       issues.push(createUntranslatedGenerationIssue(modeReason, MODEL_TARGET));
@@ -3513,7 +3545,7 @@ export const getGenerationValidationIssues = (
 
     // Every request emits one output, and the Canvas edit modes add the composite as one init image.
     if (isSeedreamBatchModel(model)) {
-      const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
+      const totalImages = getExternalReferenceImages(settings, model).length + (providerMode === 'txt2img' ? 0 : 1) + 1;
 
       if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
         issues.push(
@@ -3541,6 +3573,10 @@ export const getGenerationValidationIssues = (
     );
   }
 
+  if (isFluxFillModel(model) && (mode === 'txt2img' || mode === 'img2img')) {
+    issues.push(issue('model:fluxFillMode', 'fluxFillMode', FLUX_FILL_MODE_REASON, MODEL_TARGET));
+  }
+
   issues.push(...getModelFamilyValidationIssues(model, settings));
   issues.push(
     ...getRefinerValidationReasons(model, settings).map((reason) =>
@@ -3555,7 +3591,7 @@ export const getGenerationValidationIssues = (
 export const getGenerationValidationReasons = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
-  mode: ExternalGenerationMode = 'txt2img'
+  mode: GenerationValidationMode = 'txt2img'
 ): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
 
 export const needsEmptyCanvasFrameForReferenceBudget = (
@@ -3592,8 +3628,112 @@ export const getGenerateInvocationIssues = (
       providerModes !== null && canvasFrame
         ? { ...values, ...resolveExternalCanvasRequestSize(model, canvasFrame) }
         : values,
-      providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img'
+      providerModes !== null
+        ? providerModes.includes('txt2img')
+          ? 'txt2img'
+          : 'img2img'
+        : canvasFrame
+          ? 'canvasFrame'
+          : 'txt2img'
     ),
     ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
   ];
 };
+
+// How each denoise node clips `denoising_start`: Canvas picks its strength curve by it, Upscale translates Creativity.
+
+/** A start `s` enters at sigma `1 - s`, whatever the shift. */
+interface SigmaClipping {
+  kind: 'sigma';
+}
+
+/** Clips by step index, so a start enters noisier; `test_upscale_index_clipped_starts.py` pins these schedules. */
+export interface StepClipping {
+  kind: 'step';
+  /** Noisiest first, without the final 0. */
+  sigmas: (model: Pick<MainModelConfig, 'variant'>, size: { width: number; height: number }, steps: number) => number[];
+  /** `int(start * steps)`, or Python's half-to-even `int(round(start * steps))`. */
+  rounding: 'floor' | 'round';
+}
+
+export type DenoisingStartClipping = SigmaClipping | StepClipping;
+
+/** First `steps` sigmas of a flow schedule shifted by `shift`, without the final 0 (diffusers: shift = exp(mu)). */
+const shiftedSigmas = (shift: number, steps: number): number[] =>
+  Array.from({ length: steps }, (_, index) => {
+    const t = 1 - index / steps;
+
+    return (shift * t) / (1 + (shift - 1) * t);
+  });
+
+/** `mu` on a line through two token counts, one token per 16x16 pixels, held at the line's upper end. */
+const tokenFitMu = (
+  { width, height }: { width: number; height: number },
+  fit: { minSeqLen: number; maxSeqLen: number; baseShift: number; maxShift: number }
+): number => {
+  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), fit.maxSeqLen);
+  const slope = (fit.maxShift - fit.baseShift) / (fit.maxSeqLen - fit.minSeqLen);
+
+  return seqLen * slope + fit.baseShift - slope * fit.minSeqLen;
+};
+
+/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
+const Z_IMAGE_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 4096, maxShift: 1.15, minSeqLen: 256 };
+
+/** `ANIMA_SHIFT`: Anima's schedule is shifted by a constant, not by resolution. */
+const ANIMA_SCHEDULE_SHIFT = 3;
+
+/** `krea2/sampling_utils.py`: Turbo's fixed mu and Raw's token-count fit; anything not Raw counts as distilled. */
+const KREA2_DISTILLED_MU = 1.15;
+const KREA2_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 6400, maxShift: 1.15, minSeqLen: 256 };
+
+/** `qwen_image_denoise`'s scheduler: mu 0.5 at 256 tokens to 0.9 at 8192, held at the end, stretched to 0.02. */
+const QWEN_IMAGE_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 8192, maxShift: 0.9, minSeqLen: 256 };
+const QWEN_IMAGE_SHIFT_TERMINAL = 0.02;
+
+/** As diffusers' FlowMatchEulerDiscreteScheduler builds them, including `stretch_shift_to_terminal`. */
+const qwenImageSigmas = (size: { width: number; height: number }, steps: number): number[] => {
+  const shifted = shiftedSigmas(Math.exp(tokenFitMu(size, QWEN_IMAGE_SHIFT_FIT)), steps);
+  const scale = (1 - (shifted[steps - 1] ?? 0)) / (1 - QWEN_IMAGE_SHIFT_TERMINAL);
+
+  return shifted.map((sigma) => 1 - (1 - sigma) / scale);
+};
+
+const SIGMA_CLIPPING: SigmaClipping = { kind: 'sigma' };
+
+// The step schedules assume the node's default shift. Upscale sends no shift; Canvas can, so it reads only `kind`.
+const DENOISING_START_CLIPPING: Partial<Record<string, DenoisingStartClipping>> = {
+  anima: {
+    kind: 'step',
+    rounding: 'floor',
+    sigmas: (_model, _size, steps) => shiftedSigmas(ANIMA_SCHEDULE_SHIFT, steps),
+  },
+  flux: SIGMA_CLIPPING,
+  flux2: SIGMA_CLIPPING,
+  flux3: SIGMA_CLIPPING,
+  'krea-2': {
+    kind: 'step',
+    rounding: 'round',
+    sigmas: (model, size, steps) =>
+      shiftedSigmas(
+        Math.exp(model.variant === 'krea2_base' ? tokenFitMu(size, KREA2_SHIFT_FIT) : KREA2_DISTILLED_MU),
+        steps
+      ),
+  },
+  'moss-image': SIGMA_CLIPPING,
+  'qwen-image': { kind: 'step', rounding: 'round', sigmas: (_model, size, steps) => qwenImageSigmas(size, steps) },
+  'sd-3': SIGMA_CLIPPING,
+  'z-image': {
+    kind: 'step',
+    rounding: 'floor',
+    sigmas: (_model, size, steps) => shiftedSigmas(Math.exp(tokenFitMu(size, Z_IMAGE_SHIFT_FIT)), steps),
+  },
+};
+
+/** Null where neither rule applies (SD clips scheduler timesteps); the start is then passed as is. */
+export const getDenoisingStartClipping = (
+  model: Pick<GenerateModelConfig, 'base' | 'type'>
+): DenoisingStartClipping | null =>
+  model.type !== 'external_image_generator' && Object.hasOwn(DENOISING_START_CLIPPING, model.base)
+    ? (DENOISING_START_CLIPPING[model.base] ?? null)
+    : null;
