@@ -86,6 +86,7 @@ def test_integrated_cuda_cache_cap_is_clamped_by_host_headroom(monkeypatch: pyte
         cache._execution_device = torch.device("cuda")
         cache._max_vram_cache_size_gb = 100.0
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 80 * GB)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 80 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 10 * GB)
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
@@ -109,6 +110,7 @@ def test_integrated_cuda_vram_admission_credits_reusable_allocator_blocks(monkey
     try:
         cache._execution_device = torch.device("cuda")
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 15 * GB)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 15 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 10 * GB)
         monkeypatch.setattr(torch.cuda, "memory_reserved", lambda _device: 14 * GB)
@@ -143,6 +145,7 @@ def test_integrated_cuda_physical_and_cache_availability_share_host_headroom(
         cache._execution_device = torch.device("cuda")
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
         monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
@@ -162,6 +165,7 @@ def test_integrated_cuda_reserve_decision_uses_host_headroom(monkeypatch: pytest
     try:
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
         monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
@@ -181,6 +185,7 @@ def test_integrated_cuda_calibration_matches_cache_identity(monkeypatch: pytest.
     try:
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
         monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
         working = 4 * GB

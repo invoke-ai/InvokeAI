@@ -67,6 +67,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -136,6 +137,45 @@ def _int4_int8_split(markers: dict[str, dict[str, Any]]) -> str:
     """How the kept quantized layers divide into packed int4 and int8, for the load log."""
     int4 = sum(marker_layout(marker).packed_int4 for marker in markers.values())
     return f"{int4} int4, {len(markers) - int4} int8"
+
+
+def _keep_rms_norms_in_fp32(model: torch.nn.Module) -> None:
+    """Hold every `Krea2RMSNorm` weight in float32, as diffusers' `_keep_in_fp32_modules` does on a folder load.
+
+    The norm upcasts its input to float32; a bf16 weight there both rounds `1 + weight` and makes torch skip the fused
+    rms_norm kernel for the dtype mismatch (#10117). A GGUF stores these unquantized, so they are taken as stored
+    rather than through the bf16 compute dtype.
+    """
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    for module in model.modules():
+        if not isinstance(module, Krea2RMSNorm):
+            continue
+        weight = module.weight
+        if isinstance(weight, GGMLTensor):
+            stored = weight.quantized_data
+            weight = (
+                stored
+                if stored.is_floating_point() and stored.shape == weight.shape
+                else weight.get_dequantized_tensor()
+            )
+        module.weight = torch.nn.Parameter(weight.detach().to(torch.float32), requires_grad=False)
+
+
+def _stored_rms_norm_weights(model: torch.nn.Module, sd: dict[str, Any], dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """Float32 copies of the `Krea2RMSNorm` weights in `sd` that a cast to `dtype` would round: 16- or 32-bit floats of
+    another dtype. Copies, because an mmap-backed view would pin the whole checkpoint file for the model's lifetime."""
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    keys = (f"{name}.weight" for name, module in model.named_modules() if isinstance(module, Krea2RMSNorm))
+    return {
+        key: tensor.to(torch.float32, copy=True)
+        for key in keys
+        if isinstance(tensor := sd.get(key), torch.Tensor)
+        and tensor.is_floating_point()
+        and tensor.element_size() >= 2
+        and tensor.dtype != dtype
+    }
 
 
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
@@ -678,6 +718,9 @@ class Krea2CheckpointModel(ModelLoader):
         modules = {name for name, _ in model.named_children()}
         nvfp4_payloads = {path: payload for path, payload in nvfp4_payloads.items() if path.split(".", 1)[0] in modules}
         nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        # The casts below round every float to `model_dtype` before `_keep_rms_norms_in_fp32` widens the norms, so
+        # hold back their stored copies or they arrive rounded (#10117). They are vectors; no reservation needed.
+        stored_norms = _stored_rms_norm_weights(model, sd, model_dtype)
 
         if int8_markers:
             # A merged file's bundled submodels are in `sd` too -- this loader does not
@@ -750,6 +793,7 @@ class Krea2CheckpointModel(ModelLoader):
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
             self._logger.info(f"Krea-2: kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed.")
 
+        sd.update(stored_norms)
         load_state_dict_ignoring_extras(
             model, sd, source="Krea-2 single-file checkpoint", assign=True, allow_missing=True
         )
@@ -802,8 +846,10 @@ class Krea2CheckpointModel(ModelLoader):
             # The layerwise-casting path exists to *produce* fp8 weights from full-precision ones. The
             # checkpoint already is fp8, and its hooks would cast back to the compute dtype without
             # applying weight_scale, so it must not run here.
+            _keep_rms_norms_in_fp32(model)
             return model
 
+        _keep_rms_norms_in_fp32(model)
         # Honor the fp8-storage setting (re-quantizes the dequantized weights to fp8-resident on CUDA).
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
@@ -886,6 +932,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         # ComfyUI GGUFs may use key names needing conversion). Failing here beats a confusing meta-tensor
         # crash mid-inference.
         _reject_incomplete_load(model, what="Krea-2 GGUF checkpoint")
+        _keep_rms_norms_in_fp32(model)
         return model
 
 
