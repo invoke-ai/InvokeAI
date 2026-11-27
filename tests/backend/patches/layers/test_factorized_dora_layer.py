@@ -435,16 +435,25 @@ def test_a_1d_magnitude_of_a_square_layer_is_ignored_with_one_warning(monkeypatc
 
 
 @pytest.mark.parametrize("key", ["dora_scale", "dora_magnitude"])
-@pytest.mark.parametrize(
-    "shape", [(5, 1), (1, 7), (12, 8), (13,), (12, 2), (2, 12), (1,), (), (1, 4), (1, 2), (1, 1), (1, 8, 1, 1)]
-)
-def test_a_magnitude_that_fits_neither_axis_is_refused_at_load(key: str, shape: tuple[int, ...]) -> None:
+@pytest.mark.parametrize("shape", [(5, 1), (1, 7), (12, 8), (13,), (12, 2), (2, 12), (1,), (), (1, 4), (1, 2), (1, 1)])
+def test_a_magnitude_that_fits_neither_axis_applies_as_the_plain_layer_with_one_warning(
+    key: str, shape: tuple[int, ...], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Applied, such a magnitude fails in the middle of a generation, or a full (out, in) one is multiplied in as an
-    elementwise factor. The weight is 12 x 8."""
+    elementwise factor; refused at load, it would fail the whole LoRA, for the SD loaders catch nothing per layer. The
+    layer applies as the plain LoKr, as it did before magnitudes were read. The weight is 12 x 8."""
+    warning = MagicMock()
+    monkeypatch.setattr(dora_module.logger, "warning", warning)
+    monkeypatch.setattr(dora_module, "_magnitude_ambiguous_warned", False)
     case = _lokr_whole(torch.Generator().manual_seed(24))
 
-    with pytest.raises(ValueError, match="fits neither axis"):
-        any_lora_layer_from_state_dict({**case.state_dict, key: torch.ones(shape, dtype=F64)})
+    layers = [any_lora_layer_from_state_dict({**case.state_dict, key: torch.ones(shape, dtype=F64)}) for _ in range(2)]
+
+    assert all(type(layer) is LoKRLayer for layer in layers)
+    weight = _randn(torch.Generator().manual_seed(25), *case.weight_shape)
+    torch.testing.assert_close(layers[0].get_parameters({"weight": weight}, 1.0)["weight"], case.update)
+    warning.assert_called_once()
+    assert "fits neither axis" in warning.call_args.args[0]
 
 
 @pytest.mark.parametrize("out_axis", [True, False], ids=["out_axis", "in_axis"])
@@ -506,13 +515,18 @@ def _conv_state_dict(variant: str, out_channels: int) -> dict[str, torch.Tensor]
         ("tucker", (1, 72, 1, 1)),
     ],
 )
-def test_a_conv_magnitude_that_is_not_one_of_its_layouts_is_refused(variant: str, shape: tuple[int, ...]) -> None:
+def test_a_conv_magnitude_that_is_not_one_of_its_layouts_applies_as_the_plain_layer(
+    variant: str, shape: tuple[int, ...], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """On a conv of 8 channels (8 -> 16) a per-column magnitude is `(1, 8, 1, 1)`, whatever the factors: divisors of
-    the flattened columns, a 2-D one and, where the factors show the kernel, a 1-D one do not fit."""
+    the flattened columns that are not a square kernel, a 2-D one and, where the factors show the kernel, a 1-D one do
+    not fit."""
+    monkeypatch.setattr(dora_module.logger, "warning", MagicMock())
     state_dict = _conv_state_dict(variant, 16)
 
-    with pytest.raises(ValueError, match="fits neither axis"):
-        any_lora_layer_from_state_dict({**state_dict, "dora_scale": torch.ones(shape, dtype=F64)})
+    layer = any_lora_layer_from_state_dict({**state_dict, "dora_scale": torch.ones(shape, dtype=F64)})
+
+    assert type(layer) is LoKRLayer
 
 
 @pytest.mark.parametrize("variant", ["flat", "tucker"])
@@ -532,3 +546,27 @@ def test_a_square_conv_1d_magnitude_falls_back_whether_or_not_the_kernel_shows()
     layer = any_lora_layer_from_state_dict({**_conv_state_dict("tucker", 8), "dora_scale": torch.ones(8, dtype=F64)})
 
     assert type(layer) is LoKRLayer
+
+
+@pytest.mark.parametrize("variant", ["doha", "dokr_decomposed_w2"])
+def test_an_input_axis_magnitude_of_a_1x1_conv_is_applied(variant: str) -> None:
+    """LyCORIS' input-axis DoRA writes `(1, channels, 1, 1)` for a 1x1 conv, SD1.5's proj_in among them, and its LoHa
+    and decomposed LoKr factors hold the one-element kernel flattened, so the factors cannot show it."""
+    g = torch.Generator().manual_seed(41)
+    channels, rank = 12, 3
+    if variant == "doha":
+        w1_a, w1_b, w2_a, w2_b = (_randn(g, channels, rank), _randn(g, rank, channels)) * 2
+        state_dict = {"hada_w1_a": w1_a, "hada_w1_b": w1_b, "hada_w2_a": w2_a, "hada_w2_b": w2_b}
+        update = ((w1_a @ w1_b) * (w2_a @ w2_b)).reshape(channels, channels, 1, 1)
+    else:
+        w1, w2_a, w2_b = _randn(g, 3, 3), _randn(g, 4, rank), _randn(g, rank, 4)
+        state_dict = {"lokr_w1": w1, "lokr_w2_a": w2_a, "lokr_w2_b": w2_b}
+        update = _kron(w1, w2_a @ w2_b).reshape(channels, channels, 1, 1)
+    magnitude = torch.rand(1, channels, 1, 1, generator=g, dtype=F64) + 0.5
+    weight = _randn(g, channels, channels, 1, 1)
+
+    layer = any_lora_layer_from_state_dict({**state_dict, "dora_scale": magnitude})
+
+    assert isinstance(layer, FactorizedDoRALayer) and not layer.magnitude_is_out_dim
+    expected = _reference_residual(weight, update, magnitude, out_axis=False)
+    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)

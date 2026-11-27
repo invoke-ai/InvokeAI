@@ -288,15 +288,24 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
     ) -> "FactorizedDoRALayer | LoKRLayer | LoHALayer":
         """`layer`, built from `values` without their magnitude, with the magnitude in `values`.
 
-        Raises ``ValueError`` for a magnitude that fits neither axis of the update's weight: it would otherwise fail
-        in the middle of a generation, or be applied as an elementwise factor. A 1-D magnitude of a square layer is
-        returned as the plain `layer`, with a warning: its length fits both axes and nothing in the file tells which
-        it indexes. PEFT and ai-toolkit store 1-D output-axis vectors and ComfyUI reads a square 1-D one per output
+        A magnitude that fits neither axis of the update's weight would fail in the middle of a generation, or be
+        applied as an elementwise factor; one that fits both (a 1-D vector of a square layer) has no axis to apply on.
+        Either is returned as the plain `layer`, with one warning, as such a layer was applied before magnitudes were
+        read. It is not refused: the loaders of the SD families catch nothing per layer, so one odd layer would fail
+        the whole LoRA. PEFT and ai-toolkit store 1-D output-axis vectors and ComfyUI reads a square 1-D one per output
         row, but no known writer emits a 1-D ``dora_scale`` for a LoKr or LoHa, so a guess could apply it on the wrong
-        axis; the update without a magnitude, as before this layer existed, is the safe reading."""
-        is_out_dim = _factorized_magnitude_axis(layer, values)
+        axis."""
+        try:
+            is_out_dim = _factorized_magnitude_axis(layer, values)
+        except ValueError as error:
+            _warn_magnitude_unusable_once(str(error))
+            return layer
         if is_out_dim is None:
-            _warn_magnitude_ambiguous_once(layer)
+            size = layer.out_features()
+            _warn_magnitude_unusable_once(
+                f"a 1-D magnitude of length {size} on a square {size}x{size} {type(layer).__name__} fits both the "
+                "output and the input axis, and no known writer emits one"
+            )
             return layer
         magnitude = values["dora_magnitude"] if "dora_magnitude" in values else values["dora_scale"]
         return cls(layer, dora_scale=magnitude, magnitude_is_out_dim=is_out_dim)
@@ -345,15 +354,13 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
 _magnitude_ambiguous_warned = False
 
 
-def _warn_magnitude_ambiguous_once(layer: LoKRLayer | LoHALayer) -> None:
+def _warn_magnitude_unusable_once(reason: str) -> None:
     global _magnitude_ambiguous_warned
     if not _magnitude_ambiguous_warned:
         _magnitude_ambiguous_warned = True
-        size = layer.out_features()
         logger.warning(
-            f"A {type(layer).__name__} layer of a LoRA has a 1-D DoRA magnitude of length {size} on a square "
-            f"{size}x{size} weight, which fits both the output and the input axis; no known writer emits one, so the "
-            "magnitude is ignored for it and every layer like it, and the update is applied as plain LoKr/LoHa."
+            f"A LoKr/LoHa layer of a LoRA has a DoRA magnitude it cannot apply ({reason}). Its magnitude is ignored, "
+            "and so is that of every layer like it: they apply as plain LoKr/LoHa."
         )
 
 
@@ -394,7 +401,8 @@ def _factorized_magnitude_axis(layer: LoKRLayer | LoHALayer, values: Dict[str, t
     ``(1, in[, 1, 1])`` per input column. The input axis is matched exactly: a magnitude that merely divides the
     columns would fail when applied, or scale a column of the wrong group. A 1-D or 2-D per-column magnitude does not
     exist for a conv whose factors show its kernel (`has_kernel`). Factors that do not show one could still be a
-    conv's, flattened: for them a 4-D magnitude has to split the flattened columns into channels and a square kernel.
+    conv's, flattened: for them a 4-D magnitude has to split the flattened columns into channels and a square kernel,
+    1x1 included (LyCORIS' input-axis DoRA writes ``(1, channels, 1, 1)`` for an SD1.5 proj_in).
     """
     out_features, in_features, has_kernel = layer.out_features(), layer.in_features(), layer.has_kernel()
     is_peft = "dora_magnitude" in values
@@ -420,7 +428,7 @@ def _factorized_magnitude_axis(layer: LoKRLayer | LoHALayer, values: Dict[str, t
         if has_kernel:
             if channels == in_features:
                 return False
-        elif in_features % channels == 0 and in_features // channels > 1:
+        elif in_features % channels == 0:
             kernel = math.isqrt(in_features // channels)
             if kernel * kernel == in_features // channels:
                 return False
