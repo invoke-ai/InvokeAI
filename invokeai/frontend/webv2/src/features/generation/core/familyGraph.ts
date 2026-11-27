@@ -1,4 +1,5 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 /** A node output that feeds an input: the node and its output field. */
 export interface GraphOutput {
@@ -8,8 +9,9 @@ export interface GraphOutput {
 
 /**
  * A family builder's graph with the facts callers compose over. Canvas grafts image encodes, masks, control and
- * regional conditioning onto the nodes the builder names here, so it neither guesses node ids nor scans edges for these
- * facts. The `seed` and `canvas_output` ids stay shared contracts outside this record.
+ * regional conditioning onto the nodes the builder names here, and Upscale feeds its enlarged frame through `latents`
+ * into `denoise`, so neither guesses node ids nor scans edges for these facts. The `seed` and output ids stay shared
+ * contracts outside this record.
  */
 export interface FamilyGraph {
   graph: BackendGraphContract;
@@ -52,4 +54,46 @@ export interface FamilyConditioning {
    * where regional references are FLUX Redux (FLUX).
    */
   fluxReduxCollector: BackendInvocationContract | null;
+}
+
+/** The settings a pipeline reads; widening it fails Upscale's build until Upscale maps the new field. */
+export type FamilyPipelineSettings = Pick<
+  GenerateSettings,
+  | 'cfgRescaleMultiplier'
+  | 'cfgScale'
+  | 'clipEmbedModel'
+  | 'clipSkip'
+  | 'componentSourceModel'
+  | 'loras'
+  | 'mistralEncoderModel'
+  | 'qwen35EncoderModel'
+  | 'qwen3EncoderModel'
+  | 'qwen3VLEncoderModel'
+  | 'qwenVLEncoderModel'
+  | 'scheduler'
+  | 'steps'
+  | 't5EncoderModel'
+  | 'vae'
+  | 'vaePrecision'
+>;
+
+/** Prompts, seed, loader, LoRAs, encoders, denoise and decode; Generate-only additions cannot be asked for here. */
+export interface FamilyPipelineInput {
+  model: MainModelConfig;
+  settings: FamilyPipelineSettings;
+  /** The size the denoise runs at, already on the family's grid. */
+  denoiseSize: { width: number; height: number };
+  /** Where the denoise enters its schedule, in the denoise node's own terms (see `getDenoisingStartClipping`). */
+  denoisingStart: number;
+  useCpuNoise: boolean;
+  output: { id: string; isIntermediate: boolean };
+  /** Tiles the decode where the node has the switch; null decodes whole. The caller tiles its own encode. */
+  vaeTileSize: number | null;
+  /** SD only: tiled multi-diffusion denoise, which takes one conditioning per side and so has no `conditioning`. */
+  multiDiffusion: { tileSize: number; tileOverlap: number } | null;
+}
+
+/** A family graph plus the decode node whose image is the result. */
+export interface FamilyPipeline extends FamilyGraph {
+  output: BackendInvocationContract;
 }

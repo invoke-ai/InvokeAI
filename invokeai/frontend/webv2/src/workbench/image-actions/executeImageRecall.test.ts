@@ -673,38 +673,66 @@ describe('executeImageRecall', () => {
     );
   });
 
-  it('applies a prompts recall on top of an edit made while the metadata loaded', async () => {
-    const { commands, setSettings } = createCommands();
-    let finishRead: ((value: unknown) => void) | undefined;
-    let panel: Record<string, unknown> = { modelKey: model.key, steps: 20 };
-    const getGenerateValues = vi.fn(() => panel);
+  it.each(['prompts', 'positivePrompt', 'negativePrompt'] as const)(
+    'applies %s recall without reverting unrelated edits made while metadata loaded',
+    async (kind) => {
+      const { commands, setSettings } = createCommands();
+      let finishRead: ((value: unknown) => void) | undefined;
+      let panel: Record<string, unknown> = {
+        modelKey: model.key,
+        steps: 20,
+        positivePrompt: 'original positive',
+        negativePrompt: 'original negative',
+      };
+      const getGenerateValues = vi.fn(() => panel);
 
-    galleryApi.galleryImages.metadata.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishRead = resolve;
-      })
-    );
-    const recall = executeImageRecall({
-      queryClient,
-      t,
-      commands,
-      getGenerateValues,
-      image,
-      kind: 'prompts',
-      models: [model],
-      projectId: 'project-1',
-    });
+      galleryApi.galleryImages.metadata.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishRead = resolve;
+        })
+      );
+      const recall = executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues,
+        image,
+        kind,
+        models: [model],
+        projectId: 'project-1',
+      });
 
-    await vi.waitFor(() => expect(finishRead).toBeDefined());
-    panel = { ...panel, steps: 42 };
-    finishRead!({ positive_prompt: 'recalled prompt' });
+      await vi.waitFor(() => expect(finishRead).toBeDefined());
+      panel = {
+        ...panel,
+        steps: 42,
+        positivePrompt: 'edited positive',
+        negativePrompt: 'edited negative',
+        negativePromptEnabled: false,
+        promptTemplate: {
+          id: 'new-template',
+          name: 'New template',
+          positivePrompt: '{prompt}, cinematic',
+          negativePrompt: '{prompt}, lowres',
+        },
+        promptTemplateViewMode: true,
+      };
+      finishRead!({ positive_prompt: 'recalled positive', negative_prompt: 'recalled negative' });
 
-    await expect(recall).resolves.toBe(true);
-    expect(setSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ positivePrompt: 'recalled prompt', steps: 42 }),
-      'project-1'
-    );
-  });
+      await expect(recall).resolves.toBe(true);
+      expect(setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positivePrompt: kind === 'negativePrompt' ? 'edited positive, cinematic' : 'recalled positive',
+          negativePrompt: kind === 'positivePrompt' ? 'edited negative, lowres' : 'recalled negative',
+          negativePromptEnabled: kind !== 'positivePrompt',
+          promptTemplate: null,
+          promptTemplateViewMode: false,
+          steps: 42,
+        }),
+        'project-1'
+      );
+    }
+  );
 
   it('applies on top of an edit made while the reference check was pending', async () => {
     const { commands, setSettings } = createCommands();

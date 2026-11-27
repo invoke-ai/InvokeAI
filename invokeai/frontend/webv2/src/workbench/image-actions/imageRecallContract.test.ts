@@ -14,6 +14,7 @@ import { recallCatalogFor } from '@features/generation/core/graphCoverage.testin
 import {
   deriveAspectRatioId,
   getDefaultGenerateSettings,
+  getEffectivePrompts,
   getExternalResolutionPresets,
   getGenerationUiPolicy,
   isSupportedGenerateModel,
@@ -104,7 +105,7 @@ const IMAGE_RECALL_CONTRACT = {
   },
   negative_prompt: {
     kinds: ['all', 'remix', 'prompts'],
-    restores: ['negativePrompt', 'promptTemplate', 'promptTemplateViewMode'],
+    restores: ['negativePrompt', 'negativePromptEnabled', 'promptTemplate', 'promptTemplateViewMode'],
   },
   seed: { kinds: ['all', 'seed'], restores: ['seed', 'seedMode'] },
   // An upscale records the size of the frame it enlarged, which only exists once the graph runs.
@@ -426,6 +427,7 @@ const baselineValues = (): GenerateWidgetValues => ({
   ],
   model: BASELINE_MODEL,
   positivePrompt: 'the baseline prompt',
+  negativePromptEnabled: false,
   promptTemplate: { id: 'template', name: 'Template', negativePrompt: 'lowres', positivePrompt: '{prompt}, detailed' },
   promptTemplateViewMode: true,
   referenceImages: normalizeReferenceImages([
@@ -769,7 +771,7 @@ describe('image recall contract', () => {
         [
           'prompts',
           recall(testCase, 'prompts')?.values ?? null,
-          { ...baseline, ...pick(all, settingsUnder(testCase, 'prompts')) },
+          { ...baseline, ...getEffectivePrompts(baseline), ...pick(all, settingsUnder(testCase, 'prompts')) },
         ],
         [
           'seed',

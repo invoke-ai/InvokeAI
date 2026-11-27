@@ -6407,6 +6407,8 @@
             "all": "Recalled image metadata",
             "clipSkip": "Recalled CLIP skip",
             "dimensions": "Recalled image size",
+            "negativePrompt": "Recalled negative prompt",
+            "positivePrompt": "Recalled positive prompt",
             "prompts": "Recalled prompts",
             "remix": "Recalled remix settings",
             "seed": "Recalled seed",
@@ -6446,6 +6448,8 @@
             "all": "Recall all",
             "clipSkip": "Use CLIP skip",
             "dimensions": "Use size",
+            "negativePrompt": "Use negative prompt",
+            "positivePrompt": "Use positive prompt",
             "prompts": "Use prompt",
             "remix": "Remix image",
             "seed": "Use seed"

@@ -12,6 +12,9 @@
 #     blocks.0.adaln_proj.linear.lora_A.weight        (AdaLN time-conditioning)
 #     token_refiner.blocks.0.attn.qkv_proj.lora_A.weight
 #     final_layer.adaln_proj.linear.lora_A.weight
+#     audio_patch_proj.lora_A.weight                  (top-level projections: video_patch_proj,
+#                                                      audio_patch_proj, condition_proj,
+#                                                      final_layer.{video,audio}_out)
 #
 # ComfyUI users sometimes re-key these with a ``diffusion_model.`` prefix; a bare
 # ``transformer.`` / ``base_model.model.transformer.`` PEFT prefix is also accepted.
@@ -63,9 +66,9 @@ _H3_FINAL_LAYER_RE = re.compile(_PEFT_PREFIX_RE + r"final_layer\.adaln_proj\.lin
 
 MINIMAX_H3_KOHYA_PREFIX = "lora_unet_"
 
-# Native module vocabulary for un-flattening kohya keys. Only Linears with a LoRA conversion
-# are leaves, so a flattened path that names anything else fails to reconstruct rather than
-# being rewritten into a key that matches no module. Refiner blocks have no ``adaln_proj``.
+# Native module vocabulary for un-flattening kohya keys and validating dotted ones. Only Linears
+# with a LoRA conversion are leaves, so a path that names anything else is rejected rather than
+# converted into a layer that matches no module (a silent no-op). Refiner blocks have no ``adaln_proj``.
 _H3_KOHYA_BLOCK_SUBTREE: ParsingTree = {
     "attn": {"qkv_proj": {}, "out_proj": {}},
     "mlp": {"fc1": {}, "fc2": {}},
@@ -73,7 +76,10 @@ _H3_KOHYA_BLOCK_SUBTREE: ParsingTree = {
 _H3_KOHYA_PARSING_TREE: ParsingTree = {
     "blocks": {INDEX_PLACEHOLDER: {**_H3_KOHYA_BLOCK_SUBTREE, "adaln_proj": {"linear": {}}}},
     "token_refiner": {"blocks": {INDEX_PLACEHOLDER: _H3_KOHYA_BLOCK_SUBTREE}},
-    "final_layer": {"adaln_proj": {"linear": {}}},
+    "final_layer": {"adaln_proj": {"linear": {}}, "video_out": {}, "audio_out": {}},
+    "video_patch_proj": {},
+    "audio_patch_proj": {},
+    "condition_proj": {},
 }
 
 
