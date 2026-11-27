@@ -14,6 +14,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from weakref import ref
 
 import gguf
 import numpy as np
@@ -227,20 +228,47 @@ def test_a_real_gguf_identifies_from_its_header_alone(
 
     reader_init = gguf.GGUFReader.__init__
     opened_paths: list[Path] = []
+    reader_refs = []
+    mapping_refs = []
+    real_hash = mod.hash
 
     def count_open(reader: gguf.GGUFReader, reader_path: Path) -> None:
         opened_paths.append(reader_path)
         reader_init(reader, reader_path)
+        reader_refs.append(ref(reader))
+        mapping_refs.append(ref(reader.data))
+
+    def hash_after_parse() -> str:
+        assert opened_paths == [path]
+        assert all(reader_ref() is None for reader_ref in reader_refs)
+        assert all(mapping_ref() is None for mapping_ref in mapping_refs)
+        return real_hash()
 
     monkeypatch.setattr(gguf.GGUFReader, "__init__", count_open)
-    result = ModelConfigFactory.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+    monkeypatch.setattr(mod, "hash", hash_after_parse)
+    result = ModelConfigFactory.from_model_on_disk(mod)
 
     assert result.match_count == 1
     assert isinstance(result.config, expected)
     assert opened_paths == [path]
-    # What the configs probed is what production identification reads: the header, not the tensor data.
+    assert mod.metadata()["general.architecture"] == "t5encoder"
+    assert mod.metadata()["t5encoder.block_count"] == 2
+    assert "tokenizer.ggml.tokens" not in mod.metadata()
     state_dict = mod.load_state_dict()
     assert all(tensor.quantized_data.is_meta for tensor in state_dict.values())
     assert state_dict["token_embd.weight"].tensor_shape == (vocab_size, 1)
-    # Keep the model and classification result alive. Windows cannot rename a still-mapped file.
+    assert opened_paths == [path]
+    # Windows cannot rename a still-mapped file.
     path.rename(tmp_path / "moved.gguf")
+
+
+def test_uppercase_gguf_does_not_enable_t5_identification(tmp_path: Path) -> None:
+    path = tmp_path / "encoder.GGUF"
+    _write_llamacpp_t5_encoder_gguf(path, vocab_size=_T5_V1_1_VOCAB_SIZE, bias_in_every_block=False)
+    mod = ModelOnDisk(path)
+
+    assert mod.metadata() == {}
+    result = ModelConfigFactory.from_model_on_disk(mod, allow_unknown=False)
+
+    assert result.match_count == 0
+    assert result.config is None

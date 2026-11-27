@@ -244,7 +244,7 @@ from invokeai.backend.model_manager.configs.wan_t5_encoder import (
     WanT5Encoder_GGUF_Config,
     WanT5Encoder_WanT5Encoder_Config,
 )
-from invokeai.backend.model_manager.model_on_disk import GGUFFileChangedError, ModelOnDisk, read_safetensors_header
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -1045,18 +1045,6 @@ class ModelConfigFactory:
         # This rejects obviously non-model paths early, saving time
         ModelConfigFactory._validate_path_looks_like_model(mod.path)
 
-        if not isinstance(mod, ModelOnDisk):
-            return ModelConfigFactory._classify(mod, override_fields, allow_unknown)
-        try:
-            with mod.reuse_gguf_header():
-                return ModelConfigFactory._classify(mod, override_fields, allow_unknown)
-        except GGUFFileChangedError as e:
-            return ModelClassificationResult(config=None, details={"gguf_file": InvalidMatchError(str(e))})
-
-    @staticmethod
-    def _classify(
-        mod: ModelOnDisk, override_fields: dict[str, Any] | None, allow_unknown: bool
-    ) -> ModelClassificationResult:
         # A property of the file, not of any model family: no candidate runs on a file nothing can load.
         if refusal := ModelConfigFactory._gguf_file_refusal(mod):
             return ModelClassificationResult(config=None, details={"gguf_file": refusal})

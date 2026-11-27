@@ -14,7 +14,7 @@ This config only describes how to recognise the model on disk; downloading
 and accepting Gemma's license is the user's responsibility.
 """
 
-from contextlib import ExitStack
+from pathlib import Path
 from typing import Any, Literal, Self
 
 import gguf
@@ -88,29 +88,21 @@ class Gemma2Encoder_Gemma2Encoder_Config(Config_Base):
         return cls(**override_fields)
 
 
-def _read_gguf_arch_and_hidden_size(mod: ModelOnDisk) -> tuple[str, int | None]:
-    """Read (general.architecture, <arch>.embedding_length) from a GGUF file's metadata.
-
-    Raises NotAMatchError if the file is not a readable GGUF or is missing the architecture marker.
-    """
-    with ExitStack() as stack:
-        try:
-            reader = (
-                stack.enter_context(mod.open_gguf_header(mod.path, strict=True))
-                if isinstance(mod, ModelOnDisk)
-                else gguf.GGUFReader(mod.path)
-            )
-        except Exception as e:
-            raise NotAMatchError(f"not a readable GGUF file: {e}") from e
-
+def _read_mixed_case_gguf_metadata(path: Path) -> dict[str, Any]:
+    # Gemma2 historically accepts mixed-case GGUF suffixes with a strict reader.
+    try:
+        reader = gguf.GGUFReader(path)
+    except Exception as e:
+        error = str(e)
+    else:
         arch_field = reader.fields.get("general.architecture")
         if arch_field is None:
-            raise NotAMatchError("GGUF file is missing the 'general.architecture' metadata field")
+            return {}
         architecture = str(arch_field.contents())
-
-        hidden_field = reader.fields.get(f"{architecture}.embedding_length")
-        hidden_size = int(hidden_field.contents()) if hidden_field is not None else None
-        return architecture, hidden_size
+        width_key = f"{architecture}.embedding_length"
+        width_field = reader.fields.get(width_key)
+        return {"general.architecture": architecture, width_key: width_field.contents() if width_field else None}
+    raise NotAMatchError(f"not a readable GGUF file: {error}")
 
 
 class Gemma2Encoder_GGUF_Config(Config_Base):
@@ -137,7 +129,20 @@ class Gemma2Encoder_GGUF_Config(Config_Base):
         if mod.path.suffix.lower() != ".gguf":
             raise NotAMatchError(f"not a .gguf file: {mod.path.name}")
 
-        architecture, hidden_size = _read_gguf_arch_and_hidden_size(mod)
+        if mod.path.suffix == ".gguf":
+            metadata = mod.metadata()
+            if error := mod.gguf_duplicate_header_error():
+                raise NotAMatchError(f"not a readable GGUF file: {error}")
+            if not metadata and (error := mod.metadata_read_error()):
+                raise NotAMatchError(f"not a readable GGUF file: {error.split(': ', 1)[-1]}")
+        else:
+            metadata = _read_mixed_case_gguf_metadata(mod.path)
+
+        if "general.architecture" not in metadata:
+            raise NotAMatchError("GGUF file is missing the 'general.architecture' metadata field")
+        architecture = str(metadata["general.architecture"])
+        hidden_length = metadata.get(f"{architecture}.embedding_length")
+        hidden_size = int(hidden_length) if hidden_length is not None else None
         if architecture != "gemma2":
             raise NotAMatchError(f"GGUF architecture '{architecture}' is not 'gemma2'")
         if hidden_size != _PID_GEMMA_HIDDEN_SIZE:
