@@ -207,7 +207,8 @@ def test_body_stream_supports_chunked_read() -> None:
 
 def test_get_path_returns_synthetic_s3_uri() -> None:
     storage, _ = _make_storage()
-    p = str(storage.get_path("foo.png", thumbnail=True))
+    # as_posix: str(Path) uses backslashes on Windows.
+    p = storage.get_path("foo.png", thumbnail=True).as_posix()
     assert "test-bucket" in p and "thumbnails/foo.webp" in p
 
 
