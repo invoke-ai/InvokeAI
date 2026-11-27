@@ -840,6 +840,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         model_path: Path,
         loader: Optional[Callable[[Path], AnyModel]] = None,
+        part_of: Optional[tuple[str, str]] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file located at the indicated path
@@ -852,13 +853,16 @@ class ModelsInterface(InvocationContextInterface):
         Args:
             path: A model Path
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
+            part_of: (model key, part name) for a part of an installed model, dropped along with that model.
 
         Returns:
             A LoadedModelWithoutConfig object.
         """
 
         self._util.signal_progress(f"Loading model {model_path.name}")
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path, loader=loader, part_of=part_of
+        )
 
     def load_remote_model(
         self,

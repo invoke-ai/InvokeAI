@@ -74,7 +74,10 @@ class ModelLoadServiceBase(ABC):
 
     @abstractmethod
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+        part_of: Optional[tuple[str, str]] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file or directory located at the indicated Path.
@@ -90,6 +93,7 @@ class ModelLoadServiceBase(ABC):
         Args:
           model_path: A pathlib.Path to a checkpoint-style models file
           loader: A Callable that expects a Path and returns a Dict[str, Tensor]
+          part_of: (model key, part name) for a part of an installed model, dropped along with that model.
 
         Returns:
           A LoadedModel object.

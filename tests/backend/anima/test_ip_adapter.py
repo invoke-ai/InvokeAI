@@ -6,7 +6,6 @@ node's own reshapes, its `scale_mask`, and its `_LoRALinear` wrappers on the cro
 """
 
 import copy
-import logging
 
 import accelerate
 import pytest
@@ -21,8 +20,10 @@ from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.anima.ip_adapter import (
     AnimaIPAdapter,
     AnimaIPAdapterExtension,
+    anima_ip_adapter_lora,
     combine_block_fns,
     encode_image_tokens,
+    load_anima_ip_adapter_lora,
     siglip_pixel_values,
 )
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Anima_Config
@@ -33,7 +34,6 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_loaders.anima import AnimaIPAdapterModelLoader
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -172,7 +172,10 @@ def test_the_term_and_its_lora_match_the_reference_node() -> None:
     apply_custom_layers_to_model(model)
     block_fns = extension.block_fns(model.blocks)
     with LayerPatcher.apply_smart_model_patches(
-        model=model, patches=[(adapter.lora_patch(), 1.0)], prefix=ANIMA_LORA_TRANSFORMER_PREFIX, dtype=torch.float32
+        model=model,
+        patches=[(anima_ip_adapter_lora(sd), 1.0)],
+        prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
+        dtype=torch.float32,
     ):
         actual = model(x, t, ctx, ip_adapter_blocks=block_fns)
 
@@ -224,7 +227,7 @@ def test_images_sharing_an_adapter_are_attended_together_each_at_its_strength() 
     def run(block_fns) -> torch.Tensor:
         with LayerPatcher.apply_smart_model_patches(
             model=model,
-            patches=[(adapter.lora_patch(), 1.0)],
+            patches=[(anima_ip_adapter_lora(sd), 1.0)],
             prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
             dtype=torch.float32,
         ):
@@ -325,7 +328,7 @@ def test_the_bundled_lora_is_its_cross_attention_part_on_real_linears() -> None:
         transformer = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
     modules = dict(transformer.named_modules())
 
-    layers = adapter.lora_patch().layers
+    layers = anima_ip_adapter_lora(sd).layers
 
     assert adapter.num_blocks == NUM_BLOCKS
     assert set(layers) == {
@@ -340,6 +343,17 @@ def test_the_bundled_lora_is_its_cross_attention_part_on_real_linears() -> None:
         assert (layer.up.shape[0], layer.down.shape[1]) == (linear.out_features, linear.in_features)
         # No alpha in the file: the reference's alpha / rank, 32 / 32.
         assert layer.scale() == 1.0
+
+
+def test_the_bundled_lora_reads_peft_default_keys_and_skips_a_layer_missing_a_half() -> None:
+    prefix = "lora.base_model.model.blocks.0.cross_attn"
+    sd = {
+        f"{prefix}.q_proj.lora_A.default.weight": torch.zeros(_LORA_RANK, 64),
+        f"{prefix}.q_proj.lora_B.default.weight": torch.zeros(64, _LORA_RANK),
+        f"{prefix}.k_proj.lora_A.weight": torch.zeros(_LORA_RANK, 32),
+    }
+
+    assert set(anima_ip_adapter_lora(sd).layers) == {f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.cross_attn.q_proj"}
 
 
 @pytest.mark.parametrize(
@@ -359,13 +373,24 @@ def test_a_variant_this_adapter_does_not_compute_is_refused(extra_key, extra_met
         AnimaIPAdapter.from_state_dict(sd, {**metadata, **extra_metadata})
 
 
-def test_the_model_cache_size_counts_the_bundled_lora() -> None:
+def test_the_model_cache_sizes_the_adapter_and_its_lora_as_two_entries(tmp_path) -> None:
+    """The partially loadable adapter is sized by its state dict alone, so the LoRA must be its own entry to be
+    counted."""
     sd = _tiny_checkpoint()
-    adapter = AnimaIPAdapter.from_state_dict(sd, metadata)
+    path = tmp_path / "anima-ip-adapter.safetensors"
+    save_file(sd, path, metadata=metadata)
 
-    # Every tensor of the checkpoint but the self-attention LoRA, which is not applied and so not kept.
-    expected = sum(t.numel() * t.element_size() for key, t in sd.items() if ".self_attn." not in key)
-    assert calc_model_size_by_data(logging.getLogger(__name__), adapter) == expected
+    adapter_bytes = CachedModelWithPartialLoad(
+        AnimaIPAdapter.from_state_dict(sd, metadata), _CPU, keep_ram_copy=False
+    ).total_bytes()
+    lora_bytes = load_anima_ip_adapter_lora(path).calc_size()
+
+    def size(keep) -> int:
+        return sum(t.numel() * t.element_size() for key, t in sd.items() if keep(key))
+
+    assert adapter_bytes == size(lambda key: not key.startswith("lora."))
+    # The self-attention LoRA is not applied and so not kept.
+    assert lora_bytes == size(lambda key: ".cross_attn." in key)
 
 
 def test_the_reference_image_is_letterboxed_on_black_and_normalized() -> None:
@@ -416,7 +441,7 @@ def test_the_loaded_adapter_holds_real_weights_the_model_cache_can_move(monkeypa
     tensors = {**adapter.state_dict(keep_vars=True), **dict(adapter.named_buffers())}
     assert tensors and not any(t.is_meta for t in tensors.values())
     torch.testing.assert_close(adapter.blocks[1].ip_v_proj.weight, sd["blocks.1.ip_v_proj.weight"])
-    layers = adapter.lora_patch().layers.values()
+    layers = load_anima_ip_adapter_lora(path).layers.values()
     assert all(isinstance(layer, LoRALayer) for layer in layers)
     lora_tensors = [t for layer in layers for t in (layer.up, layer.down)]  # type: ignore[attr-defined]
     assert len(lora_tensors) == 2 * 2 * 4 and all(t.device.type == "cpu" for t in lora_tensors)

@@ -15,6 +15,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
 from invokeai.app.services.model_load.model_load_common import distinct_caches, load_settings_changed
 from invokeai.app.services.model_records import UnknownModelException
+from invokeai.backend.model_manager.cache_key import get_model_part_cache_key
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.roles import ModelRoleError, view_as
 from invokeai.backend.model_manager.load import (
@@ -336,11 +337,14 @@ class ModelLoadService(ModelLoadServiceBase):
         return not self._load_settings_changed(config, current)
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+        part_of: Optional[tuple[str, str]] = None,
     ) -> LoadedModelWithoutConfig:
         # Resolve the calling thread's cache once so the whole load uses a single device's cache.
         ram_cache = self.ram_cache
-        cache_key = str(model_path)
+        cache_key = get_model_part_cache_key(*part_of, model_path) if part_of else str(model_path)
         try:
             # Retrieve with a first-use claim so the record cannot be evicted between the lookup
             # and the wrapper's first lock (see ModelCache.get_with_first_use_claim).

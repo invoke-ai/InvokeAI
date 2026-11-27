@@ -316,11 +316,17 @@
               "description": "A Callable that expects a Path and returns a dict[str|int, Any]",
               "name": "loader",
               "type": "Optional[Callable[[Path], AnyModel]]"
+            },
+            {
+              "default": "None",
+              "description": "(model key, part name) for a part of an installed model, dropped along with that model.",
+              "name": "part_of",
+              "type": "Optional[tuple[str, str]]"
             }
           ],
           "return_type": "LoadedModelWithoutConfig",
           "returns": "A LoadedModelWithoutConfig object.",
-          "signature": "(model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None) -> LoadedModelWithoutConfig"
+          "signature": "(model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None, part_of: Optional[tuple[str, str]] = None) -> LoadedModelWithoutConfig"
         },
         {
           "description": "Download, cache, and load the model file located at the indicated URL or repo_id.\nIf the model is already downloaded, it will be loaded from the cache.\nIf the a loader callable is provided, it will be invoked to load the model. Otherwise,\n`safetensors.torch.load_file()` or `torch.load()` will be called to load the model.\nBe aware that the LoadedModelWithoutConfig object has no `config` attribute",

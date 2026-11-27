@@ -7,7 +7,7 @@ cross-attention query (`cross_attn.q_norm(cross_attn.q_proj(x))` on the adaLN-mo
 ControlNet-LLLite on `q_proj` reaches it too); its keys and values are per-block projections of the SigLIP2 image
 tokens, with no key norm and no output projection; a per-block gate computed from the timestep embedding scales it,
 and it is added after the whole block. The checkpoint also carries a PEFT LoRA trained with the adapter. The
-reference applies only its cross-attention part, at scale 1.0, and so does `lora_patch`.
+reference applies only its cross-attention part, at scale 1.0, and so does `anima_ip_adapter_lora`.
 
 Several reference images may share one adapter: their scaled tokens are concatenated along the token axis into one
 key/value set, so each block runs one attention per adapter rather than one per image. The reference takes one image
@@ -16,6 +16,7 @@ per adapter; with one image this is exactly its computation.
 
 import re
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence
 
 import accelerate
@@ -116,42 +117,24 @@ class AnimaIPAdapterBlock(nn.Module):
 
 
 class AnimaIPAdapter(nn.Module):
-    """The adapter's per-block weights, plus the cross-attention LoRA trained with them."""
+    """The adapter's per-block weights. Its bundled LoRA is loaded on its own by `load_anima_ip_adapter_lora`."""
 
-    def __init__(self, num_blocks: int, token_dim: int, inner_dim: int, x_dim: int, lora: ModelPatchRaw):
+    def __init__(self, num_blocks: int, token_dim: int, inner_dim: int, x_dim: int):
         super().__init__()
         self.blocks = nn.ModuleList([AnimaIPAdapterBlock(token_dim, inner_dim, x_dim) for _ in range(num_blocks)])
-        self._lora = lora
 
     @property
     def num_blocks(self) -> int:
         return len(self.blocks)
-
-    def lora_patch(self) -> ModelPatchRaw:
-        """The bundled LoRA's cross-attention q/k/v/output layers, keyed for `ANIMA_LORA_TRANSFORMER_PREFIX`."""
-        return self._lora
 
     @classmethod
     def from_state_dict(
         cls, sd: Mapping[str, torch.Tensor], metadata: Optional[Mapping[str, str]] = None
     ) -> "AnimaIPAdapter":
         """Build the adapter from its checkpoint, adopting the checkpoint's tensors rather than copying them."""
-        # Imported here: importing the LoRA conversion module before `model_manager.load` trips an import cycle.
-        from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import (
-            lora_model_from_anima_state_dict,
-        )
-
         validate_anima_ip_adapter(sd.keys(), metadata)
 
-        ip_sd: dict[str, torch.Tensor] = {}
-        lora_pairs: dict[str, dict[str, torch.Tensor]] = {}
-        for key, tensor in sd.items():
-            if _IP_KEY_RE.match(key):
-                ip_sd[key] = tensor
-            elif match := _CROSS_ATTN_LORA_KEY_RE.match(key):
-                block, projection, side = match.groups()
-                lora_pairs.setdefault(f"blocks.{block}.cross_attn.{projection}", {})[side] = tensor
-
+        ip_sd = {key: tensor for key, tensor in sd.items() if _IP_KEY_RE.match(key)}
         block_indices = sorted({int(_IP_KEY_RE.match(key).group(1)) for key in ip_sd})  # type: ignore[union-attr]
         if not block_indices:
             raise ValueError("Not an Anima IP-Adapter: no `blocks.N.ip_k_proj` weights.")
@@ -159,21 +142,47 @@ class AnimaIPAdapter(nn.Module):
         inner_dim, token_dim = ip_sd[f"blocks.{block_indices[0]}.ip_k_proj.weight"].shape
         x_dim = ip_sd[f"blocks.{block_indices[0]}.adaln_ip.1.weight"].shape[0]
 
-        # As the reference does, a LoRA layer missing one of its two halves is skipped. No alpha key, so the PEFT
-        # conversion scales by 1.0 -- the reference's alpha / rank with alpha == rank.
-        lora_sd = {
-            f"{layer}.lora_{side}.weight": pair[side] for layer, pair in lora_pairs.items() if len(pair) == 2
-            for side in ("A", "B")
-        }  # fmt: skip
-        lora = lora_model_from_anima_state_dict(lora_sd)
-
         with accelerate.init_empty_weights():
-            model = cls(num_blocks, token_dim, inner_dim, x_dim, lora)
+            model = cls(num_blocks, token_dim, inner_dim, x_dim)
         # Outside the empty-weights scope: it patches `register_parameter`, through which `assign=True` installs
         # each tensor, so loading inside it would put every weight back on the meta device. Strict: every block from
         # 0 to the highest must be present, and nothing else.
         model.load_state_dict(ip_sd, strict=True, assign=True)
         return model
+
+
+def anima_ip_adapter_lora(sd: Mapping[str, torch.Tensor]) -> ModelPatchRaw:
+    """The checkpoint's bundled LoRA: its cross-attention q/k/v/output layers, keyed for
+    `ANIMA_LORA_TRANSFORMER_PREFIX`."""
+    # Imported here: importing the LoRA conversion module before `model_manager.load` trips an import cycle.
+    from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import (
+        lora_model_from_anima_state_dict,
+    )
+
+    lora_pairs: dict[str, dict[str, torch.Tensor]] = {}
+    for key, tensor in sd.items():
+        if match := _CROSS_ATTN_LORA_KEY_RE.match(key):
+            block, projection, side = match.groups()
+            lora_pairs.setdefault(f"blocks.{block}.cross_attn.{projection}", {})[side] = tensor
+    # As the reference does, a LoRA layer missing one of its two halves is skipped. No alpha key, so the PEFT
+    # conversion scales by 1.0 -- the reference's alpha / rank with alpha == rank.
+    lora_sd = {
+        f"{layer}.lora_{side}.weight": pair[side] for layer, pair in lora_pairs.items() if len(pair) == 2
+        for side in ("A", "B")
+    }  # fmt: skip
+    return lora_model_from_anima_state_dict(lora_sd)
+
+
+def load_anima_ip_adapter_lora(path: Path) -> ModelPatchRaw:
+    """Read only the bundled LoRA from an IP-Adapter checkpoint, for the model cache to hold as its own entry: the
+    adapter module's partial-load size counts only its state dict, which a LoRA held beside it is not part of."""
+    from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint
+
+    # Owned: the cache entry keeps these tensors as read, so they must not stay views of the file mapping.
+    sd = load_safetensors_checkpoint(
+        path, select=lambda names: {k: v for k, v in names.items() if _CROSS_ATTN_LORA_KEY_RE.match(k)}, owned=True
+    )
+    return anima_ip_adapter_lora(sd)
 
 
 class AnimaIPAdapterExtension:

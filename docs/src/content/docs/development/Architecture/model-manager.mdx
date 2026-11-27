@@ -1389,9 +1389,11 @@ You can also point at an arbitrary individual file within a repo_id directory us
 
 * stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
 
-### context.load_local_model(model_path, [loader]) -> LoadedModel
+### context.load_local_model(model_path, [loader], [part_of]) -> LoadedModel
 
 This method loads a local model from the indicated path, returning a `LoadedModel`. The optional loader is a Callable that accepts a Path to the object, and returns a `AnyModel` object. If no loader is provided, then the method will use `torch.load()` for a .ckpt or .bin checkpoint file, `safetensors.torch.load_file()` for a safetensors checkpoint file, or `cls.from_pretrained()` for a directory that looks like a diffusers directory.
+
+The model is cached under its path. When the file holds a part of an installed model that the node reads with its own loader, such as the Anima IP-Adapter's bundled LoRA, pass `part_of=(model key, part name)`. The part is then cached as an entry of that model, so deleting, re-identifying or reconfiguring the model drops it too.
 
 ### context.load_remote_model(source, [loader]) -> LoadedModel
 

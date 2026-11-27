@@ -380,7 +380,8 @@ class AnimaControlNetLLLiteModel(ModelLoader):
 
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
 class AnimaIPAdapterModelLoader(ModelLoader):
-    """Loads the SigLIP2 Anima IP-Adapter (per-block image K/V projections and gates, plus its cross-attention LoRA)."""
+    """Loads the SigLIP2 Anima IP-Adapter's per-block image K/V projections and gates; denoise loads its bundled LoRA
+    with `load_anima_ip_adapter_lora`."""
 
     def _load_model(
         self,
