@@ -103,6 +103,20 @@ def _inline_content_disposition(filename: str) -> str:
     return f"inline; filename*=utf-8''{quoted}"
 
 
+def _image_response_headers(filename: Optional[str]) -> dict[str, str]:
+    headers = {"Cache-Control": _get_image_cache_control()}
+    if filename is not None:
+        # One Content-Disposition for all backends, so the same filename yields
+        # an identical header.
+        headers["Content-Disposition"] = _inline_content_disposition(filename)
+    return headers
+
+
+def _set_content_length_header(headers: dict[str, str], content_length: Optional[int]) -> None:
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+
+
 async def _serve_image(image_name: str, *, thumbnail: bool, media_type: str, filename: Optional[str]) -> Response:
     """Serve an image (or thumbnail) without buffering the whole payload in memory.
 
@@ -112,11 +126,7 @@ async def _serve_image(image_name: str, *, thumbnail: bool, media_type: str, fil
     run in a threadpool so the event loop is not blocked.
     """
     images = ApiDependencies.invoker.services.images
-    headers = {"Cache-Control": _get_image_cache_control()}
-    if filename is not None:
-        # One Content-Disposition for both backends (disk FileResponse and S3
-        # streaming), so the same filename yields an identical header.
-        headers["Content-Disposition"] = _inline_content_disposition(filename)
+    headers = _image_response_headers(filename)
 
     def _existing_local_path() -> Optional[pathlib.Path]:
         # Resolve the backend's local path and confirm it exists, all inside the
@@ -129,10 +139,29 @@ async def _serve_image(image_name: str, *, thumbnail: bool, media_type: str, fil
     if local_path is not None:
         return FileResponse(local_path, media_type=media_type, headers=headers)
     stream = await run_in_threadpool(images.open_stream, image_name, thumbnail)
+    _set_content_length_header(headers, getattr(stream, "content_length", None))
     # Single close path: _iter_and_close's finally runs on normal completion and on
     # disconnect (the send error closes the generator). Starlette skips background on
     # disconnect, so a BackgroundTask would only double-close the normal path.
     return StreamingResponse(_iter_and_close(stream), media_type=media_type, headers=headers)
+
+
+async def _serve_image_head(image_name: str, *, thumbnail: bool, media_type: str, filename: Optional[str]) -> Response:
+    """Serve image headers without streaming a remote object body."""
+    images = ApiDependencies.invoker.services.images
+    headers = _image_response_headers(filename)
+
+    def _existing_local_path() -> Optional[pathlib.Path]:
+        path = images.get_local_path(image_name, thumbnail)
+        return path if path is not None and path.is_file() else None
+
+    local_path = await run_in_threadpool(_existing_local_path)
+    if local_path is not None:
+        return FileResponse(local_path, media_type=media_type, headers=headers)
+
+    content_length = await run_in_threadpool(images.get_content_length, image_name, thumbnail)
+    _set_content_length_header(headers, content_length)
+    return Response(status_code=200, media_type=media_type, headers=headers)
 
 
 class ResizeToDimensions(BaseModel):
@@ -499,6 +528,7 @@ def get_image_workflow(
     },
 )
 async def get_image_full(
+    request: Request,
     current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> Response:
@@ -511,6 +541,8 @@ async def get_image_full(
     await run_in_threadpool(assert_image_move_maintenance_inactive)
 
     try:
+        if request.method == "HEAD":
+            return await _serve_image_head(image_name, thumbnail=False, media_type="image/png", filename=image_name)
         return await _serve_image(image_name, thumbnail=False, media_type="image/png", filename=image_name)
     except (ImageFileNotFoundException, ImageRecordNotFoundException):
         raise HTTPException(status_code=404)

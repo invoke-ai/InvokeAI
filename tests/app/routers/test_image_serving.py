@@ -11,9 +11,17 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from invokeai.app.api.auth_dependencies import get_current_media_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import images_router
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+
+
+class _ContentLengthStream(io.BytesIO):
+    def __init__(self, data: bytes) -> None:
+        super().__init__(data)
+        self.content_length = len(data)
 
 
 def _client(monkeypatch, images: MagicMock, *, raise_server_exceptions: bool = True) -> TestClient:
@@ -21,7 +29,11 @@ def _client(monkeypatch, images: MagicMock, *, raise_server_exceptions: bool = T
     app.include_router(images_router)
     invoker = MagicMock()
     invoker.services.images = images
+    invoker.services.image_moves.is_maintenance_active.return_value = False
     monkeypatch.setattr(ApiDependencies, "invoker", invoker, raising=False)
+    # Access control is covered by the authorization tests; these cover body delivery only.
+    monkeypatch.setattr("invokeai.app.api.routers.images._assert_image_read_access", lambda *args, **kwargs: None)
+    app.dependency_overrides[get_current_media_user_or_default] = lambda: MagicMock()
     return TestClient(app, raise_server_exceptions=raise_server_exceptions)
 
 
@@ -46,7 +58,7 @@ def test_get_image_full_streams_when_no_local_path(monkeypatch):
     data = b"s3-png-bytes"
     images = MagicMock()
     images.get_local_path.return_value = None
-    images.open_stream.return_value = io.BytesIO(data)
+    images.open_stream.return_value = _ContentLengthStream(data)
     client = _client(monkeypatch, images)
 
     r = client.get("/v1/images/i/img.png/full")
@@ -54,6 +66,23 @@ def test_get_image_full_streams_when_no_local_path(monkeypatch):
     assert r.status_code == 200
     assert r.content == data
     assert r.headers["content-type"].startswith("image/png")
+    assert r.headers["content-length"] == str(len(data))
+
+
+def test_head_image_full_remote_backend_does_not_open_stream(monkeypatch):
+    images = MagicMock()
+    images.get_local_path.return_value = None
+    images.get_content_length.return_value = 123
+    client = _client(monkeypatch, images)
+
+    r = client.head("/v1/images/i/img.png/full")
+
+    assert r.status_code == 200
+    assert r.content == b""
+    assert r.headers["content-type"].startswith("image/png")
+    assert r.headers["content-length"] == "123"
+    images.get_content_length.assert_called_once_with("img.png", False)
+    images.open_stream.assert_not_called()
 
 
 def test_get_image_thumbnail_streams(monkeypatch):
@@ -77,6 +106,28 @@ def test_get_image_full_returns_404_when_missing(monkeypatch):
     client = _client(monkeypatch, images)
 
     r = client.get("/v1/images/i/missing.png/full")
+
+    assert r.status_code == 404
+
+
+def test_get_image_full_returns_404_when_image_record_missing(monkeypatch):
+    images = MagicMock()
+    images.get_local_path.side_effect = ImageRecordNotFoundException()
+    client = _client(monkeypatch, images)
+
+    r = client.get("/v1/images/i/missing-record.png/full")
+
+    assert r.status_code == 404
+    images.open_stream.assert_not_called()
+
+
+def test_get_image_full_returns_404_when_open_stream_reports_missing_record(monkeypatch):
+    images = MagicMock()
+    images.get_local_path.return_value = None
+    images.open_stream.side_effect = ImageRecordNotFoundException()
+    client = _client(monkeypatch, images)
+
+    r = client.get("/v1/images/i/missing-record.png/full")
 
     assert r.status_code == 404
 

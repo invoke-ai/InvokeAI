@@ -71,6 +71,13 @@ class ImageFileStorageBase(ABC):
         """
         return io.BytesIO(self.get_bytes(image_name, thumbnail=thumbnail, image_subfolder=image_subfolder))
 
+    def get_content_length(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Optional[int]:
+        """Gets the byte length of an image or thumbnail when cheaply available."""
+        local_path = self.get_local_path(image_name, thumbnail=thumbnail, image_subfolder=image_subfolder)
+        if local_path is not None and local_path.is_file():
+            return local_path.stat().st_size
+        return None
+
     # TODO: We need to validate paths before starlette makes the FileResponse, else we get a
     # 500 internal server error. I don't like having this method on the service.
     @abstractmethod

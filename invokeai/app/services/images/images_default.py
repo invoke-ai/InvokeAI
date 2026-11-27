@@ -391,6 +391,12 @@ class ImageService(ImageServiceABC):
             image_name, thumbnail, image_subfolder=record.image_subfolder
         )
 
+    def get_content_length(self, image_name: str, thumbnail: bool = False) -> Optional[int]:
+        record = self.__invoker.services.image_records.get(image_name)
+        return self.__invoker.services.image_files.get_content_length(
+            image_name, thumbnail, image_subfolder=record.image_subfolder
+        )
+
     def get_record(self, image_name: str) -> ImageRecord:
         try:
             return self.__invoker.services.image_records.get(image_name)

@@ -109,6 +109,11 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def get_content_length(self, image_name: str, thumbnail: bool = False) -> Optional[int]:
+        """Gets the byte length of an image or thumbnail when cheaply available."""
+        pass
+
+    @abstractmethod
     def get_record(self, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass

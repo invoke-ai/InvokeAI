@@ -198,6 +198,10 @@ the disk backend is faster for that case.
 - **Bucket pre-creation.** The bucket must exist before InvokeAI
   starts. The application does not create it and will fail loudly on
   first write if the bucket is missing.
+- **No automatic migration.** Changing `storage_backend` changes where
+  new image reads and writes look; it does not copy existing images
+  between the local `outputs/images` directory and the bucket. Migrate
+  existing images separately before switching a production instance.
 - **Credential rotation.** Restart the Invoke process to pick up new
   credentials — the boto3 client is built once at startup.
 - **Versioned buckets (B2).** B2 buckets retain prior object versions
