@@ -262,8 +262,10 @@ def read_qwen3vl_lm_head_tensors(path: Path) -> dict[str, torch.Tensor]:
     """
     from safetensors import safe_open
 
+    from invokeai.backend.quantization.fp8_scaled import safetensors_backend
+
     tensors: dict[str, torch.Tensor] = {}
-    with safe_open(str(path), framework="pt", device="cpu") as handle:
+    with safe_open(str(path), framework="pt", device="cpu", backend=safetensors_backend(path)) as handle:
         for key in handle.keys():
             suffix = qwen3vl_lm_head_suffix(key)
             if suffix is not None:
