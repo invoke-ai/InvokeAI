@@ -157,7 +157,8 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         default=None,
         ge=-4.0,
         le=4.0,
-        description="Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.",
+        description="Override the logit-normal schedule mean (resolution-adjusted internally). "
+        "Empty or 0 = use the preset (0 cannot be set as an override).",
     )
 
     def _build_metadata(self) -> MetadataField:

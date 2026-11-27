@@ -138,7 +138,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
         default=None,
         ge=0.0,
         description="Override the timestep shift for the sigma schedule. "
-        "Leave blank to auto-calculate based on image dimensions (recommended). "
+        "Leave blank or set 0 to auto-calculate based on image dimensions (recommended). "
         "This is the shift itself, not the mu it is derived from: the auto-calculated value runs "
         "from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more "
         "of the input image, higher values less.",
@@ -388,6 +388,16 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             sigmas = sigmas[start_idx:end_idx]
 
         is_heun = self.scheduler == "heun"
+        if is_heun:
+            # Heun's scheduler holds the sigmas as float32 and divides by every sigma it evaluates, so an interval of
+            # zero length at sigma 0 is 0/0 and turns the latents into NaN. A positive but tiny shift (1e-50) rounds
+            # the interior sigmas to zero there. Euler steps through such an interval unchanged; Heun cannot.
+            float32_sigmas = torch.tensor(sigmas, dtype=torch.float32)
+            if len(sigmas) > 1 and not bool((float32_sigmas[1:] < float32_sigmas[:-1]).all()):
+                raise ValueError(
+                    f"A shift of {shift:g} gives a schedule whose sigmas collapse to equal values in float32, which "
+                    "the Heun scheduler cannot step through. Use a larger shift, leave it empty, or use Euler."
+                )
         total_steps = len(sigmas) - 1
 
         # Load input latents if provided (image-to-image)

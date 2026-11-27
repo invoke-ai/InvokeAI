@@ -174,3 +174,23 @@ def test_a_shift_of_zero_runs_the_auto_schedule(scheduler: str, denoising_start:
     assert len(auto.sigmas) > 1
     assert zero.sigmas == auto.sigmas
     assert torch.equal(zero_result, auto_result)
+
+
+def test_heun_rejects_a_shift_whose_sigmas_collapse_in_float32():
+    # 1e-50 is positive, so it is a real shift, but every interior sigma rounds to 0 in float32 and Heun would
+    # divide 0 by 0 across the repeated zero intervals.
+    with pytest.raises(ValueError, match="collapse"):
+        _drive("heun", shift=1e-50)
+
+
+def test_a_tiny_shift_that_float32_still_resolves_runs_finite_in_heun():
+    _, result, _ = _drive("heun", shift=1e-30)
+
+    assert torch.isfinite(result).all()
+
+
+def test_euler_steps_through_a_collapsed_schedule_unchanged():
+    # Euler's zero-length intervals are no-ops, so the Heun-only guard must not reject it.
+    _, result, _ = _drive("euler", shift=1e-50)
+
+    assert torch.isfinite(result).all()
