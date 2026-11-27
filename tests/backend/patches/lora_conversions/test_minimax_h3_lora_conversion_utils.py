@@ -9,9 +9,15 @@ class the base-model converter shipped with and had to fix).
 import pytest
 import torch
 
+from invokeai.backend.minimax_h3.transformer_minimax_h3 import MiniMaxH3Transformer3DModel
+from invokeai.backend.minimax_h3.transformer_minimax_h3_pruned import MiniMaxH3PrunedTransformer3DModel
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.load.model_loaders.minimax_h3_state_dict_utils import (
     convert_minimax_h3_checkpoint_to_diffusers,
 )
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
     MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
@@ -26,6 +32,9 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils 
 HIDDEN = 8
 FFN = 12
 TIME_EMBED = 6
+VIDEO_PATCH = 5
+AUDIO = 3
+TEXT = 7
 RANK = 4
 
 
@@ -57,7 +66,21 @@ def _make_turbo_style_state_dict(prefix: str = "") -> dict[str, torch.Tensor]:
     down, up = _lora_pair(2 * HIDDEN, TIME_EMBED, rank=2)
     sd[f"{prefix}final_layer.adaln_proj.linear.lora_A.weight"] = down
     sd[f"{prefix}final_layer.adaln_proj.linear.lora_B.weight"] = up
+    for stem, out_features, in_features in TOP_LEVEL_SHAPES:
+        down, up = _lora_pair(out_features, in_features)
+        sd[f"{prefix}{stem}.lora_A.weight"] = down
+        sd[f"{prefix}{stem}.lora_B.weight"] = up
     return sd
+
+
+# Top-level projections: (native path, out_features, in_features).
+TOP_LEVEL_SHAPES = (
+    ("video_patch_proj", HIDDEN, VIDEO_PATCH),
+    ("audio_patch_proj", HIDDEN, AUDIO),
+    ("condition_proj", HIDDEN, TEXT),
+    ("final_layer.video_out", VIDEO_PATCH, HIDDEN),
+    ("final_layer.audio_out", AUDIO, HIDDEN),
+)
 
 
 EXPECTED_LAYER_PATHS = {
@@ -75,6 +98,11 @@ EXPECTED_LAYER_PATHS = {
     "token_refiner.refiner_blocks.0.ff.net.0.proj",
     "token_refiner.refiner_blocks.0.ff.net.2",
     "norm_out.linear",
+    "proj_in",
+    "audio_proj_in",
+    "context_embedder",
+    "proj_out",
+    "audio_proj_out",
 }
 
 
@@ -293,6 +321,11 @@ def _malformed_cases() -> list[tuple[str, dict[str, torch.Tensor], str]]:
     mixed_spellings = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
     mixed_spellings.update({k: v for k, v in _make_turbo_style_state_dict().items() if "blocks.0.mlp.fc1." in k})
 
+    # Dotted paths are held to the same supported-Linear vocabulary as kohya ones.
+    dotted_unknown = _make_turbo_style_state_dict()
+    dotted_unknown["time_embedder.linear_1.lora_A.weight"] = torch.zeros(RANK, HIDDEN)
+    dotted_unknown["time_embedder.linear_1.lora_B.weight"] = torch.zeros(HIDDEN, RANK)
+
     peft_dora = _make_turbo_style_state_dict()
     peft_dora["blocks.0.attn.out_proj.lora_magnitude_vector.weight"] = torch.ones(HIDDEN)
 
@@ -315,6 +348,7 @@ def _malformed_cases() -> list[tuple[str, dict[str, torch.Tensor], str]]:
         ("dotted-and-kohya", dotted_and_kohya, "two spellings"),
         ("mixed-A/B-and-down/up", mixed_spellings, "'lora_A.weight', 'lora_B.weight', 'lora_down.weight'"),
         ("peft-dora-magnitude", peft_dora, "lora_magnitude_vector"),
+        ("dotted-unknown-module", dotted_unknown, "'time_embedder.linear_1' targets no MiniMax H3"),
         ("foreign-text-encoder-pair", with_text_encoder, "lora_te_text_model.*targets no MiniMax H3"),
         ("zero-padded-block", _with_layer("blocks.01"), "'blocks.01.attn.out_proj' has block index '01'"),
         (
@@ -333,3 +367,60 @@ def test_rejects_malformed_layers(sd: dict[str, torch.Tensor], message: str):
     assert not is_state_dict_likely_in_minimax_h3_format(sd)
     with pytest.raises(ValueError, match=message):
         lora_model_from_minimax_h3_state_dict(sd)
+
+
+@pytest.mark.parametrize("model_class", [MiniMaxH3Transformer3DModel, MiniMaxH3PrunedTransformer3DModel])
+def test_top_level_projections_resolve_to_matching_linears(model_class: type[torch.nn.Module]):
+    # Released config (the constructor defaults), built on meta: each converted top-level layer must
+    # name a plain Linear whose weight the LoRA delta fits exactly.
+    with torch.device("meta"):
+        model = model_class()
+    hidden, video_patch, audio, text = 5376, 24 * 1 * 2 * 2, 32, 5120
+    native_shapes = {
+        "video_patch_proj": (hidden, video_patch),
+        "audio_patch_proj": (hidden, audio),
+        "condition_proj": (hidden, text),
+        "final_layer.video_out": (video_patch, hidden),
+        "final_layer.audio_out": (audio, hidden),
+    }
+    sd = {}
+    for stem, (out_features, in_features) in native_shapes.items():
+        sd[f"lora_unet_{stem.replace('.', '_')}.lora_down.weight"] = torch.zeros(1, in_features)
+        sd[f"lora_unet_{stem.replace('.', '_')}.lora_up.weight"] = torch.zeros(out_features, 1)
+    patch = lora_model_from_minimax_h3_state_dict(sd)
+
+    assert len(patch.layers) == len(native_shapes)
+    for key, layer in patch.layers.items():
+        module = model.get_submodule(key[len(MINIMAX_H3_LORA_TRANSFORMER_PREFIX) :])
+        assert type(module) is torch.nn.Linear
+        assert isinstance(layer, LoRALayer)
+        assert (layer.up @ layer.down).shape == module.weight.shape
+
+
+@pytest.mark.parametrize("force_sidecar", [False, True])
+@torch.no_grad()
+def test_top_level_projection_patches_fp32_module_in_bf16_compute(force_sidecar: bool):
+    # The patch projections stay fp32 in a bf16 model (``_keep_in_fp32_modules``) and the patcher casts LoRA layers
+    # to the bf16 compute dtype. Sidecar patching (forced on int8-convrot builds, and taken by any CPU-resident
+    # layer) used to crash on the fp32 input; direct patching must keep the fp32 weight.
+    model = torch.nn.Module()
+    model.audio_proj_in = torch.nn.Linear(AUDIO, HIDDEN)
+    apply_custom_layers_to_model(model)
+    down, up = _lora_pair(HIDDEN, AUDIO)
+    patch = lora_model_from_minimax_h3_state_dict(
+        {"audio_patch_proj.lora_A.weight": down, "audio_patch_proj.lora_B.weight": up}
+    )
+    x = torch.randn(2, AUDIO)
+    expected = model.audio_proj_in(x) + x @ down.T @ up.T
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(patch, 1.0)],
+        prefix=MINIMAX_H3_LORA_TRANSFORMER_PREFIX,
+        dtype=torch.bfloat16,
+        force_sidecar_patching=force_sidecar,
+    ):
+        output = model.audio_proj_in(x)
+
+    assert output.dtype == torch.float32
+    assert torch.allclose(output, expected, atol=0.05)

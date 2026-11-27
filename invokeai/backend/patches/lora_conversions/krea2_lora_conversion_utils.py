@@ -16,6 +16,8 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.patches.layers.param_shape_utils import get_param_shape
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
@@ -91,6 +93,15 @@ def _native_krea2_key_to_diffusers(key: str) -> str:
     return key
 
 
+def _strip_peft_prefix_from_native_key(key: str) -> str:
+    # The fal / Krea trainer saves PEFT keys on the native module names (``base_model.model.first.lora_A``). Give
+    # them the ``diffusion_model.`` prefix so they take the native rename and the transformer prefix stripping.
+    prefix = "base_model.model."
+    if not key.startswith(prefix) or key.startswith((f"{prefix}transformer.", f"{prefix}text_encoder.")):
+        return key
+    return "diffusion_model." + key[len(prefix) :]
+
+
 def _maybe_convert_native_krea2_state_dict(
     state_dict: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
@@ -103,7 +114,7 @@ def _maybe_convert_native_krea2_state_dict(
         # `.pt`/`.ckpt` sources can carry non-string keys. They are never native Krea-2 keys, but the
         # substring tests in `_looks_like_native_krea2_key` raise TypeError rather than returning False.
         is_native = isinstance(key, str) and _looks_like_native_krea2_key(key)
-        converted_key = _native_krea2_key_to_diffusers(key) if is_native else key
+        converted_key = _native_krea2_key_to_diffusers(_strip_peft_prefix_from_native_key(key)) if is_native else key
         if converted_key in converted_state_dict:
             raise ValueError(
                 f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}'. "
@@ -118,7 +129,7 @@ def _maybe_convert_kohya_krea2_state_dict(
 ) -> Dict[str, torch.Tensor]:
     """Rewrite kohya/LyCORIS flattened Krea-2 keys to the dotted native layout, leaving all others untouched."""
     # Whether a module can be converted is a property of the *module*, not of each key on its own. A LyCORIS
-    # module this converter has no handler for (``hada_w1_a``, ``diff``) has to stay verbatim — see below; LoKr
+    # module this converter has no handler for (``hada_w1_a``) has to stay verbatim — see below; LoKr
     # is the exception, its ``lokr_*`` suffixes are known and convert like any other — but LyCORIS also saves
     # a sibling ``.alpha`` (and ``.dora_scale`` for the weight-decomposed variants), whose suffix this
     # converter *does* recognize. Deciding per key rewrites that sibling alone and splits one module across
@@ -149,7 +160,7 @@ def _maybe_convert_kohya_krea2_state_dict(
             # dots into the module path, and the grouper's fallback for an unknown suffix is a blind
             # ``rsplit(".", 2)`` — on a dotted path that cuts *inside the module name*, fusing two modules
             # into one bogus layer that aborts the whole load. LyCORIS suffixes without a handler here, such as
-            # ``.hada_w1_a`` or ``.diff``, hit exactly that. Flattened, they have no interior dot and group
+            # ``.hada_w1_a``, hit exactly that. Flattened, they have no interior dot and group
             # harmlessly, so leaving them verbatim keeps them at the pre-existing warn-and-skip behaviour.
             if module_path is not None and flat_path in fully_convertible_flat_paths:
                 converted_key = f"{module_path}{dot}{weight_suffix}"
@@ -231,9 +242,39 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
                 "(e.g. both a 'transformer.' and a 'diffusion_model.' alias for one logical layer). "
                 "This mixed layout is unsupported - refusing to silently drop one of the layers."
             )
-        layers[final_key] = any_lora_layer_from_state_dict(values)
+        layers[final_key] = _layer_from_values(values)
 
     return ModelPatchRaw(layers=layers)
+
+
+class _BiasDiffLayer(LoRALayerBase):
+    """A module that only carries a ``diff_b`` bias delta: the weight is left as is."""
+
+    def __init__(self, bias: torch.Tensor):
+        super().__init__(alpha=None, bias=bias)
+
+    def _rank(self) -> int | None:
+        return None
+
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+        assert self.bias is not None
+        return torch.zeros(get_param_shape(orig_weight), device=self.bias.device, dtype=self.bias.dtype)
+
+
+def _layer_from_values(values: dict[str, torch.Tensor]) -> BaseLayerPatch:
+    # ``FullLayer`` reads ``diff_b`` next to ``diff``. Next to a low-rank pair, or on its own, the layer factory has
+    # no slot for this dense bias delta, so it is attached as the layer's bias here.
+    if "diff" in values or "diff_b" not in values:
+        return any_lora_layer_from_state_dict(values)
+    values = dict(values)
+    diff_b = values.pop("diff_b")
+    if not values:
+        return _BiasDiffLayer(diff_b)
+    layer = any_lora_layer_from_state_dict(values)
+    assert isinstance(layer, LoRALayerBase)
+    # The layers scale their bias by ``alpha / rank`` like the weight, but a ``diff_b`` is stored unscaled.
+    layer.bias = diff_b / layer.scale()
+    return layer
 
 
 def _get_lora_layer_values(
@@ -250,9 +291,10 @@ def _get_lora_layer_values(
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        for magnitude_key in ("dora_scale", "dora_magnitude"):
-            if magnitude_key in layer_dict:
-                values[magnitude_key] = layer_dict[magnitude_key]
+        # The magnitudes and the ``diff_b`` / ``diff`` deltas keep their names; ``_layer_from_values`` reads them.
+        for passthrough_key in ("dora_scale", "dora_magnitude", "diff_b", "diff"):
+            if passthrough_key in layer_dict:
+                values[passthrough_key] = layer_dict[passthrough_key]
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
         if alpha is not None:
@@ -281,6 +323,8 @@ _SUFFIX_TO_VALUE_KEY = {
     ".lora_magnitude_vector.weight": "dora_magnitude",
     ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
+    ".diff_b": "diff_b",
+    ".diff": "diff",
     **{f".{key}": key for key in LOKR_WEIGHT_KEYS},
 }
 

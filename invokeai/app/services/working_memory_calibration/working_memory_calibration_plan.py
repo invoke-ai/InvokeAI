@@ -310,41 +310,49 @@ def _lacks_flux2_text_encoder(main: ModelConfig, models: Sequence[ModelConfig]) 
     return not _has_standalone_encoder(main, models)
 
 
-_SD3_ENCODERS: Final[tuple[tuple[str, Callable[[ModelConfig], bool]], ...]] = (
+_FLUX1_ENCODERS: Final[tuple[tuple[str, Callable[[ModelConfig], bool]], ...]] = (
     ("T5", lambda model: model.type == ModelType.T5Encoder),
     ("CLIP-L", lambda model: model.type == ModelType.CLIPEmbed and _variant(model) == ClipVariantType.L.value),
+)
+_SD3_ENCODERS: Final = (
+    *_FLUX1_ENCODERS,
     ("CLIP-G", lambda model: model.type == ModelType.CLIPEmbed and _variant(model) == ClipVariantType.G.value),
 )
-"""The standalone text encoders the `sd-3` component policy requires for an SD3 main model that is no Diffusers
-pipeline, as a reason names them, and the models each slot takes: any T5 encoder, and a CLIP embed model of the
-variant. Generate fills each from the installed models; `Sd3ModelLoaderInvocation` refuses the graph without one."""
 
 
-def _sd3_missing_encoders(main: ModelConfig, models: Sequence[ModelConfig]) -> list[str]:
-    """The `_SD3_ENCODERS` no installed model fills for an SD3 main model that is no Diffusers pipeline (a GGUF holds
-    the transformer alone); none for any other model."""
-    if main.base != BaseModelType.StableDiffusion3 or not _is_main(main) or _is_diffusers(main):
-        return []
-    return [name for name, fits in _SD3_ENCODERS if not any(fits(model) for model in models)]
-
-
-def _lacks_text_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
-    """Whether Generate cannot compile a main model's graph for want of a text encoder: a FLUX.2 model
-    (`_lacks_flux2_text_encoder`), or an SD3 model that is no Diffusers pipeline (`_sd3_missing_encoders`)."""
-    return _lacks_flux2_text_encoder(main, models) or bool(_sd3_missing_encoders(main, models))
-
-
-def _text_encoder_reason(main: ModelConfig, models: Sequence[ModelConfig]) -> str:
-    """Why no case of a main model that `_lacks_text_encoder` compiles, and what to install."""
-    missing = _sd3_missing_encoders(main, models)
-    if missing:
-        listed = [f"a {name} encoder" for name in missing]
-        install = listed[0] if len(listed) == 1 else f"{', '.join(listed[:-1])} and {listed[-1]}"
+def _main_model_blocker(main: ModelConfig, models: Sequence[ModelConfig]) -> Optional[str]:
+    """Why a main model cannot compile or run a calibration graph."""
+    if main.base == BaseModelType.Flux and _is_diffusers(main):
+        # The graph can compile, but FluxModelLoaderInvocation rejects a plain Diffusers FLUX.1 config.
+        return (
+            f"{main.name} is a FLUX.1 Diffusers model, which the FLUX.1 model loader cannot run. "
+            "Select a FLUX.1 checkpoint, GGUF, or SDNQ model for calibration."
+        )
+    if main.base in (BaseModelType.Flux, BaseModelType.StableDiffusion3) and not ships_its_vae(main):
+        slots = _FLUX1_ENCODERS if main.base == BaseModelType.Flux else _SD3_ENCODERS
+        missing = [f"a {name} encoder" for name, fits in slots if not any(fits(model) for model in models)]
+        if not missing:
+            return None
+        install = missing[0] if len(missing) == 1 else f"{', '.join(missing[:-1])} and {missing[-1]}"
+        if main.base == BaseModelType.Flux:
+            return f"Generate cannot compile a calibration case for {main.name} (FLUX.1). Install {install}."
         return (
             f"{main.name} holds only the SD3 transformer, so no case compiles without standalone text encoders: "
             "Generate needs a T5, a CLIP-L and a CLIP-G encoder for it, and only an SD3 Diffusers pipeline brings its "
             f"own. Install {install}."
         )
+    if main.base == BaseModelType.ZImage:
+        # Generate fills required encoder slots from the catalog, but only picks a Z-Image source by default settings.
+        if ships_its_vae(main) or default_component_source(main, models) is not None:
+            return None
+        if any(_qwen3_encoder_variant(model) == Qwen3VariantType.Qwen3_4B.value for model in models):
+            return None
+        return (
+            "Install a Qwen3 4B encoder or set a bundled Z-Image pipeline as the default component source "
+            f"for {main.name}."
+        )
+    if not _lacks_flux2_text_encoder(main, models):
+        return None
     encoder = _standalone_encoder_name(main)
     pipeline = "a Diffusers FLUX.2 [dev] pipeline" if _is_dev(main) else "a fitting FLUX.2 pipeline"
     return (
@@ -378,8 +386,7 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
     from (`_flux2_sources`), the first fitting one, else the first one (`getAutoFlux2ComponentSourceModel`), which the
     graph keeps only beside a standalone text encoder. Generate lists the models in the order the server does, which is
     `models`' order. None: a standalone VAE decodes, the model's default one included (`default_vae`), or, for a model
-    without an encoder, no graph compiles (`_lacks_text_encoder`); without a VAE either, none compiles
-    (`_needs_gpu_vae`)."""
+    with missing prerequisites, no case can run (`_main_model_blocker`, `_needs_gpu_vae`)."""
     if default_vae(model, models) is not None:
         return None
     if (source := default_component_source(model, models)) is not None:
@@ -696,12 +703,12 @@ def build_plan(
                 device_class,
                 estimators,
             )
-        # One whose graph compiles and decodes on the GPU, where there is one; otherwise the first says what it lacks.
+        # Prefer a runnable graph that decodes on the GPU. Otherwise the first candidate supplies the reason.
         main = next(
             (
                 model
                 for model in candidates
-                if not _lacks_text_encoder(model, models) and _decodes_on_the_gpu(model, models)
+                if _main_model_blocker(model, models) is None and _decodes_on_the_gpu(model, models)
             ),
             candidates[0],
         )
@@ -732,8 +739,8 @@ def build_plan(
             device_class,
             estimators,
         )
-    if _lacks_text_encoder(main, models):
-        return _unsupported(target, _text_encoder_reason(main, models), device_class, estimators)
+    if (reason := _main_model_blocker(main, models)) is not None:
+        return _unsupported(target, reason, device_class, estimators)
     if not _decodes_on_the_gpu(main, models):
         cpu_vae = _cpu_default_vae(main, models)
         assert cpu_vae is not None

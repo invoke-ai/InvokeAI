@@ -257,6 +257,7 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
 def test_diffusers_loader_reaches_transformer_from_pretrained(monkeypatch, tmp_path) -> None:
     config = Main_Diffusers_Krea2_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(Krea2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loaded_model = object()
     load_class = SimpleNamespace(from_pretrained=MagicMock(return_value=loaded_model))
     loader.get_hf_load_class = lambda _path, _submodel: load_class
@@ -495,7 +496,7 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2._device_supports_fp8_storage",
+        "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage",
         lambda _device, _logger: True,
     )
 
@@ -595,6 +596,7 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     loader._logger = MagicMock()
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyInt8Krea2Transformer, raising=False)
+    loader._torch_device = torch.device("cpu")
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
         served_checkpoint(state_dict),
@@ -1091,6 +1093,92 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(config)
 
     assert run.reserved == []
+
+
+def test_gguf_loader_holds_rms_norm_weights_in_fp32_as_stored(monkeypatch, tmp_path) -> None:
+    """#10117: a bf16 norm weight against Krea2RMSNorm's float32 input rounds `1 + weight` and skips the fused kernel."""
+    import gguf
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+    class _NormHost(torch.nn.Module):
+        def __init__(self, **_kwargs) -> None:
+            super().__init__()
+            self.norm = Krea2RMSNorm(4)
+
+    stored = torch.tensor([0.1234567, -0.0101, 0.5, 3e-4])  # not representable in bf16
+    checkpoint_path = tmp_path / "krea2.gguf"
+    loader, config = _gguf_driver(monkeypatch, checkpoint_path, _NormHost)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_krea2_transformer_dtype",
+        lambda **_kwargs: torch.bfloat16,
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.gguf_sd_loader",
+        lambda _path, *, compute_dtype, **_kwargs: {
+            "norm.weight": GGMLTensor(
+                stored.clone(),
+                ggml_quantization_type=gguf.GGMLQuantizationType.F32,
+                tensor_shape=stored.shape,
+                compute_dtype=compute_dtype,
+            )
+        },
+    )
+
+    model = loader._load_from_gguf(config)
+
+    assert type(model.norm.weight.data) is torch.Tensor
+    assert model.norm.weight.dtype == torch.float32
+    assert torch.equal(model.norm.weight.data, stored)
+
+
+@pytest.mark.parametrize("stored_dtype", [torch.float32, torch.float16], ids=["fp32", "fp16"])
+def test_single_file_loader_holds_rms_norm_weights_in_fp32_as_stored(monkeypatch, tmp_path, stored_dtype) -> None:
+    """#10117: the bf16 state-dict cast must not round a norm weight before it is widened to float32."""
+    import diffusers
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    class _NormHost(torch.nn.Module):
+        def __init__(self, **_kwargs) -> None:
+            super().__init__()
+            self.norm = Krea2RMSNorm(4)
+            self.proj = torch.nn.Linear(4, 4, bias=False)
+
+    stored = torch.tensor([0.1234567, -0.0101, 0.5, 3e-4]).to(stored_dtype)  # not representable in bf16
+    assert not torch.equal(stored.to(torch.bfloat16).to(stored_dtype), stored)
+    served_norm = stored.clone()
+    checkpoint_path = tmp_path / "krea2.safetensors"
+    checkpoint_path.touch()
+    config = Main_Checkpoint_Krea2_Config.model_construct(
+        path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
+    )
+    loader = object.__new__(Krea2CheckpointModel)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _NormHost, raising=False)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint({"norm.weight": served_norm, "proj.weight": torch.ones(4, 4, dtype=stored_dtype)}),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
+        lambda: torch.device("cpu"),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+
+    model = loader._load_from_singlefile(config)
+
+    assert model.norm.weight.dtype == torch.float32
+    assert torch.equal(model.norm.weight.data, stored.to(torch.float32))
+    assert model.proj.weight.dtype == torch.bfloat16
+    # A checkpoint tensor is an mmap view of the file; keeping it would pin the file for the model's lifetime.
+    assert model.norm.weight.untyped_storage().data_ptr() != served_norm.untyped_storage().data_ptr()
 
 
 @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."], ids=["bare", "comfyui-prefixed"])

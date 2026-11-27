@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import accelerate
+import torch
 
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -17,6 +18,7 @@ from invokeai.backend.sd3.checkpoint_layout import (
     is_mmdit_transformer_key,
     sd3_transformer_config,
 )
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import reject_incomplete_load
 
 
@@ -30,6 +32,14 @@ class SD3GGUFModel(ModelLoader):
     model reads outside a matmul and what the file stores unquantized is unpacked at load. Its text encoders and
     VAE are separate models, chosen on the SD3 model loader node.
     """
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        return TorchDevice.choose_torch_dtype(device)
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        return f"full-{str(self._decision(config, submodel_type).dtype).removeprefix('torch.')}"
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -53,7 +63,8 @@ class SD3GGUFModel(ModelLoader):
         from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 
         # A bundled VAE or text encoder is never read: only the transformer is this model's.
-        sd = gguf_sd_loader(Path(config.path), compute_dtype=self._torch_dtype, keep=is_mmdit_transformer_key)
+        dtype = self._decision(config, SubModelType.Transformer).dtype
+        sd = gguf_sd_loader(Path(config.path), compute_dtype=dtype, keep=is_mmdit_transformer_key)
         sd = CheckpointPrefix.detect(sd).strip(sd, drop_foreign=True)
         transformer_config = sd3_transformer_config(sd)
         sd = convert_mmdit_to_diffusers(sd, transformer_config)

@@ -1,11 +1,11 @@
 import torch
 
 from invokeai.backend.flux.modules.layers import RMSNorm
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
 from invokeai.backend.patches.layers.set_parameter_layer import SetParameterLayer
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 class CustomFluxRMSNorm(RMSNorm, CustomModuleMixin):
