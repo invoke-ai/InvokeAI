@@ -111,6 +111,7 @@ const adapter: GalleryUiAdapter = {
     add: (...args: unknown[]) => mocks.notificationsAdd(...args),
     reportError: (...args: unknown[]) => mocks.notificationsReportError(...args),
   },
+  openItemContextMenu: noop,
   projectId: 'project-1',
   projectName: 'Project',
   projects: [],

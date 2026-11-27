@@ -3,10 +3,10 @@
 The real `Qwen2_5_VLForConditionalGeneration` is built at toy width from the vendored config (two language-model
 layers, two vision blocks), and the file is written in the legacy key layout with that build's `scale_weight` /
 `scale_input` spellings: every Linear (language model, vision tower, untied LM head) is float8 beside its scale, the
-token table is scaled too, and the patch-embedding convolution and norms are dense. On a device that can hold float8
-the Linears stay float8 with the file's own scale on their module; the token table is folded; elsewhere everything is
-folded. Expected values come from the codes and scales written, run through a second, plain model. Forwards run in
-float32: CPU bf16 matmuls fault on part of the hosted Windows fleet.
+token table is scaled too, and the patch-embedding convolution and norms are dense. The LM head stays in the file. On a
+device that can hold float8 the Linears stay float8 with the file's own scale on their module; the token table is
+folded; elsewhere everything is folded. Expected values come from the codes and scales written, run through a second,
+plain model. Forwards run in float32: CPU bf16 matmuls fault on part of the hosted Windows fleet.
 """
 
 import json
@@ -16,10 +16,12 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors import safe_open
 from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules import custom_linear
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -108,6 +110,8 @@ def _write(
         module = reference.get_submodule(module_path)
         legacy_key, legacy_module = _legacy(key), _legacy(module_path)
         is_linear = leaf == "weight" and isinstance(module, torch.nn.Linear)
+        # The file carries the LM head, but the loaded encoder does not, so no expectation about the model counts it.
+        loaded = module_path != "lm_head"
         is_table = leaf == "weight" and module_path == "model.language_model.embed_tokens"
         if not (is_linear or is_table):
             value = torch.rand(param.shape) + 0.5 if "norm" in key else torch.randn(param.shape) * 0.3
@@ -133,9 +137,12 @@ def _write(
             # The placeholder this build writes beside every scale; 1.0 is not a calibration.
             tensors[f"{legacy_module}.scale_input"] = torch.tensor(1.0)
             checkpoint.dense[key] = codes * (scale[:, None] if per_row else scale)
-            checkpoint.scales[module_path] = scale
-            checkpoint.scale_bytes += 4 * scale.numel()
+            if loaded:
+                checkpoint.scales[module_path] = scale
+                checkpoint.scale_bytes += 4 * scale.numel()
             hints[legacy_module] = {"format": "float8_e4m3fn"}
+        if not loaded:
+            continue
         if is_linear:
             checkpoint.linear_modules.append(module_path)
             checkpoint.linear_elements += param.numel()
@@ -159,9 +166,9 @@ def _decide(monkeypatch: pytest.MonkeyPatch, *, device: str, matmul: bool = Fals
     monkeypatch.setattr(qwen_image, "load_bundled_qwen2_5_vl_config_dict", _toy_config_dict)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_torch_device", lambda: torch.device(device))
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda d: matmul and d.type == "cuda")
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda d: matmul and d.type == "cuda")
     monkeypatch.setattr(
-        qwen_image, "_device_supports_fp8_storage", lambda d, _logger=None: storage and d.type == "cuda"
+        load_default, "_device_supports_fp8_storage", lambda d, _logger=None: storage and d.type == "cuda"
     )
 
 
@@ -173,8 +180,9 @@ def _loader() -> QwenVLEncoderCheckpointLoader:
     return loader
 
 
-def _load(checkpoint: _Checkpoint, loader: QwenVLEncoderCheckpointLoader | None = None):
-    config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
+def _load(checkpoint: _Checkpoint, loader: QwenVLEncoderCheckpointLoader | None = None, config=None):
+    if config is None:
+        config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
     return (loader or _loader())._load_text_encoder_from_singlefile(config)
 
 
@@ -191,13 +199,13 @@ PIXELS = torch.randn(16, 3 * 2 * 14 * 14, generator=torch.Generator().manual_see
 
 def _run(model: Qwen2_5_VLForConditionalGeneration) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
-        return model(input_ids=IDS).logits, model.model.visual(PIXELS, grid_thw=GRID)
+        return model.model(input_ids=IDS).last_hidden_state, model.model.visual(PIXELS, grid_thw=GRID)
 
 
 def _assert_encodes_like(model, dense: dict[str, torch.Tensor]) -> None:
-    logits, vision = _run(model)
-    expected_logits, expected_vision = _run(_plain_reference(dense))
-    torch.testing.assert_close(logits, expected_logits, rtol=1e-4, atol=1e-4)
+    hidden, vision = _run(model)
+    expected_hidden, expected_vision = _run(_plain_reference(dense))
+    torch.testing.assert_close(hidden, expected_hidden, rtol=1e-4, atol=1e-4)
     torch.testing.assert_close(vision, expected_vision, rtol=1e-4, atol=1e-4)
 
 
@@ -218,8 +226,7 @@ def test_a_device_that_holds_float8_keeps_every_scaled_linear_with_its_scale_and
 
     model = _load(checkpoint)
 
-    # Language model, vision tower (qkv, proj, mlp, merger) and the untied LM head alike.
-    assert "lm_head" in checkpoint.linear_modules
+    # Language model and vision tower (qkv, proj, mlp, merger) alike.
     assert any(path.startswith("model.visual.blocks.0.attn") for path in checkpoint.linear_modules)
     assert any(path.startswith("model.visual.merger") for path in checkpoint.linear_modules)
     for path in checkpoint.linear_modules:
@@ -309,7 +316,8 @@ def test_a_mxfp8_layer_named_by_its_marker_or_the_header_is_decoded_and_the_rest
     # Block-wise scales never reach the matmul, so this layer is folded even where the others stay float8.
     assert model.get_submodule(MX_MODULE).weight.dtype is torch.float32
     assert torch.equal(model.get_submodule(MX_MODULE).weight, checkpoint.dense[f"{MX_MODULE}.weight"])
-    assert model.get_submodule("lm_head").weight.dtype is (FP8 if device == "cuda:0" else torch.float32)
+    untouched = model.get_submodule("model.language_model.layers.1.self_attn.q_proj")
+    assert untouched.weight.dtype is (FP8 if device == "cuda:0" else torch.float32)
     if device == "cuda:0":
         apply_custom_layers_to_model(model)
     _assert_encodes_like(model, checkpoint.dense)
@@ -347,11 +355,34 @@ def test_the_reservation_counts_float8_weights_one_byte_and_everything_else_at_t
     assert reserved["cpu"] == 4 * checkpoint.linear_elements + widened
 
 
+@pytest.mark.parametrize("evidence", ["none", "marker", "header"])
+def test_the_lm_head_in_the_file_is_neither_loaded_nor_reserved_for(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, evidence: str
+) -> None:
+    """The head's weight, its scale and whatever names it quantized (marker or header entry) all stay behind."""
+    checkpoint = _write(tmp_path, evidence=evidence)
+    with safe_open(checkpoint.path, framework="pt") as saved:
+        assert {"lm_head.weight", "lm_head.scale_weight"} <= set(saved.keys())
+    _decide(monkeypatch, device="cpu")
+    loader = _loader()
+    unexpected: list[str] = []
+    monkeypatch.setattr(qwen_image, "log_unexpected_keys", lambda _source, keys: unexpected.extend(keys))
+
+    model = _load(checkpoint, loader)
+
+    assert list(model.lm_head.parameters()) == [] and list(model.lm_head.buffers()) == []
+    assert not any("lm_head" in key for key in unexpected)
+    widened = 4 * (checkpoint.linear_elements + checkpoint.other_elements) + checkpoint.scale_bytes
+    loader._ram_cache.make_room.assert_called_once_with(widened)
+    with pytest.raises(RuntimeError, match="without its LM head"):
+        model(input_ids=IDS)
+
+
 @pytest.mark.parametrize("device", ["cuda:0", "cpu"])
 def test_a_scale_spelling_the_loader_does_not_read_is_refused_rather_than_cast_unscaled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, device: str
 ) -> None:
-    checkpoint = _write(tmp_path, extra={"lm_head.weight_scale_inv": torch.tensor(2.0)})
+    checkpoint = _write(tmp_path, extra={"model.layers.0.self_attn.q_proj.weight_scale_inv": torch.tensor(2.0)})
     _decide(monkeypatch, device=device, storage=True)
     loader = _loader()
 
@@ -397,10 +428,28 @@ def test_the_cache_key_and_the_stored_format_come_from_one_capability_decision(
     _decide(monkeypatch, device="cuda:0")
     loader = _loader()
     config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
-    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "float32"
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "full-float32"
 
     _decide(monkeypatch, device="cuda:0", storage=True)
-    model = _load(checkpoint, loader)
+    model = _load(checkpoint, loader, config)
+
+    assert all(param.dtype is torch.float32 for param in model.parameters())
+
+
+def test_cpu_encoder_uses_cpu_dtype_for_key_and_weights(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    checkpoint = _write(tmp_path)
+    _decide(monkeypatch, device="cpu", storage=True)
+    monkeypatch.setattr(
+        qwen_image.TorchDevice,
+        "choose_bfloat16_safe_dtype",
+        lambda device: torch.float32 if device.type == "cpu" else torch.bfloat16,
+    )
+    loader = _loader()
+    config = QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint.path))
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder) == "full-float32"
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float16)
+
+    model = _load(checkpoint, loader, config)
 
     assert all(param.dtype is torch.float32 for param in model.parameters())
 
@@ -440,8 +489,10 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     checkpoint = _write(tmp_path)
     monkeypatch.setattr(qwen_image, "load_bundled_qwen2_5_vl_config_dict", _toy_config_dict)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: False)
-    monkeypatch.setattr(qwen_image, "_device_supports_fp8_storage", lambda d, _logger=None: d == torch.device("cuda:0"))
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(
+        load_default, "_device_supports_fp8_storage", lambda d, _logger=None: d == torch.device("cuda:0")
+    )
     config = QwenVLEncoder_Checkpoint_Config.model_construct(
         key="qwen-vl",
         path=checkpoint.path.name,

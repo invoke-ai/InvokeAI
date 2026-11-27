@@ -447,6 +447,9 @@ const tunedValuesFor = (testCase: Case, model: MainModelConfig): VideoWidgetValu
     // the grid, so a media-sized canvas there cannot be resolved from its own shape.
     targetResolution:
       testCase.targetResolution ??
+      // At this fixture's 10:7 media ratio, 544p and legacy 768 lowres both yield 768x544.
+      // Dimensions alone cannot distinguish those presets; use the unambiguous 480p draft.
+      (model.base === 'minimax-h3' ? '480p' : undefined) ??
       targetResolutions
         .filter((option) => option.id !== defaults.targetResolution && option.stages === undefined)
         .at(-1)!.id,

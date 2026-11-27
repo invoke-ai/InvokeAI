@@ -46,7 +46,6 @@ from invokeai.backend.model_manager.configs.mistral_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -75,10 +74,10 @@ from invokeai.backend.quantization.fp8_scaled import (
     full_precision_hints_respected,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -1126,6 +1125,10 @@ class MistralEncoderDiffusersLoader(ModelLoader):
 class MistralEncoderCheckpointLoader(ModelLoader):
     """Load a Mistral encoder from a single safetensors file (text-only)."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+
+    _encoder_fp8_storage = True
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1147,27 +1150,29 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_text_encoder(self, config: MistralEncoder_Checkpoint_Config) -> AnyModel:
-        from safetensors.torch import load_file
-
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
         model_path = Path(config.path)
-        sd = load_file(model_path)
-        sd = _strip_known_prefixes(sd)
 
         # Comfy-Org's Ministral 3B file ships the full multimodal stack: a Pixtral vision tower and
         # its projector, 222 tensors and ~0.9 GB. Only the language tower encodes prompts and the
-        # encoder-only model has no slot for the rest, so drop them before the dequantize/cast pass
-        # pays to convert weights that would then be reported as unexpected keys.
-        vision_keys = [
-            key for key in sd if isinstance(key, str) and key.startswith(("vision_tower.", "multi_modal_projector."))
-        ]
-        for key in vision_keys:
-            del sd[key]
-        if vision_keys:
-            logger.info(f"Mistral encoder: dropped {len(vision_keys)} vision-tower tensor(s); prompts use the LM only")
+        # encoder-only model has no slot for the rest, so they are never read: not read, copied or converted
+        # by the dequantize/cast pass, only to be reported as unexpected keys.
+        def without_vision_tower(names: dict[str, str]) -> dict[str, str]:
+            kept = {
+                key: value
+                for key, value in _strip_known_prefixes(names).items()
+                if not key.startswith(("vision_tower.", "multi_modal_projector."))
+            }
+            if len(kept) < len(names):
+                logger.info(
+                    f"Mistral encoder: skipped {len(names) - len(kept)} vision-tower tensor(s); prompts use the LM only"
+                )
+            return kept
+
+        sd = load_safetensors_checkpoint(model_path, select=without_vision_tower)
+        sd = _strip_known_prefixes(sd)
 
         # The header names layers before this loader strips its own wrapper prefixes on top of the generic ones,
         # so the names need both lists. With only the generic tuple, a `language_model.`-prefixed redistribution
@@ -1205,7 +1210,6 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         # placed after it would never run on the device almost everyone loads on.
         reject_int8_layers_a_plain_fold_cannot_decode(sd, "This Mistral encoder checkpoint")
 
-        keep_fp8 = should_keep_fp8_weights(target_device) or _device_supports_fp8_storage(target_device, logger)
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
@@ -1428,7 +1432,12 @@ class MistralEncoderGGUFLoader(ModelLoader):
                 f"Mistral encoder (GGUF): {len(missing)} keys missing from state dict (first 5: {missing[:5]})"
             )
 
-        materialize_quantized_embedding(model.embed_tokens, ram_cache=self._ram_cache)
+        materialize_quantized_embedding(
+            model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        )
 
         _reinit_inv_freq(model, mistral_config, compute_dtype)
 

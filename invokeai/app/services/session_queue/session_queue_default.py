@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import math
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Optional, cast
 
@@ -1286,21 +1287,26 @@ class SessionQueue(SessionQueueBase):
         # pruned before anything else saw it. Announcing a retry cannot promise that: the server may stop before the
         # announcement is handled. So the store counts the retries in flight before they commit and records them
         # after, and a count left over keeps the attempt out.
+        # The store also refuses a retry that would measure between another calibration attempt's steps, or after
+        # another calibration cut its own attempt off. Its check and the commit hold the lock every attempt's creation
+        # holds through its enqueue (`retry_admission`): no attempt starts between them.
         calibration = self.__invoker.services.working_memory_calibration
         in_flight = None
+        sources: dict[int, tuple[Optional[str], int]] = {}
         if calibration is not None:
             origin_at, retried_from_at = ITEM_COLUMNS.index("origin"), ITEM_COLUMNS.index("retried_from_item_id")
-            in_flight = calibration.retries_starting(
-                {root_item_id: (values[origin_at], values[retried_from_at]) for root_item_id, _, values in clones}
-            )
-        try:
-            admitted = self._queries.run(admit)
-        except Exception:
-            if calibration is not None and in_flight is not None:
-                # A failure once `admit` ended can be the commit's own, which may have committed all the same (a lost
-                # connection to MySQL or MariaDB): which retries exist is unknown, and the count stays.
-                calibration.retries_committed(in_flight, None if admit_ended else [])
-            raise
+            sources = {root_item_id: (values[origin_at], values[retried_from_at]) for root_item_id, _, values in clones}
+        with calibration.retry_admission(sources) if calibration is not None else nullcontext():
+            if calibration is not None:
+                in_flight = calibration.retries_starting(sources)
+            try:
+                admitted = self._queries.run(admit)
+            except Exception:
+                if calibration is not None and in_flight is not None:
+                    # A failure once `admit` ended can be the commit's own, which may have committed all the same (a
+                    # lost connection to MySQL or MariaDB): which retries exist is unknown, and the count stays.
+                    calibration.retries_committed(in_flight, None if admit_ended else [])
+                raise
         if calibration is not None and in_flight is not None:
             calibration.retries_committed(
                 in_flight,

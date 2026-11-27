@@ -89,6 +89,7 @@ describe('default control adapters', () => {
     expect(getDefaultControlAdapterKind('z-image')).toBe('z_image_control');
     expect(getDefaultControlAdapterKind('qwen-image')).toBe('qwen_image_control');
     expect(getDefaultControlAdapterKind('flux2')).toBe('flux2_control');
+    expect(getDefaultControlAdapterKind('krea-2')).toBe('control_lora');
     expect(getDefaultControlAdapterKind('sdxl')).toBe('controlnet');
     expect(getDefaultControlAdapterKind(null)).toBe('controlnet');
   });
@@ -110,6 +111,16 @@ describe('default control adapters', () => {
       kind: 'flux2_control',
       model: 'union',
       weight: 0.75,
+    });
+  });
+
+  it('starts a Krea-2 Control LoRA at the weight its checkpoint was trained at', () => {
+    expect(createDefaultControlAdapter('krea-2')).toEqual({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      kind: 'control_lora',
+      model: null,
+      weight: 1,
     });
   });
 

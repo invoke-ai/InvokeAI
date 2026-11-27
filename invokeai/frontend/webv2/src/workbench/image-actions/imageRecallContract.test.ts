@@ -31,6 +31,7 @@ import { compileGenerateGraph } from '@features/generation/graph';
 import {
   deriveAspectRatioId,
   getDefaultGenerateSettings,
+  getEffectivePrompts,
   getExternalResolutionPresets,
   getGenerationUiPolicy,
   isSupportedGenerateModel,
@@ -109,7 +110,7 @@ const IMAGE_RECALL_CONTRACT = {
   },
   negative_prompt: {
     kinds: ['all', 'remix', 'prompts'],
-    restores: ['negativePrompt', 'promptTemplate', 'promptTemplateViewMode'],
+    restores: ['negativePrompt', 'negativePromptEnabled', 'promptTemplate', 'promptTemplateViewMode'],
   },
   seed: { kinds: ['all', 'seed'], restores: ['seed', 'seedMode'] },
   // An upscale records the size of the frame it enlarged, which only exists once the graph runs.
@@ -124,8 +125,15 @@ const IMAGE_RECALL_CONTRACT = {
 
   // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults where
   // the panel hides them.
-  steps: { restores: ['steps'] },
-  cfg_scale: { restores: ['cfgScale'] },
+  // Ideogram records effective sampling in these shared fields and keeps its overrides in separate fields below.
+  steps: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { steps: Number(written.steps) } : {}),
+    restores: ['steps'],
+  },
+  cfg_scale: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { cfgScale: Number(written.cfg_scale) } : {}),
+    restores: ['cfgScale'],
+  },
   guidance: { restores: ['cfgScale'], when: (model) => getGenerationUiPolicy(model).guidanceLabel === 'Guidance' },
   cfg_rescale_multiplier: {
     restores: ['cfgRescaleMultiplier'],
@@ -411,6 +419,7 @@ const baselineValues = (): GenerateWidgetValues => ({
   ],
   model: BASELINE_MODEL,
   positivePrompt: 'the baseline prompt',
+  negativePromptEnabled: false,
   promptTemplate: { id: 'template', name: 'Template', negativePrompt: 'lowres', positivePrompt: '{prompt}, detailed' },
   promptTemplateViewMode: true,
   referenceImages: normalizeReferenceImages([
@@ -853,7 +862,7 @@ describe('image recall contract', () => {
         [
           'prompts',
           recall(testCase, 'prompts')?.values ?? null,
-          { ...baseline, ...pick(all, settingsUnder(testCase, 'prompts')) },
+          { ...baseline, ...getEffectivePrompts(baseline), ...pick(all, settingsUnder(testCase, 'prompts')) },
         ],
         [
           'seed',

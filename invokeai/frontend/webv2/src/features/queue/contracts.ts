@@ -57,6 +57,7 @@ export {
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
+export { isSameSubmissionRetry, restoreSubmissionRetry, withoutSubmissionRetry } from './core/submissionRetry';
 export {
   extractGenerationMeta,
   extractNamedGenerationMeta,

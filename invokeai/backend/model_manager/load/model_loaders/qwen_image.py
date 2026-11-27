@@ -18,7 +18,6 @@ from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -42,9 +41,9 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -102,6 +101,11 @@ def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
                     break
         remapped_sd[new_key] = tensor
     return remapped_sd
+
+
+def _is_lm_head_name(name: object) -> bool:
+    """Whether a single-file key or module path belongs to the LM head, in either spelling, sidecars included."""
+    return isinstance(name, str) and name.removeprefix("model.").split(".", 1)[0] == "lm_head"
 
 
 def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
@@ -165,6 +169,8 @@ def _build_qwen_image_transformer_config(sd: dict, is_edit: bool) -> dict:
 class QwenImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Qwen Image Edit main models."""
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -178,13 +184,21 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
 
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
+        if submodel_type is SubModelType.TextEncoder:
+            from transformers import Qwen2_5_VLForConditionalGeneration
+
+            from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
+
+            if load_class is Qwen2_5_VLForConditionalGeneration:
+                load_class = HeadlessQwen2_5_VLForConditionalGeneration
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
         # We force bfloat16 for Qwen Image Edit models.
         # Use `dtype` (newer) with fallback to `torch_dtype` (older diffusers).
-        dtype_kwarg = {"dtype": torch.bfloat16}
+        dtype = self._decision(config, submodel_type).dtype
+        dtype_kwarg = {"dtype": dtype}
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -194,7 +208,7 @@ class QwenImageDiffusersModel(GenericDiffusersLoader):
             )
         except TypeError:
             # Older diffusers uses torch_dtype instead of dtype
-            dtype_kwarg = {"torch_dtype": torch.bfloat16}
+            dtype_kwarg = {"torch_dtype": dtype}
             result = load_class.from_pretrained(
                 model_path,
                 **dtype_kwarg,
@@ -265,6 +279,8 @@ class QwenImageCheckpointModel(ModelLoader):
     `default_settings.fp8_storage` is on (which then also casts the dense remainder to fp8);
     otherwise they are dequantized to bf16 at load time. A file carries int8 or scaled fp8, not both."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -284,7 +300,6 @@ class QwenImageCheckpointModel(ModelLoader):
 
     def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import QwenImageTransformer2DModel
-        from safetensors.torch import load_file
 
         from invokeai.backend.util.logging import InvokeAILogger
 
@@ -294,10 +309,9 @@ class QwenImageCheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_checkpoint_fp8, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # Earlier versions identified InstantX's Qwen-Image ControlNet, a trimmed copy of this transformer, as a main
         # model. Such a record still exists; the file only needs identifying again.
@@ -325,8 +339,8 @@ class QwenImageCheckpointModel(ModelLoader):
         if int8_markers:
             sd = drop_unconsumed_quantization_sidecars(sd)
             fp8_layers = {}
-            # Nothing scaled to keep for fp8 storage; the outer `_apply_fp8_layerwise_casting` still casts the dense
-            # remainder when the model asks for fp8 storage.
+            # Nothing scaled to keep for fp8 storage; the int8 layers make the outer `_apply_fp8_layerwise_casting`
+            # decline the model, so the dense remainder stays as loaded.
             use_fp8_storage = False
             keep_fp8 = False
         else:
@@ -337,7 +351,7 @@ class QwenImageCheckpointModel(ModelLoader):
             # Without either, a dequantize per forward would cost speed for memory nobody asked to save, so they are
             # folded.
             use_fp8_storage = bool(fp8_layers) and self._should_use_fp8(config, SubModelType.Transformer)
-            keep_fp8 = bool(fp8_layers) and (should_keep_fp8_weights(target_device) or use_fp8_storage)
+            keep_fp8 = bool(fp8_layers) and keep_checkpoint_fp8
 
         is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
         model_config = _build_qwen_image_transformer_config(sd, is_edit=is_edit)
@@ -437,7 +451,9 @@ class QwenVLEncoderLoader(ModelLoader):
         if not isinstance(config, QwenVLEncoder_Diffusers_Config):
             raise TypeError(f"Expected QwenVLEncoder_Diffusers_Config, got {type(config).__name__}.")
 
-        from transformers import AutoTokenizer, Qwen2_5_VLForConditionalGeneration
+        from transformers import AutoTokenizer
+
+        from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 
         model_path = Path(config.path)
 
@@ -450,7 +466,7 @@ class QwenVLEncoderLoader(ModelLoader):
                 return AutoTokenizer.from_pretrained(str(tokenizer_path), local_files_only=True)
             case SubModelType.TextEncoder:
                 encoder_path = model_path / "text_encoder"
-                return Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                return HeadlessQwen2_5_VLForConditionalGeneration.from_pretrained(
                     str(encoder_path),
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
@@ -472,29 +488,8 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
     `invokeai.backend.qwen2_5_vl`, so this encoder loads with no network access.
     """
 
-    def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
-        """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
-
-        Decided once per loader (a fresh one serves each load): the cache key and the built weights must agree, and the
-        capability probes can flip between the key computation and the build under the load lock. Float8 follows the
-        execution device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
-        """
-        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        if device not in decisions:
-            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
-            decisions[device] = (keep_fp8, TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
-        return decisions[device]
-
-    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        # Device caches share one canonical CPU copy per key: a device must not adopt float8 it cannot hold, nor folded
-        # weights that throw away a capable device's saving. The visual tower is part of the text encoder's module, so
-        # it is covered too. Keyed by the device's decision, not the file's contents, which would take a header read
-        # on every cache lookup.
-        if submodel_type == SubModelType.TextEncoder:
-            keep_fp8, dtype = self._storage_format(config)
-            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
-        return ""
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
 
     def _load_model(
         self,
@@ -516,23 +511,27 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         )
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
+        from invokeai.backend.qwen2_5_vl.headless import OmittedLMHead
         from invokeai.backend.util.logging import InvokeAILogger
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         model_path = Path(config.path)
 
-        device_keeps_fp8, model_dtype = self._storage_format(config)
+        device_keeps_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
-        sd = load_file(str(model_path))
+        sd = load_safetensors_checkpoint(str(model_path))
+        header_layers = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        # The LM head is not loaded. Its weight, quantization sidecars and header entry go first, so that nothing below
+        # folds, installs or reserves room for them.
+        sd = {key: value for key, value in sd.items() if not _is_lm_head_name(key)}
+        header_layers = {path: hint for path, hint in header_layers.items() if not _is_lm_head_name(path)}
 
         # Comfy's nvfp4 build keeps the language model's projections in nvfp4, beside scaled fp8 embeddings. Take those
         # layers out before the fp8 extraction: it pops every `.weight_scale`, nvfp4's block scales included.
         # `install_nvfp4_layers` puts them back, packed.
-        header_layers = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
         nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
 
         # ComfyUI 'int8_tensorwise' (+convrot) shares the fp8 key layout, and the fp8 extraction below treats
@@ -554,6 +553,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         # Built before the reservation, which depends on its modules: they decide which nvfp4 layers stay packed.
         with accelerate.init_empty_weights():
             model = Qwen2_5_VLForConditionalGeneration(qwen_config)
+        model.lm_head = OmittedLMHead()
         skip_patterns = _model_declared_skip_patterns(model)
         # The packed and int8 layers are named in the same legacy layout as the keys.
         nvfp4_payloads = _remap_qwen_vl_checkpoint_keys(nvfp4_payloads)
@@ -622,19 +622,9 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
             logger.info(f"Qwen VL encoder: kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed.")
 
-        # Load weights; allow missing keys for tied lm_head and re-initialised buffers.
+        # Load weights; allow missing keys for re-initialised buffers.
         load_result = model.load_state_dict(sd, strict=False, assign=True)
         log_unexpected_keys("Qwen2.5-VL text encoder checkpoint", load_result.unexpected_keys)
-
-        # Tie lm_head ↔ embed_tokens if config requires it and lm_head wasn't loaded
-        if getattr(qwen_config, "tie_word_embeddings", False):
-            try:
-                if hasattr(model, "lm_head") and model.lm_head.weight.is_meta:
-                    model.lm_head.weight = model.model.embed_tokens.weight
-                else:
-                    model.tie_weights()
-            except AttributeError:
-                model.tie_weights()
 
         # Re-initialise any leftover meta buffers (RoPE inv_freq etc.)
         for name, buffer in list(model.named_buffers()):
@@ -681,19 +671,6 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 _GGUF_LM_HEAD_KEY = "output.weight"
 
 
-class _OmittedLMHead(torch.nn.Module):
-    """Stands in for the LM head of an encoder loaded without it.
-
-    The encoder's consumers take hidden states from the inner model, so nothing runs the head. A caller that runs
-    the full forward gets this error rather than logits from an uninitialized weight.
-    """
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        raise RuntimeError(
-            "This Qwen2.5-VL encoder was loaded from GGUF without its LM head; call `.model(...)` for hidden states."
-        )
-
-
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.GGUFQuantized)
 class QwenVLEncoderGGUFLoader(ModelLoader):
     """Loads a llama.cpp GGUF of the Qwen2.5-VL-7B language model as a text-only Qwen-Image encoder.
@@ -735,6 +712,8 @@ class QwenVLEncoderGGUFLoader(ModelLoader):
     def _load_text_encoder(self, config: QwenVLEncoder_GGUF_Config) -> AnyModel:
         from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
+        from invokeai.backend.qwen2_5_vl.headless import OmittedLMHead
+
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         qwen_config = Qwen2_5_VLConfig.from_dict(load_bundled_qwen2_5_vl_config_dict())
 
@@ -746,7 +725,7 @@ class QwenVLEncoderGGUFLoader(ModelLoader):
         with accelerate.init_empty_weights():
             model = Qwen2_5_VLForConditionalGeneration(qwen_config)
         drop_qwen3vl_visual_tower(model.model)
-        model.lm_head = _OmittedLMHead()
+        model.lm_head = OmittedLMHead()
 
         unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
 

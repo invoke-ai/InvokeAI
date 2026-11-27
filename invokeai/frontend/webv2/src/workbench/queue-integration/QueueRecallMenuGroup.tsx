@@ -1,5 +1,3 @@
-import type { ImageRecallKind } from '@workbench/image-actions';
-
 import { Menu } from '@chakra-ui/react';
 import { MenuActionItem } from '@platform/ui/Menu';
 import { getImageRecallVerb, IMAGE_RECALL_KINDS } from '@workbench/image-actions';
@@ -25,7 +23,7 @@ export const QueueRecallMenuGroup = ({ recall }: { recall: QueueItemRecall }) =>
   );
 };
 
-const RecallItem = ({ kind, recall }: { kind: ImageRecallKind; recall: QueueItemRecall }) => {
+const RecallItem = ({ kind, recall }: { kind: (typeof IMAGE_RECALL_KINDS)[number]; recall: QueueItemRecall }) => {
   const { t } = useTranslation();
   const verb = getImageRecallVerb(kind, t);
   const reason = recall.reasons[kind];
