@@ -78,7 +78,9 @@ def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_pat
     from invokeai.backend.model_manager.load.model_loaders import z_image
 
     loader, config = _prepare_loader(monkeypatch, tmp_path, {"x_pad_token": torch.ones(2, 2)})
-    monkeypatch.setattr(z_image, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     loader._ram_cache.make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
     extracted = False
     original_extract = z_image.extract_fp8_scaled_layers

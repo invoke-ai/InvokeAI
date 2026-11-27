@@ -241,7 +241,9 @@ def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch: pytest.
     run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(True))
     make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
     run.loader._ram_cache.make_room = make_room
-    monkeypatch.setattr(mistral_encoder, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     extracted = False
     original_extract = mistral_encoder.extract_fp8_scaled_layers
 

@@ -1,7 +1,7 @@
 """Identifying MOSS-Image's transformer, VAE and pipeline folder through the whole config factory.
 
-Single-file fixtures have captured headers and sparse, zero-filled data sections (`write_header_only_safetensors`).
-The factory sees the real keys, shapes and dtypes; its unrelated Spandrel full-tensor fallback is stubbed.
+Single-file fixtures use compact, valid safetensors payloads; quantized layouts keep the minimum valid tile geometry.
+The factory's unrelated Spandrel full-tensor fallback is stubbed.
 """
 
 import json
@@ -30,7 +30,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from tests.backend.model_manager.load.moss_image_fixtures import CONVROT_MARKER, fuse_qkv_keys, int8_convrot_keys
 from tests.backend.model_manager.load.state_dicts import moss_image_dit_keys, moss_image_vae_keys
-from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+from tests.backend.model_manager.load.state_dicts.utils import write_shrunk_safetensors
 from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
 
 Keys = dict[str, tuple[list[int], str]]
@@ -46,11 +46,11 @@ def _identify(path: Path, *, allow_unknown: bool = False) -> Any:
         return ModelConfigFactory.from_model_on_disk(path, hash_algo="random", allow_unknown=allow_unknown)
 
 
-def test_identification_does_not_hash_the_sparse_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Header-only fixtures have a large logical payload, but identification only needs their header."""
+def test_identification_does_not_hash_the_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Identification only needs keys and shapes from a compact safetensors header."""
     monkeypatch.setattr(ModelHash, "_feed", lambda *_args: pytest.fail("hashed sparse fixture payload"))
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-image-dit.safetensors", _dit()))
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-image-dit.safetensors", _dit()))
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
 
@@ -60,7 +60,7 @@ def _dit() -> Keys:
 
 
 def test_the_transformer_is_a_moss_image_checkpoint_and_nothing_else(tmp_path: Path) -> None:
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-image-dit.safetensors", _dit()))
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-image-dit.safetensors", _dit()))
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
     assert result.config.base is BaseModelType.MossImage
@@ -74,7 +74,7 @@ def test_comfy_orgs_fused_bf16_export_is_identified_as_the_same_checkpoint(tmp_p
     assert len(keys) == 379
     assert keys["layers.0.proj.qkv.weight"] == ([9216, 3072], "BF16")
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss_image_base_bf16.safetensors", keys))
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss_image_base_bf16.safetensors", keys))
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
     assert result.match_count == 1
@@ -88,7 +88,7 @@ def test_comfy_orgs_int8_convrot_export_is_identified_as_a_checkpoint(tmp_path: 
     assert keys["layers.0.proj.qkv.weight_scale"] == ([9216, 1], "F32")
 
     result = _identify(
-        write_header_only_safetensors(tmp_path / "moss_image_base_int8_convrot.safetensors", keys, markers)
+        write_shrunk_safetensors(tmp_path / "moss_image_base_int8_convrot.safetensors", keys, markers=markers)
     )
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
@@ -159,7 +159,7 @@ def test_a_comfyui_gguf_convrot_build_is_refused_with_its_reason(tmp_path: Path)
 def test_a_comfyui_prefixed_transformer_is_still_identified(tmp_path: Path) -> None:
     keys = {f"model.diffusion_model.{key}": value for key, value in _dit().items()}
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss.safetensors", keys))
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss.safetensors", keys))
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
     assert result.match_count == 1
@@ -168,7 +168,7 @@ def test_a_comfyui_prefixed_transformer_is_still_identified(tmp_path: Path) -> N
 def test_the_vae_is_one_flux2_vae(tmp_path: Path) -> None:
     keys = dict(moss_image_vae_keys.state_dict_keys)
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-image-vae.safetensors", keys))
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-image-vae.safetensors", keys))
 
     assert type(result.config) is VAE_Checkpoint_Flux2_Config
     assert result.match_count == 1
@@ -187,7 +187,7 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
         keys[f"diffusion_model.{module}.lora_B.weight"] = ([rows, 16], "BF16")
         keys[f"diffusion_model.{module}.weight"] = ([rows, columns], "BF16")
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), allow_unknown=True)
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-lora.safetensors", keys), allow_unknown=True)
 
     assert isinstance(result.details[Main_Checkpoint_MossImage_Config.__name__], NotAMatchError)
     # Its weights are no LoRA parameter, so the file is refused for them instead of installing as a partial LoRA.
@@ -216,7 +216,7 @@ def test_unsloths_torchao_fp8_build_installs_with_fp8_storage_on(tmp_path: Path)
     # Header facts of MOSS-Image-Base-FP8.safetensors: 252 quantized layers, the embedders and heads dense bf16.
     assert sum(k.endswith("._weight_qdata") for k in keys) == 252
 
-    result = _identify(write_header_only_safetensors(tmp_path / "MOSS-Image-Base-FP8.safetensors", keys))
+    result = _identify(write_shrunk_safetensors(tmp_path / "MOSS-Image-Base-FP8.safetensors", keys))
 
     assert type(result.config) is Main_Checkpoint_MossImage_Config
     assert result.match_count == 1
@@ -300,7 +300,7 @@ def test_an_unsupported_quantized_transformer_is_refused_not_registered(
     keys = _dit()
     quantize(keys)
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-quantized.safetensors", keys), allow_unknown=True)
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-quantized.safetensors", keys), allow_unknown=True)
 
     # Final, not "unknown": nothing is written to the database.
     assert result.config is None
@@ -318,7 +318,7 @@ def test_a_prefixed_stray_scaled_fp8_marker_beside_torchao_layers_is_refused_lik
     keys = {f"model.diffusion_model.{key}": value for key, value in keys.items()}
     keys["model.diffusion_model.scaled_fp8"] = ([0], "F8_E4M3")
 
-    result = _identify(write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True)
+    result = _identify(write_shrunk_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True)
 
     assert result.config is None
     refusal = result.details[Main_Checkpoint_MossImage_Config.__name__]
@@ -334,8 +334,8 @@ def test_a_file_mixing_torchao_fp8_and_int8_convrot_layers_is_refused_at_install
     keys["text_embedder.blocks.0.qkv.weight_scale"] = ([192, 1], "F32")
 
     result = _identify(
-        write_header_only_safetensors(
-            tmp_path / "moss-mixed.safetensors", keys, {"text_embedder.blocks.0.qkv": dict(CONVROT_MARKER)}
+        write_shrunk_safetensors(
+            tmp_path / "moss-mixed.safetensors", keys, markers={"text_embedder.blocks.0.qkv": dict(CONVROT_MARKER)}
         ),
         allow_unknown=True,
     )
@@ -358,8 +358,8 @@ def test_a_w4a8_build_is_refused_naming_what_does_load(tmp_path: Path) -> None:
     )
 
     result = _identify(
-        write_header_only_safetensors(
-            tmp_path / "moss-w4a8.safetensors", keys, {"layers.0.proj.q": {"format": "w4a8"}}
+        write_shrunk_safetensors(
+            tmp_path / "moss-w4a8.safetensors", keys, markers={"layers.0.proj.q": {"format": "w4a8"}}
         ),
         allow_unknown=True,
     )
@@ -376,7 +376,7 @@ def test_an_int8_build_of_another_format_than_int8_tensorwise_is_refused(tmp_pat
     markers["layers.0.proj.o"] = {"format": "int4_tensorwise", "convrot": True, "convrot_groupsize": 256}
 
     result = _identify(
-        write_header_only_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers), allow_unknown=True
+        write_shrunk_safetensors(tmp_path / "moss-int8-mixed.safetensors", keys, markers=markers), allow_unknown=True
     )
 
     assert result.config is None
@@ -425,7 +425,7 @@ def _pipeline_folder(root: Path, *, transformer_class: str = "MOSSImageTransform
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if content is None:
-            write_header_only_safetensors(path, {"weight": ([1], "BF16")})
+            write_shrunk_safetensors(path, {"weight": ([1], "BF16")})
         else:
             path.write_text(content)
     return root

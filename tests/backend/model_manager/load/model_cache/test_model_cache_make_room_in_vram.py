@@ -13,8 +13,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice, device_has_dedicated_vram
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 
 MB = 2**20
@@ -85,13 +86,15 @@ def _make_gpu_accounting_cache(mock_logger, **kwargs) -> ModelCache:
 
 
 @pytest.fixture
-def gpu_accounting_cache(mock_logger):
+def gpu_accounting_cache(mock_logger, monkeypatch: pytest.MonkeyPatch):
     """A cache whose execution device is a GPU as far as the policy is concerned, without touching a real one.
 
     `_get_physical_vram_available` needs an accelerator; the tests replace it (and the VRAM moves) with `_FakeVram`.
     `_FakeVram` reports freed memory immediately, as the real measurement does through the allocator's
     reserved-but-unallocated pool.
     """
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: True)
     cache = _make_gpu_accounting_cache(mock_logger)
     yield cache
     cache._execution_device = torch.device("cpu")
@@ -207,10 +210,12 @@ def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu
     assert available == 30 * MB
 
 
-def test_the_cache_vram_cap_does_not_apply_to_an_out_of_cache_load(mock_logger):
+def test_the_cache_vram_cap_does_not_apply_to_an_out_of_cache_load(mock_logger, monkeypatch: pytest.MonkeyPatch):
     """`max_vram_cache_size_gb` caps what the *cache* may occupy. An out-of-cache model is not subject to it, so
     the request is judged against physically free VRAM: with plenty of room on the card nothing is offloaded, and
     the (negative, here) capped budget is not what gets reported back."""
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: True)
     cache = _make_gpu_accounting_cache(mock_logger, max_vram_cache_size_gb=0.5)
     try:
         _put(cache, "resident", 40 * MB)
@@ -230,7 +235,10 @@ def test_the_cache_vram_cap_does_not_apply_to_an_out_of_cache_load(mock_logger):
         cache.shutdown()
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available.")
+@pytest.mark.skipif(
+    not torch.cuda.is_available() or not device_has_dedicated_vram(torch.device("cuda")),
+    reason="This test exercises moving weights out of dedicated CUDA VRAM.",
+)
 @pytest.mark.parametrize("partial", [False, True])
 def test_gpu_make_room_in_vram_actually_moves_weights_off_the_device(partial: bool):
     """Real-accelerator check: after `make_room_in_vram`, the unlocked models' weights are on the CPU and the

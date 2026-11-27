@@ -20,6 +20,7 @@ from safetensors.torch import load_file, save_file
 
 from invokeai.app.services.config import config_default
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
@@ -157,6 +158,8 @@ def streaming(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(weight_streaming, "_streamers", {})
     monkeypatch.setattr(weight_streaming, "_logged", set())
     monkeypatch.setattr(weight_streaming, "_runtime", None)
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: True)
     set_async_weight_streaming_enabled(True)
     state = _Streaming(registry, holders)
     yield state
@@ -228,9 +231,23 @@ def test_bytes_in_flight_stay_within_the_budget_while_the_gpu_lags(streaming, mo
     largest = max(p.nbytes for p in model.parameters() if p.device.type == "cpu")
     reference = _forward(model, streaming=False)
 
+    class PendingEvent:
+        def __init__(self, *_args, **_kwargs):
+            self._stream = None
+            self._complete = False
+
+        def record(self, stream):
+            self._stream = stream
+
+        def query(self):
+            return self._complete
+
+        def synchronize(self):
+            self._stream.synchronize()
+            self._complete = True
+
+    monkeypatch.setattr(torch.cuda, "Event", PendingEvent)
     with torch.no_grad():
-        # Hold the compute stream back so the CPU runs ahead: without the bound every copy would be issued at once.
-        torch.cuda._sleep(20_000_000)
         streamed = model(_input())
         torch.cuda.synchronize()
 

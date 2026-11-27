@@ -264,7 +264,9 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
 def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_path) -> None:
     state_dict, _ = _checkpoint(())
     run, config = _driver(monkeypatch, tmp_path, state_dict, keep_fp8=False)
-    monkeypatch.setattr(ideogram4, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
     run.loader._ram_cache.make_room = make_room
     extracted = False

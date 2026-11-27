@@ -186,7 +186,9 @@ def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_pat
     monkeypatch.setattr(loader_module, "load_safetensors_checkpoint", served_checkpoint({"weight": torch.ones(2, 2)}))
     monkeypatch.setattr(loader_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(loader_module.TorchDevice, "choose_anima_inference_dtype", lambda _device: torch.float32)
-    monkeypatch.setattr(loader_module, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
 
     loader = object.__new__(AnimaCheckpointModel)
     make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))

@@ -43,6 +43,7 @@ def moved(cache: ModelCache):
         return cache_entry.cached_model.total_bytes()
 
     with (
+        patch.object(cache, "_execution_device", torch.device("cuda")),
         patch.object(cache, "_move_model_to_ram", side_effect=move),
         patch(f"{MODULE}.device_has_dedicated_vram", return_value=True),
         patch(f"{MODULE}.TorchDevice.empty_cache", return_value=EmptyCacheOutcome.RAN) as empty_cache,
@@ -138,9 +139,9 @@ def test_integrated_cuda_with_ram_copy_still_offloads_single_model(cache: ModelC
     move.assert_called_once()
 
 
-@pytest.mark.parametrize("device", ["cpu", "mps", "xpu:2"])
+@pytest.mark.parametrize("device", ["cpu", "xpu:2"])
 def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache, device: str):
-    """CPU, MPS and integrated GPUs: moving a model "to RAM" would copy it within the same memory."""
+    """CPU and integrated XPU: moving a model "to RAM" would copy it within the same memory."""
     _put(cache, "flux:transformer", 1)
     with (
         patch.object(cache, "_execution_device", torch.device(device)),
@@ -150,6 +151,17 @@ def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache, devi
     ):
         assert cache.offload_models_from_vram_except(set()) == 0
     move.assert_not_called()
+
+
+def test_mps_with_a_ram_copy_still_offloads(cache: ModelCache):
+    _put(cache, "flux:transformer", 1)
+    with (
+        patch.object(cache, "_execution_device", torch.device("mps")),
+        patch.object(cache, "_move_model_to_ram", return_value=MB) as move,
+        patch(f"{MODULE}.TorchDevice.empty_cache", return_value=EmptyCacheOutcome.RAN),
+    ):
+        assert cache.offload_models_from_vram_except(set()) == MB
+    move.assert_called_once()
 
 
 def test_a_calibration_offload_moves_every_other_unlocked_entry_out_whole(cache: ModelCache, moved):

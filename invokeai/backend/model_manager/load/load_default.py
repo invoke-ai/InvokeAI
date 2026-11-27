@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
     FirstUseClaim,
     ModelCache,
+    _is_integrated_cuda,
     get_model_cache_key,
 )
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
@@ -571,11 +572,13 @@ class ModelLoader(ModelLoaderBase):
                 model_path = Path(config.path)
                 size_fs = self.get_size_fs(config, model_path, submodel_type)
                 host_bytes_needed = self._get_host_bytes_needed(config, model_path, submodel_type)
-                if host_bytes_needed:
+                effective_execution_device = execution_device or self._ram_cache.execution_device
+                integrated_cuda = _is_integrated_cuda(effective_execution_device)
+                if integrated_cuda and host_bytes_needed:
                     ram_admission = self._ram_cache.make_room(size_fs, host_bytes_needed=host_bytes_needed)
                 else:
                     ram_admission = self._ram_cache.make_room(size_fs)
-                if getattr(ram_admission, "ram_headroom_satisfied", True) is False:
+                if integrated_cuda and getattr(ram_admission, "ram_headroom_satisfied", True) is False:
                     raise MemoryError(
                         f"Insufficient host memory to construct model '{cache_key}'; "
                         "close other applications or load a smaller model."

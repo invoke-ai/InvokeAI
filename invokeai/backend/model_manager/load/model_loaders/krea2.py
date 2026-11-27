@@ -1,7 +1,6 @@
 """Class for Krea-2 model loading in InvokeAI."""
 
 from abc import abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 
@@ -50,6 +49,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     INPUT_SCALE_SUFFIXES,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -59,7 +59,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
@@ -96,7 +95,7 @@ from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     load_bundled_qwen3_vl_tokenizer,
 )
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.ram import require_ram_headroom
+from invokeai.backend.util.ram import HostMemoryReserver
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 # Kept as a module-level alias: this helper moved to model_manager.util.qwen3_vl so the MiniMax H3
@@ -333,7 +332,7 @@ def _load_qwen3vl_visual_tower(
     vision_config: Any,
     dtype: torch.dtype,
     *,
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
 ) -> torch.nn.Module:
     """Build a Qwen3-VL vision tower from the ``visual.*`` tensors of `files`, reading nothing else.
 
@@ -662,13 +661,7 @@ class Krea2CheckpointModel(ModelLoader):
 
             # MXFP8 extraction widens compact scale grids before the regular reservation below can account for
             # them. Admit that decode peak first; the file-sized reservation already covers the compact source grids.
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
-
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             # ComfyUI 'scaled fp8' checkpoints (fp8 weight + .weight_scale, optionally .input_scale).
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
@@ -1205,12 +1198,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             sd = _remap_qwen3vl_singlefile_keys(sd)
             layer_hints = {qwen3vl_target_key(path): hints for path, hints in layer_hints.items()}
 
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes
-                )
-
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale). Only the language-model linears are
             # quantized in the checkpoints seen so far.
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)

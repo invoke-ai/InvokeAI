@@ -45,6 +45,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -52,7 +53,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -237,6 +237,8 @@ class Ideogram4DiffusersModel(ModelLoader):
             # buffers without materializing a second dense parameter set.
             with accelerate.init_empty_weights():
                 model = Ideogram4Transformer(Ideogram4Config())
+                # Match the former dense FP8 path: it cast the non-persistent RoPE frequencies too.
+                model.to(dtype=compute_dtype)
             with accelerate.init_empty_weights(include_buffers=True):
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
             for tensor_key in raw_fp8_tensors:
@@ -461,13 +463,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 **parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)),
             }
 
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
-
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Two consumers want these packed and either is enough: the fp8 matmul, which runs on
             # them directly, and FP8 Storage asked of this model. Asking only the matmul -- which is

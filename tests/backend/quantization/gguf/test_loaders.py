@@ -487,7 +487,7 @@ def test_a_quantized_tensor_unpacked_in_row_slices_holds_what_the_whole_decodes_
     monkeypatch.setattr(GGMLTensor, "get_dequantized_tensor", recording)
     sd = {"embed.weight": weight}
 
-    unpack_ggml_at_load(sd, torch.nn.Embedding(37, 512, device="meta"), (), lambda _bytes: None)
+    unpack_ggml_at_load(sd, torch.nn.Embedding(37, 512, device="meta"), (), lambda _bytes, **_kwargs: None)
 
     assert decoded == [3 * 512] * 12 + [512]
     assert type(sd["embed.weight"]) is torch.Tensor
@@ -662,7 +662,7 @@ def test_failed_ram_admission_stops_before_unpacking(monkeypatch):
             {"embed.weight": weight},
             torch.nn.Embedding(37, 512, device="meta"),
             (),
-            lambda _bytes: SimpleNamespace(ram_headroom_satisfied=False),
+            lambda _bytes, **_kwargs: SimpleNamespace(ram_headroom_satisfied=False),
         )
 
 

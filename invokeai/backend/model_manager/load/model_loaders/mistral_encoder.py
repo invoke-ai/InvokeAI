@@ -71,6 +71,7 @@ from invokeai.backend.model_manager.util.llamacpp_keys import (
 from invokeai.backend.quantization.fp8_scaled import (
     TRANSFORMER_KEY_PREFIXES,
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -81,7 +82,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
@@ -103,7 +103,6 @@ from invokeai.backend.quantization.nvfp4 import (
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 # Architecture constants for the 30-layer cow-mistral3-small build.
@@ -907,8 +906,8 @@ def _try_load_embedded_tekken(model_path: Path, logger: Any, *, flux2_template: 
 # Filename of the standalone Tekken vocab shipped by official mistralai downloads and by the
 # BFL-style standalone-encoder layouts these loaders accept.
 _TEKKEN_FILENAME = "tekken.json"
-# A real 18.4 MiB Tekken file peaked at 102.3 MiB while parsing; round up for admission.
-_TEKKEN_PARSE_HEADROOM_BYTES = 104 * 2**20
+# Real 14.1-18.4 MiB Tekken files peaked at 105.0-105.8 MiB while parsing; leave margin.
+_TEKKEN_PARSE_HEADROOM_BYTES = 108 * 2**20
 
 
 def _tekken_adapter_from_file(tekken_path: Path, description: str, logger: Any) -> Optional[AnyModel]:
@@ -1348,12 +1347,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # Ministral 3B is a different architecture, not a smaller Mistral Small 3: YaRN RoPE and a

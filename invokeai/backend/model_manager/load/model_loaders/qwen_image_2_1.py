@@ -22,13 +22,13 @@ from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import 
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
 from invokeai.backend.quantization.fp8_scaled import (
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     safetensors_backend,
@@ -53,7 +53,6 @@ from invokeai.backend.qwen_image_2_1.checkpoint_layout import (
     split_fused_layer_names,
 )
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 
@@ -254,12 +253,7 @@ class QwenImage21CheckpointModel(ModelLoader):
             sd = drop_unconsumed_quantization_sidecars(sd)
         else:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
 

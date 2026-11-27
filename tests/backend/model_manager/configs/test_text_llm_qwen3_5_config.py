@@ -1,10 +1,9 @@
 """Identifying the FLUX.3 prompt upsampler -- a Qwen3.5-9B vision-language model -- as a Text LLM.
 
-Two containers: the release folder (`black-forest-labs/flux-3-image-klein-pup`) and ComfyUI's single files. The
-single files are their captured headers written back without data (`write_header_only_safetensors`), with the int8
-build's `.comfy_quant` markers as the only bytes: identification reads nothing else, and it runs through the whole
-config factory, so a second config claiming a file shows up as a second match. What separates the upsampler from a
-Qwen3.5 text-encoder export is its LM head alone, so both sides of that line are pinned here, on the real header.
+Two containers: the release folder (`black-forest-labs/flux-3-image-klein-pup`) and ComfyUI's single files. Compact
+single-file headers keep key names, dtypes and embedding width; identification never reads the weights. The int8
+build's `.comfy_quant` markers are written as the only payload bytes. What separates the upsampler from a Qwen3.5
+text-encoder export is its LM head alone, so both sides of that line are pinned through the whole config factory.
 """
 
 import shutil
@@ -62,6 +61,16 @@ def _matches(result: ModelClassificationResult) -> list[str]:
     return [type(config).__name__ for config in result.all_matches]
 
 
+def _compact_checkpoint(path: Path, keys: Keys, markers: dict | None = None) -> Path:
+    compact = {}
+    for key, (shape, dtype) in keys.items():
+        extents = [min(extent, 4) for extent in shape]
+        if key.endswith("embed_tokens.weight") and len(shape) == 2:
+            extents[1] = shape[1]
+        compact[key] = (extents, dtype)
+    return write_header_only_safetensors(path, compact, markers)
+
+
 def _release_folder(root: Path, *, processor: bool = True) -> Path:
     root.mkdir()
     shutil.copyfile(_RELEASE_CONFIG, root / "config.json")
@@ -103,7 +112,7 @@ class TestComfyUISingleFiles:
     def test_each_build_is_a_text_llm_that_reads_images_and_nothing_else(
         self, tmp_path: Path, keys: Keys, markers: dict | None
     ) -> None:
-        result = _identify(write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys, markers))
+        result = _identify(_compact_checkpoint(tmp_path / "upsampler.safetensors", keys, markers))
 
         assert _matches(result) == [TextLLM_Checkpoint_Config.__name__]
         assert isinstance(result.config, TextLLM_Checkpoint_Config)
@@ -138,7 +147,7 @@ class TestComfyUISingleFiles:
     def test_a_build_the_loader_cannot_decode_is_refused_naming_its_scheme(
         self, tmp_path: Path, keys: Keys, scheme: str
     ) -> None:
-        result = _identify(write_header_only_safetensors(tmp_path / "upsampler.safetensors", keys), allow_unknown=True)
+        result = _identify(_compact_checkpoint(tmp_path / "upsampler.safetensors", keys), allow_unknown=True)
 
         # Final, not "unknown": nothing is written to the database.
         assert result.config is None
@@ -155,7 +164,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
     def test_without_its_lm_head_the_upsampler_is_an_encoder_export(self, tmp_path: Path) -> None:
         keys = {key: value for key, value in _BF16.items() if key != "lm_head.weight"}
 
-        result = _identify(write_header_only_safetensors(tmp_path / "qwen35_9b.safetensors", keys))
+        result = _identify(_compact_checkpoint(tmp_path / "qwen35_9b.safetensors", keys))
 
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert isinstance(result.config, Qwen35Encoder_Checkpoint_Config)
@@ -165,7 +174,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
     def test_an_explicit_encoder_type_still_installs_the_upsampler_as_one_serving_as_a_text_llm(
         self, tmp_path: Path
     ) -> None:
-        path = write_header_only_safetensors(tmp_path / "upsampler.safetensors", _BF16)
+        path = _compact_checkpoint(tmp_path / "upsampler.safetensors", _BF16)
 
         result = _identify(path, {"type": ModelType.Qwen35Encoder})
 
@@ -178,7 +187,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
     ) -> None:
         """The encoder loader reads safetensors only, and the Text LLM config takes only `.safetensors`: a `.pt` copy
         stays unidentified, and filed as an encoder by hand it does not claim a role no config would accept."""
-        source = write_header_only_safetensors(tmp_path / "upsampler.safetensors", _BF16)
+        source = _compact_checkpoint(tmp_path / "upsampler.safetensors", _BF16)
         state_dict = ModelOnDisk(source).load_state_dict()
         pickle_file = tmp_path / "upsampler.pt"
         source.rename(pickle_file)
@@ -197,7 +206,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
         keys = dict(_BF16)
         keys["model.language_model.embed_tokens.weight"] = ([248320, 2560], "BF16")
 
-        result = _identify(write_header_only_safetensors(tmp_path / "qwen35_4b.safetensors", keys))
+        result = _identify(_compact_checkpoint(tmp_path / "qwen35_4b.safetensors", keys))
 
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert isinstance(result.config, Qwen35Encoder_Checkpoint_Config)
@@ -209,7 +218,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
         encoder config."""
         keys = {key: value for key, value in _BF16.items() if not key.startswith("model.visual.")}
 
-        result = _identify(write_header_only_safetensors(tmp_path / "qwen35_9b_causal_lm.safetensors", keys))
+        result = _identify(_compact_checkpoint(tmp_path / "qwen35_9b_causal_lm.safetensors", keys))
 
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert result.config is not None and result.config.roles == []
@@ -217,7 +226,7 @@ class TestTheLineBetweenTheUpsamplerAndAQwen3_5Encoder:
     def test_a_qwen3_vl_export_of_the_same_outer_layout_stays_the_qwen3_vl_encoder(self, tmp_path: Path) -> None:
         path = tmp_path / "qwen3vl_4b_bf16.safetensors"
 
-        result = _identify(write_header_only_safetensors(path, qwen3_vl_4b_comfy_keys.state_dict_keys))
+        result = _identify(_compact_checkpoint(path, qwen3_vl_4b_comfy_keys.state_dict_keys))
 
         assert _matches(result) == [Qwen3VLEncoder_Checkpoint_Config.__name__]
 
@@ -243,7 +252,7 @@ class TestQuantizedQwen3_5Encoders:
         }
 
     def _int8_file(self, tmp_path: Path) -> Path:
-        return write_header_only_safetensors(
+        return _compact_checkpoint(
             tmp_path / "qwen3.5_9b_int8_convrot.safetensors", _INT8, flux3_pup_int8_convrot_keys.markers
         )
 
@@ -289,7 +298,7 @@ class TestQuantizedQwen3_5Encoders:
         keys = {key: value for key, value in _INT8.items() if not key.startswith("lm_head.")}
         markers = {path: marker for path, marker in flux3_pup_int8_convrot_keys.markers.items() if path != "lm_head"}
 
-        result = _identify(write_header_only_safetensors(tmp_path / "encoder.safetensors", keys, markers))
+        result = _identify(_compact_checkpoint(tmp_path / "encoder.safetensors", keys, markers))
 
         assert _matches(result) == [Qwen35Encoder_Checkpoint_Config.__name__]
         assert result.config is not None and result.config.roles == []
@@ -320,7 +329,7 @@ class TestQuantizedQwen3_5Encoders:
         self, tmp_path: Path, keys: Keys, scheme: str
     ) -> None:
         result = _identify(
-            write_header_only_safetensors(tmp_path / "encoder.safetensors", keys),
+            _compact_checkpoint(tmp_path / "encoder.safetensors", keys),
             self._starter_fields(),
             allow_unknown=True,
         )

@@ -161,10 +161,12 @@ Invoke caches models in RAM and VRAM so it rarely loads them from disk, and size
   what other programs use (with a ROCm build on Windows, the budget Windows grants Invoke).
 - **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a GPU with dedicated
   memory that is capped at its VRAM minus `device_working_mem_gb` (or at `max_cache_vram_gb` if you set it). Native
-  integrated CUDA uses the CUDA-reported shared pool, less `device_working_mem_gb`, rather than the generic 32GB
-  ceiling. The cap is never below 4GB for the automatic limit. On integrated CUDA, this budget counts cached model
-  weights even while they are CUDA-resident; it is a capacity limit, not a report of memory already allocated. When a
-  model load needs capacity, dynamic memory-pressure checks evict idle Spark models. The log shows the result at startup:
+  integrated CUDA skips the half-RAM heuristic: its automatic RAM-cache limit is the CUDA-reported allocation pool
+  minus `device_working_mem_gb`, with a 4GB minimum. If you set `max_cache_vram_gb`, the pool is capped at that value
+  before subtracting `device_working_mem_gb`; this explicit cap has a 0GB minimum, not the automatic 4GB minimum. On
+  integrated CUDA, this budget counts cached model weights even while they are CUDA-resident; it is a capacity limit,
+  not a report of memory already allocated. When a model load needs capacity, dynamic memory-pressure checks evict idle
+  Spark models. The log shows the result at startup:
   `Calculated model RAM cache size: … MB`.
 
 Integrated-CUDA admission is coordinated within one InvokeAI process. Other processes can still consume shared RAM

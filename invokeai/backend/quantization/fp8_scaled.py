@@ -25,6 +25,7 @@ from typing import Any, Callable, Iterable, Literal, Mapping
 import torch
 
 from invokeai.backend.quantization.block_scale_tiles import check_tile_layout, unblock_scale_grid
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 
 FP8_DTYPE = torch.float8_e4m3fn
 
@@ -602,6 +603,16 @@ def mxfp8_scale_decode_host_bytes(sd: Mapping[str, Any], layer_hints: Mapping[st
     return decoded_bytes + largest_grid_bytes * (
         torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize
     )
+
+
+def admit_mxfp8_scale_decode(
+    sd: Mapping[str, Any], layer_hints: Mapping[str, Any], reserve: HostMemoryReserver | None
+) -> int:
+    """Reserve the temporary host peak before extraction expands MXFP8 scale grids."""
+    host_bytes_needed = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+    if reserve is not None and host_bytes_needed:
+        require_ram_headroom(reserve(0, host_bytes_needed=host_bytes_needed), host_bytes_needed)
+    return host_bytes_needed
 
 
 def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:

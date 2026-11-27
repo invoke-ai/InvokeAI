@@ -35,7 +35,11 @@ def _linear_model(in_features: int, out_features: int) -> torch.nn.Module:
 def _asked() -> tuple[list[int], object]:
     """A `reserve` callable and the list it records into."""
     asked: list[int] = []
-    return asked, asked.append
+
+    def reserve(cache_bytes: int, *, host_bytes_needed: int) -> None:
+        asked.append(cache_bytes)
+
+    return asked, reserve
 
 
 class TestTheSideChannelIsCounted:
@@ -108,6 +112,18 @@ class TestTheSideChannelIsCounted:
 
 
 class TestTheDictAndThePayloads:
+    def test_reservation_requires_the_host_memory_keyword(self) -> None:
+        with pytest.raises(TypeError, match="host_bytes_needed"):
+            reserve_for_load(
+                lambda _cache_bytes: None,
+                {"weight": torch.zeros(4, dtype=torch.float32)},
+                torch.bfloat16,
+                keep_fp8=False,
+                model=None,
+                fp8_layers={},
+                nvfp4_payloads={},
+            )
+
     def test_mapped_multiple_fp8_sources_charge_the_full_new_output(self) -> None:
         sd = {f"weight_{index}": torch.zeros(1024, dtype=torch.float8_e4m3fn) for index in range(4)}
         asked: list[tuple[int, dict[str, int]]] = []
@@ -203,31 +219,6 @@ class TestTheDictAndThePayloads:
         assert needed == 1024 * torch.float32.itemsize + torch.float32.itemsize + 128 * 64 * torch.float32.itemsize
         assert asked == [(needed, {"host_bytes_needed": 55_296})]
 
-    def test_mapped_accounting_takes_precedence_over_retained_only_for_mixed_sources(self) -> None:
-        sd = {
-            **{f"fp8_{index}": torch.zeros(1024, dtype=torch.float8_e4m3fn) for index in range(2)},
-            **{f"bf16_{index}": torch.zeros(1024, dtype=torch.bfloat16) for index in range(2)},
-        }
-        asked: list[tuple[int, dict[str, int]]] = []
-
-        def reserve(bytes_needed: int, **kwargs: int) -> None:
-            asked.append((bytes_needed, kwargs))
-
-        needed = reserve_for_load(
-            reserve,
-            sd,
-            torch.bfloat16,
-            keep_fp8=False,
-            model=None,
-            fp8_layers={},
-            nvfp4_payloads={},
-            source_tensors_retained=True,
-            source_tensors_mapped=True,
-        )
-
-        assert needed == 4 * 1024 * torch.bfloat16.itemsize
-        assert asked == [(needed, {"host_bytes_needed": 2 * 1024 * torch.bfloat16.itemsize})]
-
     def test_mapped_fp8_sources_are_not_credited_as_reclaimed_host_bytes(self) -> None:
         """File-backed source pages remain reclaimable in the live-RAM sample while the widened output is live."""
         sd = {"lin.weight": torch.zeros((4, 8), dtype=torch.float8_e4m3fn)}
@@ -249,142 +240,6 @@ class TestTheDictAndThePayloads:
 
         assert needed == 4 * 8 * torch.bfloat16.itemsize
         assert asked == [(needed, {"host_bytes_needed": needed})]
-
-    def test_retained_mapped_sources_charge_final_output_tensors(self) -> None:
-        payload = quantize_scaled_fp8(torch.arange(32, dtype=torch.float32).reshape(4, 8))
-        sd = {
-            "lin.weight": payload.codes,
-            "lin.weight_scale": payload.scale,
-            "lin.bias": torch.zeros(2048, dtype=torch.bfloat16),
-        }
-        layers = extract_fp8_scaled_layers(sd)
-        asked: list[tuple[int, dict[str, int]]] = []
-
-        def reserve(bytes_needed: int, **kwargs: int) -> None:
-            asked.append((bytes_needed, kwargs))
-
-        needed = reserve_for_load(
-            reserve,
-            sd,
-            torch.bfloat16,
-            keep_fp8=False,
-            model=_linear_model(8, 4),
-            fp8_layers=layers,
-            nvfp4_payloads={},
-            source_tensors_retained=True,
-        )
-
-        assert asked == [(needed, {"host_bytes_needed": 4 * 8 * 2 + 2048 * 2})]
-
-    def test_mapped_sources_override_retained_only_accounting(self) -> None:
-        payload = quantize_scaled_fp8(torch.arange(32, dtype=torch.float32).reshape(4, 8))
-        sd = {
-            "lin.weight": payload.codes,
-            "lin.weight_scale": payload.scale,
-            "lin.bias": torch.zeros(2048, dtype=torch.bfloat16),
-        }
-        layers = extract_fp8_scaled_layers(sd)
-        asked: list[tuple[int, dict[str, int]]] = []
-
-        def reserve(bytes_needed: int, **kwargs: int) -> None:
-            asked.append((bytes_needed, kwargs))
-
-        needed = reserve_for_load(
-            reserve,
-            sd,
-            torch.bfloat16,
-            keep_fp8=False,
-            model=_linear_model(8, 4),
-            fp8_layers=layers,
-            nvfp4_payloads={},
-            source_tensors_retained=True,
-            source_tensors_mapped=True,
-        )
-
-        # A shallow retained dict still points at mmap-backed source pages. The fold allocates its
-        # bf16 destination and transient scratch; an already-bf16 bias is reused rather than charged
-        # as a second copy.
-        fold_peak = 4 * 8 * torch.bfloat16.itemsize + fold_transient_bytes(sd["lin.weight"], layers["lin"].weight_scale)
-        assert asked == [(needed, {"host_bytes_needed": fold_peak})]
-
-    def test_mapped_cloned_same_dtype_sources_charge_owned_copies_during_fp8_fold(self) -> None:
-        payload = quantize_scaled_fp8(torch.arange(32, dtype=torch.float32).reshape(4, 8))
-        sd = {
-            "lin.weight": payload.codes,
-            "lin.weight_scale": payload.scale,
-            "lin.bias": torch.zeros(4096, dtype=torch.bfloat16),
-        }
-        layers = extract_fp8_scaled_layers(sd)
-        asked: list[tuple[int, dict[str, int]]] = []
-
-        def reserve(bytes_needed: int, **kwargs: int) -> None:
-            asked.append((bytes_needed, kwargs))
-
-        needed = reserve_for_load(
-            reserve,
-            sd,
-            torch.bfloat16,
-            keep_fp8=False,
-            model=_linear_model(8, 4),
-            fp8_layers=layers,
-            nvfp4_payloads={},
-            source_tensors_mapped=True,
-            source_tensors_cloned=True,
-        )
-
-        fold_peak = 4 * 8 * torch.bfloat16.itemsize + fold_transient_bytes(sd["lin.weight"], layers["lin"].weight_scale)
-        assert asked == [
-            (
-                needed,
-                {"host_bytes_needed": max(fold_peak, 4 * 8 * torch.bfloat16.itemsize + sd["lin.bias"].nbytes)},
-            )
-        ]
-
-    def test_retained_sources_release_before_decoded_nvfp4_output_is_counted(self) -> None:
-        payload = quantize_scaled_fp8(torch.arange(32, dtype=torch.float32).reshape(4, 8))
-        nv_tensors, _ = nvfp4_signed_tensors("decoded", torch.randint(0, 2, (128, 64), dtype=torch.bool))
-        sd = {
-            "lin.weight": payload.codes,
-            "lin.weight_scale": payload.scale,
-            "lin.bias": torch.zeros(2048, dtype=torch.float32),
-            **nv_tensors,
-        }
-        payloads = pop_nvfp4_layers(sd, {"decoded": {"format": "nvfp4"}})
-        layers = extract_fp8_scaled_layers(sd)
-        model = torch.nn.Module()
-        model.lin = torch.nn.Linear(8, 4, bias=False)
-        model.decoded = torch.nn.Linear(64, 128, bias=False)
-        asked: list[tuple[int, dict[str, int]]] = []
-
-        def reserve(bytes_needed: int, **kwargs: int) -> None:
-            asked.append((bytes_needed, kwargs))
-
-        needed = reserve_for_load(
-            reserve,
-            sd,
-            torch.bfloat16,
-            keep_fp8=False,
-            model=model,
-            fp8_layers=layers,
-            nvfp4_payloads=payloads,
-            skip_patterns=("decoded",),
-            source_tensors_retained=True,
-        )
-
-        original_sd_bytes = sd["lin.weight"].nbytes + sd["lin.bias"].nbytes
-        final_sd_bytes = sd["lin.weight"].nelement() * torch.bfloat16.itemsize + sd["lin.bias"].nelement() * 2
-        nvfp4_host_bytes = predict_nvfp4_install_host_size(model, payloads, torch.bfloat16, ("decoded",))
-        released_scale_bytes = layers["lin"].weight_scale.nbytes
-        assert asked == [
-            (
-                needed,
-                {
-                    "host_bytes_needed": max(
-                        final_sd_bytes, final_sd_bytes - original_sd_bytes - released_scale_bytes + nvfp4_host_bytes
-                    )
-                },
-            )
-        ]
 
     def test_packed_nvfp4_payload_has_no_additional_host_demand(self) -> None:
         tensors, _ = nvfp4_signed_tensors("lin", torch.randint(0, 2, (128, 64), dtype=torch.bool))
@@ -836,7 +691,7 @@ class TestTheDictAndThePayloads:
 
         with pytest.raises(MemoryError, match="host memory"):
             reserve_for_load(
-                lambda _needed: SimpleNamespace(ram_headroom_satisfied=False),
+                lambda _needed, **_kwargs: SimpleNamespace(ram_headroom_satisfied=False),
                 sd,
                 torch.bfloat16,
                 keep_fp8=False,

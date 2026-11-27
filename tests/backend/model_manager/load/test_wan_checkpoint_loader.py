@@ -508,11 +508,13 @@ class TestHeaderFirstRead:
         path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
         save_file(sd, path)
 
-        model, events, alive_at_read = self._load_recording(path)
+        loader = _make_loader()
+        model, events, alive_at_read = self._load_recording(path, loader=loader)
 
         # The folded size, plus the one fold in flight: the weight's float32 copy and product, and its float32 scale.
         in_flight = 2 * 128 * 128 * torch.float32.itemsize + 128 * torch.float32.itemsize
         assert events[0] == ("reserve", sum(v.numel() for v in reference.state_dict().values()) * 2 + in_flight)
+        assert loader._ram_cache.make_room.call_args.kwargs["host_bytes_needed"] > 0
         read = {key for kind, key in events if kind == "read"}
         assert read == set(reference.state_dict()) | {"blocks.0.attn1.to_q.scale_weight"}
         # Only the fp8 weight is still alive while its scale is read; it is folded right after.

@@ -186,7 +186,9 @@ def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch: pytest.
     _decide(monkeypatch, matmul=True, device="cuda:0")
     loader = _loader()
     loader._ram_cache.make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
-    monkeypatch.setattr(z_image, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     extracted = False
     original_extract = z_image.extract_fp8_scaled_layers
 

@@ -1,3 +1,6 @@
+import base64
+import gzip
+import json
 import logging
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,7 +39,10 @@ from invokeai.backend.model_manager.load.model_loaders.z_image import (
     Qwen3EncoderGGUFLoader,
     Qwen3EncoderSDNQLoader,
 )
-from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+from invokeai.backend.model_manager.load.model_util import (
+    QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    calc_tokenizer_size_by_fs,
+)
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.qwen3.qwen3_tokenizer import _TOKENIZER_DIR
 from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR as _T5_TOKENIZER_DIR
@@ -162,21 +168,80 @@ def test_qwen3_5_checkpoint_sizes_tokenizer_and_processor_assets(tmp_path: Path)
     assert loader.get_size_fs(config, checkpoint, SubModelType.Tokenizer) == expected
     assert loader.get_size_fs(config, checkpoint, SubModelType.Processor) == expected
     assert loader._get_host_bytes_needed(config, checkpoint, SubModelType.Processor) == calc_tokenizer_size_by_fs(
-        qwen35_tokenizer_dir, include_runtime_overhead=True
+        qwen35_tokenizer_dir,
+        include_runtime_overhead=True,
+        runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
     )
+
+
+def test_qwen3_5_tokenizer_construction_allowance_covers_compressed_and_uncompressed_assets(tmp_path: Path):
+    from transformers import AutoTokenizer
+
+    from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR, load_qwen3_5_tokenizer
+
+    tokenizer = load_qwen3_5_tokenizer()
+    assert tokenizer("a real tokenizer parse", add_special_tokens=False)["input_ids"]
+
+    compressed = calc_tokenizer_size_by_fs(
+        _TOKENIZER_DIR,
+        include_runtime_overhead=True,
+        runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    )
+    assert compressed > 213 * 2**20
+
+    uncompressed_dir = tmp_path / "tokenizer"
+    uncompressed_dir.mkdir()
+    with gzip.open(_TOKENIZER_DIR / "tokenizer.json.gz", "rb") as src:
+        (uncompressed_dir / "tokenizer.json").write_bytes(src.read())
+    (uncompressed_dir / "tokenizer_config.json").write_bytes((_TOKENIZER_DIR / "tokenizer_config.json").read_bytes())
+
+    uncompressed = calc_tokenizer_size_by_fs(
+        uncompressed_dir,
+        include_runtime_overhead=True,
+        runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(uncompressed_dir, local_files_only=True)
+    assert tokenizer("a real tokenizer parse", add_special_tokens=False)["input_ids"]
+    assert uncompressed - (uncompressed_dir / "tokenizer.json").stat().st_size - (
+        uncompressed_dir / "tokenizer_config.json"
+    ).stat().st_size == compressed - sum(file.stat().st_size for file in _TOKENIZER_DIR.iterdir())
+    assert uncompressed > 213 * 2**20
 
 
 @pytest.mark.parametrize("location", ["tokenizer/tekken.json", "tekken.json"])
 def test_mistral_local_tekken_admission_covers_parser_peak(tmp_path: Path, location: str):
+    from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
     from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderDiffusersLoader
+    from invokeai.backend.model_manager.taxonomy import MistralVariantType
 
     tekken = tmp_path / location
     tekken.parent.mkdir(parents=True, exist_ok=True)
-    _file_of_size(tekken, 18 * 2**20)
+    special_tokens = ("<unk>", "<s>", "</s>", "[INST]", "[/INST]")
+    vocab = [{"rank": i, "token_bytes": base64.b64encode(bytes([i])).decode(), "token_str": None} for i in range(256)]
+    tekken.write_text(
+        json.dumps(
+            {
+                "config": {
+                    "pattern": r"\s+",
+                    "num_vocab_tokens": 256 + len(special_tokens),
+                    "default_vocab_size": 256 + len(special_tokens),
+                    "default_num_special_tokens": len(special_tokens),
+                    "version": "v7",
+                },
+                "vocab": vocab,
+                "special_tokens": [
+                    {"rank": i, "token_str": token, "is_control": True} for i, token in enumerate(special_tokens)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     loader = _loader(MistralEncoderDiffusersLoader)
 
-    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == 18 * 2**20
-    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == 104 * 2**20
+    tokenizer = mistral_encoder._load_tokenizer_for_model(tmp_path, MagicMock(), MistralVariantType.Cow)
+    assert tokenizer is not None
+    assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == tekken.stat().st_size
+    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) >= 108 * 2**20
 
 
 def test_qwen3_5_encoder_cached_tokenizer_has_no_second_cold_charge(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -308,10 +373,11 @@ def test_mistral_tokenizer_host_estimate_follows_sibling_hf_selection(tmp_path: 
     (sibling / "tokenizer.json").write_bytes(b"selected-sibling-vocabulary" * 20)
     (tmp_path / "chat_template.json").write_bytes(b"{}")
     loader = _loader(MistralEncoderDiffusersLoader)
-    expected = calc_tokenizer_size_by_fs(sibling, include_runtime_overhead=True)
+    expected = calc_tokenizer_size_by_fs(sibling)
+    expected_host = calc_tokenizer_size_by_fs(sibling, include_runtime_overhead=True)
 
     assert loader.get_size_fs(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == expected
-    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == expected
+    assert loader._get_host_bytes_needed(SimpleNamespace(), tmp_path, SubModelType.Tokenizer) == expected_host
 
 
 def test_mistral_checkpoint_without_embedded_tokenizer_admits_hf_fallback_before_parser(
@@ -320,6 +386,7 @@ def test_mistral_checkpoint_without_embedded_tokenizer_admits_hf_fallback_before
     from safetensors.torch import save_file
 
     from invokeai.backend.model_manager.configs.mistral_encoder import MistralEncoder_Checkpoint_Config
+    from invokeai.backend.model_manager.load import load_default
     from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
     from invokeai.backend.model_manager.taxonomy import MistralVariantType
 
@@ -333,6 +400,7 @@ def test_mistral_checkpoint_without_embedded_tokenizer_admits_hf_fallback_before
     loader._logger = MagicMock()
     loader.config_check = None
     loader._get_model_path = lambda model_config: Path(model_config.path)
+    monkeypatch.setattr(load_default, "_is_integrated_cuda", lambda _device: True)
     hf_fallback_parser = MagicMock(return_value=object())
     monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", hf_fallback_parser)
 
@@ -342,6 +410,7 @@ def test_mistral_checkpoint_without_embedded_tokenizer_admits_hf_fallback_before
     loader._ram_cache = SimpleNamespace(
         get_with_first_use_claim=MagicMock(side_effect=[IndexError, IndexError, (object(), None)]),
         shared_cpu_weights=None,
+        execution_device=torch.device("cpu"),
         make_room=MagicMock(side_effect=make_room),
         put=MagicMock(return_value=None),
     )
@@ -372,6 +441,7 @@ def test_mistral_diffusers_without_local_vocabulary_admits_hf_fallback_before_pa
     from safetensors.torch import save_file
 
     from invokeai.backend.model_manager.configs.mistral_encoder import MistralEncoder_Diffusers_Config
+    from invokeai.backend.model_manager.load import load_default
     from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
     from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderDiffusersLoader
     from invokeai.backend.model_manager.taxonomy import MistralVariantType
@@ -389,6 +459,7 @@ def test_mistral_diffusers_without_local_vocabulary_admits_hf_fallback_before_pa
     loader._logger = MagicMock()
     loader.config_check = None
     loader._get_model_path = lambda model_config: Path(model_config.path)
+    monkeypatch.setattr(load_default, "_is_integrated_cuda", lambda _device: True)
     hf_fallback_parser = MagicMock(return_value=object())
     monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", hf_fallback_parser)
 
@@ -399,7 +470,7 @@ def test_mistral_diffusers_without_local_vocabulary_admits_hf_fallback_before_pa
     hf_fallback_parser.assert_called_once()
     hf_fallback_parser.reset_mock()
 
-    expected_cold_fallback_bytes = max(calc_tokenizer_size_by_fs(model_dir, include_runtime_overhead=True), 104 * 2**20)
+    expected_cold_fallback_bytes = max(calc_tokenizer_size_by_fs(model_dir, include_runtime_overhead=True), 108 * 2**20)
     assert loader._get_host_bytes_needed(config, model_dir, SubModelType.Tokenizer) == expected_cold_fallback_bytes
 
     def make_room(_size: int, *, host_bytes_needed: int = 0):
@@ -408,6 +479,7 @@ def test_mistral_diffusers_without_local_vocabulary_admits_hf_fallback_before_pa
     loader._ram_cache = SimpleNamespace(
         get_with_first_use_claim=MagicMock(side_effect=[IndexError, IndexError, (object(), None)]),
         shared_cpu_weights=None,
+        execution_device=torch.device("cpu"),
         make_room=MagicMock(side_effect=make_room),
         put=MagicMock(return_value=None),
     )

@@ -25,6 +25,8 @@ from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 # Embedded FP16 Tekken decoding measured about 8x the recovered byte payload before parsing.
 TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER = 8
+TOKENIZER_RUNTIME_OVERHEAD_BYTES = 130 * 2**20
+QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES = 220 * 2**20
 
 
 def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
@@ -200,7 +202,11 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
 
 
 def calc_tokenizer_size_by_fs(
-    model_path: Path, subfolder: Optional[str] = None, *, include_runtime_overhead: bool = False
+    model_path: Path,
+    subfolder: Optional[str] = None,
+    *,
+    include_runtime_overhead: bool = False,
+    runtime_overhead_bytes: int = TOKENIZER_RUNTIME_OVERHEAD_BYTES,
 ) -> int:
     """Estimate the host memory needed by a tokenizer loaded from local files.
 
@@ -225,8 +231,6 @@ def calc_tokenizer_size_by_fs(
     }
     files = [file for file in path.iterdir() if file.is_file() and file.name in tokenizer_names]
     size = sum(file.stat().st_size for file in files)
-    if include_runtime_overhead and any(file.name == "tokenizer.json.gz" for file in files):
-        # Measured Qwen3 tokenizer construction retains about 130 MiB above the compressed assets. Keep this separate
-        # from the file estimate so ordinary uncompressed/local tokenizers retain their exact sizing contract.
-        size += 130 * 2**20
+    if include_runtime_overhead and any(file.name in {"tokenizer.json", "tokenizer.json.gz"} for file in files):
+        size += runtime_overhead_bytes
     return size

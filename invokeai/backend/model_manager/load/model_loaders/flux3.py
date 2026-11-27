@@ -15,7 +15,7 @@ also takes the published quantized builds: BFL's per-row scaled fp8 (`variants/f
 key names. The file says which it is.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from logging import Logger
 from pathlib import Path
 from typing import Any, Optional
@@ -48,6 +48,7 @@ from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_scaled import (
     COMFY_QUANT_SUFFIX,
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -55,7 +56,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     read_safetensors_metadata,
     safetensors_backend,
     split_fp8_scaled_layers,
@@ -80,7 +80,7 @@ from invokeai.backend.quantization.nvfp4 import (
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.ram import require_ram_headroom
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 _QK_NORM_WEIGHTS = (".norm_q.weight", ".norm_k.weight")
@@ -108,14 +108,14 @@ def _build_transformer(state_dict: dict) -> torch.nn.Module:
         return Flux3Transformer2DModel(**model_config)
 
 
-def _reserve_nothing(_bytes: int) -> None:
+def _reserve_nothing(_bytes: int, *, host_bytes_needed: int) -> None:
     """The reservation of a load that happens outside the RAM cache."""
 
 
 def flux3_transformer_from_single_file(
     sd: dict,
     dtype: torch.dtype,
-    reserve: Optional[Callable[..., Any]] = None,
+    reserve: Optional[HostMemoryReserver] = None,
     *,
     metadata: Optional[Mapping[str, Any]] = None,
     keep_fp8: bool = False,
@@ -195,9 +195,7 @@ def flux3_transformer_from_single_file(
         )
         log.info(f"FLUX.3: kept {len(int8_layers)} of {len(int8_markers)} layer(s) in int8 (int8_tensorwise, {how}).")
     else:
-        mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-        if reserve is not None and mxfp8_decode_host_bytes:
-            require_ram_headroom(make_room(0, host_bytes_needed=mxfp8_decode_host_bytes), mxfp8_decode_host_bytes)
+        admit_mxfp8_scale_decode(sd, layer_hints, reserve)
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
         reserve_for_load(
             make_room,

@@ -150,10 +150,6 @@ def test_no_parameter_reads_the_file_after_the_load(monkeypatch, tmp_path, keep_
 
     assert read_log.backends == ["pread"]
     assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
-    if not keep_fp8:
-        assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
-        assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
-
     assert tensors_reading_the_file(model, tmp_path / CHECKPOINT) == []
 
 
@@ -173,8 +169,6 @@ def test_a_pread_fp8_load_fits_a_32k_host_admission(monkeypatch, tmp_path) -> No
     expected_host_bytes = 7 * _TinyTransformer().img_in.weight.numel() * torch.bfloat16.itemsize
     assert requested == [expected_host_bytes]
     assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
-    assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
-    assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
 
 
 def test_mxfp8_decode_admission_precedes_scale_extraction(monkeypatch, tmp_path) -> None:
@@ -193,7 +187,9 @@ def test_mxfp8_decode_admission_precedes_scale_extraction(monkeypatch, tmp_path)
         extracted = True
         return original_extract(*args, **kwargs)
 
-    monkeypatch.setattr(qwen_image_2_1, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     monkeypatch.setattr(qwen_image_2_1, "extract_fp8_scaled_layers", observe_extract)
 
     with pytest.raises(MemoryError, match="Insufficient host memory"):

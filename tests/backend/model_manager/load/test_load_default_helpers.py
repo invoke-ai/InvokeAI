@@ -13,8 +13,9 @@ import torch
 from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Config
+from invokeai.backend.model_manager.load import load_default as load_default_module
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode, resolve_submodel_path
-from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult, ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
 from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelFormat, ModelType, SubModelType
 
 
@@ -321,7 +322,9 @@ class TestGetSizeFs:
             selected_source_bytes + (4 + 8) * torch.bfloat16.itemsize
         )
 
-    def test_flux_bundle_passes_total_host_peak_to_initial_admission(self, tmp_path: Path) -> None:
+    def test_flux_bundle_passes_total_host_peak_to_integrated_cuda_admission(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         checkpoint = tmp_path / "flux-bundle.safetensors"
         marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
         save_file(
@@ -346,8 +349,9 @@ class TestGetSizeFs:
         loader._logger = MagicMock()
         loader.config_check = None
         loader._get_model_path = lambda _config: checkpoint  # type: ignore[method-assign]
-        loader._get_execution_device = lambda *_args: torch.device("cpu")  # type: ignore[method-assign]
+        loader._get_execution_device = lambda *_args: torch.device("cuda")  # type: ignore[method-assign]
         loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
+        monkeypatch.setattr(load_default_module, "_is_integrated_cuda", lambda _device: True)
 
         loader._load_and_cache(config, SubModelType.Transformer)
 
@@ -356,28 +360,34 @@ class TestGetSizeFs:
         loader._ram_cache.make_room.assert_called_once_with(selected, host_bytes_needed=selected + converted)
 
 
-def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insufficient(tmp_path: Path) -> None:
-    """A fixed cache cap must not let a large CPU construction run into a smaller live host budget."""
+@pytest.mark.parametrize(
+    ("device", "refuses"),
+    [("cpu", False), ("cuda:1", False), ("mps", False), ("cuda:0", True)],
+)
+def test_cold_load_host_refusal_is_integrated_cuda_only(
+    tmp_path: Path, device: str, refuses: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only integrated CUDA treats live host headroom as a cold-load admission limit."""
     from invokeai.backend.model_manager.load.load_default import ModelLoader
 
-    cache = ModelCache(
-        execution_device_working_mem_gb=1.0,
-        enable_partial_loading=False,
-        keep_ram_copy_of_weights=True,
-        execution_device="cpu",
-        storage_device="cpu",
-        logger=MagicMock(),
+    cache = MagicMock()
+    cache.execution_device = torch.device(device)
+    cache.shared_cpu_weights = None
+    cache.get_with_first_use_claim.side_effect = [IndexError, IndexError, (MagicMock(), None)]
+    cache.put.return_value = MagicMock()
+    cache.make_room = MagicMock(return_value=CacheClearResult(0, 0, False, False))
+    monkeypatch.setattr(
+        load_default_module, "_is_integrated_cuda", lambda candidate: candidate == torch.device("cuda:0")
     )
     loader = ModelLoader.__new__(ModelLoader)
     loader._torch_dtype = torch.float32
-    loader._torch_device = torch.device("cpu")
+    loader._torch_device = torch.device(device)
     loader._ram_cache = cache
     loader._app_config = SimpleNamespace(log_memory_usage=False)
     loader._logger = MagicMock()
     loader._get_model_path = lambda _config: tmp_path  # type: ignore[method-assign]
-    loader.get_size_fs = lambda *_args: cache.local_ram_cache_size_bytes + 1  # type: ignore[method-assign]
+    loader.get_size_fs = lambda *_args: 123  # type: ignore[method-assign]
     loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
-    cache.make_room = MagicMock(return_value=CacheClearResult(0, 0, False, False))  # type: ignore[method-assign]
     config = SimpleNamespace(
         base="base",
         type="type",
@@ -388,9 +398,11 @@ def test_cold_load_refuses_before_model_construction_when_host_headroom_is_insuf
         submodels=None,
     )
 
-    try:
+    if refuses:
         with pytest.raises(MemoryError, match="host memory"):
             loader._load_and_cache(config)
         loader._load_model.assert_not_called()  # type: ignore[attr-defined]
-    finally:
-        cache.shutdown()
+    else:
+        loader._load_and_cache(config)
+        loader._load_model.assert_called_once()  # type: ignore[attr-defined]
+        cache.make_room.assert_called_once_with(123)

@@ -110,7 +110,9 @@ def test_gguf_adaln_conversion_is_admitted_before_decode_and_concat(monkeypatch,
 
 def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch) -> None:
     state_dict = to_native(tiny_flux3_model(flow_map=True))
-    monkeypatch.setattr(flux3_loaders, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
     make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
     extracted = False
     original_extract = flux3_loaders.extract_fp8_scaled_layers
@@ -130,7 +132,9 @@ def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch) -> None
 
 
 def test_uncached_flux3_loader_accepts_the_host_decode_check(monkeypatch) -> None:
-    monkeypatch.setattr(flux3_loaders, "mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
 
     model = flux3_loaders.flux3_transformer_from_single_file(to_native(tiny_flux3_model(flow_map=True)), torch.float32)
 

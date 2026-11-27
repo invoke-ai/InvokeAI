@@ -432,8 +432,6 @@ def test_no_parameter_of_a_torchao_load_reads_the_file_afterwards(
     model = run.load(_config(path=str(path)), SubModelType.Transformer)
 
     assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
-    assert run.reservation_kwargs[-1].get("source_tensors_retained", False) is False
-    assert run.reservation_kwargs[-1].get("source_tensors_cloned", False) is False
     assert tensors_reading_the_file(model, path) == []
 
 

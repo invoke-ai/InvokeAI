@@ -547,17 +547,10 @@ _INTEGRATED_CUDA_ADMISSION_LOCK = threading.RLock()
 
 
 @contextmanager
-def host_transfer_admission_lock() -> Generator[None, None, None]:
-    """Serialize allocations in shared host RAM from integrated-device moves and page pinning."""
-    with _INTEGRATED_CUDA_ADMISSION_LOCK:
-        yield
-
-
-@contextmanager
 def integrated_cuda_admission_lock(device: torch.device) -> Generator[None, None, None]:
     """Serialize integrated-CUDA transfers that allocate in shared host RAM."""
     if _is_integrated_cuda(device):
-        with host_transfer_admission_lock():
+        with _INTEGRATED_CUDA_ADMISSION_LOCK:
             yield
     else:
         yield
@@ -2515,7 +2508,9 @@ class ModelCache:
                     _is_integrated_cuda(cache_entry.cached_model.compute_device)
                     and cache_entry.cached_model.get_cpu_state_dict() is None
                 ):
-                    host_bytes_available = _host_memory_available()
+                    host_bytes_available = weight_streaming.PINNED_STORAGES.host_memory_available(
+                        _host_memory_available
+                    )
                 return cache_entry.cached_model.partial_unload_from_vram(
                     vram_bytes_to_free,
                     keep_required_weights_in_vram=(
@@ -2531,7 +2526,9 @@ class ModelCache:
                     and cache_entry.cached_model.get_cpu_state_dict() is None
                 ):
                     resident_bytes = cache_entry.cached_model.cur_vram_bytes()
-                    host_bytes_available = _host_memory_available()
+                    host_bytes_available = weight_streaming.PINNED_STORAGES.host_memory_available(
+                        _host_memory_available
+                    )
                     if resident_bytes > max(host_bytes_available, 0):
                         raise HostMemoryAdmissionError(
                             f"Cannot unload model '{cache_entry.key}' to shared host memory: its "
@@ -2605,7 +2602,7 @@ class ModelCache:
             capped = vram_total_available_to_cache - self._get_vram_in_use() - reserve_vram_bytes
             if _is_integrated_cuda(self._execution_device):
                 physical = (
-                    TorchDevice.memory_available_to_process(self._execution_device)
+                    weight_streaming.PINNED_STORAGES.host_memory_available(_host_memory_available)
                     - self._get_vram_in_use()
                     - working_mem_bytes
                     - reserve_vram_bytes
@@ -2616,7 +2613,13 @@ class ModelCache:
             return capped
 
         # Shared-memory devices (MPS, integrated CUDA, Intel integrated GPUs) count free system RAM, not device totals.
-        vram_available_to_process = TorchDevice.memory_available_to_process(self._execution_device)
+        # Integrated-CUDA admission also subtracts page-fault bytes reserved by async pinning, whose faults may not
+        # have reached the OS sample yet.
+        vram_available_to_process = (
+            weight_streaming.PINNED_STORAGES.host_memory_available(_host_memory_available)
+            if _is_integrated_cuda(self._execution_device)
+            else TorchDevice.memory_available_to_process(self._execution_device)
+        )
         if device_has_dedicated_vram(self._execution_device) or (
             _is_integrated_cuda(self._execution_device) and not expandable_segments_enabled()
         ):
@@ -3594,8 +3597,10 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
-        if not device_has_dedicated_vram(self._execution_device) and not (
-            _is_integrated_cuda(self._execution_device) and self._keep_ram_copy_of_weights
+        if (
+            self._execution_device.type == "cpu"
+            or (self._execution_device.type == "xpu" and not device_has_dedicated_vram(self._execution_device))
+            or (_is_integrated_cuda(self._execution_device) and not self._keep_ram_copy_of_weights)
         ):
             return 0
         prefix = f"{model_key}:"
@@ -3613,10 +3618,12 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
-        if not device_has_dedicated_vram(self._execution_device) and not (
-            _is_integrated_cuda(self._execution_device) and self._keep_ram_copy_of_weights
+        if (
+            self._execution_device.type == "cpu"
+            or (self._execution_device.type == "xpu" and not device_has_dedicated_vram(self._execution_device))
+            or (_is_integrated_cuda(self._execution_device) and not self._keep_ram_copy_of_weights)
         ):
-            # CPU, MPS, and no-copy shared GPUs have no duplicate device weights to release.
+            # No-copy integrated CUDA has no duplicate device weights to release.
             return 0
         keep = set(keep_model_keys)
         return self._offload_entries_from_vram(lambda key: key.split(":", 1)[0] not in keep)
@@ -3634,10 +3641,12 @@ class ModelCache:
 
         Returns the number of VRAM bytes freed.
         """
-        if not device_has_dedicated_vram(self._execution_device) and not (
-            _is_integrated_cuda(self._execution_device) and self._keep_ram_copy_of_weights
+        if (
+            self._execution_device.type == "cpu"
+            or (self._execution_device.type == "xpu" and not device_has_dedicated_vram(self._execution_device))
+            or (_is_integrated_cuda(self._execution_device) and not self._keep_ram_copy_of_weights)
         ):
-            # CPU, MPS, and no-copy shared GPUs have no duplicate device weights to release.
+            # No-copy integrated CUDA has no duplicate device weights to release.
             return 0
         keep = set(keep_cache_keys)
         return self._offload_entries_from_vram(lambda key: key not in keep)

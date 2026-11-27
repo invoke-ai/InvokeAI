@@ -196,6 +196,29 @@ def test_an_fp8_folder_build_still_loads(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert output.shape == (1, 1, 8)
 
 
+def test_fp8_transformer_rope_matches_the_dense_compute_dtype(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state_dict = _tiny_transformer_state_dict()
+    codes, scale = quantize_weight_to_fp8(state_dict[f"{QUANTIZED}.weight"])
+    state_dict[f"{QUANTIZED}.weight"] = codes
+    state_dict[f"{QUANTIZED}.weight_scale"] = scale
+    run = prepare(
+        Seam(**{**TRANSFORMER_SEAM.__dict__, "compute_dtype": torch.bfloat16}),
+        monkeypatch,
+        state_dict=state_dict,
+        geometry=_shrink_the_geometry,
+    )
+
+    fp8_model = run.load(tmp_path)
+    dense_model = Ideogram4Transformer(_tiny_config()).to(dtype=torch.bfloat16)
+    positions = torch.arange(576).reshape(1, 576, 1).expand(-1, -1, 3)
+    expected_cos, expected_sin = dense_model.rotary_emb(positions)
+    actual_cos, actual_sin = fp8_model.rotary_emb(positions)
+
+    assert fp8_model.rotary_emb.inv_freq.dtype == torch.bfloat16
+    torch.testing.assert_close(actual_cos, expected_cos, rtol=0, atol=0)
+    torch.testing.assert_close(actual_sin, expected_sin, rtol=0, atol=0)
+
+
 def test_fp8_transformer_reserves_prepared_weights_and_builds_on_meta(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

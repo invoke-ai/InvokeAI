@@ -1,4 +1,3 @@
-import inspect
 import json
 import math
 import re
@@ -20,7 +19,7 @@ from invokeai.backend.quantization.int8_convrot import (
     marker_layout,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.ram import require_ram_headroom
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 
 logger = InvokeAILogger.get_logger()
 
@@ -405,24 +404,11 @@ _UNQUANTIZED_GGML_TYPES = frozenset(
 _UNPACK_CHUNK_ELEMENTS = 1 << 24
 
 
-def _reserve(reserve: Callable[[int], Any], cache_bytes: int, host_bytes_needed: int) -> Any:
-    """Pass incremental host demand while preserving one-argument reserve callbacks."""
-    try:
-        parameters = inspect.signature(reserve).parameters.values()
-    except (TypeError, ValueError):
-        parameters = ()
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters) or any(
-        parameter.name == "host_bytes_needed" for parameter in parameters
-    ):
-        return reserve(cache_bytes, host_bytes_needed=host_bytes_needed)  # type: ignore[call-arg]
-    return reserve(cache_bytes)
-
-
 def unpack_ggml_at_load(
     sd: dict[str, torch.Tensor],
     model: torch.nn.Module,
     skip_patterns: tuple[str, ...],
-    reserve: Callable[[int], Any],
+    reserve: HostMemoryReserver,
 ) -> int:
     """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
 
@@ -515,7 +501,7 @@ def unpack_ggml_at_load(
             source_counts[storage_id] -= 1
             if source_counts[storage_id] == 0:
                 incremental_host_bytes -= source_bytes[storage_id]
-    require_ram_headroom(_reserve(reserve, reserved_bytes, host_bytes_needed), host_bytes_needed)
+    require_ram_headroom(reserve(reserved_bytes, host_bytes_needed=host_bytes_needed), host_bytes_needed)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
         sd[key] = unpack_ggml_tensor(sd[key])

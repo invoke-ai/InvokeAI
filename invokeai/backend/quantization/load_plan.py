@@ -28,8 +28,7 @@ reserve=...)` next door. That is not only for tests: it keeps `backend/quantizat
 import edge into `backend/model_manager/load/model_cache`, which nothing in this package has today.
 """
 
-import inspect
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from typing import Any
 
 import torch
@@ -48,7 +47,7 @@ from invokeai.backend.quantization.nvfp4 import (
     predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
 )
-from invokeai.backend.util.ram import _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
+from invokeai.backend.util.ram import HostMemoryReserver, _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
 
 
 def side_channel_bytes(fp8_layers: Mapping[str, Fp8ScaledLayer]) -> int:
@@ -71,21 +70,8 @@ def side_channel_bytes(fp8_layers: Mapping[str, Fp8ScaledLayer]) -> int:
     return total
 
 
-def _reserve(reserve: Callable[[int], Any], needed: int, host_bytes_needed: int) -> Any:
-    """Pass incremental host demand while preserving one-argument reserve callbacks."""
-    try:
-        parameters = inspect.signature(reserve).parameters.values()
-    except (TypeError, ValueError):
-        parameters = ()
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters) or any(
-        parameter.name == "host_bytes_needed" for parameter in parameters
-    ):
-        return reserve(needed, host_bytes_needed=host_bytes_needed)  # type: ignore[call-arg]
-    return reserve(needed)
-
-
 def reserve_for_load(
-    reserve: Callable[[int], Any],
+    reserve: HostMemoryReserver,
     state_dict: Mapping[str, Any],
     dtype: torch.dtype,
     *,
@@ -94,9 +80,7 @@ def reserve_for_load(
     fp8_layers: Mapping[str, Fp8ScaledLayer],
     nvfp4_payloads: Mapping[str, NVFP4Payload],
     skip_patterns: Iterable[str] = (),
-    source_tensors_retained: bool = False,
     source_tensors_mapped: bool | Collection[int] | None = False,
-    source_tensors_cloned: bool = False,
     modelopt_nvfp4_relayout: bool = False,
     extra_host_bytes: int = 0,
     folded_keys: Collection[str] = (),
@@ -205,15 +189,14 @@ def reserve_for_load(
         cast_sd,
         dtype,
         in_place=True,
-        source_tensors_mapped=True if source_tensors_retained else source_tensors_mapped,
+        source_tensors_mapped=source_tensors_mapped,
     )
     source_bytes = sum(
         tensor.nelement() * tensor.element_size()
         for key, tensor in state_dict.items()
         if not tensor.is_meta
         and (
-            source_tensors_retained
-            or not _source_is_mapped(tensor, source_tensors_mapped)
+            not _source_is_mapped(tensor, source_tensors_mapped)
             or (key not in fold_sd and key not in cast_sd and key not in folded_keys)
             or getattr(tensor, "dtype", None) == dtype
         )
@@ -222,17 +205,17 @@ def reserve_for_load(
         scale.nelement() * scale.element_size()
         for layer in fp8_layers.values()
         for scale in (layer.weight_scale, layer.input_scale)
-        if scale is not None and (source_tensors_retained or not _source_is_mapped(scale, source_tensors_mapped))
+        if scale is not None and not _source_is_mapped(scale, source_tensors_mapped)
     )
     source_bytes += sum(
         payload.nbytes()
         for payload in nvfp4_payloads.values()
-        if source_tensors_retained or not _source_is_mapped(payload.weight, source_tensors_mapped)
+        if not _source_is_mapped(payload.weight, source_tensors_mapped)
     )
     mapped_nvfp4_source_bytes = sum(
         payload.nbytes()
         for payload in nvfp4_payloads.values()
-        if not source_tensors_retained and _source_is_mapped(payload.weight, source_tensors_mapped)
+        if _source_is_mapped(payload.weight, source_tensors_mapped)
     )
     cast_source_bytes = sum(tensor.nelement() * tensor.element_size() for tensor in cast_sd.values())
     cast_delta = cast_target_bytes - cast_source_bytes
@@ -243,7 +226,6 @@ def reserve_for_load(
             if key in folded_keys
             and isinstance(tensor, torch.Tensor)
             and not tensor.is_meta
-            and not source_tensors_retained
             and not _source_is_mapped(tensor, source_tensors_mapped)
         )
         if folded_keys
@@ -257,19 +239,6 @@ def reserve_for_load(
         if is_castable_float(tensor)
         and getattr(tensor, "dtype", None) != dtype
         and _source_is_mapped(tensor, source_tensors_mapped)
-    )
-    cloned_mapped_bytes = (
-        sum(
-            tensor.nelement() * tensor.element_size()
-            for key, tensor in state_dict.items()
-            if isinstance(tensor, torch.Tensor)
-            and not tensor.is_meta
-            and key not in fold_sd
-            and key not in folded_keys
-            and (not is_castable_float(tensor) or tensor.dtype == dtype)
-        )
-        if source_tensors_cloned
-        else 0
     )
     released_side_channel_bytes = 0
     for path, layer in fp8_layers.items():
@@ -300,9 +269,9 @@ def reserve_for_load(
         if isinstance(tensor, torch.Tensor) and not tensor.is_meta
     )
     if all_sources_mapped:
-        cast_phase_peak = max(fold_peak, post_fold_delta + mapped_cast_bytes + cloned_mapped_bytes)
-        cast_phase_delta = post_fold_delta + mapped_cast_bytes + cloned_mapped_bytes
-    elif mapped_sources or source_tensors_retained:
+        cast_phase_peak = max(fold_peak, post_fold_delta + mapped_cast_bytes)
+        cast_phase_delta = post_fold_delta + mapped_cast_bytes
+    elif mapped_sources:
         cast_delta = sum(
             tensor.nelement() * dtype.itemsize - tensor.nelement() * tensor.element_size()
             for tensor in cast_sd.values()
@@ -329,14 +298,5 @@ def reserve_for_load(
         cast_phase_delta + later_install_peak,
         extra_host_bytes,
     )
-    if source_tensors_retained and not bool(source_tensors_mapped):
-        # Pread-backed source tensors stay live while the model receives its assigned tensors. The final state dict
-        # therefore has to coexist with the retained source, including values already at the destination dtype.
-        retained_output_bytes = sum(
-            tensor.nelement() * (dtype.itemsize if is_castable_float(tensor) else tensor.element_size())
-            for tensor in state_dict.values()
-            if isinstance(tensor, torch.Tensor) and not tensor.is_meta
-        )
-        host_bytes_needed = max(host_bytes_needed, retained_output_bytes)
-    require_ram_headroom(_reserve(reserve, needed, host_bytes_needed), host_bytes_needed)
+    require_ram_headroom(reserve(needed, host_bytes_needed=host_bytes_needed), host_bytes_needed)
     return needed

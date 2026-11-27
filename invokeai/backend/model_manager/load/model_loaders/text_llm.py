@@ -4,7 +4,7 @@ Both serve the model, its tokenizer and its processor as submodels, so a caller 
 container the same way, through the model cache (`load_text_llm_tokenizer_and_processor`).
 """
 
-from collections.abc import Callable
+import json
 from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -29,7 +29,11 @@ from invokeai.backend.model_manager.configs.text_llm import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+from invokeai.backend.model_manager.load.model_util import (
+    QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    calc_tokenizer_size_by_fs,
+)
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import (
     cast_state_dict,
@@ -50,6 +54,7 @@ from invokeai.backend.qwen3_5.qwen3_5_vl import (
     qwen3_5_vl_config,
     qwen3_5_vl_generation_config,
 )
+from invokeai.backend.util.ram import HostMemoryReserver
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
@@ -70,6 +75,18 @@ _QWEN3_5_MODEL_TYPES = frozenset({"qwen3_5", "qwen3_5_text"})
 _DEQUANTIZED_ON_LOAD = ("lm_head",)
 
 
+def _tokenizer_runtime_overhead(model_path: Path) -> int:
+    try:
+        model_type = json.loads((model_path / "config.json").read_text(encoding="utf-8")).get("model_type")
+    except (OSError, ValueError):
+        model_type = None
+    return (
+        QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES
+        if model_type in _QWEN3_5_MODEL_TYPES
+        else TOKENIZER_RUNTIME_OVERHEAD_BYTES
+    )
+
+
 class _TextLLMLoader(ModelLoader):
     """What both TextLLM containers share: tokenizer and processor sizes, and the compute dtype."""
 
@@ -85,7 +102,11 @@ class _TextLLMLoader(ModelLoader):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
-            return calc_tokenizer_size_by_fs(model_path, include_runtime_overhead=True)
+            return calc_tokenizer_size_by_fs(
+                model_path,
+                include_runtime_overhead=True,
+                runtime_overhead_bytes=_tokenizer_runtime_overhead(model_path),
+            )
         return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _without_mtp_head(self, names: dict[str, str], what: str) -> dict[str, str]:
@@ -162,7 +183,11 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
             from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR
 
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+            return calc_tokenizer_size_by_fs(
+                _TOKENIZER_DIR,
+                include_runtime_overhead=True,
+                runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+            )
         return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
@@ -216,7 +241,7 @@ def qwen3_5_vl_from_state_dict(
     sd: dict[str, torch.Tensor],
     dtype: torch.dtype,
     *,
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
     what: str,
     logger: Logger,
     source_tensors_mapped: bool = False,

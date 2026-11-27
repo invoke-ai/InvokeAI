@@ -48,7 +48,6 @@ to check a model family against, it keeps refusing them.
 """
 
 import functools
-import inspect
 import json
 import struct
 from collections.abc import Callable, Collection, Iterable, Mapping
@@ -75,7 +74,7 @@ from invokeai.backend.quantization.int8_matmul import (
     is_int8_compute_enabled,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.ram import _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
+from invokeai.backend.util.ram import HostMemoryReserver, _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -1182,7 +1181,7 @@ def install_int8_convrot_layers(
     dtype: torch.dtype,
     *,
     architecture: str,
-    reserve: Callable[[int], Any],
+    reserve: HostMemoryReserver,
     skip_patterns: Iterable[str] = (),
     extra_reserved_bytes: int = 0,
     extra_host_bytes: int = 0,
@@ -1347,16 +1346,7 @@ def install_int8_convrot_layers(
         host_peak = max(int8_target_bytes, dequant_peak, cast_peak)
         host_peak = max(host_peak, read_peak)
         host_bytes_needed = max(0, host_peak - source_bytes, int8_target_bytes - source_bytes + extra_host_bytes)
-    try:
-        parameters = inspect.signature(reserve).parameters.values()
-    except (TypeError, ValueError):
-        parameters = ()
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters) or any(
-        parameter.name == "host_bytes_needed" for parameter in parameters
-    ):
-        reservation = reserve(reserved_bytes, host_bytes_needed=host_bytes_needed)  # type: ignore[call-arg]
-    else:
-        reservation = reserve(reserved_bytes)
+    reservation = reserve(reserved_bytes, host_bytes_needed=host_bytes_needed)
     require_ram_headroom(reservation, host_bytes_needed)
     if read is not None:
         # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading

@@ -523,7 +523,7 @@ class TestTheSharedInstall:
                 {"keeps": MARKER},
                 torch.float32,
                 architecture="Z-Image",
-                reserve=reserved.append,
+                reserve=lambda amount, **_kwargs: reserved.append(amount),
             )
 
         assert reserved == []
@@ -540,7 +540,7 @@ class TestTheSharedInstall:
             {"keeps": MARKER, "widens": MARKER},
             torch.float32,
             architecture="Z-Image",
-            reserve=lambda _bytes: widths.append(sd["widens.weight"].dtype),
+            reserve=lambda _bytes, **_kwargs: widths.append(sd["widens.weight"].dtype),
             skip_patterns=("widens",),
         )
 
@@ -559,7 +559,7 @@ class TestTheSharedInstall:
                 {"keeps": MARKER, "widens": MARKER},
                 torch.float32,
                 architecture="Z-Image",
-                reserve=lambda _bytes: SimpleNamespace(ram_headroom_satisfied=False),
+                reserve=lambda _bytes, **_kwargs: SimpleNamespace(ram_headroom_satisfied=False),
             )
 
         assert sd["widens.weight"].dtype is torch.int8
@@ -577,7 +577,7 @@ class TestTheSharedInstall:
             {"keeps": MARKER, "widens": MARKER},
             torch.float32,
             architecture="Z-Image",
-            reserve=lambda _bytes: None,
+            reserve=lambda _bytes, **_kwargs: None,
             skip_patterns=("widens",),
         )
 
@@ -597,7 +597,7 @@ class TestTheSharedInstall:
             {"keeps": MARKER},
             torch.float32,
             architecture="Z-Image",
-            reserve=reserved.append,
+            reserve=lambda amount, **_kwargs: reserved.append(amount),
             extra_reserved_bytes=4096,
         )
 
@@ -717,7 +717,7 @@ class TestTheSharedInstall:
             {},
             torch.bfloat16,
             architecture="test",
-            reserve=lambda _bytes: None,
+            reserve=lambda _bytes, **_kwargs: None,
         )
 
         assert refs["second.weight"]() is None
@@ -744,7 +744,7 @@ class TestTheSharedInstall:
             {"widens": MARKER},
             torch.bfloat16,
             architecture="test",
-            reserve=lambda _bytes: None,
+            reserve=lambda _bytes, **_kwargs: None,
             skip_patterns=("widens",),
         )
 
@@ -1062,7 +1062,7 @@ class TestTheSharedInstall:
             {"keeps": MARKER, "widens": convrot_w4a4_marker()},
             torch.float32,
             architecture="Krea-2",
-            reserve=reserved.append,
+            reserve=lambda amount, **_kwargs: reserved.append(amount),
         )
 
         assert type(model.keeps) is Int8ConvrotLinear and type(model.widens) is Int4ConvrotLinear

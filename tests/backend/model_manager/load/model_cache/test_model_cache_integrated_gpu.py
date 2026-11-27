@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 from invokeai.backend.model_manager.load.model_cache.model_cache import GB, ModelCache, integrated_cuda_admission_lock
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -1421,6 +1422,7 @@ def test_integrated_cuda_reuses_non_expandable_allocator_credit_after_eviction(m
                 "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
                 return_value=False,
             ),
+            patch.object(weight_streaming.PINNED_STORAGES, "host_memory_available", return_value=8 * 2**30),
             patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
             patch.object(cache, "_get_vram_in_use", return_value=0),
             patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),
@@ -1439,6 +1441,7 @@ def test_integrated_cuda_calibration_capacity_matches_uncapped_availability(mock
                 "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
                 return_value=False,
             ),
+            patch.object(weight_streaming.PINNED_STORAGES, "host_memory_available", return_value=8 * 2**30),
             patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
             patch.object(cache, "_get_vram_in_use", return_value=0),
             patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),
@@ -1464,6 +1467,7 @@ def test_integrated_cuda_capped_availability_uses_credit_but_honors_cap(
                 "invokeai.backend.model_manager.load.model_cache.model_cache.expandable_segments_enabled",
                 return_value=False,
             ),
+            patch.object(weight_streaming.PINNED_STORAGES, "host_memory_available", return_value=8 * 2**30),
             patch.object(TorchDevice, "memory_available_to_process", return_value=8 * 2**30),
             patch.object(cache, "_get_vram_in_use", return_value=0),
             patch.object(cache, "_get_reclaimable_allocator_bytes", return_value=2 * 2**30),

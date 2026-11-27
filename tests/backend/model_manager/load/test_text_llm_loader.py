@@ -30,6 +30,7 @@ from transformers import (
 
 from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import text_llm as loader_module
 from invokeai.backend.model_manager.load.model_loaders.text_llm import (
     TextLLMCheckpointLoader,
@@ -74,7 +75,11 @@ class TestTheReleasedLayouts:
         reserved: list[int] = []
 
         model = qwen3_5_vl_from_state_dict(
-            _meta_state_dict(keys, markers), torch.bfloat16, reserve=reserved.append, what="pup", logger=MagicMock()
+            _meta_state_dict(keys, markers),
+            torch.bfloat16,
+            reserve=lambda n, **_kwargs: reserved.append(n),
+            what="pup",
+            logger=MagicMock(),
         )
 
         kept = {name: module for name, module in model.named_modules() if isinstance(module, Int8ConvrotLinear)}
@@ -108,7 +113,11 @@ class TestTheReleasedLayouts:
         reserved: list[int] = []
 
         model = qwen3_5_vl_from_state_dict(
-            _meta_state_dict(keys, {}), torch.bfloat16, reserve=reserved.append, what="pup", logger=MagicMock()
+            _meta_state_dict(keys, {}),
+            torch.bfloat16,
+            reserve=lambda n, **_kwargs: reserved.append(n),
+            what="pup",
+            logger=MagicMock(),
         )
 
         assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
@@ -328,7 +337,7 @@ class TestTheCheckpointLoader:
 
         monkeypatch.setattr(loader_module, "reserve_for_load", reserve_for_load)
         qwen3_5_vl_from_state_dict(
-            state_dict, torch.float32, reserve=lambda _nbytes: None, what="owned", logger=MagicMock()
+            state_dict, torch.float32, reserve=lambda _nbytes, **_kwargs: None, what="owned", logger=MagicMock()
         )
 
         assert seen["source_tensors_mapped"] is False
@@ -602,6 +611,8 @@ class TestTheFolderLoader:
         loader._ram_cache.get_with_first_use_claim.side_effect = IndexError
         loader._ram_cache.shared_cpu_weights = None
         loader._ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+        loader._ram_cache.execution_device = torch.device("cuda:0")
+        monkeypatch.setattr(load_default, "_is_integrated_cuda", lambda _device: True)
         monkeypatch.setattr(loader, "_get_model_path", lambda _config: folder)
         monkeypatch.setattr(loader, "_load_model", construct)
 

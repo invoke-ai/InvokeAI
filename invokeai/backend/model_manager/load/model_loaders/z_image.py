@@ -49,6 +49,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     FP8_WEIGHT_DTYPES,
     QKV_SPLIT_SIDECHANNEL_SUFFIXES,
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -56,7 +57,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     load_safetensors_checkpoint,
-    mxfp8_scale_decode_host_bytes,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -86,7 +86,6 @@ from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import _TOKENIZER_DIR, load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.ram import require_ram_headroom
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
 
@@ -656,12 +655,7 @@ class ZImageCheckpointModel(ModelLoader):
             # deleted those scales and cast the weight — silently producing a weight off by
             # 1/weight_scale — and had no way to tell such a checkpoint from a raw fp8 one.
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
             # Handle memory management and dtype conversion. Casting fp8 weights here would discard
@@ -1318,12 +1312,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             # Pops every scale and marker, so what is left loads into a model that knows no fp8. An unparsed scale
             # spelling beside an fp8 weight is refused here rather than cast unscaled.
             layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
-            mxfp8_decode_host_bytes = mxfp8_scale_decode_host_bytes(sd, layer_hints)
-            if mxfp8_decode_host_bytes:
-                require_ram_headroom(
-                    self._ram_cache.make_room(0, host_bytes_needed=mxfp8_decode_host_bytes),
-                    mxfp8_decode_host_bytes,
-                )
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # `lm_head` is tied to the embeddings below, which replaces whatever it was loaded with.
             fp8_layers.pop("lm_head", None)

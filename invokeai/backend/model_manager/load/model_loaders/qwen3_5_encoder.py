@@ -21,7 +21,10 @@ from invokeai.backend.model_manager.configs.qwen3_5_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+from invokeai.backend.model_manager.load.model_util import (
+    QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    calc_tokenizer_size_by_fs,
+)
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel, safetensors_backend
 from invokeai.backend.quantization.int8_convrot import (
@@ -211,7 +214,11 @@ class Qwen35EncoderCheckpointLoader(ModelLoader):
 
             if load_bundled_qwen3_5_tokenizer.cache_info().currsize:
                 return 0
-            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+            return calc_tokenizer_size_by_fs(
+                _TOKENIZER_DIR,
+                include_runtime_overhead=True,
+                runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+            )
         return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:

@@ -1,9 +1,13 @@
 """Small shared contracts for host-RAM admission."""
 
 from collections.abc import Collection, Mapping
-from typing import Any
+from typing import Any, Protocol
 
 import torch
+
+
+class HostMemoryReserver(Protocol):
+    def __call__(self, cache_bytes: int, *, host_bytes_needed: int) -> Any: ...
 
 
 def require_ram_headroom(reservation_result: Any, bytes_needed: int) -> None:

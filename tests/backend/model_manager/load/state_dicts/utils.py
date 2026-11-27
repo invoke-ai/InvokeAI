@@ -145,13 +145,14 @@ def write_shrunk_safetensors(
     one whole scale tile of rows and blocks (`_NVFP4_TILE`), so a released layer stays a valid one and a misaligned
     one stays misaligned. Nothing else that reads a size may use this.
     """
-    tensors: dict[str, torch.Tensor] = {}
+    tensors: dict[str, torch.Tensor] = {
+        f"{layer}.comfy_quant": torch.frombuffer(
+            bytearray(json.dumps(dict(marker)).encode("utf-8")), dtype=torch.uint8
+        ).clone()
+        for layer, marker in (markers or {}).items()
+    }
     for key, (shape, dtype) in keys.items():
-        layer = key.removesuffix(".comfy_quant")
-        if markers is not None and layer != key and layer in markers:
-            raw = json.dumps(dict(markers[layer])).encode("utf-8")
-            tensors[key] = torch.frombuffer(bytearray(raw), dtype=torch.uint8).clone()
-        else:
+        if key not in tensors:
             tensors[key] = torch.zeros(_shrunk_extents(key, shape, dtype), dtype=_TORCH_DTYPES[dtype])
     save_file(tensors, str(path), metadata=dict(metadata) if metadata else None)
     return path
