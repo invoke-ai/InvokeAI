@@ -373,6 +373,21 @@ def test_explicit_krea2_override_accepts_single_module_native_lora(_raise_if_not
     assert config.base is BaseModelType.Krea2
 
 
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_fal_peft_native_lora(_raise_if_not_file) -> None:
+    # The fal / Krea trainer writes PEFT keys on the native module names. Block attention alone carries none of the
+    # auto-detection keys, so it must install under an explicit base like its `diffusion_model.` spelling does.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "base_model.model.blocks.0.attn.wq.lora_A.weight": object(),
+        "base_model.model.blocks.0.attn.wq.lora_B.weight": object(),
+    }
+
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+    assert config.base is BaseModelType.Krea2
+
+
 _LOKR_MODULE = "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq"
 
 

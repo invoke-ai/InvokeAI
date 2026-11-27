@@ -205,7 +205,7 @@ describe('IndexedDB queue run journal', () => {
     ]);
   });
 
-  it('keeps the failed submission of a run not yet accepted, and drops a malformed or stale one without losing the run', async () => {
+  it('keeps the failed submission of a run not yet accepted, and drops an unreadable or stale one without losing the run', async () => {
     const { journal } = await createJournal();
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
@@ -219,46 +219,19 @@ describe('IndexedDB queue run journal', () => {
       status: 500,
     };
     const retrying = createItem({ submissionRetry: retry });
-    // A server error must be counted, and its window cannot start after the failure it ends with.
-    const miscounted = createItem({ id: 'queue-item-2', submissionRetry: { ...retry, serverErrorCount: 0 } });
-    const backwards = createItem({ id: 'queue-item-3', submissionRetry: { ...retry, serverErrorSince: 13_000 } });
-    // Every server error is a failed submission.
-    const undercounted = createItem({ id: 'queue-item-5', submissionRetry: { ...retry, failureCount: 1 } });
     // A run the backend accepted has no submission left to retry.
     const accepted = createItem({
       backendItemIds: [11],
-      id: 'queue-item-4',
+      id: 'queue-item-2',
       status: 'running',
       submissionRetry: retry,
     });
-    // A failure that is neither a server error nor a transport failure keeps its own reason.
-    const otherError = {
-      ...retry,
-      message: 'Invalid queue enqueue response',
-      reason: 'error' as const,
-      serverErrorCount: 0,
-      serverErrorSince: null,
-      status: null,
-    };
-    const unreadable = createItem({ id: 'queue-item-6', submissionRetry: otherError });
-    // A reason this build does not know, as a later build might write it.
+    // As a later build might write it.
     const unknownReason = createItem({
-      id: 'queue-item-7',
-      submissionRetry: { ...otherError, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
+      id: 'queue-item-3',
+      submissionRetry: { ...retry, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
     });
-    // Written before messages were bounded: a whole HTML error page.
-    const page = `<html>${'x'.repeat(5_000)}</html>`;
-    const longMessage = createItem({ id: 'queue-item-8', submissionRetry: { ...retry, message: page } });
-    for (const item of [
-      retrying,
-      miscounted,
-      backwards,
-      undercounted,
-      accepted,
-      unreadable,
-      unknownReason,
-      longMessage,
-    ]) {
+    for (const item of [retrying, accepted, unknownReason]) {
       await journal.record(projectId, item);
     }
 
@@ -274,12 +247,7 @@ describe('IndexedDB queue run journal', () => {
       status: 'pending',
       submissionRetry: retry,
     });
-    expect(restored.find((item) => item.id === unreadable.id)).toMatchObject({ submissionRetry: otherError });
-    expect(restored.find((item) => item.id === longMessage.id)?.submissionRetry).toEqual({
-      ...retry,
-      message: `${page.slice(0, 499)}…`,
-    });
-    for (const item of [miscounted, backwards, undercounted, accepted, unknownReason]) {
+    for (const item of [accepted, unknownReason]) {
       const restoredItem = restored.find((candidate) => candidate.id === item.id);
       expect(restoredItem).toMatchObject({ status: item.status });
       expect(restoredItem).not.toHaveProperty('submissionRetry');

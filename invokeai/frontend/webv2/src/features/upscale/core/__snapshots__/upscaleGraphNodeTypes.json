@@ -68,6 +68,7 @@
     "flux_model_loader max_seq_len flux_text_encoder t5_max_seq_len",
     "flux_model_loader t5_encoder flux_lora_collection_loader t5_encoder",
     "flux_model_loader transformer flux_lora_collection_loader transformer",
+    "flux_model_loader vae flux_denoise controlnet_vae",
     "flux_model_loader vae flux_vae_decode vae",
     "flux_model_loader vae flux_vae_encode vae",
     "flux_text_encoder conditioning collect item",
@@ -75,8 +76,10 @@
     "i2l latents tiled_multi_diffusion_denoise_latents latents",
     "img_resize height core_metadata height",
     "img_resize image anima_i2l image",
+    "img_resize image controlnet image",
     "img_resize image flux2_vae_encode image",
     "img_resize image flux_vae_encode image",
+    "img_resize image i2l image",
     "img_resize image qwen_image_i2l image",
     "img_resize image z_image_control image",
     "img_resize image z_image_i2l image",
@@ -122,6 +125,7 @@
     "qwen_image_lora_collection_loader transformer qwen_image_denoise transformer",
     "qwen_image_model_loader qwen_vl_encoder qwen_image_lora_collection_loader qwen_vl_encoder",
     "qwen_image_model_loader transformer qwen_image_lora_collection_loader transformer",
+    "qwen_image_model_loader vae qwen_image_denoise vae",
     "qwen_image_model_loader vae qwen_image_i2l vae",
     "qwen_image_model_loader vae qwen_image_l2i vae",
     "qwen_image_text_encoder conditioning qwen_image_denoise negative_conditioning",
@@ -151,13 +155,7 @@
     "string value sdxl_compel_prompt style",
     "string value z_image_text_encoder prompt",
     "tiled_multi_diffusion_denoise_latents latents l2i latents",
-    "unsharp_mask height core_metadata height",
-    "unsharp_mask height noise height",
-    "unsharp_mask image controlnet image",
-    "unsharp_mask image i2l image",
     "unsharp_mask image img_resize image",
-    "unsharp_mask width core_metadata width",
-    "unsharp_mask width noise width",
     "z_image_control control z_image_denoise control",
     "z_image_denoise latents z_image_l2i latents",
     "z_image_i2l latents z_image_denoise latents",
@@ -180,6 +178,7 @@
         "controlnet",
         "core_metadata",
         "i2l",
+        "img_resize",
         "integer",
         "l2i",
         "lora_collection_loader",
@@ -198,6 +197,7 @@
         "controlnet",
         "core_metadata",
         "i2l",
+        "img_resize",
         "integer",
         "l2i",
         "lora_selector",
@@ -644,6 +644,7 @@
     },
     "flux_denoise": {
       "inputs": [
+        "controlnet_vae",
         "latents",
         "positive_text_conditioning",
         "seed",
@@ -798,6 +799,9 @@
         "vae"
       ],
       "literalInputs": {
+        "cfg_scale": [
+          1
+        ],
         "denoising_end": [
           1
         ],
@@ -1328,11 +1332,12 @@
     },
     "noise": {
       "inputs": [
-        "height",
-        "seed",
-        "width"
+        "seed"
       ],
       "literalInputs": {
+        "height": [
+          400
+        ],
         "is_intermediate": [
           true
         ],
@@ -1341,6 +1346,9 @@
         ],
         "use_cpu": [
           true
+        ],
+        "width": [
+          808
         ]
       },
       "outputs": [
@@ -1353,7 +1361,8 @@
         "negative_conditioning",
         "positive_conditioning",
         "seed",
-        "transformer"
+        "transformer",
+        "vae"
       ],
       "literalInputs": {
         "cfg_scale": [
@@ -1609,6 +1618,9 @@
         "unet"
       ],
       "literalInputs": {
+        "cfg_rescale_multiplier": [
+          0
+        ],
         "cfg_scale": [
           2
         ],
@@ -1663,9 +1675,7 @@
         ]
       },
       "outputs": [
-        "height",
-        "image",
-        "width"
+        "image"
       ]
     },
     "z_image_control": {

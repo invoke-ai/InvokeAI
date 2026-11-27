@@ -7,7 +7,7 @@ import type {
 
 import { SEED_MAX } from '@platform/core/seed';
 
-import type { FamilyGraph } from './familyGraph';
+import type { FamilyGraph, FamilyPipeline, FamilyPipelineInput } from './familyGraph';
 import type {
   CompiledGenerateGraph,
   ComponentModelConfig,
@@ -77,12 +77,12 @@ import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 import { getEffectiveIdeogram4Sampling } from './settings';
 
 const getCompatibleComponentSource = (
-  settings: GenerateSettings,
+  settings: Pick<GenerateSettings, 'componentSourceModel'>,
   model: MainModelConfig
 ): MainModelConfig | undefined => getCompatibleDiffusersComponentSource(model, settings.componentSourceModel);
 
 // The picker's rule, not a copy of it: a base list here once dropped a VAE the picker offered.
-const getCompatibleVae = (settings: GenerateSettings, model: MainModelConfig) =>
+const getCompatibleVae = (settings: Pick<GenerateSettings, 'vae'>, model: MainModelConfig) =>
   settings.vae && isVaeCompatibleWithGenerateModel(model, settings.vae) ? settings.vae : null;
 
 /** Filter stale optional selections that required-slot validation skips. */
@@ -252,7 +252,10 @@ const addFluxKontextReferenceImages = (
   return prevCollect;
 };
 
-const getDiffusersSource = (settings: GenerateSettings, model: MainModelConfig): MainModelConfig | undefined =>
+const getDiffusersSource = (
+  settings: Pick<GenerateSettings, 'componentSourceModel'>,
+  model: MainModelConfig
+): MainModelConfig | undefined =>
   getCompatibleComponentSource(settings, model) ?? (isBundledMainForBase(model.base)(model) ? model : undefined);
 
 const requireComponent = <T extends ComponentModelConfig | null>(value: T, label: string): NonNullable<T> => {
@@ -380,18 +383,224 @@ export const addWanLoraLoaders = (
   return source;
 };
 
-const buildSDGraph = (
+type GenerateGraphBuilder = (
   settings: GenerateSettings,
   model: MainModelConfig,
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+) => FamilyGraph;
+
+/** What a decode hook is handed: the latents to decode, the VAE and what PiD conditions its decode on. */
+interface DecodeSources {
+  denoise: BackendInvocationContract;
+  positivePrompt: BackendInvocationContract;
+  seed: BackendInvocationContract;
+  vaeSource?: BackendInvocationContract;
+  vaeField?: string;
+}
+
+/** Builds the decode in place of the plain VAE decode and returns the result node. */
+type DecodeBuilder = (graph: BackendGraphContract, sources: DecodeSources) => BackendInvocationContract;
+
+/** Generate-only hooks: splices run inside the pipeline; the rest keep Generate's edge order, which collects follow. */
+interface PipelineExtras {
+  /** Literal fields the denoise node gains: FLUX DyPE, a schedule shift, MOSS-Image's skip layers, HiDiffusion. */
+  denoiseFields?: Record<string, unknown>;
+  /** The decode Generate builds instead of the VAE decode: PiD. */
+  decode?: DecodeBuilder;
+}
+
+/** Positive conditioning passed through Generate's enhancers on its way to the collector. */
+type ConditioningHook = (
+  graph: BackendGraphContract,
+  conditioning: BackendInvocationContract,
+  seed: BackendInvocationContract
+) => BackendInvocationContract;
+
+const addPromptAndSeedNodes = (graph: BackendGraphContract) => ({
+  negativePrompt: addNode(graph, { id: 'negative_prompt', type: 'string' }),
+  positivePrompt: addNode(graph, { id: 'positive_prompt', type: 'string' }),
+  seed: addNode(graph, { id: 'seed', type: 'integer' }),
+});
+
+const addImageOutputNode = (graph: BackendGraphContract, type: string, outputIsIntermediate: boolean) =>
+  addNode(graph, { id: 'canvas_output', is_intermediate: outputIsIntermediate, type, use_cache: false });
+
+/** A pipeline's output node without its edges, for families that wire it as they go. */
+const addPipelineOutputNode = (
+  graph: BackendGraphContract,
+  input: FamilyPipelineInput,
+  type: string,
+  { tiles }: { tiles: boolean }
+) =>
+  addNode(graph, {
+    id: input.output.id,
+    is_intermediate: input.output.isIntermediate,
+    type,
+    use_cache: false,
+    ...(tiles ? vaeTilingFields(input) : {}),
+  });
+
+/** The switch a VAE node with tiling takes, when the input asks for it. */
+const vaeTilingFields = (input: FamilyPipelineInput) =>
+  input.vaeTileSize === null ? {} : { tile_size: input.vaeTileSize, tiled: true };
+
+/** A pass from 0 sends no range, so Generate's graph is unchanged; Canvas sets the range itself. */
+const partialDenoisingRange = (input: FamilyPipelineInput) =>
+  input.denoisingStart === 0 ? {} : { denoising_end: 1, denoising_start: input.denoisingStart };
+
+const addVaeDecode = (
+  graph: BackendGraphContract,
+  output: { id: string; isIntermediate: boolean; tiling: Record<string, unknown> },
+  {
+    denoise,
+    l2iProps,
+    l2iType,
+    vaeField = 'vae',
+    vaeSource,
+  }: Omit<DecodeSources, 'positivePrompt' | 'seed'> & { l2iType: string; l2iProps?: Record<string, unknown> }
+): BackendInvocationContract => {
+  const node = addNode(graph, {
+    id: output.id,
+    is_intermediate: output.isIntermediate,
+    type: l2iType,
+    use_cache: false,
+    ...l2iProps,
+    ...output.tiling,
+  });
+
+  if (vaeSource) {
+    addEdge(graph, vaeSource, vaeField, node, 'vae');
+  }
+  addEdge(graph, denoise, 'latents', node, 'latents');
+
+  return node;
+};
+
+/** The pipeline's decode: the extra's where Generate passes one, else the VAE decode the input asks for. */
+const addPipelineDecode = (
+  graph: BackendGraphContract,
+  input: FamilyPipelineInput,
+  decode: DecodeBuilder | undefined,
+  {
+    l2iProps,
+    l2iType,
+    ...sources
+  }: DecodeSources & {
+    l2iType: string;
+    /** Extra props for the VAE decode node; a decode hook builds its own. */
+    l2iProps?: Record<string, unknown>;
+  }
+): BackendInvocationContract =>
+  decode
+    ? decode(graph, sources)
+    : addVaeDecode(
+        graph,
+        { id: input.output.id, isIntermediate: input.output.isIntermediate, tiling: vaeTilingFields(input) },
+        { ...sources, l2iProps, l2iType }
+      );
+
+/** Generate's decode hook: PiD where it is on; otherwise none, and the pipeline decodes with the VAE. */
+const getGenerateDecode = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean
+): DecodeBuilder | undefined =>
+  shouldUsePidDecode(settings, model.base)
+    ? (graph, sources) => addPidDecode({ ...sources, base: model.base, graph, outputIsIntermediate, settings })
+    : undefined;
+
+/** Both decode branches return canvas_output for metadata attachment. */
+const addDecodeOutput = ({
+  graph,
+  settings,
+  model,
+  l2iType,
+  l2iProps,
+  denoise,
+  positivePrompt,
+  seed,
+  vaeSource,
+  vaeField = 'vae',
+  outputIsIntermediate,
+}: {
+  graph: BackendGraphContract;
+  settings: GenerateSettings;
+  model: MainModelConfig;
+  l2iType: string;
+  /** Extra props for the ordinary decode node; ignored by the PiD chain, which has its own. */
+  l2iProps?: Record<string, unknown>;
+  denoise: BackendInvocationContract;
+  positivePrompt: BackendInvocationContract;
+  seed: BackendInvocationContract;
+  vaeSource?: BackendInvocationContract;
+  vaeField?: string;
+  outputIsIntermediate: boolean;
+}): BackendInvocationContract =>
+  getGenerateDecode(
+    settings,
+    model,
+    outputIsIntermediate
+  )?.(graph, {
+    denoise,
+    positivePrompt,
+    seed,
+    vaeField,
+    vaeSource,
+  }) ??
+  addVaeDecode(
+    graph,
+    { id: 'canvas_output', isIntermediate: outputIsIntermediate, tiling: {} },
+    { denoise, l2iProps, l2iType, vaeField, vaeSource }
+  );
+
+/** Native PiD denoises at one quarter of the requested target dimensions. */
+const getDenoiseSize = (settings: GenerateSettings, model: MainModelConfig): { width: number; height: number } =>
+  // Use the model-native grid for divided dimensions, not the UI's PiD-scaled grid.
+  getPidDenoiseSize(settings, model.base, getGenerationDimensions(model).grid);
+
+/** The pipeline a Generate run asks for: the whole schedule, decoded whole into `canvas_output`. */
+const toGeneratePipelineInput = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings,
+  denoiseSize: { width: number; height: number }
+): FamilyPipelineInput => ({
+  denoiseSize,
+  denoisingStart: 0,
+  model,
+  multiDiffusion: null,
+  output: { id: 'canvas_output', isIntermediate: outputIsIntermediate },
+  settings,
+  useCpuNoise: projectSettings.useCpuNoise,
+  vaeTileSize: null,
+});
+
+interface SdPipelineExtras extends PipelineExtras {
+  /** The denoise's start and end, which the SDXL refiner splits. */
+  denoisingRange?: { denoising_start: number; denoising_end: number };
+  /** Seamless tiling, which wraps the UNet and the VAE the graph decodes with. */
+  seamless?: { seamless_x: boolean; seamless_y: boolean } | null;
+  /** Runs once the denoise is wired and returns the node whose latents are decoded: the refiner's, when it runs. */
+  afterDenoise?: (
+    graph: BackendGraphContract,
+    nodes: {
+      denoise: BackendInvocationContract;
+      negativePrompt: BackendInvocationContract;
+      positivePrompt: BackendInvocationContract;
+      seamless: BackendInvocationContract | null;
+    }
+  ) => BackendInvocationContract;
+}
+
+const buildSdPipeline = (input: FamilyPipelineInput, extras: SdPipelineExtras = {}): FamilyPipeline => {
+  const { model, multiDiffusion, settings } = input;
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
   const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
-  const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
 
   const positivePrompt = addNode(graph, { id: 'positive_prompt', type: 'string' });
   const negativePrompt = addNode(graph, { id: 'negative_prompt', type: 'string' });
@@ -399,52 +608,38 @@ const buildSDGraph = (
   const modelLoader = addNode(graph, { id: 'model_loader', model, type: modelLoaderType });
   const posCond = addNode(graph, { id: 'pos_cond', type: compelType });
   const negCond = addNode(graph, { id: 'neg_cond', type: compelType });
-  const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
-  const negCondCollect = addNode(graph, { id: 'neg_cond_collect', type: 'collect' });
-  const sdDenoiseSize = getDenoiseSize(settings, model);
+  // The multi-diffusion denoise takes one conditioning per side, not a collected list.
+  const posCondCollect = multiDiffusion ? null : addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
+  const negCondCollect = multiDiffusion ? null : addNode(graph, { id: 'neg_cond_collect', type: 'collect' });
   const noise = addNode(graph, {
-    height: sdDenoiseSize.height,
+    height: input.denoiseSize.height,
     id: 'noise',
     type: 'noise',
-    use_cpu: projectSettings.useCpuNoise,
-    width: sdDenoiseSize.width,
+    use_cpu: input.useCpuNoise,
+    width: input.denoiseSize.width,
   });
   const denoise = addNode(graph, {
     cfg_rescale_multiplier: settings.cfgRescaleMultiplier,
     cfg_scale: settings.cfgScale,
-    ...getBaseDenoisingRange(settings, model, 0),
+    ...(extras.denoisingRange ?? { denoising_end: 1, denoising_start: input.denoisingStart }),
     id: 'denoise_latents',
-    ...(supportsHiDiffusion
-      ? {
-          hidiffusion: settings.hiDiffusionEnabled,
-          hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
-          hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
-          ...(settings.hiDiffusionEnabled
-            ? {
-                hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
-                hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio ?? 0,
-                hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio ?? 0,
-              }
-            : {}),
-        }
-      : {}),
+    ...extras.denoiseFields,
     scheduler,
     steps: settings.steps,
-    type: 'denoise_latents',
+    ...(multiDiffusion
+      ? {
+          tile_height: multiDiffusion.tileSize,
+          tile_overlap: multiDiffusion.tileOverlap,
+          tile_width: multiDiffusion.tileSize,
+        }
+      : {}),
+    type: multiDiffusion ? 'tiled_multi_diffusion_denoise_latents' : 'denoise_latents',
   });
   const vaeOverride = getCompatibleVae(settings, model);
   const vaeLoader = vaeOverride
     ? addNode(graph, { id: 'vae_loader', type: 'vae_loader', vae_model: vaeOverride })
     : null;
-  const seamless =
-    settings.seamlessXAxis || settings.seamlessYAxis
-      ? addNode(graph, {
-          id: 'seamless',
-          seamless_x: settings.seamlessXAxis,
-          seamless_y: settings.seamlessYAxis,
-          type: 'seamless',
-        })
-      : null;
+  const seamless = extras.seamless ? addNode(graph, { id: 'seamless', ...extras.seamless, type: 'seamless' }) : null;
   let unetSource: BackendInvocationContract = seamless ?? modelLoader;
   let clipSource: BackendInvocationContract = modelLoader;
   let clip2Source: BackendInvocationContract | undefined;
@@ -486,10 +681,15 @@ const buildSDGraph = (
     addEdge(graph, clipSource, 'clip', negCond, 'clip');
   }
 
-  addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
-  addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
-  addEdge(graph, negCond, 'conditioning', negCondCollect, 'item');
-  addEdge(graph, negCondCollect, 'collection', denoise, 'negative_conditioning');
+  if (posCondCollect && negCondCollect) {
+    addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+    addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
+    addEdge(graph, negCond, 'conditioning', negCondCollect, 'item');
+    addEdge(graph, negCondCollect, 'collection', denoise, 'negative_conditioning');
+  } else {
+    addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
   addEdge(graph, seed, 'value', noise, 'seed');
 
   // Seamless wrapping covers both the selected UNet and overridden VAE.
@@ -500,25 +700,83 @@ const buildSDGraph = (
 
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
-  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
-  // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
-  const refiner = getActiveRefiner(settings, model);
-  const refinerDenoise = refiner
-    ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
-    : null;
+  const decoded = extras.afterDenoise?.(graph, { denoise, negativePrompt, positivePrompt, seamless }) ?? denoise;
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
-  const output = addDecodeOutput({
-    denoise: refinerDenoise ?? denoise,
-    graph,
+  const output = addPipelineDecode(graph, input, extras.decode, {
+    denoise: decoded,
     l2iProps: { fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
-    model,
-    outputIsIntermediate,
     positivePrompt,
     seed,
-    settings,
     vaeSource,
   });
+
+  return {
+    conditioning:
+      posCondCollect && negCondCollect
+        ? {
+            fluxReduxCollector: null,
+            ipAdapterCollector: null,
+            negative: { collector: negCondCollect, node: negCond },
+            positive: posCond,
+            positiveCollector: posCondCollect,
+          }
+        : null,
+    denoise,
+    denoiseSize: input.denoiseSize,
+    graph,
+    latents: {
+      encodeType: 'i2l',
+      fp32: settings.vaePrecision === 'fp32',
+
+      unet: { field: 'unet', node: unetSource },
+      vae: { field: 'vae', node: vaeSource },
+    },
+    layoutPrompt: null,
+    output,
+    vaeModel: vaeOverride,
+  };
+};
+
+const buildSDGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const supportsHiDiffusion = model.base === 'sd-1' || model.base === 'sdxl';
+  const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
+  // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
+  const refiner = getActiveRefiner(settings, model);
+  let ipAdapterCollector = null as BackendInvocationContract | null;
+  const pipeline = buildSdPipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
+    {
+      afterDenoise: (graph, { denoise, negativePrompt, positivePrompt, seamless }) => {
+        ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
+
+        return refiner
+          ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
+          : denoise;
+      },
+      decode: getGenerateDecode(settings, model, outputIsIntermediate),
+      denoiseFields: supportsHiDiffusion
+        ? {
+            hidiffusion: settings.hiDiffusionEnabled,
+            hidiffusion_raunet: settings.hiDiffusionRauNetEnabled,
+            hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
+            ...(settings.hiDiffusionEnabled
+              ? {
+                  hidiffusion_auto_ratios: settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null,
+                  hidiffusion_t1_ratio: settings.hiDiffusionT1Ratio ?? 0,
+                  hidiffusion_t2_ratio: settings.hiDiffusionT2Ratio ?? 0,
+                }
+              : {}),
+          }
+        : {},
+      denoisingRange: getBaseDenoisingRange(settings, model, 0),
+      seamless:
+        settings.seamlessXAxis || settings.seamlessYAxis
+          ? { seamless_x: settings.seamlessXAxis, seamless_y: settings.seamlessYAxis }
+          : null,
+    }
+  );
+  const { graph, output } = pipeline;
 
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
     ...(supportsHiDiffusion
@@ -538,96 +796,10 @@ const buildSDGraph = (
   addReferenceImageMetadata(graph, settings);
 
   return {
-    conditioning: {
-      fluxReduxCollector: null,
-      ipAdapterCollector,
-      negative: { collector: negCondCollect, node: negCond },
-      positive: posCond,
-      positiveCollector: posCondCollect,
-    },
-    denoise,
-    denoiseSize: { height: noise.height, width: noise.width },
-    graph,
-    latents: {
-      encodeType: 'i2l',
-      fp32: settings.vaePrecision === 'fp32',
-      unet: { field: 'unet', node: unetSource },
-      vae: { field: 'vae', node: vaeSource },
-    },
-    layoutPrompt: null,
+    ...pipeline,
+    conditioning: pipeline.conditioning && { ...pipeline.conditioning, ipAdapterCollector },
   };
 };
-
-const addPromptAndSeedNodes = (graph: BackendGraphContract) => ({
-  negativePrompt: addNode(graph, { id: 'negative_prompt', type: 'string' }),
-  positivePrompt: addNode(graph, { id: 'positive_prompt', type: 'string' }),
-  seed: addNode(graph, { id: 'seed', type: 'integer' }),
-});
-
-const addImageOutputNode = (graph: BackendGraphContract, type: string, outputIsIntermediate: boolean) =>
-  addNode(graph, { id: 'canvas_output', is_intermediate: outputIsIntermediate, type, use_cache: false });
-
-/** Both decode branches return canvas_output for metadata attachment. */
-const addDecodeOutput = ({
-  graph,
-  settings,
-  model,
-  l2iType,
-  l2iProps,
-  denoise,
-  positivePrompt,
-  seed,
-  vaeSource,
-  vaeField = 'vae',
-  outputIsIntermediate,
-}: {
-  graph: BackendGraphContract;
-  settings: GenerateSettings;
-  model: MainModelConfig;
-  l2iType: string;
-  /** Extra props for the ordinary decode node; ignored by the PiD chain, which has its own. */
-  l2iProps?: Record<string, unknown>;
-  denoise: BackendInvocationContract;
-  positivePrompt: BackendInvocationContract;
-  seed: BackendInvocationContract;
-  vaeSource?: BackendInvocationContract;
-  vaeField?: string;
-  outputIsIntermediate: boolean;
-}): BackendInvocationContract => {
-  if (shouldUsePidDecode(settings, model.base)) {
-    return addPidDecode({
-      base: model.base,
-      denoise,
-      graph,
-      outputIsIntermediate,
-      positivePrompt,
-      seed,
-      settings,
-      vaeField,
-      vaeSource,
-    });
-  }
-
-  const output = addNode(graph, {
-    id: 'canvas_output',
-    is_intermediate: outputIsIntermediate,
-    type: l2iType,
-    use_cache: false,
-    ...l2iProps,
-  });
-
-  if (vaeSource) {
-    addEdge(graph, vaeSource, vaeField, output, 'vae');
-  }
-  addEdge(graph, denoise, 'latents', output, 'latents');
-
-  return output;
-};
-
-/** Native PiD denoises at one quarter of the requested target dimensions. */
-const getDenoiseSize = (settings: GenerateSettings, model: MainModelConfig): { width: number; height: number } =>
-  // Use the model-native grid for divided dimensions, not the UI's PiD-scaled grid.
-  getPidDenoiseSize(settings, model.base, getGenerationDimensions(model).grid);
 
 const buildSD3Graph = (
   settings: GenerateSettings,
@@ -728,12 +900,8 @@ const getFluxDypeFields = (
   };
 };
 
-const buildFluxGraph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+const buildFluxPipeline = (input: FamilyPipelineInput, extras: PipelineExtras = {}) => {
+  const { model, settings } = input;
   const graph: BackendGraphContract = { edges: [], id: createId('flux_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const hasBundledComponents = isSelfContainedSDNQFlux1Pipeline(model);
@@ -759,29 +927,23 @@ const buildFluxGraph = (
     : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux_text_encoder' });
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
-  const denoiseSize = getDenoiseSize(settings, model);
-  const dype = getFluxDypeFields(settings);
   const denoise = addNode(graph, {
     denoising_end: 1,
-    denoising_start: 0,
+    denoising_start: input.denoisingStart,
     guidance: settings.cfgScale,
-    height: denoiseSize.height,
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     num_steps: settings.steps,
     scheduler,
     type: 'flux_denoise',
-    width: denoiseSize.width,
-    ...dype,
+    width: input.denoiseSize.width,
+    ...extras.denoiseFields,
   });
-  const output = addDecodeOutput({
+  const output = addPipelineDecode(graph, input, extras.decode, {
     denoise,
-    graph,
     l2iType: 'flux_vae_decode',
-    model,
-    outputIsIntermediate,
     positivePrompt,
     seed,
-    settings,
     vaeSource: modelLoader,
   });
 
@@ -793,46 +955,57 @@ const buildFluxGraph = (
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
-  addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
-  // Generation validation has checked that the enabled Kontext references belong to this model.
-  addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
-  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
-  const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
-  addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
-    clip_embed_model: clipEmbedModel ?? undefined,
-    guidance: settings.cfgScale,
-    ...dype,
-    // Recorded even when off, so recall can restore it over a preset the panel has since turned on.
-    dype_preset: settings.fluxDypePreset,
-    scheduler,
-    t5_encoder: t5EncoderModel ?? undefined,
-    vae: vaeModel ?? undefined,
-    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
-  });
-  addReferenceImageMetadata(graph, settings);
+  addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
+    components: { clipEmbedModel, t5EncoderModel },
     conditioning: {
-      fluxReduxCollector,
-      ipAdapterCollector,
+      fluxReduxCollector: null,
+      ipAdapterCollector: null,
       negative: null,
       positive: posCond,
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
+    denoiseSize: input.denoiseSize,
     graph,
     latents: { encodeType: 'flux_vae_encode', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
+    output,
+    vaeModel,
   };
 };
 
-const buildFlux2Graph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+const buildFluxGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const dype = getFluxDypeFields(settings);
+  const pipeline = buildFluxPipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
+    { decode: getGenerateDecode(settings, model, outputIsIntermediate), denoiseFields: dype }
+  );
+  const { components, denoise, graph, output, vaeModel } = pipeline;
+
+  // Generation validation has checked that the enabled Kontext references belong to this model.
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
+  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
+  const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
+  addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
+    clip_embed_model: components.clipEmbedModel ?? undefined,
+    guidance: settings.cfgScale,
+    ...dype,
+    // Recorded even when off, so recall can restore it over a preset the panel has since turned on.
+    dype_preset: settings.fluxDypePreset,
+    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    t5_encoder: components.t5EncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+  });
+  addReferenceImageMetadata(graph, settings);
+
+  return { ...pipeline, conditioning: { ...pipeline.conditioning, fluxReduxCollector, ipAdapterCollector } };
+};
+
+const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras = {}) => {
+  const { model, settings } = input;
   const isDev = model.variant === 'dev';
   const sourceModel = getFlux2ComponentSource(model, settings);
   const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
@@ -854,7 +1027,7 @@ const buildFlux2Graph = (
   }
 
   const graph: BackendGraphContract = { edges: [], id: createId('flux2_graph'), nodes: {} };
-  const { positivePrompt } = addPromptAndSeedNodes(graph);
+  const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(
@@ -891,28 +1064,24 @@ const buildFlux2Graph = (
     type: isDev ? 'flux2_dev_text_encoder' : 'flux2_klein_text_encoder',
   });
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
-  const flux2DenoiseSize = getDenoiseSize(settings, model);
+  // CFG stays off: the slider drives the guidance [dev] is distilled on, which Klein ignores.
   const denoise = addNode(graph, {
     cfg_scale: 1,
     denoising_end: 1,
-    denoising_start: 0,
+    denoising_start: input.denoisingStart,
     guidance: settings.cfgScale,
-    height: flux2DenoiseSize.height,
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     num_steps: settings.steps,
     scheduler,
     type: 'flux2_denoise',
-    width: flux2DenoiseSize.width,
+    width: input.denoiseSize.width,
   });
-  const output = addDecodeOutput({
+  const output = addPipelineDecode(graph, input, extras.decode, {
     denoise,
-    graph,
     l2iType: 'flux2_vae_decode',
-    model,
-    outputIsIntermediate,
     positivePrompt,
-    seed: graph.nodes.seed,
-    settings,
+    seed,
     vaeSource: modelLoader,
   });
 
@@ -925,23 +1094,15 @@ const buildFlux2Graph = (
   );
   addEdge(graph, modelLoader, 'max_seq_len', posCond, 'max_seq_len');
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise normalizes the latents with this VAE's BatchNorm statistics.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
-  addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
-  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
-  addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
-    ...(isDev
-      ? { mistral_encoder: mistralEncoderModel ?? undefined }
-      : { qwen3_encoder: qwen3EncoderModel ?? undefined, qwen3_source: sourceModel }),
-    scheduler,
-    vae: vaeModel ?? undefined,
-    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
-  });
-  addReferenceImageMetadata(graph, settings);
+  addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
+    components: { mistralEncoderModel, qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -950,11 +1111,34 @@ const buildFlux2Graph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
+    denoiseSize: input.denoiseSize,
     graph,
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
+    output,
+    vaeModel,
   };
+};
+
+const buildFlux2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const pipeline = buildFlux2Pipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
+    { decode: getGenerateDecode(settings, model, outputIsIntermediate) }
+  );
+  const { components, denoise, graph, output, vaeModel } = pipeline;
+
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
+    ...(model.variant === 'dev'
+      ? { mistral_encoder: components.mistralEncoderModel ?? undefined }
+      : { qwen3_encoder: components.qwen3EncoderModel ?? undefined, qwen3_source: components.sourceModel }),
+    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+  });
+  addReferenceImageMetadata(graph, settings);
+
+  return pipeline;
 };
 
 const buildCogView4Graph = (
@@ -1078,12 +1262,13 @@ const buildErnieImageGraph = (
   };
 };
 
-const buildQwenImageGraph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+interface QwenImagePipelineExtras extends PipelineExtras {
+  /** Literal fields each text encoder gains: Generate's encoder quantization. */
+  encoderFields?: Record<string, unknown>;
+}
+
+const buildQwenImagePipeline = (input: FamilyPipelineInput, extras: QwenImagePipelineExtras = {}) => {
+  const { model, settings } = input;
   const sourceModel = getCompatibleComponentSource(settings, model);
   const hasBundledComponents = model.format === 'diffusers' || sourceModel;
   const vaeModel = getCompatibleVae(settings, model);
@@ -1112,33 +1297,25 @@ const buildQwenImageGraph = (
         'qwen_vl_encoder',
       ])
     : modelLoader;
-  // The encoders default to `none`, so only an actual quantization choice reaches the graph.
-  const encoderQuantization =
-    settings.qwenImageEncoderQuantization === 'none' ? {} : { quantization: settings.qwenImageEncoderQuantization };
-  const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_text_encoder', ...encoderQuantization });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_text_encoder', ...extras.encoderFields });
   const negCond = useCfg
-    ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_text_encoder', ...encoderQuantization })
+    ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_text_encoder', ...extras.encoderFields })
     : null;
-  const qwenDenoiseSize = getDenoiseSize(settings, model);
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
-    height: qwenDenoiseSize.height,
+    ...partialDenoisingRange(input),
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
-    // Null keeps the node's dynamic shift; a value fixes the schedule (3 for the Lightning LoRAs).
-    ...(settings.qwenImageShift === null ? {} : { shift: settings.qwenImageShift }),
+    ...extras.denoiseFields,
     steps: settings.steps,
     type: 'qwen_image_denoise',
-    width: qwenDenoiseSize.width,
+    width: input.denoiseSize.width,
   });
-  const output = addDecodeOutput({
+  const output = addPipelineDecode(graph, input, extras.decode, {
     denoise,
-    graph,
     l2iType: 'qwen_image_l2i',
-    model,
-    outputIsIntermediate,
     positivePrompt,
     seed,
-    settings,
     vaeSource: modelLoader,
   });
 
@@ -1156,6 +1333,36 @@ const buildQwenImageGraph = (
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
+
+  return {
+    components: { sourceModel },
+    conditioning: null,
+    denoise,
+    denoiseSize: input.denoiseSize,
+    graph,
+    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+    output,
+    positiveEncoder: posCond,
+    vaeModel,
+  };
+};
+
+const buildQwenImageGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const pipeline = buildQwenImagePipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
+    {
+      decode: getGenerateDecode(settings, model, outputIsIntermediate),
+      // Null keeps the node's dynamic shift; a value fixes the schedule (3 for the Lightning LoRAs).
+      denoiseFields: settings.qwenImageShift === null ? {} : { shift: settings.qwenImageShift },
+      // The encoders default to `none`, so only an actual quantization choice reaches the graph.
+      encoderFields:
+        settings.qwenImageEncoderQuantization === 'none' ? {} : { quantization: settings.qwenImageEncoderQuantization },
+    }
+  );
+  const { components, denoise, graph, output, positiveEncoder: posCond, vaeModel } = pipeline;
+  // The VAE the graph decodes with, which encodes the edit reference too.
+  const vae = pipeline.latents.vae;
   const qwenReferenceImages =
     model.variant === 'edit' ? getEnabledReferenceImages(settings.referenceImages, 'qwen_image_reference_image') : [];
 
@@ -1195,12 +1402,12 @@ const buildQwenImageGraph = (
       });
 
       addEdge(graph, refImageNode, 'image', refI2l, 'image');
-      addEdge(graph, modelLoader, 'vae', refI2l, 'vae');
+      addEdge(graph, vae.node, vae.field, refI2l, 'vae');
       addEdge(graph, refI2l, 'latents', denoise, 'reference_latents');
     }
   }
   addMetadata(graph, output, settings, model, 'qwen_image_txt2img', projectSettings, {
-    qwen_image_component_source: sourceModel,
+    qwen_image_component_source: components.sourceModel,
     qwen_image_quantization: settings.qwenImageEncoderQuantization,
     qwen_image_qwen_vl_encoder: settings.qwenVLEncoderModel ?? undefined,
     qwen_image_shift: settings.qwenImageShift ?? 'auto',
@@ -1210,22 +1417,16 @@ const buildQwenImageGraph = (
   });
   addReferenceImageMetadata(graph, settings);
 
-  return {
-    conditioning: null,
-    denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
-    graph,
-    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
-    layoutPrompt: null,
-  };
+  return pipeline;
 };
 
-const buildZImageGraph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+interface ConditionedPipelineExtras extends PipelineExtras {
+  /** Passes the positive conditioning through Generate's enhancers before its collector. */
+  positiveConditioning?: ConditioningHook;
+}
+
+const buildZImagePipeline = (input: FamilyPipelineInput, extras: ConditionedPipelineExtras = {}) => {
+  const { model, settings } = input;
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
     settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
@@ -1258,51 +1459,33 @@ const buildZImageGraph = (
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'z_image_text_encoder' }) : null;
   const negCondCollect = useCfg ? addNode(graph, { id: 'neg_cond_collect', type: 'collect' }) : null;
-  const zImageDenoiseSize = getDenoiseSize(settings, model);
   const denoise = addNode(graph, {
     denoising_end: 1,
-    denoising_start: 0,
+    denoising_start: input.denoisingStart,
     guidance_scale: settings.cfgScale,
-    height: zImageDenoiseSize.height,
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     scheduler,
-    // Null keeps the node's size-derived shift.
-    ...(settings.zImageShift === null ? {} : { shift: settings.zImageShift }),
+    ...extras.denoiseFields,
     steps: settings.steps,
     type: 'z_image_denoise',
-    width: zImageDenoiseSize.width,
+    width: input.denoiseSize.width,
   });
-  const output = addDecodeOutput({
+  const output = addPipelineDecode(graph, input, extras.decode, {
     denoise,
-    graph,
     l2iType: 'z_image_l2i',
-    model,
-    outputIsIntermediate,
     positivePrompt,
     seed,
-    settings,
     vaeSource: modelLoader,
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
+  // The denoise encodes a control image itself, with this VAE.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
-  // Zero strength would be a no-op node, so it is left out like Krea-2's enhancer.
-  if (settings.zImageSeedVarianceEnabled && settings.zImageSeedVarianceStrength > 0) {
-    const seedVariance = addNode(graph, {
-      id: 'seed_variance_enhancer',
-      randomize_percent: settings.zImageSeedVarianceRandomizePercent,
-      strength: settings.zImageSeedVarianceStrength,
-      type: 'z_image_seed_variance_enhancer',
-    });
-
-    addEdge(graph, seed, 'value', seedVariance, 'seed');
-    addEdge(graph, posCond, 'conditioning', seedVariance, 'conditioning');
-    addEdge(graph, seedVariance, 'conditioning', posCondCollect, 'item');
-  } else {
-    addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
-  }
+  const positiveConditioning = extras.positiveConditioning?.(graph, posCond, seed) ?? posCond;
+  addEdge(graph, positiveConditioning, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond && negCondCollect) {
@@ -1313,19 +1496,9 @@ const buildZImageGraph = (
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
-  addMetadata(graph, output, settings, model, 'z_image_txt2img', projectSettings, {
-    qwen3_encoder: qwen3EncoderModel ?? undefined,
-    qwen3_source: sourceModel,
-    scheduler,
-    vae: vaeModel ?? undefined,
-    z_image_seed_variance_enabled: settings.zImageSeedVarianceEnabled,
-    z_image_seed_variance_randomize_percent: settings.zImageSeedVarianceRandomizePercent,
-    z_image_seed_variance_strength: settings.zImageSeedVarianceStrength,
-    z_image_shift: settings.zImageShift ?? 'auto',
-    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
-  });
 
   return {
+    components: { qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1334,19 +1507,60 @@ const buildZImageGraph = (
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
+    denoiseSize: input.denoiseSize,
     graph,
     latents: { encodeType: 'z_image_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
+    output,
+    vaeModel,
   };
 };
 
-const buildAnimaGraph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+const buildZImageGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const pipeline = buildZImagePipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
+    {
+      decode: getGenerateDecode(settings, model, outputIsIntermediate),
+      // Null keeps the node's size-derived shift.
+      denoiseFields: settings.zImageShift === null ? {} : { shift: settings.zImageShift },
+      // Zero strength would be a no-op node, so it is left out like Krea-2's enhancer.
+      positiveConditioning:
+        settings.zImageSeedVarianceEnabled && settings.zImageSeedVarianceStrength > 0
+          ? (graph, conditioning, seed) => {
+              const seedVariance = addNode(graph, {
+                id: 'seed_variance_enhancer',
+                randomize_percent: settings.zImageSeedVarianceRandomizePercent,
+                strength: settings.zImageSeedVarianceStrength,
+                type: 'z_image_seed_variance_enhancer',
+              });
+
+              addEdge(graph, seed, 'value', seedVariance, 'seed');
+              addEdge(graph, conditioning, 'conditioning', seedVariance, 'conditioning');
+
+              return seedVariance;
+            }
+          : undefined,
+    }
+  );
+  const { components, graph, output, vaeModel } = pipeline;
+
+  addMetadata(graph, output, settings, model, 'z_image_txt2img', projectSettings, {
+    qwen3_encoder: components.qwen3EncoderModel ?? undefined,
+    qwen3_source: components.sourceModel,
+    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    vae: vaeModel ?? undefined,
+    z_image_seed_variance_enabled: settings.zImageSeedVarianceEnabled,
+    z_image_seed_variance_randomize_percent: settings.zImageSeedVarianceRandomizePercent,
+    z_image_seed_variance_strength: settings.zImageSeedVarianceStrength,
+    z_image_shift: settings.zImageShift ?? 'auto',
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+  });
+
+  return pipeline;
+};
+
+const buildAnimaPipeline = (input: FamilyPipelineInput) => {
+  const { model, settings } = input;
   const vaeModel = requireComponent(getCompatibleVae(settings, model), 'Anima VAE');
   const qwen3EncoderModel = requireComponent(
     settings.qwen3EncoderModel && isAnimaQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null,
@@ -1381,16 +1595,17 @@ const buildAnimaGraph = (
   const negCondCollect = useCfg ? addNode(graph, { id: 'neg_cond_collect', type: 'collect' }) : null;
   const denoise = addNode(graph, {
     denoising_end: 1,
-    denoising_start: 0,
+    denoising_start: input.denoisingStart,
     guidance_scale: settings.cfgScale,
-    height: settings.height,
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     scheduler,
     steps: settings.steps,
     type: 'anima_denoise',
-    width: settings.width,
+    width: input.denoiseSize.width,
   });
-  const output = addImageOutputNode(graph, 'anima_l2i', outputIsIntermediate);
+  // `anima_l2i` has no tiling switch: it tiles on its own once an untiled decode would take most of the card.
+  const output = addPipelineOutputNode(graph, input, 'anima_l2i', { tiles: false });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
@@ -1415,29 +1630,45 @@ const buildAnimaGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
-  addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
-    qwen3_encoder: qwen3EncoderModel,
-    ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
-    scheduler,
-    vae: vaeModel,
-  });
-  addReferenceImageMetadata(graph, settings);
 
   return {
+    components: { qwen35EncoderModel, qwen3EncoderModel },
     conditioning: {
       fluxReduxCollector: null,
-      ipAdapterCollector,
+      ipAdapterCollector: null,
       negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
       positive: posCond,
       positiveCollector: posCondCollect,
     },
     denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
+    denoiseSize: input.denoiseSize,
     graph,
     latents: { encodeType: 'anima_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
+    output,
+    vaeModel,
   };
+};
+
+const buildAnimaGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const pipeline = buildAnimaPipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, {
+      height: settings.height,
+      width: settings.width,
+    })
+  );
+  const { components, denoise, graph, output, vaeModel } = pipeline;
+  const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
+
+  addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
+    qwen3_encoder: components.qwen3EncoderModel,
+    ...(components.qwen35EncoderModel ? { qwen3_5_encoder: components.qwen35EncoderModel } : {}),
+    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    vae: vaeModel,
+  });
+  addReferenceImageMetadata(graph, settings);
+
+  return { ...pipeline, conditioning: { ...pipeline.conditioning, ipAdapterCollector } };
 };
 
 /** Each reference reaches encoder and denoise in the same order; chained collects keep it, a single one would not. */
@@ -1490,19 +1721,19 @@ const addKrea2EditReferences = (
   }
 };
 
-const buildKrea2Graph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+interface Krea2PipelineExtras extends ConditionedPipelineExtras {
+  /** The GGUF encoder's vision tower for edit references; the loader refuses one beside any other encoder. */
+  visionTower?: ComponentModelConfig | null;
+}
+
+const buildKrea2Pipeline = (input: FamilyPipelineInput, extras: Krea2PipelineExtras = {}) => {
+  const { model, settings } = input;
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
-  // The loader refuses a tower beside any other encoder, so a stale pick is never sent.
   const qwen3VlVisionTowerModel =
     qwen3VlEncoderModel && isGgufQwen3Vl4bEncoder(qwen3VlEncoderModel)
-      ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl4bVisionTower)
+      ? getCompatibleComponent(extras.visionTower ?? null, isQwen3Vl4bVisionTower)
       : null;
 
   if (!isDiffusers) {
@@ -1533,30 +1764,26 @@ const buildKrea2Graph = (
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'krea2_text_encoder' }) : null;
   const negCondCollect = useCfg ? addNode(graph, { id: 'neg_cond_collect', type: 'collect' }) : null;
+  // `krea2_denoise` picks its own shift, fixed for Turbo and by size for Raw, so the graph sends none.
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
-    height: settings.height,
+    ...partialDenoisingRange(input),
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     steps: settings.steps,
     type: 'krea2_denoise',
-    width: settings.width,
+    width: input.denoiseSize.width,
   });
   // Krea-2 decodes with the Qwen-Image VAE, so it reuses that family's latents-to-image node.
-  const output = addImageOutputNode(graph, 'qwen_image_l2i', outputIsIntermediate);
+  const output = addPipelineOutputNode(graph, input, 'qwen_image_l2i', { tiles: true });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
 
-  const positiveConditioningSource = addKrea2ConditioningEnhancers({
-    conditioning: posCond,
-    graph,
-    idPrefix: 'krea2',
-    seed,
-    settings,
-  });
-  addEdge(graph, positiveConditioningSource, 'conditioning', posCondCollect, 'item');
+  const positiveConditioning = extras.positiveConditioning?.(graph, posCond, seed) ?? posCond;
+  addEdge(graph, positiveConditioning, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond && negCondCollect) {
@@ -1568,6 +1795,41 @@ const buildKrea2Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+
+  return {
+    components: { loadsLoras: activeLoras.length > 0, qwen3VlEncoderModel, qwen3VlVisionTowerModel },
+    conditioning: {
+      fluxReduxCollector: null,
+      ipAdapterCollector: null,
+      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
+      positive: posCond,
+      positiveCollector: posCondCollect,
+    },
+    denoise,
+    denoiseSize: input.denoiseSize,
+    graph,
+    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null,
+    output,
+    vaeModel,
+  };
+};
+
+const buildKrea2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const pipeline = buildKrea2Pipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, {
+      height: settings.height,
+      width: settings.width,
+    }),
+    {
+      positiveConditioning: (graph, conditioning, seed) =>
+        addKrea2ConditioningEnhancers({ conditioning, graph, idPrefix: 'krea2', seed, settings }),
+      visionTower: settings.qwen3VLVisionTowerModel,
+    }
+  );
+  const { components, conditioning, denoise, graph, output, vaeModel } = pipeline;
+  // The VAE the graph decodes with, which encodes the references too.
+  const vaeSource = pipeline.latents.vae.node;
   // Validation keeps edit and style references apart; the denoise refuses the two together.
   const editReferenceImages = getEnabledReferenceImages(settings.referenceImages, 'krea2_edit_reference_image').flatMap(
     ({ config }) => (config.image ? [toImageField(config.image)] : [])
@@ -1582,15 +1844,15 @@ const buildKrea2Graph = (
 
   // Only an edit LoRA trained with `kv_cache` reads the cache; without one the stored switch is kept but not sent.
   const referenceKvCache =
-    editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
+    editReferenceImages.length > 0 && components.loadsLoras ? settings.krea2ReferenceKvCache : undefined;
 
   if (editReferenceImages.length > 0) {
     addKrea2EditReferences(graph, {
       denoise,
-      prompts: negCond ? [posCond, negCond] : [posCond],
+      prompts: conditioning.negative ? [conditioning.positive, conditioning.negative.node] : [conditioning.positive],
       referenceImages: editReferenceImages,
       referenceKvCache,
-      vaeSource: modelLoader,
+      vaeSource,
     });
   } else if (styleReference?.config.image) {
     const styleReferenceNode = addNode(graph, {
@@ -1603,7 +1865,7 @@ const buildKrea2Graph = (
       width: settings.width,
     });
 
-    addEdge(graph, modelLoader, 'vae', styleReferenceNode, 'vae');
+    addEdge(graph, vaeSource, 'vae', styleReferenceNode, 'vae');
     addEdge(graph, styleReferenceNode, 'style_reference', denoise, 'style_reference');
   }
   addMetadata(graph, output, settings, model, 'krea2_txt2img', projectSettings, {
@@ -1615,26 +1877,13 @@ const buildKrea2Graph = (
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
     ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
-    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
-    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
+    qwen3_vl_encoder: components.qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower: components.qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
   addReferenceImageMetadata(graph, settings);
 
-  return {
-    conditioning: {
-      fluxReduxCollector: null,
-      ipAdapterCollector: null,
-      negative: negCond && negCondCollect ? { collector: negCondCollect, node: negCond } : null,
-      positive: posCond,
-      positiveCollector: posCondCollect,
-    },
-    denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
-    graph,
-    latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
-    layoutPrompt: null,
-  };
+  return pipeline;
 };
 
 const buildQwenImage21Graph = (
@@ -1773,12 +2022,16 @@ const addQwenImage21ReferenceImages = (
   addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
 };
 
-const buildMossImageGraph = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-): FamilyGraph => {
+interface MossImagePipelineExtras extends PipelineExtras {
+  /** The node whose text the positive encoder reads instead of the prompt: Generate's layout prompt. */
+  positivePromptSource?: (
+    graph: BackendGraphContract,
+    positivePrompt: BackendInvocationContract
+  ) => BackendInvocationContract;
+}
+
+const buildMossImagePipeline = (input: FamilyPipelineInput, extras: MossImagePipelineExtras = {}) => {
+  const { model, settings } = input;
   // The filter drops a stale Qwen3.5 4B pick left over from Anima-3.8B, which shares the setting.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
@@ -1809,28 +2062,23 @@ const buildMossImageGraph = (
     : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
-  const denoiseSize = getDenoiseSize(settings, model);
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
     denoising_end: 1,
-    denoising_start: 0,
-    height: denoiseSize.height,
+    denoising_start: input.denoisingStart,
+    height: input.denoiseSize.height,
     id: 'denoise_latents',
     steps: settings.steps,
     type: 'moss_image_denoise',
-    uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
-    width: denoiseSize.width,
+    ...extras.denoiseFields,
+    width: input.denoiseSize.width,
   });
   // MOSS-Image denoises into the FLUX.2 VAE's raw latent layout, so it decodes, and PiD-decodes, as FLUX.2 does.
-  const output = addDecodeOutput({
+  const output = addPipelineDecode(graph, input, extras.decode, {
     denoise,
-    graph,
     l2iType: 'flux2_vae_decode',
-    model,
-    outputIsIntermediate,
     positivePrompt,
     seed,
-    settings,
     vaeSource: modelLoader,
   });
 
@@ -1838,16 +2086,8 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  // Compiles a layout draft and canvas `regions` at run time; batch prompt variation still flows via `positive_prompt`.
-  const layoutPrompt = addNode(graph, {
-    height: denoiseSize.height,
-    id: 'layout_prompt',
-    regions: [],
-    type: 'moss_image_layout_prompt',
-    width: denoiseSize.width,
-  });
-  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
-  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
+  const promptSource = extras.positivePromptSource?.(graph, positivePrompt) ?? positivePrompt;
+  addEdge(graph, promptSource, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1857,25 +2097,57 @@ const buildMossImageGraph = (
   }
 
   addEdge(graph, seed, 'value', denoise, 'seed');
+
+  return {
+    components: { qwen35EncoderModel },
+    conditioning: null,
+    denoise,
+    denoiseSize: input.denoiseSize,
+    graph,
+    latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
+    layoutPrompt: null as BackendInvocationContract | null,
+    output,
+    vaeModel,
+  };
+};
+
+const buildMossImageGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediate, projectSettings) => {
+  const denoiseSize = getDenoiseSize(settings, model);
+  let layoutPrompt = null as BackendInvocationContract | null;
+  const pipeline = buildMossImagePipeline(
+    toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, denoiseSize),
+    {
+      decode: getGenerateDecode(settings, model, outputIsIntermediate),
+      denoiseFields: { uncond_skip_layers: [...settings.mossImageUncondSkipLayers] },
+      // Compiles a layout draft and canvas `regions` at run time; batch prompt variation flows via `positive_prompt`.
+      positivePromptSource: (graph, positivePrompt) => {
+        layoutPrompt = addNode(graph, {
+          height: denoiseSize.height,
+          id: 'layout_prompt',
+          regions: [],
+          type: 'moss_image_layout_prompt',
+          width: denoiseSize.width,
+        });
+        addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+
+        return layoutPrompt;
+      },
+    }
+  );
+  const { components, graph, output, vaeModel } = pipeline;
+
   addMetadata(graph, output, settings, model, 'moss_image_txt2img', projectSettings, {
     moss_image_uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
-    qwen3_5_encoder: qwen35EncoderModel ?? undefined,
+    qwen3_5_encoder: components.qwen35EncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
-  if (metadata) {
+  if (metadata && layoutPrompt) {
     addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
   }
 
-  return {
-    conditioning: null,
-    denoise,
-    denoiseSize: { height: denoise.height, width: denoise.width },
-    graph,
-    latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
-    layoutPrompt,
-  };
+  return { ...pipeline, layoutPrompt };
 };
 
 const buildFlux3Graph = (
@@ -2233,13 +2505,6 @@ export const buildExternalGraph = (
   return graph;
 };
 
-type GenerateGraphBuilder = (
-  settings: GenerateSettings,
-  model: MainModelConfig,
-  outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
-) => FamilyGraph;
-
 export const GRAPH_BUILDERS = {
   'sd-1': buildSDGraph,
   'sd-2': buildSDGraph,
@@ -2259,6 +2524,32 @@ export const GRAPH_BUILDERS = {
   'moss-image': buildMossImageGraph,
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
+
+/** The families Upscale's detail pass can run: Generate's pipeline builders, called without Generate's extras. */
+const IMAGE_TO_IMAGE_PIPELINES = {
+  anima: buildAnimaPipeline,
+  flux: buildFluxPipeline,
+  flux2: buildFlux2Pipeline,
+  'krea-2': buildKrea2Pipeline,
+  'moss-image': buildMossImagePipeline,
+  'qwen-image': buildQwenImagePipeline,
+  'sd-1': buildSdPipeline,
+  sdxl: buildSdPipeline,
+  'z-image': buildZImagePipeline,
+} satisfies Partial<Record<SupportedGenerateBase, (input: FamilyPipelineInput) => FamilyPipeline>>;
+
+export type ImageToImagePipelineBase = keyof typeof IMAGE_TO_IMAGE_PIPELINES;
+
+/** A family's image pipeline as another feature asks for it; throws for a family that has none. */
+export const buildImageToImagePipeline = (input: FamilyPipelineInput): FamilyPipeline => {
+  const { base } = input.model;
+
+  if (!Object.hasOwn(IMAGE_TO_IMAGE_PIPELINES, base)) {
+    throw new Error(`${input.model.name} has no image-to-image pipeline.`);
+  }
+
+  return IMAGE_TO_IMAGE_PIPELINES[base as ImageToImagePipelineBase](input);
+};
 
 /** The builder for a base, or null. Own keys only: a base from the API must not reach `Object.prototype` members. */
 export const getFamilyGraphBuilder = (base: string): GenerateGraphBuilder | null =>
