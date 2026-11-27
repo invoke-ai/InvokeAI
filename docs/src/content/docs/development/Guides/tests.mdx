@@ -76,6 +76,19 @@ Most backend tests live in the [`tests/`](https://github.com/invoke-ai/InvokeAI/
 
 Tests do not download models routinely, and there is no shared helper that installs one. Prefer small CPU fixtures built in the test. A test that needs a real model must be marked `slow` (excluded by default and in CI) and must not download large models unless it is run on purpose. Keep the total number of models the slow tests need low, re-use models other tests already need, and comment why a new one is required.
 
+### Windows ARM64 in CI
+
+The Windows ARM64 job exercises the lockfile's ARM64 dependency fork and is slow, so it runs in shards, each a disjoint set of test files (`tests/sharding.py`, balanced by the durations in `tests/shard_durations.json`). On a pull request it runs when the change is relevant to the Python suite (the same filter the other Python jobs use) and to ARM64: it touches `pyproject.toml`, `uv.lock`, the Python test workflow or the sharding files, or mentions `arm64` or `aarch64` (case-insensitive, so `is_windows_arm64` and `win_arm64` count) in a changed path, a changed line (including a removed one) or a changed file. Otherwise its jobs are skipped and the `py3.12: windows-arm64` check passes. The merge queue and pushes to `main` run it for every change the Python suite covers, and `always_run` runs every shard. A maintainer is meant to mark `py3.12: windows-arm64` (not the individual shards) as a required check; once it is, the merge queue blocks on ARM64 for the changes that run it.
+
+Every shard uploads the durations it measured, but only from a session that exited cleanly. To refresh the balance, download the `shard-durations-*` artifacts of a run on `main` or in the merge queue where every shard passed (artifacts of a fork's pull request are written by that pull request's code), and merge them into `tests/shard_durations.json` from the repository root. The merge updates the existing entries and drops files that no longer exist:
+
+```bash
+gh run download <run-id> --pattern 'shard-durations-*' --dir <dir>
+uv run --no-sync python -m tests.sharding <dir>/*/*.json
+```
+
+To reproduce a shard locally, pass CI's exact selection (`-m "not slow"`, no `-k`, `--lf` or paths), because narrowing the collection changes the partition: `uv run --no-sync pytest -m "not slow" --shard=2/4 --shard-durations=tests/shard_durations.json`.
+
 ### Test Coverage
 
 To review test coverage, append `--cov` and the report formats you want to your pytest command:
