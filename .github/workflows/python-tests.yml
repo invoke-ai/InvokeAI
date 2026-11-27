@@ -2,6 +2,7 @@
 #
 # Checks for changes to python files before running the tests.
 # If always_run is true, always runs the tests.
+# A push to main skips each job that already ran its tests on the same commit in the merge queue.
 #
 # Windows ARM64 runs in shards, in jobs of its own, whenever the Python tests run. The
 # `py3.12: windows-arm64` job is its single status, meant to be marked required by a maintainer.
@@ -46,7 +47,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A push to main fast-forwards main to the commit the merge queue's group tested (squash merge queue), so the
+  # `merge_group` run of this workflow for the same SHA has already run these jobs on the identical tree. The queue
+  # merges as soon as the required jobs pass, while the non-required ones can still run, so this is decided per
+  # job by name: a job is skipped only when its namesake concluded `success` and its own `run pytest` step
+  # succeeded in a merge-group run of this SHA. The step check matters because an entry of a multi-entry group
+  # diffs only against the previous entry, so its jobs can succeed with pytest skipped. No such run, a job that
+  # did not succeed there (failed, skipped, cancelled, still running) or any API error leaves the list empty or
+  # short and the job runs. The ARM64 jobs are not deduplicated; they run on free runners and are the post-merge
+  # signal for that lane.
+  # Assumptions: the jobs endpoint returns the latest attempt of a run (`filter=latest`, the default), and a
+  # success in any merge-group run of the SHA counts.
+  merge-queue-results:
+    name: 'merge queue results'
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.always_run != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # A failed lookup must not turn the push run red; the jobs then test as before.
+    continue-on-error: true
+    # Callers (release.yml) must grant `actions: read` too: a called workflow cannot elevate permissions.
+    permissions:
+      actions: read
+    outputs:
+      verified: ${{ steps.verified.outputs.names }}
+    steps:
+      - name: list the jobs that passed in the merge queue
+        id: verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          lines=''
+          if ! run_ids=$(gh api --paginate "repos/$REPO/actions/workflows/python-tests.yml/runs?head_sha=$SHA&event=merge_group&per_page=100" --jq '.workflow_runs[].id' | tr -d '\r'); then
+            echo "could not list the merge-group runs; every job runs"
+            run_ids=''
+          fi
+          for run_id in $run_ids; do
+            if ! found=$(gh api --paginate "repos/$REPO/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | select(.conclusion == "success" and any(.steps[]?; .name == "run pytest" and .conclusion == "success")) | [.name, .html_url] | @tsv' | tr -d '\r'); then
+              echo "could not list the jobs of merge-group run $run_id; its jobs run"
+              continue
+            fi
+            while IFS=$'\t' read -r name url; do
+              [ -n "$name" ] || continue
+              echo "verified in https://github.com/$REPO/actions/runs/$run_id: $name ($url)"
+              lines+="$name"$'\n'
+            done <<< "$found"
+          done
+          names=$(printf '%s' "$lines" | jq -R -s -c 'split("\n") | map(select(length > 0)) | unique' | tr -d '\r') || names='[]'
+          echo "names=${names:-[]}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
   matrix:
+    needs: merge-queue-results
+    # Runs when the job above was skipped (every event but a push to main) or failed, and tests as usual then.
+    if: ${{ !cancelled() }}
     strategy:
       # Let the other platforms finish when one runner fails, so a rerun repeats only the failed job.
       fail-fast: false
@@ -106,14 +162,19 @@ jobs:
       # cores. This caps torch only; helper processes the tests spawn thread themselves.
       OMP_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
+      # 'true' when the merge queue already passed this job on this commit. Like a change that touches no Python
+      # file, it leaves no step to run: change detection is skipped, so every gated step below skips too.
+      MERGE_QUEUE_VERIFIED: "${{ inputs.always_run != true && contains(fromJSON(needs.merge-queue-results.outputs.verified || '[]'), format('py{0}: {1}', matrix.python-version, matrix.platform)) }}"
 
     steps:
       - name: checkout
+        if: ${{ env.MERGE_QUEUE_VERIFIED != 'true' }}
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: restore LFS cache
+        if: ${{ env.MERGE_QUEUE_VERIFIED != 'true' }}
         uses: actions/cache@v5
         with:
           path: .git/lfs
@@ -122,11 +183,17 @@ jobs:
           restore-keys: lfs-
 
       - name: pull LFS files
+        if: ${{ env.MERGE_QUEUE_VERIFIED != 'true' }}
         run: git lfs pull
         shell: bash
 
+      - name: skip, passed in the merge queue
+        if: ${{ env.MERGE_QUEUE_VERIFIED == 'true' }}
+        run: echo "This job passed on this commit in the merge queue; the 'merge queue results' job lists the run."
+        shell: bash
+
       - name: check for changed python files
-        if: ${{ inputs.always_run != true }}
+        if: ${{ inputs.always_run != true && env.MERGE_QUEUE_VERIFIED != 'true' }}
         id: changed-files
         # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
         # See:
@@ -357,6 +424,11 @@ jobs:
   # included, would pull both server images and wait for them to become healthy.
   external-database-changes:
     name: 'external database: change detection'
+    needs: merge-queue-results
+    # Skipped when the merge queue passed both server jobs on this commit (they are one matrix, so a job-level
+    # `if` cannot take them one by one). The two names must match the `external-database` job name template;
+    # a drift only makes the job run. A skipped or failed lookup job tests as usual.
+    if: "${{ !cancelled() && !(contains(fromJSON(needs.merge-queue-results.outputs.verified || '[]'), 'py3.12: linux-mysql') && contains(fromJSON(needs.merge-queue-results.outputs.verified || '[]'), 'py3.12: linux-mariadb')) }}"
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
