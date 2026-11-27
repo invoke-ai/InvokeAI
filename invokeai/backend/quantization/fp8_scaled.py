@@ -510,6 +510,50 @@ def _reject_unparsed_scales(sd: Mapping[str, Any]) -> None:
         )
 
 
+def mx_scale_layout_problem(weight: Any, scale: Any, hints: Mapping[str, Any]) -> str | None:
+    """Why an MXFP8 exponent grid cannot describe ``weight``, or None when it can. Reads shapes only.
+
+    The layout half of :func:`decode_mx_block_scales`, which raises it, so a header's ``meta`` tensors answer what the
+    decode would refuse.
+    """
+    if scale.dim() != 2 or scale.shape[0] != weight.shape[0] or weight.dim() != 2:
+        return (
+            f"an MXFP8 scale must be a 2-D [rows, blocks] grid matching the weight's rows; got "
+            f"{tuple(scale.shape)} for a {tuple(weight.shape)} weight."
+        )
+    block_size, remainder = divmod(weight.shape[1], scale.shape[1])
+    declared = hints.get("block_size", MXFP8_BLOCK_SIZE)
+    if remainder or declared != block_size:
+        return f"a {tuple(scale.shape)} grid does not describe a {tuple(weight.shape)} weight in blocks of {declared}."
+    return None
+
+
+def float_scale_layout_problem(weight: Any, scale: Any) -> str | None:
+    """Why a float ``weight_scale`` cannot be applied to ``weight`` (:func:`expand_weight_scale`, :func:`_fold_scale`),
+    or None when it can. Reads shapes only.
+
+    Per-tensor, per-output-channel and block-wise scales are the layouts that apply; a block-wise one must tile the
+    weight along every axis it spans.
+    """
+    if scale.numel() == 1:
+        return None
+    rows = weight.shape[0] if weight.dim() else 1
+    if scale.dim() <= 1:
+        if scale.numel() != rows:
+            return (
+                f"fp8 weight_scale has {scale.numel()} entries but the weight has {rows} output channels; the scale "
+                "is neither per-tensor nor per-output-channel and cannot be applied. The checkpoint's quantization "
+                "metadata appears to be malformed."
+            )
+        return None
+    if scale.dim() > weight.dim() or any(weight.shape[dim] % scale.shape[dim] for dim in range(scale.dim())):
+        return (
+            f"a {tuple(scale.shape)} block-wise weight_scale does not tile its {tuple(weight.shape)} weight; the "
+            "checkpoint's quantization metadata appears to be malformed."
+        )
+    return None
+
+
 def decode_mx_block_scales(
     path: str, weight: torch.Tensor, scale: torch.Tensor, hints: Mapping[str, Any]
 ) -> torch.Tensor:
@@ -538,19 +582,9 @@ def decode_mx_block_scales(
             f"names it '{MXFP8_FORMAT}'. Its layout is therefore unknown, and reading it as one would load "
             "cleanly and generate noise. Use the scaled-fp8 or bf16 build of this checkpoint."
         )
-    if scale.dim() != 2 or scale.shape[0] != weight.shape[0] or weight.dim() != 2:
-        raise ValueError(
-            f"'{path}': an MXFP8 scale must be a 2-D [rows, blocks] grid matching the weight's rows; got "
-            f"{tuple(scale.shape)} for a {tuple(weight.shape)} weight."
-        )
-    blocks = scale.shape[1]
-    block_size, remainder = divmod(weight.shape[1], blocks)
-    declared = hints.get("block_size", MXFP8_BLOCK_SIZE)
-    if remainder or declared != block_size:
-        raise ValueError(
-            f"'{path}': a {tuple(scale.shape)} grid does not describe a {tuple(weight.shape)} weight in blocks of "
-            f"{declared}."
-        )
+    problem = mx_scale_layout_problem(weight, scale, hints)
+    if problem is not None:
+        raise ValueError(f"'{path}': {problem}")
 
     exponents = unblock_scale_grid(scale.view(torch.uint8)).to(torch.int32)
     if bool((exponents == _E8M0_NAN).any()):
@@ -700,18 +734,15 @@ def expand_weight_scale(weight: torch.Tensor, scale: torch.Tensor, path: str | N
         # otherwise broadcast back-aligned into a `(1, out, in)` product.
         return scale.reshape(())
     if scale.dim() <= 1:
-        if scale.numel() != weight.shape[0]:
+        problem = float_scale_layout_problem(weight, scale)
+        if problem is not None:
             # A 1-D scale is per-output-channel by definition, so any other length means the file
             # does not describe this weight — most likely a block-wise scale flattened by the
             # producer, whose block structure is not recoverable from the tensor alone. Say so:
             # left to broadcast, torch raises "The size of tensor a (16) must match the size of
             # tensor b (7)" from inside the multiply — the weight's *last* axis against the scale,
             # naming neither the layer nor the axis the scale was supposed to describe.
-            raise ValueError(
-                f"{f'{path}: ' if path else ''}fp8 weight_scale has {scale.numel()} entries but the weight has "
-                f"{weight.shape[0]} output channels; the scale is neither per-tensor nor per-output-channel and "
-                "cannot be applied. The checkpoint's quantization metadata appears to be malformed."
-            )
+            raise ValueError(f"{f'{path}: ' if path else ''}{problem}")
         return scale.reshape(-1, *([1] * (weight.dim() - 1)))
     for dim in range(weight.dim()):
         if dim < scale.dim() and scale.shape[dim] != weight.shape[dim]:

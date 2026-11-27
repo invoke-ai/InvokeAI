@@ -20,7 +20,13 @@ from typing import Any
 
 import torch
 
-from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, MXFP8_FORMAT, parse_quantization_metadata
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
+    MXFP8_FORMAT,
+    float_scale_layout_problem,
+    mx_scale_layout_problem,
+    parse_quantization_metadata,
+)
 from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
 
 
@@ -322,6 +328,11 @@ def qwen3vl_lm_head_refusal(head: Mapping[str, Any], hints: Mapping[str, Any], e
     embedding_shape = tuple(getattr(embedding, "shape", ()))
     if tuple(weight.shape) != embedding_shape:
         return f"its LM head is {tuple(weight.shape)}, but its token embedding is {embedding_shape}"
+    if weight.dtype.itemsize == 1 and weight.dtype not in FP8_WEIGHT_DTYPES:
+        return (
+            f"its LM head is stored as {weight.dtype}, an fp8 format whose scale the loader does not read; only "
+            "float8_e4m3fn and float8_e5m2 load as a Text LLM"
+        )
     unread = sorted(set(head) - {"weight"} - _LM_HEAD_SIDECARS)
     if unread:
         return f"its LM head carries {', '.join(f'lm_head.{suffix}' for suffix in unread)}, which is not read"
@@ -336,4 +347,13 @@ def qwen3vl_lm_head_refusal(head: Mapping[str, Any], hints: Mapping[str, Any], e
             f"its fp8 LM head has a {scale.dtype} scale, an MX exponent grid that neither its comfy_quant marker nor "
             f"the _quantization_metadata header names '{MXFP8_FORMAT}'"
         )
+    if weight.dtype in FP8_WEIGHT_DTYPES and isinstance(scale, torch.Tensor):
+        # The fold would raise on the same layouts, but only after the whole language model was decoded and reserved.
+        layout = (
+            float_scale_layout_problem(weight, scale)
+            if scale.dtype in _PLAIN_SCALE_DTYPES
+            else mx_scale_layout_problem(weight, scale, hints)
+        )
+        if layout is not None:
+            return f"its fp8 LM head's scale does not fit it: {layout}"
     return None

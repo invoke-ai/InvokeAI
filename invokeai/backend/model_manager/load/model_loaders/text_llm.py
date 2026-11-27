@@ -281,7 +281,9 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
         # float32 on the CPU with the fp8 weights folded there, rather than dequantized on every token.
         dtype = decoder._decision(encoder_config, SubModelType.TextEncoder).dtype
 
-        tied = qwen3_vl_ties_word_embeddings(config.variant)
+        # The geometry is the encoder's: the view's own variant is the role's, which a later edit of the record's
+        # variant leaves behind.
+        tied = qwen3_vl_ties_word_embeddings(encoder_config.variant)
         hints: dict[str, Any] = {}
         head_bytes = 0
         if not tied:

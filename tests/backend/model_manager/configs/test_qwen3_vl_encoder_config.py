@@ -357,7 +357,9 @@ class TestQwen3VLEncoderServesAsATextLLM:
         head_prefix: str = "lm_head.",
         vocab: int = 2,
         metadata: dict[str, str] | None = None,
+        override: Qwen3VLVariantType | None = None,
     ) -> list[ModelRole]:
+        """The roles of a file whose tensors are those of `variant`, installed with `override` as its variant."""
         hidden = _HIDDEN_BY_VARIANT[variant]
         state_dict = {
             f"{language_model}embed_tokens.weight": torch.zeros(vocab, hidden, dtype=torch.bfloat16),
@@ -368,8 +370,9 @@ class TestQwen3VLEncoderServesAsATextLLM:
         }
         path = tmp_path / "qwen3vl.safetensors"
         save_file(state_dict, str(path), metadata=metadata)
-        config = Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(ModelOnDisk(path), {**_REQUIRED_FIELDS})
-        assert config.variant is variant
+        fields = {**_REQUIRED_FIELDS, **({"variant": override} if override else {})}
+        config = Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(ModelOnDisk(path), fields)
+        assert config.variant is (override or variant)
         return config.roles
 
     @staticmethod
@@ -418,25 +421,67 @@ class TestQwen3VLEncoderServesAsATextLLM:
 
         assert roles == self._role(Qwen3VLVariantType.Qwen3VL_8B)
 
+    def test_whether_the_head_ties_follows_the_tensors_not_a_variant_the_record_was_installed_with(
+        self, tmp_path: Path
+    ) -> None:
+        """An 8B file without a head, installed as a 4B (which ties): the 8B embedding must not become its head."""
+        roles = self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, override=Qwen3VLVariantType.Qwen3VL_4B)
+
+        assert roles == []
+
     @pytest.mark.parametrize(
-        ("head", "vocab"),
+        ("head", "vocab", "metadata"),
         [
-            pytest.param({}, 2, id="no-lm-head"),
-            pytest.param({"lm_head.weight": torch.zeros(2, 2048, dtype=torch.uint8)}, 2, id="packed-lm-head"),
-            pytest.param({"lm_head.weight": torch.zeros(3, 4096, dtype=torch.bfloat16)}, 2, id="head-wider-than-vocab"),
+            pytest.param({}, 2, None, id="no-lm-head"),
+            pytest.param({"lm_head.weight": torch.zeros(2, 2048, dtype=torch.uint8)}, 2, None, id="packed-lm-head"),
+            pytest.param(
+                {"lm_head.weight": torch.zeros(3, 4096, dtype=torch.bfloat16)}, 2, None, id="head-wider-than-vocab"
+            ),
             pytest.param(
                 {
                     "lm_head.weight": torch.zeros(2, 4096, dtype=torch.bfloat16),
                     "lm_head.bias": torch.zeros(2, dtype=torch.bfloat16),
                 },
                 2,
+                None,
                 id="unread-head-key",
             ),
-            pytest.param(_mx_head(), 128, id="mx-grid-nothing-names"),
+            pytest.param(_mx_head(), 128, None, id="mx-grid-nothing-names"),
+            pytest.param(
+                {
+                    "lm_head.weight": torch.zeros(2, 4096, dtype=torch.float8_e4m3fnuz),
+                    "lm_head.weight_scale": torch.tensor(0.01),
+                },
+                2,
+                None,
+                id="fnuz-head",
+            ),
+            pytest.param(
+                {
+                    "lm_head.weight": quantize_scaled_fp8(torch.randn(2, 4096)).codes,
+                    "lm_head.weight_scale": torch.ones(5),
+                },
+                2,
+                None,
+                id="scale-neither-per-tensor-nor-per-row",
+            ),
+            pytest.param(
+                {
+                    **mxfp8_tensors("lm_head", torch.full((128, 4096 // 32), 127))[0],
+                    "lm_head.weight_scale": torch.zeros(128, 4096 // 16, dtype=torch.uint8),
+                },
+                128,
+                _MX_HEADER,
+                id="mx-grid-of-the-wrong-block-width",
+            ),
         ],
     )
-    def test_an_8b_file_that_cannot_generate_is_only_an_encoder(self, tmp_path: Path, head, vocab: int) -> None:
-        assert self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head, vocab=vocab) == []
+    def test_an_8b_file_that_cannot_generate_is_only_an_encoder(
+        self, tmp_path: Path, head, vocab: int, metadata
+    ) -> None:
+        roles = self._roles(tmp_path, Qwen3VLVariantType.Qwen3VL_8B, head, vocab=vocab, metadata=metadata)
+
+        assert roles == []
 
 
 class TestQwen3VLEncoderDirectoryConfig:

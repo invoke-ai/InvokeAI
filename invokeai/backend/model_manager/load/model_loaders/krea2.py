@@ -1374,12 +1374,14 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # which is what this pass is for: an MXFP8 build's block scales are folded, and its language model
             # is held in fp8 rather than at twice the size. A folded embedding is not: Comfy's nvfp4 8B build
             # scales its token table, and cast again it would lose that scale for the accuracy cost measured
-            # above for exactly this table -- the reason the attach branch leaves every embedding alone.
+            # above for exactly this table -- the reason the attach branch leaves every embedding alone. An
+            # unscaled one is no exception: the Text LLM view ties a 4B's output head to this same table.
             self._apply_fp8_to_nn_module(
                 model,
                 storage_dtype=torch.float8_e4m3fn,
                 compute_dtype=model_dtype,
-                skip=lambda name, module: name in scaled_paths and not isinstance(module, torch.nn.Linear),
+                skip=lambda name, module: isinstance(module, torch.nn.Embedding)
+                or (name in scaled_paths and not isinstance(module, torch.nn.Linear)),
             )
         # Counted rather than assumed: on that nvfp4 build every Linear is packed and the embedding skipped, so
         # the pass leaves nothing in fp8, and saying it did would misdescribe the encoder.

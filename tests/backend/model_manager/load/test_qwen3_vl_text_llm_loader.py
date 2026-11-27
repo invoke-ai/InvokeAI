@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_loaders import krea2
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderCheckpointLoader
 from invokeai.backend.model_manager.load.model_loaders.text_llm import TextLLMQwen3VLLoader
 from invokeai.backend.model_manager.taxonomy import ModelType, Qwen3VLVariantType, SubModelType
+from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
 from invokeai.backend.util.devices import TorchDevice
 from tests.fixtures.loader_seams import Seam, SeamRun, prepare
@@ -233,12 +234,35 @@ def test_an_mxfp8_head_named_only_in_the_header_is_decoded(monkeypatch: pytest.M
         pytest.param(
             mxfp8_tensors("lm_head", torch.full((VOCAB, HIDDEN // 32), 127))[0], None, "mxfp8", id="unnamed-mx-grid"
         ),
+        pytest.param(
+            {"lm_head.weight": torch.zeros(VOCAB, HIDDEN, dtype=torch.float8_e4m3fnuz)}, None, "fnuz", id="fnuz"
+        ),
+        pytest.param(
+            {
+                "lm_head.weight": torch.zeros(VOCAB, HIDDEN, dtype=torch.float8_e4m3fn),
+                "lm_head.weight_scale": torch.ones(VOCAB + 3),
+            },
+            None,
+            "neither per-tensor nor per-output-channel",
+            id="scale-fits-no-layout",
+        ),
+        pytest.param(
+            {
+                **mxfp8_tensors("lm_head", torch.full((VOCAB, HIDDEN // 32), 127))[0],
+                "lm_head.weight_scale": torch.zeros(VOCAB, HIDDEN // 16, dtype=torch.uint8),
+            },
+            _MX_HEADER,
+            "does not describe",
+            id="mx-grid-of-the-wrong-block-width",
+        ),
     ],
 )
 def test_an_lm_head_the_loader_cannot_widen_is_refused_before_room_is_reserved(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, head: dict[str, torch.Tensor], metadata, message: str
 ) -> None:
-    view = _view(tmp_path, {**_comfy_file(_reference(tied=False)), **head}, Qwen3VLVariantType.Qwen3VL_8B)
+    view = _view(
+        tmp_path, {**_comfy_file(_reference(tied=False)), **head}, Qwen3VLVariantType.Qwen3VL_8B, metadata=metadata
+    )
     run = _run(monkeypatch, tied=False)
 
     with pytest.raises(ValueError, match=message):
@@ -310,6 +334,53 @@ def test_devices_with_different_fp8_policies_never_share_the_views_weights(
     assert keeps_fp8 != folds_fp8
     assert key(torch.device("cuda", 2), supported=True) == keeps_fp8
     assert key(torch.device("cuda", 0), supported=True, cpu_only=True) not in {keeps_fp8, folds_fp8}
+
+
+@pytest.mark.parametrize("tied", [True, False], ids=["4b", "8b"])
+def test_an_unscaled_fp8_layer_never_turns_the_embedding_or_the_head_into_unscaled_fp8(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, tied: bool
+) -> None:
+    """A build with an unscaled fp8 Linear takes the FP8 Storage pass; on a 4B it must leave the table the head ties to
+    alone, as the attach branch does, and the encoder with it."""
+    reference = _reference(tied=tied)
+    gate_proj = quantize_scaled_fp8(reference.model.language_model.layers[0].mlp.gate_proj.weight.detach()).codes
+    head = {} if tied else {"lm_head.weight": reference.lm_head.weight.detach().to(torch.bfloat16)}
+    variant = Qwen3VLVariantType.Qwen3VL_4B if tied else Qwen3VLVariantType.Qwen3VL_8B
+    view = _view(
+        tmp_path, {**_comfy_file(reference), "model.layers.0.mlp.gate_proj.weight": gate_proj, **head}, variant
+    )
+    run = _run(monkeypatch, tied=tied, compute_dtype=torch.bfloat16)
+    _fp8_policy(monkeypatch, torch.device("cuda"), supported=True)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: False)
+
+    model = run.load(view, None)
+
+    assert model.model.language_model.layers[0].mlp.gate_proj.weight.dtype in FP8_WEIGHT_DTYPES
+    assert model.get_input_embeddings().weight.dtype == torch.bfloat16
+    assert model.lm_head.weight.dtype == torch.bfloat16
+    assert (model.lm_head.weight is model.get_input_embeddings().weight) is tied
+    encoder = _prepare(
+        monkeypatch, _seam(Qwen3VLEncoderCheckpointLoader, "_load_text_encoder", torch.bfloat16), tied=tied
+    )
+    encoder.loader._torch_device = torch.device("cuda")
+    assert encoder.load(view_as(view, ModelType.Qwen3VLEncoder)).get_input_embeddings().weight.dtype == torch.bfloat16
+
+
+def test_whether_the_head_ties_is_read_from_the_encoders_variant_not_the_views_role(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The role is fixed at install; the record's variant can be corrected later. An 8B file without a head that was
+    installed as a 4B got the role because the 4B ties, and once fixed to 8B must be refused, not served with its
+    embedding as the head."""
+    path = tmp_path / "qwen3vl.safetensors"
+    save_file(_comfy_file(_reference(tied=False)), str(path))
+    record = qwen3_vl_encoder_file("vl", Qwen3VLVariantType.Qwen3VL_4B).model_copy(update={"path": str(path)})
+    view = view_as(record.model_copy(update={"variant": Qwen3VLVariantType.Qwen3VL_8B}), ModelType.TextLLM)
+    run = _run(monkeypatch, tied=False)
+
+    with pytest.raises(ValueError, match="lm_head.weight"):
+        run.load(view, None)
+    assert run.reserved == []
 
 
 def test_the_text_side_is_its_own_tokenizer_stopping_at_the_end_of_the_turn_and_no_processor(

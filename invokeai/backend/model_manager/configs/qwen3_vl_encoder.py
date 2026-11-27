@@ -265,7 +265,14 @@ def _text_llm_roles(mod: ModelOnDisk, state_dict: dict[str | int, Any], variant:
     whose config ties it to the token embedding (the 4B) has one in every file. Otherwise the file must carry one the
     Text LLM view widens on load, by the rule its loader applies (`qwen3vl_lm_head_refusal`); a file without one stays
     an encoder only. The role names the view's format (`TextLLM_Qwen3VLEncoder_Config`).
+
+    Whether the head ties is a property of the tensors, so the geometry decides it. The variant a user overrode the
+    record with is only the fallback for a file whose shapes name none.
     """
+    try:
+        variant = _variant_from_checkpoint_shape(state_dict)
+    except NotAMatchError:
+        pass
     if not qwen3_vl_ties_word_embeddings(variant):
         head = qwen3vl_lm_head_entries(state_dict)
         if "weight" not in head:
