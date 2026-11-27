@@ -9,6 +9,8 @@ the loader cannot widen it.
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -381,6 +383,32 @@ def test_whether_the_head_ties_is_read_from_the_encoders_variant_not_the_views_r
     with pytest.raises(ValueError, match="lm_head.weight"):
         run.load(view, None)
     assert run.reserved == []
+
+
+def test_a_file_stored_relative_to_the_models_folder_loads_through_the_cache_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Installs inside the models folder record a relative path, which `_load_and_cache` makes absolute only after the
+    cache key was asked for. The decode must read the resolved path, not the copy the key was computed from."""
+    root = tmp_path / "models"
+    (root / "abc").mkdir(parents=True)
+    save_file(_comfy_file(_reference(tied=True)), str(root / "abc" / "q.safetensors"))
+    view = view_as(
+        qwen3_vl_encoder_file("vl", Qwen3VLVariantType.Qwen3VL_4B).model_copy(update={"path": "abc/q.safetensors"}),
+        ModelType.TextLLM,
+    )
+    run = _run(monkeypatch, tied=True)
+    loader = run.loader
+    loader._app_config = SimpleNamespace(models_path=root, log_memory_usage=False)
+    loaded: list[object] = []
+    loader._ram_cache = MagicMock(shared_cpu_weights=None, make_room=lambda needed: run.reserved.append(needed))
+    loader._ram_cache.get_with_first_use_claim.side_effect = [IndexError, IndexError, ("record", None)]
+    loader._ram_cache.put.side_effect = lambda key, model, **_: loaded.append(model)
+
+    record, _claim = loader._load_and_cache(view, None)
+
+    assert record == "record"
+    assert isinstance(loaded[0], Qwen3VLForConditionalGeneration)
 
 
 def test_the_text_side_is_its_own_tokenizer_stopping_at_the_end_of_the_turn_and_no_processor(

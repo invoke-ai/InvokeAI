@@ -276,6 +276,9 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
         from transformers import Qwen3VLForConditionalGeneration
 
         encoder_config, decoder = self._decoder(config)
+        # The encoder copy was made for the cache key, before the cache resolved the record's path against the models
+        # folder; the decision it carries is the one the decode must use, the path is not.
+        encoder_config.path = config.path
         path = Path(config.path)
         what = f"Qwen3-VL checkpoint {path.name}"
         # float32 on the CPU with the fp8 weights folded there, rather than dequantized on every token.

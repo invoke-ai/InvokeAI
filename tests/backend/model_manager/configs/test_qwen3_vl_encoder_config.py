@@ -467,6 +467,15 @@ class TestQwen3VLEncoderServesAsATextLLM:
             ),
             pytest.param(
                 {
+                    "lm_head.weight": quantize_scaled_fp8(torch.randn(2, 4096)).codes,
+                    "lm_head.weight_scale": torch.ones(2, 0),
+                },
+                2,
+                None,
+                id="scale-with-an-empty-axis",
+            ),
+            pytest.param(
+                {
                     **mxfp8_tensors("lm_head", torch.full((128, 4096 // 32), 127))[0],
                     "lm_head.weight_scale": torch.zeros(128, 4096 // 16, dtype=torch.uint8),
                 },

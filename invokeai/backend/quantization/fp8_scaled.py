@@ -516,7 +516,7 @@ def mx_scale_layout_problem(weight: Any, scale: Any, hints: Mapping[str, Any]) -
     The layout half of :func:`decode_mx_block_scales`, which raises it, so a header's ``meta`` tensors answer what the
     decode would refuse.
     """
-    if scale.dim() != 2 or scale.shape[0] != weight.shape[0] or weight.dim() != 2:
+    if scale.dim() != 2 or scale.shape[0] != weight.shape[0] or weight.dim() != 2 or 0 in scale.shape:
         return (
             f"an MXFP8 scale must be a 2-D [rows, blocks] grid matching the weight's rows; got "
             f"{tuple(scale.shape)} for a {tuple(weight.shape)} weight."
@@ -546,7 +546,11 @@ def float_scale_layout_problem(weight: Any, scale: Any) -> str | None:
                 "metadata appears to be malformed."
             )
         return None
-    if scale.dim() > weight.dim() or any(weight.shape[dim] % scale.shape[dim] for dim in range(scale.dim())):
+    if (
+        scale.dim() > weight.dim()
+        or 0 in scale.shape
+        or any(weight.shape[dim] % scale.shape[dim] for dim in range(scale.dim()))
+    ):
         return (
             f"a {tuple(scale.shape)} block-wise weight_scale does not tile its {tuple(weight.shape)} weight; the "
             "checkpoint's quantization metadata appears to be malformed."
