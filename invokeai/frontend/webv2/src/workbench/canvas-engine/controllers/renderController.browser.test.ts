@@ -2,9 +2,11 @@ import type { ToolContext } from '@workbench/canvas-engine/tools/tool';
 
 import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelInput } from '@workbench/canvas-engine/input/wheel';
+import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
 import { RenderController } from './renderController';
 
 const cleanups: (() => void)[] = [];
@@ -56,6 +58,8 @@ const createAttachedInput = () => {
   });
   const controller = new RenderController({
     applyCursor: () => undefined,
+    backend: createDomRasterBackend(),
+    rasterMemory: new RasterMemoryBudgetController(),
     getInputHandlers: () => ({ ...pipeline, ...wheel }),
     isEngineDisposed: () => false,
     onPageHide: () => undefined,

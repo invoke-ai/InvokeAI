@@ -1166,6 +1166,37 @@ describe('queue runtime', () => {
     await runtime.dispose();
   });
 
+  it('keeps the 500 streak of a run whose answer took longer than five minutes to come', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const startedAt = Date.now();
+    const slowServerError = () =>
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new ApiError('graph validation crashed', 500)), 6 * 60_000);
+      });
+    const enqueueGenerate = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('graph validation crashed', 500))
+      .mockImplementation(slowServerError);
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    // The second attempt starts at 1 s and its 500 arrives six minutes later.
+    await vi.advanceTimersByTimeAsync(6 * 60_000 + 2_000);
+
+    expect(enqueueGenerate).toHaveBeenCalledTimes(2);
+    expect(workbench.getRun()).toMatchObject({
+      status: 'pending',
+      submissionRetry: { failureCount: 2, serverErrorCount: 2, serverErrorSince: startedAt },
+    });
+    await runtime.dispose();
+  });
+
   it.each([
     { error: new ApiError('request timeout', 408), reason: 'unavailable', status: 408 },
     { error: new TypeError('Failed to fetch'), reason: 'unreachable', status: null },

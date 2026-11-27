@@ -1,7 +1,9 @@
 /** The starts the widget sends index-clipping denoise nodes, recorded for the backend to replay. */
 
 import type { MainModelConfig } from '@features/generation/contracts';
+import type { StepClipping } from '@features/generation/settings';
 
+import { getDenoisingStartClipping } from '@features/generation/settings';
 import { describe, expect, it } from 'vitest';
 
 import type { UpscaleBase } from './settings';
@@ -24,9 +26,9 @@ const BASES = [...new Set(MODELS.map((model) => model.base))];
 
 describe('index-clipped denoising starts', () => {
   it('covers every architecture whose denoise node clips by index', () => {
-    const indexClipped = Object.entries(UPSCALE_ARCHITECTURES)
-      .filter(([, architecture]) => architecture.indexClipping)
-      .map(([base]) => base);
+    const indexClipped = Object.keys(UPSCALE_ARCHITECTURES).filter(
+      (base) => getDenoisingStartClipping({ base, type: 'main' })?.kind === 'step'
+    );
 
     expect([...BASES].sort()).toEqual(indexClipped.sort());
   });
@@ -37,8 +39,8 @@ describe('index-clipped denoising starts', () => {
         STEP_COUNTS.flatMap((steps) =>
           CREATIVITIES.map((creativity) => {
             const valueStart = getUpscaleDenoisingStart(creativity);
-            const clipping = UPSCALE_ARCHITECTURES[base].indexClipping!;
-            const model = { base, variant } as MainModelConfig;
+            const model = { base, type: 'main', variant } as MainModelConfig;
+            const clipping = getDenoisingStartClipping(model) as StepClipping;
             const sigmas = clipping.sigmas(model, { height: side, width: side }, steps);
 
             return {
