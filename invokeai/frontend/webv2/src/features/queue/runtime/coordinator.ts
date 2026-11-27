@@ -199,9 +199,11 @@ interface RunProgressState {
 }
 
 interface WaitState {
+  activePercentageItemId: number | null;
   frameGates: Map<number, { revision: number | null; sessionId: string }>;
   hasOwnFrame: boolean;
   hasWorkflowCall: boolean;
+  itemPercentages: Map<number, number | null>;
   localQueueItemId: string;
   origin: QueueRunOrigin | null;
   settle: (outcome: TerminalOutcome) => void;
@@ -271,9 +273,68 @@ export const createQueueCoordinator = (
       }
     }
   };
-  const clearFrameGate = (itemId: number): void => {
-    for (const wait of waits.values()) {
-      if (wait.frameGates.delete(itemId)) {
+  const setBoundedItemPercentage = (wait: WaitState, itemId: number, percentage: number | null): void => {
+    wait.itemPercentages.delete(itemId);
+    wait.itemPercentages.set(itemId, percentage);
+
+    while (wait.itemPercentages.size > FRAME_GATES_PER_WAIT_LIMIT) {
+      let evicted = false;
+      for (const candidateId of wait.itemPercentages.keys()) {
+        if (candidateId !== wait.activePercentageItemId) {
+          wait.itemPercentages.delete(candidateId);
+          evicted = true;
+          break;
+        }
+      }
+      if (!evicted) {
+        break;
+      }
+    }
+  };
+  const syncSlotPercentage = (wait: WaitState, rootBackendItemId: number): boolean => {
+    const state = runProgress.get(wait.localQueueItemId);
+    if (!state || !state.backendItemIds.includes(rootBackendItemId)) {
+      return false;
+    }
+
+    const slotIndex = getProgressImageTarget(wait.localQueueItemId, rootBackendItemId).itemIndex;
+
+    if (wait.activePercentageItemId === null) {
+      return state.slotPercentages.delete(slotIndex);
+    }
+
+    const next = wait.itemPercentages.get(wait.activePercentageItemId) ?? null;
+    const hadKey = state.slotPercentages.has(slotIndex);
+    const previous = state.slotPercentages.get(slotIndex);
+    if (hadKey && previous === next) {
+      return false;
+    }
+
+    state.slotPercentages.set(slotIndex, next);
+    return true;
+  };
+  const clearChildTracking = (itemId: number): void => {
+    for (const [rootBackendItemId, wait] of waits.entries()) {
+      const removedGate = wait.frameGates.delete(itemId);
+      const removedPercentage = wait.itemPercentages.delete(itemId);
+
+      if (removedPercentage && wait.activePercentageItemId === itemId) {
+        let nextActiveId: number | null = null;
+        for (const [candidateId, candidatePct] of wait.itemPercentages.entries()) {
+          if (nextActiveId === null || candidatePct !== null) {
+            nextActiveId = candidateId;
+            if (candidatePct !== null) {
+              break;
+            }
+          }
+        }
+        wait.activePercentageItemId = nextActiveId;
+        if (syncSlotPercentage(wait, rootBackendItemId)) {
+          publishRunProgress(wait.localQueueItemId);
+        }
+      }
+
+      if (removedGate || removedPercentage) {
         return;
       }
     }
@@ -282,7 +343,7 @@ export const createQueueCoordinator = (
   const recentTerminalOutcomes = new Map<number, TerminalOutcome>();
   /** Replayed once the item registers: a fast run's nodes can start and finish while `enqueue_batch` resolves. */
   const pendingNodeEvents = new Map<number, NodeEvent[]>();
-  const pendingProgressEvents = new Map<number, InvocationProgressEvent>();
+  const pendingProgressEvents = new Map<number, { event: InvocationProgressEvent; sequence: number }>();
   const nodeIdsByBackendItem = new Map<number, Set<string>>();
   let nodeExecutionRootItemId: number | null = null;
   let nodeExecutionRootItemSequence = 0;
@@ -446,20 +507,9 @@ export const createQueueCoordinator = (
         if (wait) {
           const target = getProgressImageTarget(wait.localQueueItemId, backendItemId);
           activeProgressTarget.set(target);
-          const state = runProgress.get(wait.localQueueItemId);
-          if (state) {
-            const previous = state.slotPercentages.get(target.itemIndex);
-            const hadSlotPercentage = previous !== undefined && previous !== null;
-            const clearedActive =
-              state.activeBackendItemId === backendItemId && (state.percentage !== null || state.message !== '');
-            state.slotPercentages.set(target.itemIndex, null);
-            if (state.activeBackendItemId === backendItemId) {
-              state.message = '';
-              state.percentage = null;
-            }
-            if (hadSlotPercentage || clearedActive) {
-              publishRunProgress(wait.localQueueItemId);
-            }
+          setBoundedItemPercentage(wait, nodeEvent.event.item_id, null);
+          if (wait.activePercentageItemId === nodeEvent.event.item_id && syncSlotPercentage(wait, backendItemId)) {
+            publishRunProgress(wait.localQueueItemId);
           }
         }
         nodeExecution.started(routedEvent);
@@ -520,7 +570,7 @@ export const createQueueCoordinator = (
     const backendItemId = getTrackedBackendItemId(event);
 
     pendingProgressEvents.delete(backendItemId);
-    pendingProgressEvents.set(backendItemId, event);
+    pendingProgressEvents.set(backendItemId, { event, sequence: ++nodeEventSequence });
 
     while (pendingProgressEvents.size > PROGRESS_EVENT_BUFFER_ITEM_LIMIT) {
       const oldestId = pendingProgressEvents.keys().next().value;
@@ -540,6 +590,26 @@ export const createQueueCoordinator = (
 
     for (const nodeEvent of events ?? []) {
       applyNodeEvent(nodeEvent);
+    }
+  };
+
+  const replayBufferedEvents = (backendItemId: number): void => {
+    const nodeEvents = pendingNodeEvents.get(backendItemId) ?? [];
+    const bufferedProgress = pendingProgressEvents.get(backendItemId);
+
+    pendingNodeEvents.delete(backendItemId);
+    pendingProgressEvents.delete(backendItemId);
+
+    let progressReplayed = false;
+    for (const nodeEvent of nodeEvents) {
+      if (bufferedProgress && !progressReplayed && bufferedProgress.sequence < nodeEvent.sequence) {
+        progressReplayed = true;
+        handleProgress(bufferedProgress.event);
+      }
+      applyNodeEvent(nodeEvent);
+    }
+    if (bufferedProgress && !progressReplayed) {
+      handleProgress(bufferedProgress.event);
     }
   };
 
@@ -579,6 +649,8 @@ export const createQueueCoordinator = (
     }
 
     wait.frameGates.clear();
+    wait.itemPercentages.clear();
+    wait.activePercentageItemId = null;
     waits.delete(backendItemId);
     settleNodes(backendItemId, outcome);
     const progressTarget = getProgressImageTarget(wait.localQueueItemId, backendItemId);
@@ -638,6 +710,12 @@ export const createQueueCoordinator = (
   };
 
   const resetRequeuedSlotProgress = (localQueueItemId: string, backendItemId: number): void => {
+    const wait = waits.get(backendItemId);
+    if (wait) {
+      wait.itemPercentages.clear();
+      wait.activePercentageItemId = null;
+    }
+
     const state = runProgress.get(localQueueItemId);
 
     if (!state) {
@@ -696,9 +774,16 @@ export const createQueueCoordinator = (
     }
 
     return new Promise<TerminalOutcome>((settle) => {
-      waits.set(backendItemId, { frameGates: new Map(), hasOwnFrame: false, ...context, localQueueItemId, settle });
-      replayNodeEvents(backendItemId);
-      replayProgressEvent(backendItemId);
+      waits.set(backendItemId, {
+        activePercentageItemId: null,
+        frameGates: new Map(),
+        hasOwnFrame: false,
+        itemPercentages: new Map(),
+        ...context,
+        localQueueItemId,
+        settle,
+      });
+      replayBufferedEvents(backendItemId);
     });
   };
 
@@ -833,6 +918,8 @@ export const createQueueCoordinator = (
           wait.hasOwnFrame = false;
           activeProgressTarget.clear(getProgressImageTarget(wait.localQueueItemId, event.item_id));
           resetRequeuedSlotProgress(wait.localQueueItemId, event.item_id);
+        } else if (!wait) {
+          clearChildTracking(event.item_id);
         }
         wait?.frameGates.clear();
       }
@@ -842,7 +929,7 @@ export const createQueueCoordinator = (
 
     // Root settlement clears its own gates; only child statuses need the cross-wait lookup.
     if (!waits.has(event.item_id)) {
-      clearFrameGate(event.item_id);
+      clearChildTracking(event.item_id);
     }
 
     if (!isTrackedEvent(event)) {
@@ -944,20 +1031,14 @@ export const createQueueCoordinator = (
       state.activeBackendItemId = backendItemId;
       state.message = event.message;
       state.percentage = event.percentage;
-      state.slotPercentages.set(target.itemIndex, event.percentage);
+      setBoundedItemPercentage(wait, event.item_id, event.percentage);
+      if (wait.activePercentageItemId === null) {
+        wait.activePercentageItemId = event.item_id;
+      }
+      syncSlotPercentage(wait, backendItemId);
       publishRunProgress(wait.localQueueItemId);
     } else {
       progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
-    }
-  };
-
-  const replayProgressEvent = (backendItemId: number): void => {
-    const event = pendingProgressEvents.get(backendItemId);
-
-    pendingProgressEvents.delete(backendItemId);
-
-    if (event) {
-      handleProgress(event);
     }
   };
 
@@ -967,6 +1048,10 @@ export const createQueueCoordinator = (
       return;
     }
 
+    for (const wait of waits.values()) {
+      wait.itemPercentages.clear();
+      wait.activePercentageItemId = null;
+    }
     for (const state of runProgress.values()) {
       state.activeBackendItemId = undefined;
       state.message = '';

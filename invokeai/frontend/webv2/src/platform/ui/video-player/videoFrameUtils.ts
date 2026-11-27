@@ -1,19 +1,13 @@
 import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 
+import type { VideoFrameCopyFailureReason, VideoFrameCopyResult } from './videoFrameCopyKeys';
+
+export type { VideoFrameCopyFailureReason, VideoFrameCopyResult };
+
 /** Seek far enough from zero to clear poster state and display native-resolution frame zero. */
 export const FIRST_FRAME_SEEK_SECONDS = 0.0001;
 
-export type VideoFrameCopyFailureReason =
-  | 'clipboard-failed'
-  | 'draw-failed'
-  | 'encode-failed'
-  | 'not-ready'
-  | 'stale'
-  | 'unsupported';
-
-export type VideoFrameCopyResult = { ok: true } | { ok: false; reason: VideoFrameCopyFailureReason };
-
-export const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
+const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoElement =>
   Boolean(
     video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0
   );
@@ -21,10 +15,10 @@ export const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTML
 export const isVideoFrameCopyAvailable = (video: HTMLVideoElement | null): boolean =>
   canCopyImage() && isVideoFrameReady(video);
 
-export const isCanvasSecurityError = (error: unknown): boolean =>
+const isCanvasSecurityError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'SecurityError';
 
-export const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
+const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
   new Promise((resolve, reject) => {
     try {
       canvas.toBlob(resolve, 'image/png');

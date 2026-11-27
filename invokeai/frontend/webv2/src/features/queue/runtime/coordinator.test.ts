@@ -592,7 +592,8 @@ describe('queueCoordinator', () => {
       totalItemCount: 2,
     });
 
-    // Starting the next invocation (e.g. VAE decode after denoise) resets that slot's percentage to null.
+    // Starting the next invocation (e.g. VAE decode after denoise) resets that slot's percentage to null
+    // without wiping the run-level message/percentage used by top-bar and staging consumers.
     harness.socket.fire('invocation_started', {
       ...createStatusEvent({ item_id: 801 }),
       invocation_source_id: 'vae_decode',
@@ -601,10 +602,112 @@ describe('queueCoordinator', () => {
       workflow_call_parent_source_id: 'call',
     });
     expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: null, 2: 0.72 });
+    expect(harness.progressEntries.get('local-wf')?.message).toBe('Slot 1 child');
+    expect(harness.progressEntries.get('local-wf')?.percentage).toBe(0.5);
 
     // Completing slot 2 removes its per-slot entry while keeping slot 1 intact.
     harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 702, status: 'completed' }));
     expect(harness.progressEntries.get('local-wf')?.slotPercentages).toEqual({ 1: null });
+  });
+
+  it('keeps parallel children of one saved-workflow call from jumping or blanking the slot percentage', async () => {
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-parallel-children',
+      enqueued: 1,
+      itemIds: [701],
+      requested: 1,
+    });
+
+    await harness.coordinator.submitGenerate('local-wf-parallel', {
+      ...generateRequest,
+      graph: { edges: [], id: 'g', nodes: { call: { id: 'call', type: 'call_saved_workflow' } } },
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 701, status: 'waiting' }));
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Child A',
+      percentage: 0.8,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.8 });
+
+    // A second child under the same root starts and reports 0.1 on another GPU: slot 1 stays pinned to Child A.
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 802 }),
+      invocation_source_id: 'denoise',
+      root_item_id: 701,
+      session_id: 'child-b',
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.8 });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 802 }),
+      message: 'Child B',
+      percentage: 0.1,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.8 });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Child A',
+      percentage: 0.85,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.85 });
+
+    // Once Child A completes, slot 1 hands off cleanly to Child B.
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 801, status: 'completed' }));
+    expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.1 });
+  });
+
+  it('replays buffered progress and invocation_started in chronological order so frames stay while slotPercentages resets', async () => {
+    harness.coordinator.connect();
+    let resolveEnqueue!: (value: { batchId: string; enqueued: number; itemIds: number[]; requested: number }) => void;
+    harness.api.enqueueGenerate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveEnqueue = resolve;
+        })
+    );
+
+    const pendingSubmit = harness.coordinator.submitGenerate('local-buffered', generateRequest);
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 901 }),
+      invocation_source_id: 'denoise',
+      session_id: 'session-buffered',
+    });
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 901 }),
+      image: { dataURL: 'data:image/png;base64,YnVmZmVy', height: 32, width: 32 },
+      invocation_source_id: 'denoise',
+      message: 'Denoising',
+      percentage: 1,
+      revision: 1,
+      session_id: 'session-buffered',
+    });
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 901 }),
+      invocation_source_id: 'l2i',
+      session_id: 'session-buffered',
+    });
+
+    resolveEnqueue({ batchId: 'batch-buffered', enqueued: 1, itemIds: [901], requested: 1 });
+    await pendingSubmit;
+
+    expect(harness.progressImage.set).toHaveBeenCalledWith(
+      { dataUrl: 'data:image/png;base64,YnVmZmVy', height: 32, width: 32 },
+      { itemIndex: 1, queueItemId: 'local-buffered' }
+    );
+    expect(harness.progressEntries.get('local-buffered')?.slotPercentages).toEqual({ 1: null });
+    expect(harness.progressEntries.get('local-buffered')?.percentage).toBe(1);
+    expect(harness.progressEntries.get('local-buffered')?.message).toBe('Denoising');
   });
 
   it("signals each slot's first frame of its own once, after the frame is stored", async () => {

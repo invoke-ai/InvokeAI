@@ -1,54 +1,25 @@
 import type { GalleryItemRef, GalleryVideoItem } from '@features/gallery/contracts';
 
-import { Badge, Box, Flex, Text } from '@chakra-ui/react';
+import { Badge, Box } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
-import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useVideoErrorRecovery, VideoFailureOverlay } from '@platform/ui/video-player/VideoFailureOverlay';
+import { VIDEO_FRAME_COPY_FAILURE_KEYS } from '@platform/ui/video-player/videoFrameCopyKeys';
 import {
   copyVideoFrame,
-  createVideoErrorRecovery,
   FIRST_FRAME_SEEK_SECONDS,
   isVideoFrameCopyAvailable,
   seekVideo,
-  type VideoErrorRecovery,
-  type VideoFrameCopyFailureReason,
 } from '@platform/ui/video-player/videoFrameUtils';
 import { VideoPlayer } from '@platform/ui/video-player/VideoPlayer';
 import { GripHorizontalIcon } from 'lucide-react';
-import {
-  memo,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type MouseEvent,
-  type Ref,
-} from 'react';
+import { memo, useCallback, useImperativeHandle, useMemo, useRef, type MouseEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const VIDEO_FAILURE_POSTER_STYLE: CSSProperties = {
-  display: 'block',
-  height: '100%',
-  inset: 0,
-  objectFit: 'contain',
-  position: 'absolute',
-  width: '100%',
-};
-
-const VIDEO_FRAME_COPY_FAILURE_KEYS: Record<VideoFrameCopyFailureReason, string> = {
-  'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
-  'draw-failed': 'widgets.preview.copyCurrentFrameDrawFailed',
-  'encode-failed': 'widgets.preview.copyCurrentFrameEncodeFailed',
-  'not-ready': 'widgets.preview.copyCurrentFrameNotReady',
-  stale: 'widgets.preview.copyCurrentFrameStale',
-  unsupported: 'widgets.preview.copyCurrentFrameUnsupported',
-};
+const getAccountEpoch = (): number => getAuthSession().accountEpoch;
 
 export interface CurrentImageVideoController {
   copyCurrentFrame(): Promise<void>;
@@ -76,7 +47,10 @@ const CurrentImageVideoSurfaceComponent = ({
   const { t } = useTranslation();
   const notifications = useWorkflowNotifications();
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasFailed, setHasFailed] = useState(false);
+  const { handleError, hasFailed, retry } = useVideoErrorRecovery({
+    getAccountEpoch,
+    refreshCookie: refreshProtectedMediaCookie,
+  });
 
   const publishCopyAvailability = useCallback(() => {
     onCopyAvailabilityChange(surfaceKey, isVideoFrameCopyAvailable(localVideoRef.current));
@@ -93,24 +67,12 @@ const CurrentImageVideoSurfaceComponent = ({
     [onCopyAvailabilityChange, surfaceKey]
   );
 
-  const recoveryRef = useRef<VideoErrorRecovery | null>(null);
-  const getRecovery = useCallback(() => {
-    if (!recoveryRef.current) {
-      recoveryRef.current = createVideoErrorRecovery({
-        getAccountEpoch: () => getAuthSession().accountEpoch,
-        onFailedChange: setHasFailed,
-        refreshCookie: refreshProtectedMediaCookie,
-      });
-    }
-    return recoveryRef.current;
-  }, []);
-
   const copyCurrentFrame = useCallback(async () => {
     const video = localVideoRef.current;
-    const accountEpoch = getAuthSession().accountEpoch;
+    const accountEpoch = getAccountEpoch();
     const result = await copyVideoFrame(
       video,
-      () => localVideoRef.current === video && getAuthSession().accountEpoch === accountEpoch
+      () => localVideoRef.current === video && getAccountEpoch() === accountEpoch
     );
 
     if (result.ok) {
@@ -123,16 +85,11 @@ const CurrentImageVideoSurfaceComponent = ({
 
   useImperativeHandle(controllerRef, () => ({ copyCurrentFrame }), [copyCurrentFrame]);
 
-  // Surface is keyed by `videoSurfaceKey`; guarantee availability resets on unmount even if the video ref never attached.
-  useMountEffect(() => () => {
-    onCopyAvailabilityChange(surfaceKey, false);
-  });
-
   const handleVideoError = useCallback(() => {
     publishCopyAvailability();
     const video = localVideoRef.current;
-    getRecovery().handleError(video, () => localVideoRef.current === video);
-  }, [getRecovery, publishCopyAvailability]);
+    handleError(video, () => localVideoRef.current === video);
+  }, [handleError, publishCopyAvailability]);
 
   const handleLoadedMetadata = useCallback(() => {
     publishCopyAvailability();
@@ -146,47 +103,25 @@ const CurrentImageVideoSurfaceComponent = ({
     (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      getRecovery().retry(localVideoRef.current);
+      retry(localVideoRef.current);
       publishCopyAvailability();
     },
-    [getRecovery, publishCopyAvailability]
+    [publishCopyAvailability, retry]
   );
 
   const failureOverlay = useMemo(
     () =>
       hasFailed ? (
-        <>
-          <img
-            aria-hidden="true"
-            alt=""
-            draggable={false}
-            height={item.height}
-            src={item.thumbnailUrl}
-            style={VIDEO_FAILURE_POSTER_STYLE}
-            width={item.width}
-          />
-          <Flex
-            align="center"
-            bg="blackAlpha.700"
-            data-testid="current-image-video-failure"
-            direction="column"
-            gap="2.5"
-            inset="0"
-            justify="center"
-            position="absolute"
-            px="3"
-            textAlign="center"
-          >
-            <Text color="white" fontSize="sm" fontWeight="semibold">
-              {t('widgets.preview.videoFailed')}
-            </Text>
-            <Button aria-label={t('widgets.preview.videoRetry')} size="sm" onClick={handleRetryClick}>
-              {t('widgets.preview.videoRetry')}
-            </Button>
-          </Flex>
-        </>
+        <VideoFailureOverlay
+          height={item.height}
+          poster={item.thumbnailUrl}
+          size="compact"
+          testId="current-image-video-failure"
+          width={item.width}
+          onRetry={handleRetryClick}
+        />
       ) : null,
-    [handleRetryClick, hasFailed, item.height, item.thumbnailUrl, item.width, t]
+    [handleRetryClick, hasFailed, item.height, item.thumbnailUrl, item.width]
   );
 
   return (

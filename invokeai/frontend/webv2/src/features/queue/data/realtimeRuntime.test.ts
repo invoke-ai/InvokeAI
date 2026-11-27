@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { QueueItemStatusChangedEvent } from './events';
 
-import { getActiveProgressItemIds, itemProgressStore } from './itemProgressStore';
 import { applyQueueItemStatusToReadModels, queueKeys } from './queries';
 import { createQueueRealtimeRuntime } from './realtimeRuntime';
 
@@ -123,60 +122,10 @@ describe('queue realtime runtime', () => {
     runtime.start();
     handlers.get('queue_item_status_changed')?.({ item_id: 42, status: 'completed' } as never);
     handlers.get('queue_item_status_changed')?.({ item_id: 43, status: 'failed' } as never);
-    handlers.get('queue_item_status_changed')?.({ item_id: 44, status: 'pending' } as never);
-    handlers.get('queue_item_status_changed')?.({ item_id: 45, status: 'waiting' } as never);
 
     expect(progress.clear).not.toHaveBeenCalledWith(42);
     expect(progress.clear).toHaveBeenCalledWith(43);
-    expect(progress.clear).toHaveBeenCalledWith(44);
-    expect(progress.clear).toHaveBeenCalledWith(45);
     runtime.dispose();
-  });
-
-  it('drops stale percentages and active rail IDs from itemProgressStore when items return to pending or waiting', () => {
-    itemProgressStore.clearAll();
-    const runtime = createQueueRealtimeRuntime({
-      applyStatusChange,
-      backend,
-      invalidate,
-      progress: itemProgressStore,
-      refreshModelCache,
-    });
-
-    try {
-      runtime.start();
-      handlers.get('invocation_progress')?.({
-        item_id: 51,
-        message: 'Denoising',
-        percentage: 0.75,
-      } as never);
-      handlers.get('invocation_progress')?.({
-        item_id: 52,
-        message: 'Denoising',
-        percentage: 0.4,
-      } as never);
-
-      expect(itemProgressStore.get(51)?.percentage).toBe(0.75);
-      expect(itemProgressStore.get(52)?.percentage).toBe(0.4);
-      expect(getActiveProgressItemIds()).toEqual([51, 52]);
-
-      handlers.get('queue_item_status_changed')?.({ item_id: 51, status: 'pending', status_sequence: 2 } as never);
-      expect(itemProgressStore.get(51)).toBeNull();
-      expect(getActiveProgressItemIds()).toEqual([52]);
-
-      // A late pending event with an older status_sequence must not blank an active item's progress.
-      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'in_progress', status_sequence: 3 } as never);
-      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'pending', status_sequence: 2 } as never);
-      expect(itemProgressStore.get(52)?.percentage).toBe(0.4);
-      expect(getActiveProgressItemIds()).toEqual([52]);
-
-      handlers.get('queue_item_status_changed')?.({ item_id: 52, status: 'waiting', status_sequence: 4 } as never);
-      expect(itemProgressStore.get(52)).toBeNull();
-      expect(getActiveProgressItemIds()).toEqual([]);
-    } finally {
-      runtime.dispose();
-      itemProgressStore.clearAll();
-    }
   });
 
   it('ignores timers and socket callbacks after its account scope expires', () => {

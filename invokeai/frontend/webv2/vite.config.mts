@@ -169,6 +169,7 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/canvas/bboxGrid.ts',
   '/workbench/settings/aspectRatioPresets.ts',
   '/workbench/widgets/preview/spanPlaybackRequest.ts',
+  '/platform/ui/video-player/videoFrameCopyKeys.ts',
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
   '/platform/ui/ProgressBadge.tsx',
   '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
@@ -485,6 +486,7 @@ const CANVAS_PROCESSING_SIZE_MODULES = [
 
 /** Lazy video surfaces share VideoPlayer and its frame/timeline/store utilities in one on-demand chunk. */
 const VIDEO_PLAYER_MODULES = [
+  '/platform/ui/video-player/VideoFailureOverlay.tsx',
   '/platform/ui/video-player/VideoPlayer.tsx',
   '/platform/ui/video-player/mediaElementStore.ts',
   '/platform/ui/video-player/videoFrameUtils.ts',

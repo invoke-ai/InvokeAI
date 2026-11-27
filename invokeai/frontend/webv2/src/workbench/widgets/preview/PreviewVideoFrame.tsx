@@ -1,14 +1,11 @@
-/* eslint-disable react/refs, react/immutability */
 import type { GalleryItemKey } from '@features/gallery';
-import type { VideoErrorRecovery } from '@platform/ui/video-player/videoFrameUtils';
+import type { VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameCopyKeys';
 
-import { Flex, Text } from '@chakra-ui/react';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button } from '@platform/ui/Button';
+import { useVideoErrorRecovery, VideoFailureOverlay } from '@platform/ui/video-player/VideoFailureOverlay';
 import {
   copyVideoFrame,
-  createVideoErrorRecovery,
   FIRST_FRAME_SEEK_SECONDS,
   isVideoFrameCopyAvailable,
   seekVideo,
@@ -18,24 +15,22 @@ import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import {
   useCallback,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type Ref,
   type RefObject,
   type SyntheticEvent,
 } from 'react';
-import { useTranslation } from 'react-i18next';
 
-import type { PreviewMediaSource, PreviewVideoFrameController, PreviewVideoFrameCopyResult } from './PreviewFrame';
+import type { PreviewMediaSource, PreviewVideoFrameController } from './PreviewFrame';
 
 import {
   clearVideoSpanPlaybackState,
-  consumeVideoSpanPlaybackRequest,
   getVideoSpanPlaybackRequest,
   isVideoSpanPlaybackFresh,
   publishVideoSpanPlaybackState,
-  subscribeVideoSpanPlaybackRequests,
+  type VideoSpanPlaybackRequest,
 } from './spanPlaybackRequest';
 
 /** Audio settings live here for the page session (first clip at half volume); not account data. */
@@ -45,6 +40,8 @@ const rememberPreviewVideoAudio = (event: SyntheticEvent<HTMLVideoElement>): voi
   previewVideoAudio.muted = event.currentTarget.muted;
   previewVideoAudio.volume = event.currentTarget.volume;
 };
+
+const getAccountEpoch = (): number => getAuthSession().accountEpoch;
 
 /** A trimmed window of a clip, in seconds, as the Video panel's play buttons request it. */
 interface VideoSpan {
@@ -57,14 +54,6 @@ const SPAN_SEEK_TOLERANCE_SECONDS = 0.05;
 
 /** How long a span waits for an element that could not act on it yet. */
 const PARKED_SPAN_TTL_MS = 15_000;
-
-const VIDEO_FAILURE_POSTER_STYLE: CSSProperties = {
-  height: '100%',
-  inset: 0,
-  objectFit: 'contain',
-  position: 'absolute',
-  width: '100%',
-};
 
 /** Must stay a passive effect rendered after `VideoPlayer`, so it runs after the player binds its window. */
 const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
@@ -83,6 +72,8 @@ export interface PreviewVideoPlayerProps {
   loop?: boolean;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
   onLoopChange?: (loop: boolean) => void;
+  pendingSpanRequestRef: RefObject<VideoSpanPlaybackRequest | null>;
+  playerSpanHandlerRef: RefObject<((request: VideoSpanPlaybackRequest) => void) | null>;
   source: Extract<PreviewMediaSource, { kind: 'video' }>;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }
@@ -96,13 +87,16 @@ export const PreviewVideoPlayer = ({
   loop: loopPreference,
   onCopyAvailabilityChange,
   onLoopChange,
+  pendingSpanRequestRef,
+  playerSpanHandlerRef,
   source,
   videoControllerRef,
 }: PreviewVideoPlayerProps) => {
-  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasFailed, setHasFailed] = useState(false);
-  const recoveryRef = useRef<VideoErrorRecovery | null>(null);
+  const { handleError, hasFailed, retry } = useVideoErrorRecovery({
+    getAccountEpoch,
+    refreshCookie: refreshProtectedMediaCookie,
+  });
 
   useMountEffect(() => {
     isControlsTargetRef.current = isVideoPlayerControlsTarget;
@@ -111,16 +105,6 @@ export const PreviewVideoPlayer = ({
     };
   });
 
-  const getRecovery = useCallback(() => {
-    if (!recoveryRef.current) {
-      recoveryRef.current = createVideoErrorRecovery({
-        getAccountEpoch: () => getAuthSession().accountEpoch,
-        onFailedChange: setHasFailed,
-        refreshCookie: refreshProtectedMediaCookie,
-      });
-    }
-    return recoveryRef.current;
-  }, []);
   const publishCopyAvailability = useCallback(() => {
     onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(videoRef.current));
   }, [onCopyAvailabilityChange, source.itemKey]);
@@ -147,17 +131,15 @@ export const PreviewVideoPlayer = ({
     },
     [onCopyAvailabilityChange, source.itemKey]
   );
-  const copyCurrentFrame = useCallback((): Promise<PreviewVideoFrameCopyResult> => {
+  const copyCurrentFrame = useCallback((): Promise<VideoFrameCopyResult> => {
     const video = videoRef.current;
-    const accountEpoch = getAuthSession().accountEpoch;
+    const accountEpoch = getAccountEpoch();
     const itemKey = source.itemKey;
 
     return copyVideoFrame(
       video,
       () =>
-        videoRef.current === video &&
-        getAuthSession().accountEpoch === accountEpoch &&
-        (!isItemCurrent || isItemCurrent(itemKey))
+        videoRef.current === video && getAccountEpoch() === accountEpoch && (!isItemCurrent || isItemCurrent(itemKey))
     );
   }, [isItemCurrent, source.itemKey]);
   const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
@@ -243,9 +225,9 @@ export const PreviewVideoPlayer = ({
 
     // On show this runs before the show effect consumes a request made while hidden; tokens only grow, so a pending
     // request newer than the held start supersedes it, and starting first would play the old span for a moment.
-    const request = getVideoSpanPlaybackRequest();
+    const latestToken = Math.max(getVideoSpanPlaybackRequest()?.token ?? 0, pendingSpanRequestRef.current?.token ?? 0);
 
-    if (!pending || !video || Date.now() > pending.expiresAt || (request && request.token > pending.token)) {
+    if (!pending || !video || Date.now() > pending.expiresAt || latestToken > pending.token) {
       return;
     }
 
@@ -253,7 +235,7 @@ export const PreviewVideoPlayer = ({
     // Autoplay policy can refuse an unmuted play().
     void video.play().catch(() => {});
     publishSpanState();
-  }, [publishSpanState]);
+  }, [pendingSpanRequestRef, publishSpanState]);
   // Retire spans only when seeks land outside them; own-seek markers fail for no-op or delayed seeks.
   const handleSeeking = useCallback(() => {
     const current = spanRef.current;
@@ -281,41 +263,38 @@ export const PreviewVideoPlayer = ({
     publishCopyAvailability();
     publishSpanState();
   }, [publishCopyAvailability, publishSpanState]);
-  // Subscribe by fixed item key and consume pending requests on show. The player pauses itself on hide and unmount.
+  // Receive requests consumed by PreviewVideo's eager shell and resume parked spans on show.
   useMountEffect(() => {
-    const itemKey = source.itemKey;
-    const consumeSpanRequest = (): void => {
-      const request = getVideoSpanPlaybackRequest();
-
-      if (!request || request.itemKey !== itemKey) {
-        return;
-      }
-
-      // Retired whether or not it is still honourable, so a request the user has moved on from cannot wait around for
-      // the next player that shows this clip.
-      consumeVideoSpanPlaybackRequest(request.token);
-
+    const handleConsumedRequest = (request: VideoSpanPlaybackRequest): void => {
       if (isVideoSpanPlaybackFresh(request.requestedAt)) {
         playSpan({ endSeconds: request.endSeconds, startSeconds: request.startSeconds }, request.token);
       }
     };
-    // Resume fresh parked spans on show if metadata finished while the ref was detached.
-    const parked = parkedSpanRef.current;
 
-    if (parked) {
+    playerSpanHandlerRef.current = handleConsumedRequest;
+
+    const queuedRequest = pendingSpanRequestRef.current;
+    pendingSpanRequestRef.current = null;
+
+    if (queuedRequest) {
       parkedSpanRef.current = null;
+      handleConsumedRequest(queuedRequest);
+    } else {
+      const parked = parkedSpanRef.current;
 
-      if (Date.now() <= parked.expiresAt) {
-        playSpan(parked.span, parked.token, parked.expiresAt);
+      if (parked) {
+        parkedSpanRef.current = null;
+
+        if (Date.now() <= parked.expiresAt) {
+          playSpan(parked.span, parked.token, parked.expiresAt);
+        }
       }
     }
 
-    consumeSpanRequest();
-
-    const unsubscribe = subscribeVideoSpanPlaybackRequests(consumeSpanRequest);
-
     return () => {
-      unsubscribe();
+      if (playerSpanHandlerRef.current === handleConsumedRequest) {
+        playerSpanHandlerRef.current = null;
+      }
       // Report nothing stoppable while hidden, but retain span identity for playback after showing.
       const token = spanTokenRef.current;
 
@@ -336,11 +315,8 @@ export const PreviewVideoPlayer = ({
   const handleVideoError = useCallback(() => {
     publishCopyAvailability();
     const video = videoRef.current;
-    getRecovery().handleError(
-      video,
-      () => videoRef.current === video && (!isItemCurrent || isItemCurrent(source.itemKey))
-    );
-  }, [getRecovery, isItemCurrent, publishCopyAvailability, source.itemKey]);
+    handleError(video, () => videoRef.current === video && (!isItemCurrent || isItemCurrent(source.itemKey)));
+  }, [handleError, isItemCurrent, publishCopyAvailability, source.itemKey]);
   // Seek slightly after metadata to clear the browser's show-poster flag and display native-resolution frame zero;
   // removing poster alone leaves black. This fetches extra media ranges. Skip when playback already began or the
   // playhead moved.
@@ -375,38 +351,22 @@ export const PreviewVideoPlayer = ({
     seekVideo(video, FIRST_FRAME_SEEK_SECONDS);
   }, [playSpan]);
   const handleRetry = useCallback(() => {
-    getRecovery().retry(videoRef.current);
+    retry(videoRef.current);
     publishCopyAvailability();
-  }, [getRecovery, publishCopyAvailability]);
-  const failure = hasFailed ? (
-    <>
-      <img
-        aria-hidden="true"
-        alt=""
-        draggable={false}
-        height={frameHeight}
-        src={source.poster}
-        style={VIDEO_FAILURE_POSTER_STYLE}
-        width={frameWidth}
-      />
-      <Flex
-        align="center"
-        bg="blackAlpha.700"
-        direction="column"
-        gap="3"
-        inset="0"
-        justify="center"
-        position="absolute"
-      >
-        <Text color="white" fontSize="lg" fontWeight="semibold">
-          {t('widgets.preview.videoFailed')}
-        </Text>
-        <Button aria-label={t('widgets.preview.videoRetry')} size="lg" onClick={handleRetry}>
-          {t('widgets.preview.videoRetry')}
-        </Button>
-      </Flex>
-    </>
-  ) : null;
+  }, [publishCopyAvailability, retry]);
+  const failure = useMemo(
+    () =>
+      hasFailed ? (
+        <VideoFailureOverlay
+          height={frameHeight}
+          poster={source.poster}
+          size="full"
+          width={frameWidth}
+          onRetry={handleRetry}
+        />
+      ) : null,
+    [frameHeight, frameWidth, handleRetry, hasFailed, source.poster]
+  );
 
   return (
     <>

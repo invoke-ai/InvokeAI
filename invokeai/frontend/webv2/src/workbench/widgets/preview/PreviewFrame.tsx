@@ -1,11 +1,12 @@
 /* eslint-disable react/refs, react/immutability */
 import type { GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
-import type { VideoFrameCopyFailureReason, VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameUtils';
+import type { VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameCopyKeys';
 
 import { Badge } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { GripHorizontalIcon } from 'lucide-react';
 import {
   lazy,
@@ -28,6 +29,13 @@ import { useTranslation } from 'react-i18next';
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { FittedFrame, PreviewStage } from './PreviewStage';
 import { PreviewSwipeNeighbors } from './PreviewSwipeNeighbor';
+import {
+  consumeVideoSpanPlaybackRequest,
+  getVideoSpanPlaybackRequest,
+  isVideoSpanPlaybackFresh,
+  subscribeVideoSpanPlaybackRequests,
+  type VideoSpanPlaybackRequest,
+} from './spanPlaybackRequest';
 import { usePreviewLoupe, type PreviewLoupeControls, type PreviewZoomState } from './usePreviewLoupe';
 import { usePreviewSwipe, type PreviewSwipeNavigation } from './usePreviewSwipe';
 
@@ -39,12 +47,8 @@ export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'image'; source: StreamingImageSource }
   | { fps?: number; itemKey: GalleryItemKey; kind: 'video'; label: string; poster: string; src: string };
 
-export type PreviewVideoFrameCopyFailureReason = VideoFrameCopyFailureReason;
-
-export type PreviewVideoFrameCopyResult = VideoFrameCopyResult;
-
 export interface PreviewVideoFrameController {
-  copyCurrentFrame(): Promise<PreviewVideoFrameCopyResult>;
+  copyCurrentFrame(): Promise<VideoFrameCopyResult>;
   isCopyAvailable(): boolean;
   readonly itemKey: GalleryItemKey;
 }
@@ -415,6 +419,34 @@ const PreviewVideo = ({
 }) => {
   const { t } = useTranslation();
   const isControlsTargetRef = useRef<((target: Element) => boolean) | null>(null);
+  const pendingSpanRequestRef = useRef<VideoSpanPlaybackRequest | null>(null);
+  const playerSpanHandlerRef = useRef<((request: VideoSpanPlaybackRequest) => void) | null>(null);
+
+  // Consume span requests eagerly in the shell so leaving a clip while the lazy player loads still retires them.
+  useMountEffect(() => {
+    const itemKey = source.itemKey;
+    const consumeSpanRequest = (): void => {
+      const request = getVideoSpanPlaybackRequest();
+      if (!request || request.itemKey !== itemKey) {
+        return;
+      }
+
+      consumeVideoSpanPlaybackRequest(request.token);
+
+      if (!isVideoSpanPlaybackFresh(request.requestedAt)) {
+        return;
+      }
+
+      if (playerSpanHandlerRef.current) {
+        playerSpanHandlerRef.current(request);
+      } else {
+        pendingSpanRequestRef.current = request;
+      }
+    };
+
+    consumeSpanRequest();
+    return subscribeVideoSpanPlaybackRequests(consumeSpanRequest);
+  });
   // Use a grip for video so scrubbing the player cannot activate gallery dragging.
   const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
   const disabledDragId = useId();
@@ -509,6 +541,8 @@ const PreviewVideo = ({
             isControlsTargetRef={isControlsTargetRef}
             isItemCurrent={isItemCurrent}
             loop={loopPreference}
+            pendingSpanRequestRef={pendingSpanRequestRef}
+            playerSpanHandlerRef={playerSpanHandlerRef}
             source={source}
             videoControllerRef={videoControllerRef}
             onCopyAvailabilityChange={onCopyAvailabilityChange}
