@@ -5,7 +5,11 @@ import { Checkbox, Flex, HStack, Portal, Spinner, Stack, Text } from '@chakra-ui
 import { getProposedModelLabel } from '@features/models/core/identification';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { bulkReidentifyModels } from '@features/models/data/api';
-import { unknownModelScanQueryOptions } from '@features/models/data/identificationQueries';
+import {
+  createUnknownScanProgress,
+  resumeUnknownScan,
+  unknownModelScanQueryOptions,
+} from '@features/models/data/identificationQueries';
 import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
@@ -75,8 +79,8 @@ export const IdentifyUnknownModelsDialog = ({
   // Everything starts ticked, so the user opts rows out instead of in.
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
   // Stopping ends the scan after the batch in flight; closing the dialog drops the query and abandons that too.
-  const [stopScan] = useState(() => new AbortController());
-  const scan = useQuery(unknownModelScanQueryOptions(unknownKeys, stopScan.signal));
+  const [progress] = useState(createUnknownScanProgress);
+  const scan = useQuery(unknownModelScanQueryOptions(unknownKeys, progress));
   const checkedCount = scan.data?.length ?? 0;
   const isStopped = !scan.isFetching && !scan.isError && scan.data !== undefined && checkedCount < unknownKeys.length;
   const { isBusy: isApplying, run } = useScopedAction();
@@ -96,6 +100,12 @@ export const IdentifyUnknownModelsDialog = ({
 
       return next;
     });
+
+  // A retry continues with the files not yet checked, and a Stop pressed before the failure does not end it at once.
+  const handleRetry = () => {
+    resumeUnknownScan(progress);
+    void scan.refetch();
+  };
 
   const handleApply = () =>
     run(
@@ -165,17 +175,19 @@ export const IdentifyUnknownModelsDialog = ({
                       <Text color="fg.error" fontSize="md">
                         {t('models.identifyUnknownFailed', { error: getApiErrorMessage(scan.error, '') })}
                       </Text>
-                      <Button variant="outline" onClick={() => void scan.refetch()}>
+                      <Button variant="outline" onClick={handleRetry}>
                         {t('common.retry')}
                       </Button>
                     </Stack>
                   ) : scan.isFetching ? (
-                    <HStack gap="2" role="status">
-                      <Spinner size="md" />
-                      <Text color="fg.muted" flex="1" fontSize="xs">
-                        {t('models.identifyUnknownProgress', { done: checkedCount, total: unknownKeys.length })}
-                      </Text>
-                      <Button size="sm" variant="ghost" onClick={() => stopScan.abort()}>
+                    <HStack gap="2">
+                      <HStack flex="1" gap="2" role="status">
+                        <Spinner size="md" />
+                        <Text color="fg.muted" flex="1" fontSize="xs">
+                          {t('models.identifyUnknownProgress', { done: checkedCount, total: unknownKeys.length })}
+                        </Text>
+                      </HStack>
+                      <Button size="sm" variant="ghost" onClick={() => progress.stop.abort()}>
                         {t('models.identifyUnknownStop')}
                       </Button>
                     </HStack>
@@ -185,9 +197,12 @@ export const IdentifyUnknownModelsDialog = ({
                     </Text>
                   ) : null}
                   {proposals.length === 0 && !scan.isFetching ? (
-                    <Text color="fg.muted" fontSize="md" py="2" textAlign="center">
-                      {t('models.identifyUnknownNoneFound')}
-                    </Text>
+                    // After a failure nothing was necessarily checked, so "none identified" would be a claim.
+                    scan.isError ? null : (
+                      <Text color="fg.muted" fontSize="md" py="2" textAlign="center">
+                        {t('models.identifyUnknownNoneFound')}
+                      </Text>
+                    )
                   ) : (
                     <Stack gap="1.5">
                       <Text color="fg.muted" fontSize="xs" fontWeight="600">

@@ -70,11 +70,13 @@ class ModelManagerServiceBase(ABC):
     def identify_model(self, key: str) -> ModelIdentificationPreview:
         """Probe `key`'s files as `reidentify_model` would and report the record it would write, without writing
         anything or touching caches. The files are not hashed again, so the proposal carries the stored hash; the
-        probe reads a safetensors or GGUF file's header and a pickled checkpoint (.ckpt, .pt, .bin) whole.
+        probe reads a safetensors or GGUF file's header and a pickled checkpoint (.ckpt, .pt, .bin) by a pickle
+        scan and a meta-device load that skips the tensor data.
 
         Raises `UnknownModelException` for an unknown key, and `InvalidModelException` when the files are missing
         or unreadable. Files no model class accepts are not an error: `proposed` is None and `refusal` says why a
-        class rejected them, if one did."""
+        class rejected them, if one did. A record that is not Unknown never gets an Unknown proposal: `proposed` is
+        None then, whereas `reidentify_model` still files such a record as Unknown."""
 
     @abstractmethod
     def reidentify_model(self, key: str) -> AnyModelConfig:

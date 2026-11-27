@@ -60,24 +60,47 @@ export async function* streamModelIdentifications(
 }
 
 /**
- * The scan behind "Check unknown models": always read fresh, dropped as soon as the dialog closes. Its data grows
- * with each batch, so the dialog lists results while the rest are still being checked.
+ * What one opening of the scan has already done. A retry continues from it instead of reading the checked files
+ * again: `checked` holds the keys whose outcome the query data already has, and a retry after Stop replaces `stop`.
+ */
+export interface UnknownScanProgress {
+  checked: Set<string>;
+  stop: AbortController;
+}
+
+export const createUnknownScanProgress = (): UnknownScanProgress => ({
+  checked: new Set(),
+  stop: new AbortController(),
+});
+
+/** Lifts a Stop, so the next run of the scan goes on with the unchecked keys. */
+export const resumeUnknownScan = (progress: UnknownScanProgress) => {
+  progress.stop = new AbortController();
+};
+
+/**
+ * The scan behind "Check unknown models": dropped as soon as the dialog closes. Its data grows with each batch, so
+ * the dialog lists results while the rest are still being checked; a refetch appends the keys not yet checked.
  */
 export const unknownModelScanQueryOptions = (
   modelKeys: readonly string[],
-  stop?: AbortSignal,
+  progress: UnknownScanProgress,
   owner = captureAccountScope()
 ) =>
   queryOptions({
     gcTime: 0,
     queryFn: streamedQuery<ModelIdentificationOutcome>({
+      refetchMode: 'append',
       streamFn: ({ signal }) => {
         const fencedSignal = AbortSignal.any([signal, owner.signal]);
 
         return (async function* () {
-          for await (const outcome of streamModelIdentifications(modelKeys, fencedSignal, stop)) {
+          const pending = modelKeys.filter((key) => !progress.checked.has(key));
+
+          for await (const outcome of streamModelIdentifications(pending, fencedSignal, progress.stop.signal)) {
             assertAccountScopeCurrent(owner);
             yield outcome;
+            progress.checked.add(outcome.key);
           }
         })();
       },

@@ -86,6 +86,10 @@ class ModelManagerService(ModelManagerServiceBase):
         except (ValueError, OSError) as e:
             # The files are gone, unreadable, or not shaped like a model at all.
             raise InvalidModelException(f"Unable to read model files: {e}") from e
+        if identified is not None and identified.type == ModelType.Unknown and config.type != ModelType.Unknown:
+            # Nothing recognised the files. Re-identify would file the record as Unknown, discarding the type and
+            # base the user set by hand, which is the normal way to deal with a file the probe cannot identify.
+            identified = None
         changed = identified is not None and any(
             getattr(identified, field, None) != getattr(config, field, None)
             for field in ("type", "format", "base", "variant")

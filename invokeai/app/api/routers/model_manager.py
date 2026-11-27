@@ -498,8 +498,8 @@ def get_model_identification(
 ) -> ModelIdentificationPreview:
     """Preview what reidentifying a model would do, without changing anything.
 
-    Probing reads the model's files: only the header for safetensors and GGUF, but the whole file for
-    .ckpt/.pt/.bin. It takes no claim on the key, because nothing is written.
+    Probing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a
+    meta-device torch.load (no tensor data) for .ckpt/.pt/.bin. It takes no claim on the key, because nothing is written.
     """
     try:
         preview = ApiDependencies.invoker.services.model_manager.identify_model(key)

@@ -4533,7 +4533,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "Get Model Identification",
-        "description": "Preview what reidentifying a model would do, without changing anything.\n\nProbing reads the model's files: only the header for safetensors and GGUF, but the whole file for\n.ckpt/.pt/.bin. It takes no claim on the key, because nothing is written.",
+        "description": "Preview what reidentifying a model would do, without changing anything.\n\nProbing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a\nmeta-device torch.load (no tensor data) for .ckpt/.pt/.bin. It takes no claim on the key, because nothing is written.",
         "operationId": "get_model_identification",
         "security": [
           {

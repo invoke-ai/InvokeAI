@@ -168,4 +168,61 @@ describe('IdentifyUnknownModelsDialog', () => {
     await expect.poll(() => document.body.textContent).toContain('models.identifyUnknownStopped(20,25)');
     expect(api.bulkGetModelIdentification).toHaveBeenCalledTimes(2);
   });
+
+  const mountScan = async (models: ModelConfig[]) => {
+    await act(() => root.unmount());
+    setModelsSnapshotForTests({ models, status: 'loaded' });
+    root = createRoot(host);
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <IdentifyUnknownModelsDialog isOpen onClose={() => undefined} onExitComplete={() => undefined} />
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+  };
+  const buttonByText = (text: string) =>
+    [...document.querySelectorAll('button')].find((el) => el.textContent === text)!;
+
+  it('retries after a failed batch with the files not yet checked and keeps the earlier results', async () => {
+    const many = Array.from({ length: 25 }, (_, index) => unknown(`m${index}`, `Many ${index}`));
+    let failSecond!: () => void;
+
+    api.bulkGetModelIdentification
+      .mockReset()
+      .mockImplementationOnce((keys) => Promise.resolve(keys.map((key) => proposal(unknown(key, key)))))
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failSecond = () => reject(new Error('batch failed'));
+          })
+      )
+      .mockImplementation((keys) => Promise.resolve(keys.map((key) => proposal(unknown(key, key)))));
+    await mountScan(many);
+
+    await expect.poll(() => document.body.textContent).toContain('models.identifyUnknownProgress(10,25)');
+    // The Stop button is a control, not part of the live region that announces progress.
+    expect(document.querySelector('[role="status"] button')).toBeNull();
+    await act(() => userEvent.click(buttonByText('models.identifyUnknownStop')));
+    await act(() => failSecond());
+
+    await expect.poll(() => document.body.textContent).toContain('models.identifyUnknownFailed');
+    expect(document.body.textContent).toContain('models.identifyUnknownCanBeIdentified(10)');
+    expect(document.body.textContent).not.toContain('models.identifyUnknownNoneFound');
+
+    await act(() => userEvent.click(buttonByText('common.retry')));
+
+    await expect.poll(() => document.body.textContent).toContain('models.identifyUnknownCanBeIdentified(25)');
+    expect(api.bulkGetModelIdentification.mock.calls.map(([keys]) => keys[0])).toEqual(['m0', 'm10', 'm10', 'm20']);
+  });
+
+  it('does not claim nothing was identifiable when the first batch fails', async () => {
+    api.bulkGetModelIdentification.mockReset().mockRejectedValue(new Error('down'));
+    await mountScan([A, B]);
+
+    await expect.poll(() => document.body.textContent).toContain('models.identifyUnknownFailed');
+    expect(document.body.textContent).not.toContain('models.identifyUnknownNoneFound');
+  });
 });

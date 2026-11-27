@@ -1,7 +1,6 @@
 import type { ModelConfig, ModelIdentification } from '@features/models/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { getModelsSnapshot, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -15,13 +14,11 @@ import { ModelIdentificationNotice } from './ModelIdentificationNotice';
 
 const api = vi.hoisted(() => ({
   getModelIdentification: vi.fn<(key: string) => Promise<ModelIdentification>>(),
-  reidentifyModel: vi.fn<(key: string) => Promise<ModelConfig>>(),
 }));
 
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   getModelIdentification: api.getModelIdentification,
-  reidentifyModel: api.reidentifyModel,
 }));
 vi.mock('@features/models/ui/useModelsNotify', () => ({
   useNotify: () => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }),
@@ -66,19 +63,20 @@ const adapter = (canManageModels: boolean): ModelsUiAdapter => ({
   setInstallInPlace: () => undefined,
 });
 
+const requestConfirm = vi.fn();
+
 describe('ModelIdentificationNotice', () => {
   let host: HTMLDivElement;
   let root: Root;
   let queryClient: QueryClient;
 
   const render = async (candidate: ModelConfig, canManageModels = true) => {
-    setModelsSnapshotForTests({ models: [candidate], status: 'loaded' });
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
           <QueryClientProvider client={queryClient}>
             <ModelsUiProvider adapter={adapter(canManageModels)}>
-              <ModelIdentificationNotice model={candidate} />
+              <ModelIdentificationNotice model={candidate} onRequestConfirm={requestConfirm} />
             </ModelsUiProvider>
           </QueryClientProvider>
         </ChakraProvider>
@@ -90,7 +88,7 @@ describe('ModelIdentificationNotice', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     api.getModelIdentification.mockReset();
-    api.reidentifyModel.mockReset();
+    requestConfirm.mockReset();
     accountLifecycle.activate('identification-notice', ':user:identification-notice');
     host = document.createElement('div');
     document.body.append(host);
@@ -100,30 +98,23 @@ describe('ModelIdentificationNotice', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     host.remove();
-    setModelsSnapshotForTests({ models: [], status: 'idle' });
     accountLifecycle.invalidate();
   });
 
-  it('shows what the file looks like and applies it through re-identify', async () => {
+  it('shows what the file looks like and asks for the re-identify confirmation on Apply', async () => {
     api.getModelIdentification.mockResolvedValue({ changed: true, proposed: PROPOSED_SDXL, refusal: null });
-    api.reidentifyModel.mockResolvedValue(PROPOSED_SDXL);
     await render(WRONG_BASE);
 
     await expect.poll(() => host.textContent).toContain('models.identificationLooksLike');
     // Only the field that differs is listed, from the stored label to the proposed one.
     expect(host.textContent).toContain('models.identificationChange(models.identificationFieldBase,SD 1.x,SDXL)');
     expect(host.textContent).not.toContain('models.identificationFieldFormat');
-    expect(api.reidentifyModel).not.toHaveBeenCalled();
+    expect(requestConfirm).not.toHaveBeenCalled();
 
     await act(() => userEvent.click(button('common.apply')!));
 
-    await expect.poll(() => getModelsSnapshot().modelsByKey.get(WRONG_BASE.key)?.base).toBe('sdxl');
-    expect(api.reidentifyModel).toHaveBeenCalledExactlyOnceWith(WRONG_BASE.key, expect.anything());
-
-    // The detail now holds the applied record; it reads as the proposal and is not probed a second time.
-    await render(PROPOSED_SDXL);
-    expect(host.textContent).toBe('');
-    expect(api.getModelIdentification).toHaveBeenCalledTimes(1);
+    // The record is not rewritten here: the shared confirmation warns that custom settings are reset, then applies.
+    expect(requestConfirm).toHaveBeenCalledExactlyOnceWith({ kind: 'reidentify', model: WRONG_BASE });
   });
 
   it('checks an Unknown record on opening and hides the notice when dismissed', async () => {
@@ -181,6 +172,18 @@ describe('ModelIdentificationNotice', () => {
 
     await act(() => userEvent.click(button('common.retry')!));
     await expect.poll(() => host.textContent).toContain('models.identificationMatches');
+  });
+
+  it('does not read the file again when the record changes after a requested check', async () => {
+    api.getModelIdentification.mockResolvedValue({ changed: false, proposed: CKPT, refusal: null });
+    await render(CKPT);
+    await act(() => userEvent.click(button('models.identificationCheck')!));
+    await expect.poll(() => host.textContent).toContain('models.identificationMatches');
+
+    await render({ ...CKPT, base: 'sdxl' } as ModelConfig);
+
+    expect(api.getModelIdentification).toHaveBeenCalledTimes(1);
+    expect(button('models.identificationCheck')).toBeDefined();
   });
 
   it('never asks the backend when the user cannot manage models', async () => {

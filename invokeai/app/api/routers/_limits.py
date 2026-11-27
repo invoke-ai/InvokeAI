@@ -20,6 +20,6 @@ MAX_COPY_BATCH_SIZE = 1000
 MAX_IMAGE_BATCH_SIZE = 1000
 MAX_VIDEO_BATCH_SIZE = 1000
 
-# Identifying a model probes its files: a header read for safetensors and GGUF, but a full torch.load for
-# .ckpt/.pt/.bin. One request must stay a bounded amount of that work; larger selections are split client-side.
+# Identifying a model probes its files: a header read for safetensors and GGUF, but a pickle scan and a
+# meta-device torch.load (structure only, no tensor data) for .ckpt/.pt/.bin. One request must stay a bounded amount of that work; larger selections are split client-side.
 MAX_MODEL_IDENTIFICATION_BATCH_SIZE = 100

@@ -950,6 +950,23 @@ def test_identify_of_an_unknown_record_whose_files_are_still_unidentifiable(harn
     assert preview.refusal is None
 
 
+def test_identify_never_proposes_unknown_for_a_record_filed_by_hand(harness: _Harness) -> None:
+    """A file nothing recognises, stored as an SD 1.x main model the user set by hand: the preview proposes nothing.
+    Re-identify itself is unchanged and still files such a record as Unknown."""
+    path = harness.models_path / MODEL_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(path, {"some.unrelated.weight": ([2, 2], "F32")})
+    stored = _sd1_record()
+    harness.store.add_model(stored)
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert preview.proposed is None
+    assert preview.changed is False
+    assert harness.store.get_model(KEY) == stored
+    assert isinstance(harness.manager.reidentify_model(KEY), Unknown_Config)
+
+
 def test_a_save_of_a_client_that_does_not_know_components_keeps_the_stored_ones(harness: _Harness) -> None:
     """A form that edits only the fields it knows posts the whole settings object back without `components`."""
     harness.store.add_model(

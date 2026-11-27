@@ -356,7 +356,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
         />
       ) : null}
 
-      {isEditing ? null : <ModelIdentificationNotice model={model} />}
+      {isEditing ? null : <ModelIdentificationNotice model={model} onRequestConfirm={onRequestConfirm} />}
 
       {isEditing ? (
         <ModelEditForm

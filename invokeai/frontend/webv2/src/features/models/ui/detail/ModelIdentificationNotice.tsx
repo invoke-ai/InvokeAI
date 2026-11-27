@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import { HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getIdentityChanges, getProposedModelLabel, shouldAutoIdentify } from '@features/models/core/identification';
 import { modelIdentificationQueryOptions } from '@features/models/data/identificationQueries';
-import { useModelActions } from '@features/models/ui/detail/useModelActions';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
@@ -63,54 +62,51 @@ const NoticeFrame = ({
   </HStack>
 );
 
+type RequestReidentify = (pending: { kind: 'reidentify'; model: IdentificationNoticeModel }) => void;
+
 /**
- * Tells an administrator when the model's file reads as something other than how it is filed, and applies the
- * existing re-identify on request. Unknown records and safetensors/GGUF files are checked on opening; other
- * formats read the whole file to identify it, so they wait for the button. Everyone else sees nothing.
+ * Tells an administrator when the model's file reads as something other than how it is filed, and hands Apply to
+ * the same confirmation as the other re-identify entry points. Unknown records and safetensors/GGUF files are
+ * checked on opening; other formats wait for the button, because reading them runs a pickle scan. Everyone else
+ * sees nothing.
  */
-export const ModelIdentificationNotice = ({ model }: { model: IdentificationNoticeModel }) => {
+export const ModelIdentificationNotice = ({
+  model,
+  onRequestConfirm,
+}: {
+  model: IdentificationNoticeModel;
+  onRequestConfirm: RequestReidentify;
+}) => {
   const { canManageModels } = useModelsUi();
 
-  return canManageModels ? <IdentificationCheck model={model} /> : null;
+  return canManageModels ? <IdentificationCheck model={model} onRequestConfirm={onRequestConfirm} /> : null;
 };
 
-const IdentificationCheck = ({ model }: { model: IdentificationNoticeModel }) => {
+const IdentificationCheck = ({
+  model,
+  onRequestConfirm,
+}: {
+  model: IdentificationNoticeModel;
+  onRequestConfirm: RequestReidentify;
+}) => {
   const { t } = useTranslation();
-  const { reidentify } = useModelActions();
   const isAutomatic = shouldAutoIdentify(model);
-  const [isRequested, setIsRequested] = useState(false);
+  const fingerprint = identityFingerprint(model);
+  // The record the user asked to check. A later change to the record is a different file state, so it asks again.
+  const [requestedFingerprint, setRequestedFingerprint] = useState<string | null>(null);
+  const isRequested = requestedFingerprint === fingerprint;
   // What the user dismissed, so a different proposal (after an edit, say) is not hidden with it.
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
-  // The identity the user applied: the record then reads as the proposal by definition, so it is not probed again.
-  const [appliedFingerprint, setAppliedFingerprint] = useState<string | null>(null);
-  const [isApplying, setIsApplying] = useState(false);
-  const fingerprint = identityFingerprint(model);
-  const isApplied = appliedFingerprint === fingerprint;
   const query = useQuery({
     ...modelIdentificationQueryOptions(model.key, fingerprint),
-    enabled: (isAutomatic || isRequested) && !isApplied,
+    enabled: isAutomatic || isRequested,
   });
-
-  const handleApply = async (proposed: IdentificationNoticeModel) => {
-    setIsApplying(true);
-    try {
-      if (await reidentify(model)) {
-        setAppliedFingerprint(identityFingerprint({ ...proposed, path: model.path }));
-      }
-    } finally {
-      setIsApplying(false);
-    }
-  };
-
-  if (isApplied) {
-    return isRequested ? <MatchesNotice /> : null;
-  }
 
   if (!isAutomatic && !isRequested) {
     return (
       <NoticeFrame
         actions={
-          <Button variant="outline" onClick={() => setIsRequested(true)}>
+          <Button variant="outline" onClick={() => setRequestedFingerprint(fingerprint)}>
             <Icon as={SearchCheckIcon} boxSize="3" />
             {t('models.identificationCheck')}
           </Button>
@@ -193,10 +189,10 @@ const IdentificationCheck = ({ model }: { model: IdentificationNoticeModel }) =>
     <NoticeFrame
       actions={
         <>
-          <Button loading={isApplying} variant="outline" onClick={() => void handleApply(proposed)}>
+          <Button variant="outline" onClick={() => onRequestConfirm({ kind: 'reidentify', model })}>
             {t('common.apply')}
           </Button>
-          <DismissButton disabled={isApplying} onDismiss={() => setDismissedKey(proposalKey)} />
+          <DismissButton onDismiss={() => setDismissedKey(proposalKey)} />
         </>
       }
     >
@@ -236,11 +232,11 @@ const MatchesNotice = () => {
   );
 };
 
-const DismissButton = ({ disabled, onDismiss }: { disabled?: boolean; onDismiss: () => void }) => {
+const DismissButton = ({ onDismiss }: { onDismiss: () => void }) => {
   const { t } = useTranslation();
 
   return (
-    <Button disabled={disabled} variant="ghost" onClick={onDismiss}>
+    <Button variant="ghost" onClick={onDismiss}>
       <Icon as={XIcon} boxSize="3" />
       {t('models.identificationDismiss')}
     </Button>

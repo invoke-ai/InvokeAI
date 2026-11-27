@@ -7,13 +7,13 @@ type IdentityFields = Pick<ModelConfig, 'base' | 'format' | 'path' | 'type'>;
 
 /**
  * Keys per bulk identification request. The backend accepts 100, but a request is one blocking call and pickled
- * checkpoints are read whole, so small batches keep progress visible and a stop prompt.
+ * checkpoints are scanned and unpickled, so small batches keep progress visible and a stop prompt.
  */
 export const IDENTIFICATION_BATCH_SIZE = 10;
 
 /**
  * Whether the preview is cheap and useful enough to run without being asked. Probing reads only the header of
- * safetensors and GGUF files but the whole of `.ckpt`/`.pt`/`.bin` ones, and a folder model reads its configs;
+ * safetensors and GGUF files but scans and unpickles (without reading tensor data) `.ckpt`/`.pt`/`.bin` ones, and a folder model reads its configs;
  * those wait for the user. An Unknown record is always worth a look: that is what the preview is for.
  */
 export const shouldAutoIdentify = (model: IdentityFields): boolean => {

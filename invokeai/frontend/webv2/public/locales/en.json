@@ -1617,7 +1617,6 @@
     "imageEncoderModelId": "Image Encoder",
     "importSettings": "Import settings…",
     "checkUnknownModels": "Check unknown models…",
-    "identificationApply": "Apply",
     "identificationChange": "{{field}}: {{from}} → {{to}}",
     "identificationCheck": "Check identification",
     "identificationCheckHint": "Read this file to see whether it is filed correctly.",
