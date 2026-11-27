@@ -3,7 +3,7 @@
 # Checks for changes to python files before running the tests.
 # If always_run is true, always runs the tests.
 #
-# Windows ARM64 runs in shards, in jobs of its own (see `windows-arm64-changes` for when). The
+# Windows ARM64 runs in shards, in jobs of its own, whenever the Python tests run. The
 # `py3.12: windows-arm64` job is its single status, meant to be marked required by a maintainer.
 
 name: 'python tests'
@@ -213,24 +213,20 @@ jobs:
         # matrix carries the count, because windows-ffmpeg needs a lower one.
         run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}"
 
-  # Decides whether the ARM64 jobs run: always with `always_run`; otherwise only for a change the matrix's Python
-  # filter matches, so the merge queue and pushes check every change the Python suite can see on ARM64 and a change
-  # outside that filter does not wait for ARM64. A pull request needs more: the change must also be ARM64-relevant,
-  # that is any change to pyproject.toml, uv.lock, this workflow or the sharding files, or one that mentions ARM64
-  # or aarch64, case-insensitively, in a changed path, a changed line or a changed file. The checked-out ref of a
-  # pull request is its merge commit, so `HEAD^1..HEAD` is exactly the pull request's change.
+  # Decides whether the ARM64 jobs run: always with `always_run`; otherwise for every change the matrix's Python
+  # filter matches, on every event. ARM64 has failures of its own that no other platform shows, so no change that
+  # the Python suite can see is ruled out by what it mentions.
   windows-arm64-changes:
     name: 'windows-arm64: change detection'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      run: ${{ inputs.always_run == true || (steps.changed-files.outputs.python_any_changed == 'true' && (github.event_name != 'pull_request' || steps.detect.outputs.run == 'true')) }}
+      run: ${{ inputs.always_run == true || steps.changed-files.outputs.python_any_changed == 'true' }}
     steps:
       - name: checkout
         if: ${{ inputs.always_run != true }}
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
           persist-credentials: false
 
       - name: check for changed python files
@@ -240,46 +236,6 @@ jobs:
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: *python-test-inputs
-
-      - name: detect ARM64-relevant changes
-        if: ${{ inputs.always_run != true && github.event_name == 'pull_request' && steps.changed-files.outputs.python_any_changed == 'true' }}
-        id: detect
-        run: |
-          # Without a diff there is nothing to rule the ARM64 jobs out, so they run. A rename lists both names.
-          if ! git diff --no-renames --name-only -z HEAD^1 HEAD > "$RUNNER_TEMP/changed.z" ||
-             ! git diff --no-renames -U0 HEAD^1 HEAD > "$RUNNER_TEMP/changes.diff"; then
-            echo "::warning::could not diff HEAD^1..HEAD; running the ARM64 jobs"
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          pattern='arm64|aarch64'
-          relevant=false
-          # File names are NUL-separated, and `%q` quotes them wherever they are printed, so a name cannot
-          # forge a workflow command.
-          while IFS= read -r -d '' path; do
-            case "$path" in
-              pyproject.toml|uv.lock|.github/workflows/python-tests.yml|tests/sharding.py|tests/shard_durations.json)
-                printf 'fixed file: %q\n' "$path"
-                relevant=true
-                ;;
-            esac
-            if printf '%s\n' "$path" | grep -q -i -E "$pattern"; then
-              printf 'path: %q\n' "$path"
-              relevant=true
-            fi
-            if [ -f "$path" ] && grep -q -a -i -E "$pattern" -- "$path"; then
-              printf 'content: %q\n' "$path"
-              relevant=true
-            fi
-          done < "$RUNNER_TEMP/changed.z"
-          lines=$(grep -c -a -i -E "^[+-].*($pattern)" "$RUNNER_TEMP/changes.diff" || true)
-          if [ "${lines:-0}" -gt 0 ]; then
-            echo "changed lines mentioning ARM64: $lines"
-            relevant=true
-          fi
-          echo "ARM64-relevant: $relevant"
-          echo "run=$relevant" >> "$GITHUB_OUTPUT"
-        shell: bash
 
   # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
   # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
@@ -297,9 +253,9 @@ jobs:
         shard: [1, 2, 3, 4]
     name: 'py3.12: windows-arm64 ${{ matrix.shard }}/${{ strategy.job-total }}'
     runs-on: windows-11-arm
-    # Setup (runner preparation, ffmpeg, dependency install) takes ~4 min; each shard then runs about an
-    # equal share of the suite by recorded duration. The per-test timeout turns a hang into a failure inside
-    # this limit.
+    # Setup (runner preparation, ffmpeg, dependency install) takes ~4 min. Shards are balanced by the recorded
+    # per-file durations, and a file runs on one worker, so the longest file sets a floor for its shard. The
+    # per-test timeout turns a hang into a failure inside this limit.
     timeout-minutes: 45
     env:
       PIP_USE_PEP517: '1'
@@ -373,9 +329,9 @@ jobs:
           overwrite: true
 
   # The status for Windows ARM64, meant to be marked required by a maintainer; once it is, the merge queue blocks on
-  # ARM64 for the changes that run it. A skipped job passes a required check, so this one always runs and passes
-  # only when change detection succeeded and every shard succeeded, or was skipped because the change is not
-  # relevant to ARM64.
+  # ARM64 for every change that runs the Python tests. A skipped job passes a required check, so this one always
+  # runs and passes only when change detection succeeded and every shard succeeded, or was skipped because no
+  # Python test runs.
   windows-arm64-tests:
     name: 'py3.12: windows-arm64'
     if: ${{ always() }}

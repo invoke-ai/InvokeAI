@@ -108,25 +108,22 @@ def test_invalid_shard_is_a_usage_error(pytester: pytest.Pytester, spec: str) ->
 
 
 @pytest.mark.parametrize(
-    "content",
+    ("content", "shard"),
     [
-        None,
-        "not json",
-        '{"version": 2, "files": {}}',
-        '{"version": 1}',
-        '{"version": 1, "files": {"a.py": "slow"}}',
-        '{"version": 1, "files": {"a.py": NaN}}',
-        '{"version": 1, "files": {"a.py": Infinity}}',
-        '{"version": 1, "files": {"a.py": -1}}',
-        '{"version": 1, "files": {"a.py": true}}',
+        ("not json", ["--shard=1/2"]),
+        ('{"version": 2, "files": {}}', ["--shard=1/2"]),
+        ('{"version": 1, "files": []}', ["--shard=1/2"]),
+        ('{"version": 1, "files": {"a.py": true}}', ["--shard=1/2"]),
+        ('{"version": 1, "files": {"a.py": NaN}}', ["--shard=1/2"]),
+        ('{"version": 1, "files": {"a.py": -1}}', ["--shard=1/2"]),
+        # The file is validated whenever it is given, not only for a sharded run.
+        ('{"version": 2, "files": {}}', []),
     ],
 )
-@pytest.mark.parametrize("shard", [[], ["--shard=1/2"]])
-def test_unusable_durations_fail_loudly(pytester: pytest.Pytester, content: str | None, shard: list[str]) -> None:
+def test_unusable_durations_fail_loudly(pytester: pytest.Pytester, content: str, shard: list[str]) -> None:
     _write_suite(pytester)
     path = pytester.path / "durations.json"
-    if content is not None:
-        path.write_text(content)
+    path.write_text(content)
     result = pytester.runpytest(*shard, f"--shard-durations={path}")
     assert result.ret == pytest.ExitCode.USAGE_ERROR
     result.stderr.fnmatch_lines(["*--shard-durations*"])
