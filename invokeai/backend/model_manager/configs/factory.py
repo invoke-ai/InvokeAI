@@ -62,6 +62,7 @@ from invokeai.backend.model_manager.configs.ip_adapter import (
 from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevision_Diffusers_Config
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
+    ControlLoRA_LyCORIS_Krea2_Config,
     LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
@@ -281,6 +282,12 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
     let the layerwise cast re-encode the result as *unscaled* fp8, which on `flux-2-klein-4b-fp8` flushed 3.4% of the
     weights to zero for the byte count the file already had. The loaders now keep such a file in its own scaled form
     instead, so switching the setting on is lossless and worth doing by default.
+
+    A float8 tensor named as a scale (`<layer>.weight_scale`) is not evidence: nvfp4 stores its block scales in
+    F8_E4M3 beside a packed U8 weight, and they are not fp8 weights. For such a build FP8 Storage would store only the
+    layers the file ships in full precision, a lossy trade rather than the lossless keep a scaled-fp8 file gets, so
+    it is left to the user instead of switched on. An nvfp4 file that also stores scaled fp8 weights (Qwen-Image's
+    nvfp4 build) still counts.
     """
     if mod.path.is_file():
         candidates = [mod.path]
@@ -302,7 +309,9 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
             continue
         denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
         stores_float8 = stores_float8 or any(
-            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES for info in denoiser.values()
+            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES
+            for key, info in denoiser.items()
+            if not key.endswith("_scale")
         )
     return stores_float8
 
@@ -633,6 +642,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
+        Annotated[ControlLoRA_LyCORIS_Krea2_Config, ControlLoRA_LyCORIS_Krea2_Config.get_tag()],
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
@@ -900,6 +910,7 @@ class ModelConfigFactory:
         fields["hash"] = _overrides.get("hash") or mod.hash()
         fields["key"] = _overrides.get("key") or uuid_string()
         fields["description"] = _overrides.get("description")
+        fields["source_urls"] = _overrides.get("source_urls") or []
         fields["file_size"] = _overrides.get("file_size") or mod.size()
 
         return fields

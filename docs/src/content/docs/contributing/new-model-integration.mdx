@@ -860,6 +860,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
    `FamilyGraph` requires each fact field, but its types do not prove that a nullable fact is present for the family's capabilities or that a node reference names the right node. Verify that the new base and every graph-changing variant participate in `generateGraphCases` (`graphCoverage.testing.ts`), which derives its bases from `SUPPORTED_GENERATE_BASES`. Extend `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` as needed, and update the per-base expectations in `graph.test.ts`'s `family graph facts` tests. Those tests check the facts against emitted VAE, UNet, denoise and conditioning wiring.
 
+   Upscale refines with the same builder. A family in `IMAGE_TO_IMAGE_PIPELINES` is split into a pipeline, `buildZImagePipeline(input: FamilyPipelineInput, extras)`, which builds the loader, LoRAs, encoders, denoise and decode from the narrow `FamilyPipelineSettings`, and the Generate builder, which passes references, PiD and enhancers through the pipeline's hooks and adds metadata once the pipeline returns. `UPSCALE_ARCHITECTURES` is type-checked against that table, so supporting Upscale means the split plus an Upscale entry for its own choices (tile ControlNet, schedulers, defaults).
+
    Validation that only one architecture needs belongs in `getModelFamilyValidationReasons` (`baseGenerationPolicies.ts`).
 
 4. **Component pickers** (encoder, VAE, Diffusers component source)
@@ -878,7 +880,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 5. **Canvas**
 
    - Name the encode node in the builder's `latents` record (step 3). Leave it `null` only when the architecture has no image-to-latents node.
-   - If the architecture uses the `strength^0.2` denoising-start curve, add it to `canvasDenoisingStart`.
+   - Record how its denoise clips `denoising_start` in `getDenoisingStartClipping` (`baseGenerationPolicies.ts`). Clipping by sigma value gives Canvas the `strength^0.2` curve; a node that clips by step index also records its sigmas and rounding, which Upscale aims Creativity with.
    - Add a case to `BASE_CASES` in `canvas/compileCanvasGraph.test.ts`.
 
 6. **Recall** (`src/workbench/image-actions/`)

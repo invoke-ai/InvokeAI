@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import accelerate
 import torch
-from safetensors.torch import load_file
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -32,6 +31,7 @@ from invokeai.backend.model_manager.configs.text_llm import (
     TextLLM_Diffusers_Config,
     TextLLM_Qwen3VLEncoder_Config,
 )
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderCheckpointLoader
@@ -50,6 +50,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_fp8_scaled_layers,
     fold_transient_bytes,
+    load_safetensors_checkpoint,
     read_safetensors_metadata,
     reject_quantized_side_channel,
 )
@@ -71,6 +72,7 @@ from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     qwen3_vl_instruct_generation_config,
     qwen3_vl_ties_word_embeddings,
 )
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
@@ -101,6 +103,12 @@ class _TextLLMLoader(ModelLoader):
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
             return 0
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _without_mtp_head(self, names: dict[str, str], what: str) -> dict[str, str]:
+        """What of a single file is worth reading: not the multi-token-prediction head, which is never read at all."""
+        kept = {key: value for key, value in names.items() if not is_multi_token_prediction_key(key)}
+        _log_dropped_mtp(self._logger, what, len(names) - len(kept))
+        return kept
 
     def _compute_dtype(self, cpu_only: bool | None, *, avoid_float16: bool) -> torch.dtype:
         # float32 for CPU-only models: CPU float16 is emulated and slow.
@@ -168,7 +176,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                 path = Path(config.path)
                 what = f"Qwen3.5 checkpoint {path.name}"
                 model = qwen3_5_vl_from_state_dict(
-                    load_file(path),
+                    load_safetensors_checkpoint(path, select=lambda names: self._without_mtp_head(names, what)),
                     self._compute_dtype(config.cpu_only, avoid_float16=True),
                     reserve=self._ram_cache.make_room,
                     what=what,
@@ -191,6 +199,19 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
         )
 
 
+class _Qwen3VLTextLLMDecoder(Qwen3VLEncoderCheckpointLoader):
+    """The encoder loader's decode, with a Text LLM's compute dtype: float32 on the CPU, where float16 and bfloat16 are
+    emulated or slow, otherwise the configured one except float16. Everything else the encoder's load decision settles
+    (where fp8 stays packed, the cache-key variant) is the encoder's own."""
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if device.type == "cpu":
+            return torch.float32
+        return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextLLM, format=ModelFormat.Qwen3VLEncoder)
 class TextLLMQwen3VLLoader(_TextLLMLoader):
     """Loads the Text LLM view of a single-file Qwen3-VL encoder (`TextLLM_Qwen3VLEncoder_Config`): the whole Qwen3-VL
@@ -200,6 +221,32 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
     The visual tower stays on disk. The LM head is the token embedding where the variant ties them (the 4B), and
     otherwise the file's, widened to the compute dtype on load.
     """
+
+    _decoder_for: Optional[tuple[AnyModelConfig, Qwen3VLEncoder_Checkpoint_Config, _Qwen3VLTextLLMDecoder]] = None
+
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+        self._decoder_for = None
+        return super().load_model(model_config, submodel_type)
+
+    def _decoder(self, config: AnyModelConfig) -> tuple[Qwen3VLEncoder_Checkpoint_Config, _Qwen3VLTextLLMDecoder]:
+        """The file as an encoder, and the loader that decodes it. Kept for the load, so the cache key and the decode
+        read one load decision rather than two probes that could disagree."""
+        if self._decoder_for is None or self._decoder_for[0] is not config:
+            encoder_config = view_as(config, ModelType.Qwen3VLEncoder)
+            if not isinstance(encoder_config, Qwen3VLEncoder_Checkpoint_Config):
+                raise ValueError(f"'{config.name}' is not a single-file Qwen3-VL encoder; re-identify it.")
+            decoder = _Qwen3VLTextLLMDecoder(self._app_config, self._logger, self._ram_cache)
+            self._decoder_for = (config, encoder_config, decoder)
+        return self._decoder_for[1], self._decoder_for[2]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        """The language model's storage format, which depends on the device it is decoded for (fp8 kept packed or
+        folded, the compute dtype): devices that would build different weights must not adopt each other's copy. Asked
+        of the decode itself, so it is the encoder's own answer."""
+        if submodel_type is not None:
+            return ""
+        encoder_config, decoder = self._decoder(config)
+        return decoder._cache_key_variant(encoder_config, SubModelType.TextEncoder)
 
     def _load_model(
         self,
@@ -228,15 +275,11 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
     def _load_qwen3_vl(self, config: TextLLM_Qwen3VLEncoder_Config) -> "Qwen3VLForConditionalGeneration":
         from transformers import Qwen3VLForConditionalGeneration
 
-        encoder_config = view_as(config, ModelType.Qwen3VLEncoder)
-        if not isinstance(encoder_config, Qwen3VLEncoder_Checkpoint_Config):
-            raise ValueError(f"'{config.name}' is not a single-file Qwen3-VL encoder; re-identify it.")
+        encoder_config, decoder = self._decoder(config)
         path = Path(config.path)
         what = f"Qwen3-VL checkpoint {path.name}"
-        # As for any Text LLM: float32 on the CPU, where float16 and bfloat16 are emulated or slow. fp8 weights are
-        # folded there too, rather than dequantized on every token.
-        dtype = self._compute_dtype(config.cpu_only, avoid_float16=True)
-        device = torch.device("cpu") if config.cpu_only else None
+        # float32 on the CPU with the fp8 weights folded there, rather than dequantized on every token.
+        dtype = decoder._decision(encoder_config, SubModelType.TextEncoder).dtype
 
         tied = qwen3_vl_ties_word_embeddings(config.variant)
         hints: dict[str, Any] = {}
@@ -251,13 +294,9 @@ class TextLLMQwen3VLLoader(_TextLLMLoader):
                 raise ValueError(f"'{config.name}' cannot run as a Text LLM: {refusal}. Re-identify it.")
             head_bytes = _lm_head_widening_bytes(head_meta, dtype)
 
-        encoder_loader = Qwen3VLEncoderCheckpointLoader(self._app_config, self._logger, self._ram_cache)
         # The decode makes the one reservation, before it widens anything; the head widens after it.
-        language_model = encoder_loader.load_language_model(
-            encoder_config,
-            reserve=lambda needed: self._ram_cache.make_room(needed + head_bytes),
-            device=device,
-            dtype=dtype,
+        language_model = decoder.load_language_model(
+            encoder_config, reserve=lambda needed: self._ram_cache.make_room(needed + head_bytes)
         )
 
         with accelerate.init_empty_weights():
@@ -299,6 +338,16 @@ def _lm_head_widening_bytes(head: dict[str, Any], dtype: torch.dtype) -> int:
     return total
 
 
+def is_multi_token_prediction_key(key: str) -> bool:
+    """The `mtp.*` head the int8 build ships: generation never runs it."""
+    return key.startswith("mtp.")
+
+
+def _log_dropped_mtp(logger: Logger, what: str, count: int) -> None:
+    if count:
+        logger.info(f"{what}: dropped {count} multi-token-prediction tensor(s) (mtp.*), which generation never runs.")
+
+
 def qwen3_5_vl_from_state_dict(
     sd: dict[str, torch.Tensor],
     dtype: torch.dtype,
@@ -323,13 +372,10 @@ def qwen3_5_vl_from_state_dict(
     """
     from transformers import Qwen3_5ForConditionalGeneration
 
-    mtp = [key for key in sd if key.startswith("mtp.")]
-    for key in mtp:
+    dropped = [key for key in sd if is_multi_token_prediction_key(key)]
+    for key in dropped:
         del sd[key]
-    if mtp:
-        logger.info(
-            f"{what}: dropped {len(mtp)} multi-token-prediction tensor(s) (mtp.*), which generation never runs."
-        )
+    _log_dropped_mtp(logger, what, len(dropped))
 
     markers = extract_int8_convrot_markers(sd)
     # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.

@@ -143,7 +143,7 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
       t: (key) => key,
     });
 
-  return { doc, engine, layer, loaded, maskBitmap, pixelAt, refusals, runCommand, select, sourceType };
+  return { doc, engine, layer, loaded, maskBitmap, overlay, pixelAt, refusals, runCommand, select, sourceType };
 };
 
 const mask = () =>
@@ -158,6 +158,37 @@ const photo = (overrides: Partial<CanvasLayerContract> = {}) =>
     source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
     ...overrides,
   } as Partial<CanvasLayerContract>);
+
+it('picks the raster color beneath a visible inpaint mask through the engine', async () => {
+  const inpaint = mask();
+  if (inpaint.type !== 'inpaint_mask') {
+    throw new Error('Expected an inpaint mask fixture');
+  }
+  inpaint.mask.fill.style = 'solid';
+  const { engine, loaded, overlay } = await setup([inpaint, photo()], 'mask');
+  await loaded('mask');
+  await loaded('photo');
+
+  const point = engine.viewport.getViewport().documentToScreen({ x: 10.5, y: 10.5 });
+  const { left, top } = overlay.getBoundingClientRect();
+  const sampled = engine.tools.requestColorSample();
+  for (const [type, buttons] of [
+    ['pointerdown', 1],
+    ['pointerup', 0],
+  ] as const) {
+    overlay.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        buttons,
+        clientX: left + point.x,
+        clientY: top + point.y,
+        isPrimary: true,
+        pointerId: 1,
+      })
+    );
+  }
+  await expect(sampled).resolves.toBe('#0000ff');
+});
 
 describe('selection edits on a real engine', () => {
   it('Delete and Cut remove a mask’s selected coverage, one undoable step each', async () => {

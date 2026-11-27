@@ -12,18 +12,21 @@ const FORMAT_STORAGE_KEY = 'invokeai:v7:webv2:color-format';
 const MODE_STORAGE_KEY = 'invokeai:v7:webv2:color-picker-mode';
 const MAX_RECENTS = 12;
 
-/** Keep defaults aligned with REGIONAL_GUIDANCE_FILL_COLORS; owner boundaries forbid importing the canvas constant. */
+/** Neutral swatches followed by the Canvas mask palette. */
 export const DEFAULT_COLOR_SWATCHES: readonly string[] = [
   '#000000',
   '#ffffff',
   '#808080',
   '#e07575',
-  '#dc9065',
-  '#fae150',
   '#83d683',
-  '#799ddb',
-  '#a178d6',
-  '#d58bca',
+  '#f59e42',
+  '#f4d35e',
+  '#38c9c5',
+  '#62b5f5',
+  '#637be8',
+  '#ad80e8',
+  '#ed79ba',
+  '#b7d65a',
 ];
 
 const isColorPickerFormat = (value: unknown): value is ColorPickerFormat =>

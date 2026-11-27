@@ -46,6 +46,8 @@ const createTransformOptions = () => ({
   getDocument: () => null,
   getUserToolId: () => 'brush' as const,
   hasFloatingSelection: () => false,
+  getFloatingSelection: () => null,
+  setFloatingTransform: () => false,
   invalidate: vi.fn(),
   isGestureActive: () => false,
   peekCacheRect: () => undefined,

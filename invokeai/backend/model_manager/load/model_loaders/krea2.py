@@ -24,7 +24,6 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -58,14 +57,15 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -130,6 +130,45 @@ def _int4_int8_split(markers: dict[str, dict[str, Any]]) -> str:
     """How the kept quantized layers divide into packed int4 and int8, for the load log."""
     int4 = sum(marker_layout(marker).packed_int4 for marker in markers.values())
     return f"{int4} int4, {len(markers) - int4} int8"
+
+
+def _keep_rms_norms_in_fp32(model: torch.nn.Module) -> None:
+    """Hold every `Krea2RMSNorm` weight in float32, as diffusers' `_keep_in_fp32_modules` does on a folder load.
+
+    The norm upcasts its input to float32; a bf16 weight there both rounds `1 + weight` and makes torch skip the fused
+    rms_norm kernel for the dtype mismatch (#10117). A GGUF stores these unquantized, so they are taken as stored
+    rather than through the bf16 compute dtype.
+    """
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    for module in model.modules():
+        if not isinstance(module, Krea2RMSNorm):
+            continue
+        weight = module.weight
+        if isinstance(weight, GGMLTensor):
+            stored = weight.quantized_data
+            weight = (
+                stored
+                if stored.is_floating_point() and stored.shape == weight.shape
+                else weight.get_dequantized_tensor()
+            )
+        module.weight = torch.nn.Parameter(weight.detach().to(torch.float32), requires_grad=False)
+
+
+def _stored_rms_norm_weights(model: torch.nn.Module, sd: dict[str, Any], dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """Float32 copies of the `Krea2RMSNorm` weights in `sd` that a cast to `dtype` would round: 16- or 32-bit floats of
+    another dtype. Copies, because an mmap-backed view would pin the whole checkpoint file for the model's lifetime."""
+    from diffusers.models.transformers.transformer_krea2 import Krea2RMSNorm
+
+    keys = (f"{name}.weight" for name, module in model.named_modules() if isinstance(module, Krea2RMSNorm))
+    return {
+        key: tensor.to(torch.float32, copy=True)
+        for key in keys
+        if isinstance(tensor := sd.get(key), torch.Tensor)
+        and tensor.is_floating_point()
+        and tensor.element_size() >= 2
+        and tensor.dtype != dtype
+    }
 
 
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
@@ -419,6 +458,8 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
     pipeline's tokenizer for reference images. Krea-2's edit mode loads both only when a prompt has references.
     """
 
+    _bfloat16_safe = True
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -460,7 +501,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
             return _load_qwen3vl_visual_tower(
                 qwen3vl_visual_tower_files(encoder_path),
                 AutoConfig.from_pretrained(encoder_path, local_files_only=True).vision_config,
-                TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()),
+                self._decision(config, submodel_type).dtype,
                 reserve=self._ram_cache.make_room,
             )
 
@@ -469,9 +510,8 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
-        # Krea-2 prefers bfloat16; use a safe dtype based on target device capabilities.
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        # Reuse the constructor dtype that selected the shared-weight key.
+        dtype = self._decision(config, submodel_type).dtype
 
         extra_kwargs: dict[str, Any] = {}
         if submodel_type is SubModelType.TextEncoder:
@@ -514,7 +554,8 @@ class Krea2CheckpointModel(ModelLoader):
     ``.weight_scale``) and ComfyUI 'int8_tensorwise' checkpoints (int8 weight + per-output-channel
     ``.weight_scale`` + a ``.comfy_quant`` marker, optionally convrot-rotated), in both the diffusers
     and native/ComfyUI key naming. Apply the fp8-storage setting to keep the (large) transformer
-    fp8-resident; otherwise it loads in full precision.
+    fp8-resident (not for an int8 or int4 build, which keeps every layer as shipped); otherwise it loads in
+    full precision.
 
     The int8 build stays int8-resident: `swap_in_int8_linears` installs `Int8ConvrotLinear`, which
     holds the stored codes and dequantizes per forward, so a 12.0 GiB checkpoint stays 12.0 GiB.
@@ -524,6 +565,8 @@ class Krea2CheckpointModel(ModelLoader):
     `Int4ConvrotLinear`; some name their layers only in the safetensors header. ComfyUI's 'nvfp4'
     build, whose layers the header names too, stays packed as `NVFP4Linear`.
     """
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
 
     def _load_model(
         self,
@@ -541,22 +584,22 @@ class Krea2CheckpointModel(ModelLoader):
 
     def _load_from_singlefile(self, config: AnyModelConfig) -> AnyModel:
         from diffusers import Krea2Transformer2DModel
-        from safetensors.torch import load_file
 
         if not isinstance(config, Main_Checkpoint_Krea2_Config):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
-        sd = load_file(model_path)
+        # Discard what the key conversion below would discard anyway, before anything is spent on
+        # it: not even read. One repack quantizes `last.up` with a blockwise scale grid this decode does not
+        # implement; refusing a tensor that is on its way to the bin would be an odd way to fail.
+        sd = load_safetensors_checkpoint(
+            model_path,
+            select=lambda names: _drop_discarded_native_final_layers(CheckpointPrefix.detect(names).strip(names)),
+        )
         metadata = read_safetensors_metadata(model_path, self._logger)
         sd = CheckpointPrefix.detect(sd).strip(sd)
-        # Discard what the key conversion below would discard anyway, before anything is spent on
-        # it. One repack quantizes `last.up` with a blockwise scale grid this decode does not
-        # implement; refusing a tensor that is on its way to the bin would be an odd way to fail.
-        sd = _drop_discarded_native_final_layers(sd)
 
         # Comfy's nvfp4 build names its layers in the header, natively. Take them out before either side-channel
         # format below reads a scale: both pair every `weight_scale` with its weight, and the key conversion would
@@ -652,6 +695,9 @@ class Krea2CheckpointModel(ModelLoader):
         modules = {name for name, _ in model.named_children()}
         nvfp4_payloads = {path: payload for path, payload in nvfp4_payloads.items() if path.split(".", 1)[0] in modules}
         nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        # The casts below round every float to `model_dtype` before `_keep_rms_norms_in_fp32` widens the norms, so
+        # hold back their stored copies or they arrive rounded (#10117). They are vectors; no reservation needed.
+        stored_norms = _stored_rms_norm_weights(model, sd, model_dtype)
 
         if int8_markers:
             # A merged file's bundled submodels are in `sd` too -- this loader does not
@@ -721,6 +767,7 @@ class Krea2CheckpointModel(ModelLoader):
             packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
             self._logger.info(f"Krea-2: kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed.")
 
+        sd.update(stored_norms)
         load_state_dict_ignoring_extras(
             model, sd, source="Krea-2 single-file checkpoint", assign=True, allow_missing=True
         )
@@ -773,8 +820,10 @@ class Krea2CheckpointModel(ModelLoader):
             # The layerwise-casting path exists to *produce* fp8 weights from full-precision ones. The
             # checkpoint already is fp8, and its hooks would cast back to the compute dtype without
             # applying weight_scale, so it must not run here.
+            _keep_rms_norms_in_fp32(model)
             return model
 
+        _keep_rms_norms_in_fp32(model)
         # Honor the fp8-storage setting (re-quantizes the dequantized weights to fp8-resident on CUDA).
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
@@ -857,6 +906,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         # ComfyUI GGUFs may use key names needing conversion). Failing here beats a confusing meta-tensor
         # crash mid-inference.
         _reject_incomplete_load(model, what="Krea-2 GGUF checkpoint")
+        _keep_rms_norms_in_fp32(model)
         return model
 
 
@@ -1068,6 +1118,10 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
 
     CONFIG_CLASS = Qwen3VLEncoder_Checkpoint_Config
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
+    _encoder_layerwise_storage = True
+
     def _vision_encoder_nbytes(self, model_path: Path) -> int:
         return qwen3vl_visual_tower_nbytes([model_path])
 
@@ -1088,8 +1142,6 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         config: Qwen3VLEncoder_Checkpoint_Config,
         *,
         reserve: Callable[[int], None],
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
     ) -> AnyModel:
         """Decode the file's language model into a `Qwen3VLModel`, without the visual tower and the LM head.
 
@@ -1097,25 +1149,24 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         quantization decodes alike for both. `reserve` is asked for room once, before anything widens: the encoder
         passes the cache's `make_room`; the Text LLM view adds the LM head it widens afterwards.
 
-        Args:
-            device: Where the model runs, which decides whether fp8 weights stay packed. The loader's device when
-                omitted; a CPU folds them.
-            dtype: The compute dtype. bfloat16 where `device` runs it when omitted, whatever precision is configured.
+        Where the weights run, whether fp8 stays packed and the compute dtype all come from this loader's load
+        decision (`_decision`), so a caller that serves the file another way gets the same answers by giving the
+        loader a config with the matching `cpu_only`.
         """
         import torch
-        from safetensors.torch import load_file
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
-        target_device = device or TorchDevice.choose_torch_device()
-        model_dtype = dtype or TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        decision = self._decision(config, SubModelType.TextEncoder)
+        keep_matmul_fp8 = decision.fp8_compute
+        storage_supported = decision.storage_supported
+        model_dtype = decision.dtype
 
-        sd = load_file(str(model_path))
-        # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
-        # reserved for. (The file *header* is still read below for quantization metadata, which can
-        # therefore still name visual layers; those hints match no surviving key and are ignored.)
-        # The LM head goes with it: this model has none, and a packed one would name no module.
-        sd = drop_qwen3vl_unloaded_keys(sd)
+        # The tower is never read, so never dequantized, cast, copied or reserved for. (The file *header* is still
+        # read below for quantization metadata, which can therefore still name visual layers; those hints match no
+        # surviving key and are ignored.) The LM head goes with it: this model has none, and a packed one would
+        # name no module.
+        sd = load_safetensors_checkpoint(str(model_path), select=drop_qwen3vl_unloaded_keys)
         metadata = read_safetensors_metadata(model_path, self._logger)
 
         # Comfy's nvfp4 build packs every language-model projection and names the layers in `.comfy_quant`
@@ -1169,17 +1220,9 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             source_is_fp8 = bool(fp8_layers) or any(
                 getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
             )
-            # Resolved once. `device_supports_fp8_matmul` deliberately does not cache an inconclusive
-            # probe, so two calls can disagree: a transient failure here followed by a success below
-            # would leave the scales already folded while the raw Linears stay quantized, i.e. the
-            # encoder silently on the storage path with the matmul log line never printed.
-            keep_matmul_fp8 = should_keep_fp8_weights(target_device)
-            # Resolved here, next to the matmul probe and for the same reason: the fold below is
-            # irreversible, so both consumers have to be known before it runs. Asking only about the
-            # matmul folded the scales away and then let the storage cast re-quantize the result to
-            # *unscaled* fp8 -- on a scaled checkpoint that is ~3% of the weights lost to underflow,
-            # for the byte count the file already had.
-            use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(device or self._torch_device, self._logger)
+            # Both consumers were snapshotted before the shared-store lookup. Folding is irreversible,
+            # so a later successful probe must not change the choice after the scales are gone.
+            use_fp8_storage = source_is_fp8 and storage_supported
 
         # Every layer that arrived scaled, before the split folds the ones the matmul cannot take. The storage
         # pass below must leave those alone: cast again, they would be re-quantized *without* their scale.
@@ -1402,7 +1445,12 @@ class Qwen3VLEncoderGGUFLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEncoder_GG
 
         load_state_dict_ignoring_extras(model, sd, source="Qwen3-VL encoder GGUF", assign=True, allow_missing=True)
 
-        materialize_quantized_embedding(model.language_model.embed_tokens, ram_cache=self._ram_cache)
+        materialize_quantized_embedding(
+            model.language_model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        )
 
         _reject_incomplete_load(model, what="Qwen3-VL encoder GGUF")
 

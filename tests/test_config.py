@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
@@ -89,6 +91,16 @@ def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     temp_config_file.write_text('schema_version: "4.0.3"\nwan_memory_optimization: true\n')
 
     assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
+
+
+@pytest.mark.parametrize(("yaml_line", "expected"), [("", True), ("multiuser: false\n", False)])
+def test_sign_in_is_required_unless_single_user_mode_is_set_explicitly(
+    tmp_path: Path, patch_rootdir: None, yaml_line: str, expected: bool
+) -> None:
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\n{yaml_line}')
+
+    assert load_and_migrate_config(temp_config_file).multiuser is expected
 
 
 @pytest.mark.parametrize(
@@ -270,6 +282,8 @@ def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
     assert config.port == 8080
     # image_subfolder_strategy should have its default value
     assert config.image_subfolder_strategy == "flat"
+    # Older releases default to single-user mode, so the rewrite states sign-in explicitly.
+    assert yaml.safe_load(temp_config_file.read_text())["multiuser"] is True
 
 
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
@@ -305,13 +319,15 @@ def test_write_config_to_file(patch_rootdir: None):
             assert "port: 8080" in content
 
 
-def test_update_config_with_dict(patch_rootdir: None):
+def test_update_config_with_dict(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
     """Test updating the config with a dictionary."""
-    config = InvokeAIAppConfig()
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    config = InvokeAIAppConfig(multiuser=True)
     update_dict = {"host": "10.10.10.10", "port": 6060}
     config.update_config(update_dict)
     assert config.host == "10.10.10.10"
     assert config.port == 6060
+    assert config.multiuser is True
 
 
 def test_update_config_with_object(patch_rootdir: None):
@@ -365,6 +381,7 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
     monkeypatch.setenv("INVOKEAI_HOST", "1.2.3.4")
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
     get_config.cache_clear()
     config = get_config()
     get_config.cache_clear()
@@ -384,12 +401,80 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     # It should also have the `remote_api_tokens` key
     assert "remote_api_tokens" in example_file_content
 
-    # Neither env vars nor default values should be written to the config file
+    # Neither env vars nor default values should be written to the config file, except the sign-in choice, which
+    # older releases default differently
     config_file_content = config_file_path.read_text()
     assert "host" not in config_file_content
+    assert yaml.safe_load(config_file_content)["multiuser"] is True
 
     # Undo our change to the singleton class
     InvokeAIArgs.did_parse = False
+
+
+def _start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> InvokeAIAppConfig:
+    monkeypatch.setattr(InvokeAIArgs, "did_parse", True)
+    monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
+    get_config.cache_clear()
+    try:
+        return get_config()
+    finally:
+        get_config.cache_clear()
+
+
+@pytest.mark.parametrize("ending", ["\n", ""])
+def test_startup_appends_sign_in_to_a_config_file_without_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ending: str
+) -> None:
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    content = '# my notes\nschema_version: "4.0.3"\nport: 8080  # kept\n# last' + ending
+    (tmp_path / "invokeai.yaml").write_text(content)
+
+    config = _start(tmp_path, monkeypatch)
+
+    assert config.multiuser is False
+    assert config.port == 8080
+    assert (tmp_path / "invokeai.yaml").read_text() == content + ("" if ending else "\n") + "multiuser: true\n"
+
+
+@pytest.mark.parametrize(
+    ("content", "warns"),
+    [
+        ('# my notes\nschema_version: "4.0.3"\nport: 8080\nmultiuser: false\n', False),
+        ('{schema_version: "4.0.3", port: 8080}\n', True),
+    ],
+    ids=["states-sign-in", "flow-style"],
+)
+def test_startup_leaves_a_config_file_untouched_when_it_states_sign_in_or_cannot_take_a_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture, content: str, warns: bool
+) -> None:
+    (tmp_path / "invokeai.yaml").write_text(content)
+
+    with caplog.at_level("WARNING"):
+        config = _start(tmp_path, monkeypatch)
+
+    assert config.port == 8080
+    assert (tmp_path / "invokeai.yaml").read_text() == content
+    assert ("Unable to add the multiuser setting" in caplog.text) is warns
+
+
+def test_startup_still_loads_a_read_only_config_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    config_file = tmp_path / "invokeai.yaml"
+    content = 'schema_version: "4.0.3"\nport: 8080\n'
+    config_file.write_text(content)
+    config_file.chmod(0o444)
+    try:
+        if os.access(config_file, os.W_OK):
+            pytest.skip("this user can write read-only files")
+        with caplog.at_level("WARNING"):
+            config = _start(tmp_path, monkeypatch)
+    finally:
+        config_file.chmod(0o644)
+
+    assert config.port == 8080
+    assert config_file.read_text() == content
+    assert "Unable to add the multiuser setting" in caplog.text
 
 
 def test_ensure_fonts_dir_logs_warning_on_oserror(

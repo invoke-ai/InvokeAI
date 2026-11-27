@@ -5,7 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { setRelationshipsSnapshotForTests } from '@features/models/data/relationshipsStore';
-import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
@@ -60,7 +60,7 @@ const MODELS_UI_ADAPTER = {
   installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
-  schedulerPolicy: NO_SCHEDULER_POLICY,
+  defaultsRules: NO_DEFAULTS_RULES,
   setInstallInPlace: () => undefined,
 };
 const SECTION_MODEL = { base: 'flux', key: 'flux-main', type: 'main' } as const;

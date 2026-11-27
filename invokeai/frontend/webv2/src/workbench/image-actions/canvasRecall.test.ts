@@ -341,6 +341,27 @@ describe('canvas record to recall', () => {
     }
   });
 
+  it('recalls a schema 8 raster regenerate region with a Diagonal Left fill', async () => {
+    const inpaint = { fill: { color: '#e07575', style: 'diagonal_left' as const }, isEnabled: true };
+    const canvas = {
+      ...createEmptyCanvasDocument(),
+      version: 8 as const,
+      stacks: {
+        ...createEmptyCanvasDocument().stacks,
+        raster: [{ ...base, type: 'raster' as const, source: { type: 'paint' as const, bitmap: null }, inpaint }],
+      },
+    };
+    const plan = await prepareCanvasRecall({
+      metadata: { canvas_v3_metadata: recordCanvasMetadata(canvas) },
+      model: main,
+      models,
+      owner: captureAccountScope(),
+    });
+    expect(plan.problems).toEqual([]);
+    expect(plan.document?.version).toBe(8);
+    expect(plan.document?.stacks.raster[0]).toMatchObject({ inpaint });
+  });
+
   it('distinguishes absence, explicit empty, malformed and future records; fences changes and project closure', async () => {
     const store = createWorkbenchStore(),
       target = targetFor(store),

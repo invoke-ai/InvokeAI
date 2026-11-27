@@ -18,6 +18,7 @@ from transformers import Qwen3VLConfig, Qwen3VLForConditionalGeneration
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Qwen3VLEncoder_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import krea2
 from invokeai.backend.model_manager.load.model_loaders.krea2 import Qwen3VLEncoderCheckpointLoader
 from invokeai.backend.model_manager.load.model_loaders.text_llm import TextLLMQwen3VLLoader
@@ -253,12 +254,30 @@ def _fp8_gate_proj(reference: Qwen3VLForConditionalGeneration) -> dict[str, torc
     }
 
 
-@pytest.mark.parametrize("cpu_only", [None, True], ids=["on the device", "cpu only"])
-def test_a_cpu_only_view_computes_in_float32_with_its_fp8_weights_folded(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, cpu_only: bool | None
+def _fp8_policy(monkeypatch: pytest.MonkeyPatch, device: torch.device, *, supported: bool) -> None:
+    """The process' device, and whether it keeps fp8 weights for its matmul and for storage."""
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: device))
+    monkeypatch.setattr(TorchDevice, "choose_torch_dtype", staticmethod(lambda: torch.bfloat16))
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda d: supported and d.type != "cpu")
+    monkeypatch.setattr(
+        load_default, "_device_supports_fp8_storage", lambda d, _logger=None: supported and d.type != "cpu"
+    )
+
+
+@pytest.mark.parametrize(
+    ("cpu_only", "supported", "expected"),
+    [
+        pytest.param(None, True, {torch.float8_e4m3fn, torch.bfloat16}, id="device keeping fp8"),
+        pytest.param(None, False, {torch.bfloat16}, id="device folding fp8"),
+        pytest.param(True, True, {torch.float32}, id="cpu only"),
+    ],
+)
+def test_the_view_decodes_by_the_load_decision_of_the_device_it_runs_on(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, cpu_only: bool | None, supported: bool, expected: set
 ) -> None:
-    """bfloat16 configured on a device that keeps fp8 weights for its matmul: the view on that device keeps them, a
-    CPU-only one widens everything to float32, as CPU-only Text LLMs do. Loaded, not run (no CPU bf16 forward)."""
+    """bfloat16 configured: a device that keeps fp8 weights keeps them in the view as in the encoder, one that does not
+    folds them to bfloat16, and a CPU-only record widens everything to float32, as CPU-only Text LLMs do. Loaded, not
+    run (no CPU bf16 forward)."""
     reference = _reference(tied=True)
     view = _view(
         tmp_path,
@@ -267,19 +286,30 @@ def test_a_cpu_only_view_computes_in_float32_with_its_fp8_weights_folded(
         cpu_only=cpu_only,
     )
     run = _run(monkeypatch, tied=True, compute_dtype=torch.bfloat16)
-    accelerator = torch.device("cuda")
-    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: accelerator))
-    run.loader._torch_device = accelerator
-    monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda device: device.type != "cpu")
-    monkeypatch.setattr(krea2, "_device_supports_fp8_storage", lambda device, _logger=None: device.type != "cpu")
+    _fp8_policy(monkeypatch, torch.device("cuda"), supported=supported)
 
     model = run.load(view, None)
 
-    dtypes = {parameter.dtype for parameter in model.parameters()}
-    if cpu_only:
-        assert dtypes == {torch.float32}
-    else:
-        assert torch.float8_e4m3fn in dtypes and torch.float32 not in dtypes
+    assert {parameter.dtype for parameter in model.parameters()} == expected
+
+
+def test_devices_with_different_fp8_policies_never_share_the_views_weights(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Device caches adopt a canonical CPU copy by key. The view built where fp8 stays packed differs from the one built
+    where it is folded, so their keys must differ -- and a device with the same policy keeps the same key."""
+    view = _view(tmp_path, _comfy_file(_reference(tied=True)), Qwen3VLVariantType.Qwen3VL_4B)
+
+    def key(device: torch.device, *, supported: bool, cpu_only: bool | None = None) -> str:
+        run = _run(monkeypatch, tied=True, compute_dtype=torch.bfloat16)
+        _fp8_policy(monkeypatch, device, supported=supported)
+        return run.loader._get_cache_key(view.model_copy(update={"cpu_only": cpu_only}), None)
+
+    keeps_fp8 = key(torch.device("cuda", 0), supported=True)
+    folds_fp8 = key(torch.device("cuda", 1), supported=False)
+    assert keeps_fp8 != folds_fp8
+    assert key(torch.device("cuda", 2), supported=True) == keeps_fp8
+    assert key(torch.device("cuda", 0), supported=True, cpu_only=True) not in {keeps_fp8, folds_fp8}
 
 
 def test_the_text_side_is_its_own_tokenizer_stopping_at_the_end_of_the_turn_and_no_processor(

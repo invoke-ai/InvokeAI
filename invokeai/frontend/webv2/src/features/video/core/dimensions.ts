@@ -70,7 +70,10 @@ export const MINIMAX_H3_CANVAS_MULTIPLE = 32;
 export const MINIMAX_H3_MIN_ASPECT_RATIO = 1 / 4;
 export const MINIMAX_H3_MAX_ASPECT_RATIO = 4;
 
-/** Highres: 768 short edge, soft 768x1344 area cap, 32-px rounding; lowres caps the long edge at 768. 1:4–4:1. */
+/**
+ * Highres: 768 short edge, soft 768x1344 area cap, 32-px rounding; lowres caps the long edge at 768. Draft presets
+ * target a 480/544 short edge under the same area cap. 1:4–4:1.
+ */
 export const resolveMiniMaxH3Canvas = (
   width: number,
   height: number,
@@ -99,12 +102,14 @@ export const resolveMiniMaxH3Canvas = (
       rawHeight = MINIMAX_H3_SHORT_EDGE;
     }
   } else {
+    const shortEdge = targetResolution === '480p' ? 480 : targetResolution === '544p' ? 544 : MINIMAX_H3_SHORT_EDGE;
+
     if (ratio >= 1) {
-      rawWidth = MINIMAX_H3_SHORT_EDGE * ratio;
-      rawHeight = MINIMAX_H3_SHORT_EDGE;
+      rawWidth = shortEdge * ratio;
+      rawHeight = shortEdge;
     } else {
-      rawWidth = MINIMAX_H3_SHORT_EDGE;
-      rawHeight = MINIMAX_H3_SHORT_EDGE / ratio;
+      rawWidth = shortEdge;
+      rawHeight = shortEdge / ratio;
     }
 
     const area = rawWidth * rawHeight;

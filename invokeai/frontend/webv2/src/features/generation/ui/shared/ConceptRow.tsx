@@ -4,7 +4,11 @@ import type { GenerateLora } from '@features/generation/core/types';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Avatar, Badge, Box, chakra, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
-import { DEFAULT_LORA_WEIGHT_CONFIG, getDefaultLoraWeight } from '@features/generation/core/settings';
+import {
+  DEFAULT_LORA_WEIGHT_CONFIG,
+  getDefaultLoraWeight,
+  getLoraWeightSliderRange,
+} from '@features/generation/core/settings';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
@@ -30,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { GenerateFieldContextMenu } from './GenerateFieldContextMenu';
 import { GenerateRowSwitch } from './GenerateToggleSwitch';
 
+// The track drops marks outside a concept's custom range.
 const WEIGHT_MARKS = [-1, 0, 1, 2];
 
 /** The model catalog's helpers a concept row needs; the caller supplies them through its own UI port. */
@@ -130,6 +135,7 @@ interface ConceptWeightFieldProps {
   label: string;
   onChange: (value: number) => void;
   onReset: () => void;
+  range: { max: number; min: number };
   resetLabel: string;
   value: number;
 }
@@ -142,6 +148,7 @@ const ConceptWeightField = ({
   label,
   onChange,
   onReset,
+  range,
   resetLabel,
   value,
 }: ConceptWeightFieldProps) => (
@@ -162,8 +169,8 @@ const ConceptWeightField = ({
         inputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
         label={label}
         marks={WEIGHT_MARKS}
-        max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
-        min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
+        max={range.max}
+        min={range.min}
         step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
         value={value}
         onChange={onChange}
@@ -276,6 +283,7 @@ const ConceptRowContent = ({
   const isActive = lora.isEnabled && isCompatible;
   const isSplitWeight = lowNoiseWeight !== undefined;
   const defaultWeight = getDefaultLoraWeight(lora.model);
+  const weightRange = getLoraWeightSliderRange(lora.model);
   const menu = useContextMenu();
   // Kept through the exit animation: the anchor clears the moment the menu closes.
   const { release: releaseMenu, value: shownAnchor } = useExitRetainedValue(menu.anchor);
@@ -387,6 +395,7 @@ const ConceptRowContent = ({
                   value={weight}
                   onChange={handleWeightChange}
                   onReset={handleReset}
+                  range={weightRange}
                 />
                 <ConceptWeightField
                   copyValue={copyLowNoiseWeight}
@@ -398,6 +407,7 @@ const ConceptRowContent = ({
                   value={lowNoiseWeight}
                   onChange={handleLowNoiseWeightChange}
                   onReset={handleResetLowNoise}
+                  range={weightRange}
                 />
               </Flex>
             ) : (
@@ -411,6 +421,7 @@ const ConceptRowContent = ({
                 value={weight}
                 onChange={handleWeightChange}
                 onReset={handleReset}
+                range={weightRange}
               />
             )
           }
