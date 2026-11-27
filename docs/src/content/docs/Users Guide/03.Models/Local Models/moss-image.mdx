@@ -332,12 +332,16 @@ weights instead of being merged into them.
 - An older version of InvokeAI registered MOSS-Image LoRAs as Z-Image LoRAs or as unknown models. Select one in the
   Model Manager and use **Re-identify model**.
 
+## Upscaling
+
+The [Upscale panel](/users-guide/image-generation/upscale/) refines with MOSS-Image, enabled LoRAs included. Its
+MOSS-Image tab lists the components and defaults the detail pass uses.
+
 ## Limitations
 
 - ComfyUI scaled and unscaled fp8, other torchao layouts, torchao fp8 mixed with ComfyUI-quantized layers, nvfp4, w4a8 and ComfyUI-GGUF `Q8_CR`/`Q4_CR` transformers are refused at install (see [Installing](#installing)).
 - ControlNet, reference images and seamless tiling are not available.
 - Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
-- MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
 
 ## Workflow nodes
 
