@@ -208,6 +208,41 @@ const build = (document: ProjectGraphState) => buildWorkflowPreviewModel(documen
 const titles = (model: WorkflowPreviewModel, ids: readonly string[]) => ids.map((id) => model.nodes.get(id)!.title);
 
 describe('buildWorkflowPreviewModel', () => {
+  it('includes nested collapsible titles and inputs in authored order without looping through cyclic children', () => {
+    const document = graph([node('seed', 'integer', { value: 7 })], [], exposed(['seed', 'value']));
+    const elements = document.form.elements;
+    elements.root = {
+      data: { children: ['outer'], layout: 'column' },
+      id: 'root',
+      type: 'container',
+    };
+    elements.outer = {
+      data: { children: ['inner'], content: 'Outer settings' },
+      id: 'outer',
+      parentId: 'root',
+      type: 'collapsible',
+    };
+    elements.inner = {
+      data: { children: ['field-0', 'outer'], content: 'Seed settings' },
+      id: 'inner',
+      parentId: 'outer',
+      type: 'collapsible',
+    };
+    elements['field-0']!.parentId = 'inner';
+
+    const model = build(document);
+    expect(model.inputs.map((field) => [field.nodeId, field.fieldName])).toEqual([['seed', 'value']]);
+    expect(model.inputGroups).toEqual([{ heading: 'Seed settings', labels: ['Value'] }]);
+    expect(model.form[0]).toMatchObject({
+      children: [
+        { kind: 'heading', text: 'Outer settings' },
+        { children: [{ kind: 'heading', text: 'Seed settings' }, { kind: 'input' }], kind: 'container' },
+      ],
+      kind: 'container',
+      layout: 'column',
+    });
+  });
+
   it.each(['toString', 'constructor', '__proto__'])('previews a parsed unknown node type named %s', (name) => {
     const parsed = parseWorkflowJson(graph([node('unknown', name, { value: 'saved' })], []));
     const model = build(parsed.document);

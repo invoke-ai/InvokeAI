@@ -190,6 +190,61 @@ describe('projectGraphReducer', () => {
     });
 
     expect(guarded).toBe(next);
+
+    next = projectGraphReducer(next, { content: 'Section A', elementType: 'collapsible', type: 'addFormElement' });
+    const collapsible = getFormChildren(next.form).find((candidate) => candidate.type === 'collapsible');
+    expect(collapsible?.type === 'collapsible' && collapsible.data).toEqual({
+      children: [],
+      content: 'Section A',
+    });
+
+    next = projectGraphReducer(next, {
+      content: 'Renamed Section A',
+      elementId: collapsible?.id ?? '',
+      type: 'setFormElementContent',
+    });
+    const renamedCollapsible = next.form.elements[collapsible?.id ?? ''];
+    expect(renamedCollapsible?.type === 'collapsible' && renamedCollapsible.data).toEqual({
+      children: [],
+      content: 'Renamed Section A',
+    });
+
+    next = projectGraphReducer(next, {
+      elementId: container?.id ?? '',
+      index: 0,
+      parentId: collapsible?.id ?? '',
+      type: 'moveFormElementTo',
+    });
+    expect(getFormChildren(next.form, collapsible?.id).map((child) => child.id)).toEqual([container?.id]);
+
+    const afterRemove = projectGraphReducer(next, {
+      elementId: collapsible?.id ?? '',
+      type: 'removeFormElement',
+    });
+    expect(afterRemove.form.elements[collapsible?.id ?? '']).toBeUndefined();
+    expect(afterRemove.form.elements[container?.id ?? '']).toBeUndefined();
+
+    const headingWithExtra = {
+      data: { content: 'Old Heading', customMeta: 'preserved' } as { content: string },
+      id: 'heading-extra',
+      parentId: afterRemove.form.rootElementId,
+      type: 'heading' as const,
+    };
+    const renamedExtraHeading = projectGraphReducer(
+      {
+        ...afterRemove,
+        form: {
+          ...afterRemove.form,
+          elements: { ...afterRemove.form.elements, [headingWithExtra.id]: headingWithExtra },
+        },
+      },
+      { content: 'New Heading', elementId: headingWithExtra.id, type: 'setFormElementContent' }
+    );
+    const updatedExtraHeading = renamedExtraHeading.form.elements[headingWithExtra.id];
+    expect(updatedExtraHeading?.type === 'heading' && updatedExtraHeading.data).toEqual({
+      content: 'New Heading',
+      customMeta: 'preserved',
+    });
   });
 });
 
