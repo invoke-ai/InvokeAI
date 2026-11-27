@@ -11741,6 +11741,11 @@ export type components = {
              */
             mistral_source?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * @description The Tile or Union ControlNet an upscale held the tiles to the source image with
+             * @default null
+             */
+            tile_controlnet?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
              * Ideogram4 Caption
              * @description The structured JSON caption encoded for Ideogram 4 inference
              * @default null

@@ -245,6 +245,7 @@ export const parsePreviewMetadata = (
     'clip_g_model',
     'clip_l_model',
     'mistral_source',
+    'tile_controlnet',
     'qwen3_vl_vision_tower',
     'pid_decoder',
     'flux3_prompt_upsampler',

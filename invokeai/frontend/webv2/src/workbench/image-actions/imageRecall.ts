@@ -1710,13 +1710,22 @@ export const buildImageRecallSettings = ({
       : [];
     const isProvenUnused = (setting: RecalledComponentSetting): boolean =>
       !recordsComponent(setting) && !(judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, setting));
+    // A slot that hangs on another (the vision tower follows a GGUF encoder) says nothing while the record names that
+    // one and recall did not restore it: the panel's encoder stays, and so must what belongs to it.
+    const hangsOnUnrestored = (setting: RecalledComponentSetting): boolean => {
+      const parent = DEFAULT_COMPONENT_SLOTS.find(
+        (slot) => slot.persistenceKey === DEFAULT_COMPONENT_SLOTS.find((entry) => entry.setting === setting)?.dependsOn
+      )?.setting;
+
+      return parent !== undefined && recordsComponent(parent) && !fittingSettings.includes(parent);
+    };
     const clearedSettings = [
       ...suppliedByRecord.filter(
         (key): key is RecalledComponentSetting & typeof key =>
           key !== 'vae' && isProvenUnused(key as RecalledComponentSetting)
       ),
       ...((judgedModel && SETTINGS_RECORDED_WHEN_LOADED[judgedModel.base]) ?? []).filter(isProvenUnused),
-    ];
+    ].filter((setting) => !hangsOnUnrestored(setting));
 
     for (const setting of clearedSettings) {
       values = { ...values, [setting]: null };

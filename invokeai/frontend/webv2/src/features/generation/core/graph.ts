@@ -1000,6 +1000,8 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
   const isDev = model.variant === 'dev';
   const sourceModel = getFlux2ComponentSource(model, settings);
   const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
+  // Both loaders take a source only for a main that bundles no components, so a pick left in the panel never loads.
+  const loaderSource = isBundledFlux2Main(model) ? undefined : sourceModel;
   const mistralEncoderModel =
     settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
       ? settings.mistralEncoderModel
@@ -1027,7 +1029,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
       ? {
           id: 'model_loader',
           mistral_encoder_model: mistralEncoderModel ?? undefined,
-          mistral_source_model: sourceModel,
+          mistral_source_model: loaderSource,
           model,
           type: 'flux2_dev_model_loader',
           vae_model: vaeModel ?? undefined,
@@ -1036,7 +1038,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
           id: 'model_loader',
           model,
           qwen3_encoder_model: qwen3EncoderModel ?? undefined,
-          qwen3_source_model: sourceModel,
+          qwen3_source_model: loaderSource,
           type: 'flux2_klein_model_loader',
           vae_model: vaeModel ?? undefined,
         }
@@ -1269,7 +1271,8 @@ const buildQwenImagePipeline = (input: FamilyPipelineInput, extras: QwenImagePip
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const useCfg = settings.cfgScale > 1;
   const modelLoader = addNode(graph, {
-    component_source: sourceModel,
+    // A Diffusers main supplies its own VAE and encoder before any source, so a pick left in the panel never loads.
+    component_source: model.format === 'diffusers' ? undefined : sourceModel,
     id: 'model_loader',
     model,
     qwen_vl_encoder_model: settings.qwenVLEncoderModel ?? undefined,
@@ -2339,7 +2342,8 @@ const buildWanGraph = (
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
-    component_source: sourceModel,
+    // A Diffusers main supplies its own VAE and encoder before any source, so the main is no source of its own either.
+    component_source: model.format === 'diffusers' ? undefined : sourceModel,
     id: 'model_loader',
     model,
     // The second A14B expert. Omitted, the high-noise expert covers the whole schedule.

@@ -279,7 +279,13 @@ describe('empty component supplier', () => {
             checked.source.add(model.base);
           }
 
-          if (model.format === 'diffusers' && sources.some((key) => key !== model.key) && loaded === model.key) {
+          // A source in the panel never reaches the loader of a Diffusers main, whichever order the loader prefers.
+          if (
+            MAIN_FIRST_LOADERS.has(String(loader.type)) &&
+            model.format === 'diffusers' &&
+            settings.componentSourceModel &&
+            sources.length === 0
+          ) {
             checked.mainOverSource.add(model.base);
           }
         }
@@ -307,7 +313,7 @@ describe('empty component supplier', () => {
         'z-image',
       ].sort()
     );
-    // A Diffusers main keeps supplying its components when a source is set, for the loaders that prefer it.
+    // A Diffusers main supplies its components while a source is set in the panel, which the loader never receives.
     expect([...checked.mainOverSource].sort()).toEqual(['flux2', 'qwen-image', 'wan']);
     expect([...checked.source].sort()).toEqual(['flux2', 'qwen-image', 'wan', 'z-image']);
     expect([...unattributed].filter((key) => !UNATTRIBUTED[key])).toEqual([]);

@@ -120,11 +120,6 @@ def test_every_exposed_field_has_a_value_instance_on_its_node(workflow_path: Pat
         )
 
 
-# Fields core_metadata 2.11.0 added. An embed that already carries the current version skips the editor's node
-# migration, so a field it lacks has no value instance and renders as a "Missing field" row.
-CORE_METADATA_FIELDS_ADDED_IN_2_11 = ("vae_precision", "color_compensation", "mistral_source")
-
-
 # Found by content, so a bundled workflow of any family that embeds the node is covered.
 CORE_METADATA_WORKFLOWS = sorted(
     (
@@ -137,14 +132,23 @@ CORE_METADATA_WORKFLOWS = sorted(
 
 
 @pytest.mark.parametrize("workflow_path", CORE_METADATA_WORKFLOWS, ids=lambda p: p.stem)
-def test_bundled_core_metadata_carries_the_fields_its_version_added(workflow_path: Path) -> None:
+def test_bundled_core_metadata_lists_every_field_the_invocation_declares(workflow_path: Path) -> None:
+    """An embed at the current version skips the editor's node migration, so a declared field it neither lists nor
+    receives over an edge has no value instance and renders as a "Missing field" row."""
     cls = InvocationRegistry.get_invocations_map()["core_metadata"]
-    assert cls.UIConfig.version == "2.11.0", "a newer core_metadata version adds fields this test does not know"
-    assert all(field in cls.model_fields for field in CORE_METADATA_FIELDS_ADDED_IN_2_11)
+    declared = [
+        name
+        for name, field in cls.model_fields.items()
+        if (field.json_schema_extra or {}).get("field_kind") == "input" and (field.json_schema_extra or {}).get("input")
+    ]
+    assert declared, "core_metadata declares no input fields: the field metadata this test reads has changed"
 
     workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-    nodes = [node["data"] for node in workflow["nodes"] if node["data"]["type"] == "core_metadata"]
 
-    for data in nodes:
-        missing = [field for field in CORE_METADATA_FIELDS_ADDED_IN_2_11 if field not in data["inputs"]]
+    for node in workflow["nodes"]:
+        data = node["data"]
+        if data["type"] != "core_metadata":
+            continue
+        wired = {edge["targetHandle"] for edge in workflow["edges"] if edge["target"] == data["id"]}
+        missing = [name for name in declared if name not in data["inputs"] and name not in wired]
         assert not missing, f"{workflow_path.name}: core_metadata {data['version']} embeds no input for {missing}"

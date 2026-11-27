@@ -32783,6 +32783,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "tile_controlnet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The Tile or Union ControlNet an upscale held the tiles to the source image with",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
           "ideogram4_caption": {
             "anyOf": [
               {

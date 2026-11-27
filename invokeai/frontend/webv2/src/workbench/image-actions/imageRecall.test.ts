@@ -2178,32 +2178,80 @@ describe('Diffusers main that records itself as its component source', () => {
     return (metadata![field] as { key: string }).key;
   };
 
+  it.each([['z-image', 'qwen3_source']] as const)(
+    'recalls a %s record onto a panel holding another source without keeping it',
+    (base, key) => {
+      const { model, settings } = satisfiedSettingsFor(base, {
+        label: 'diffusers',
+        overrides: { format: 'diffusers' },
+      });
+      const original = compileGenerateGraph(
+        { ...settings, componentSourceModel: null },
+        model,
+        'gallery',
+        projectSettings
+      );
+      const other = { ...model, key: `other-${base}-source`, name: 'Other source' } as MainModelConfig;
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ ...settings, componentSourceModel: other }),
+        image,
+        kind: 'all',
+        metadata: Object.values(original.backendGraph.nodes).find((node) => node.type === 'core_metadata'),
+        models: [model, other],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', projectSettings);
+
+      expect(sourceOf(original.backendGraph, key)).toBe(model.key);
+      expect(result?.values.componentSourceModel).toBeNull();
+      expect(sourceOf(recalled.backendGraph, key)).toBe(model.key);
+    }
+  );
+});
+
+// Their loaders read a source only beside a main that bundles no components, so a source left in the panel must
+// reach neither the loader nor the record, or Image Details would name a model that did not run.
+describe('Diffusers main beside a component source its loader never reads', () => {
+  const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
+  const SOURCE_FIELDS = ['component_source', 'mistral_source_model', 'qwen3_source_model'];
+  const RECORD_KEYS = ['qwen_image_component_source', 'wan_component_source', 'mistral_source', 'qwen3_source'];
+
   it.each([
-    ['z-image', 'qwen3_source'],
-    ['wan', 'wan_component_source'],
-  ] as const)('recalls a %s record onto a panel holding another source without keeping it', (base, key) => {
-    const { model, settings } = satisfiedSettingsFor(base, { label: 'diffusers', overrides: { format: 'diffusers' } });
-    const original = compileGenerateGraph(
-      { ...settings, componentSourceModel: null },
+    ['qwen-image', {}],
+    ['wan', {}],
+    ['flux2', { variant: 'klein_4b' }],
+    ['flux2', { variant: 'dev' }],
+  ] as const)('sends and records no source for a %s %j main', (base, variant) => {
+    const shape = { label: 'diffusers', overrides: { format: 'diffusers', ...variant } };
+    const { model, settings } = satisfiedSettingsFor(base, shape);
+    const source = { ...model, key: `${base}-panel-source`, name: 'Panel source' } as MainModelConfig;
+    const { backendGraph } = compileGenerateGraph(
+      { ...settings, componentSourceModel: source },
       model,
       'gallery',
       projectSettings
     );
-    const other = { ...model, key: `other-${base}-source`, name: 'Other source' } as MainModelConfig;
-    const result = buildImageRecallSettings({
-      currentValues: createValues({ ...settings, componentSourceModel: other }),
-      image,
-      kind: 'all',
-      metadata: Object.values(original.backendGraph.nodes).find((node) => node.type === 'core_metadata'),
-      models: [model, other],
-      supportedModels: [model],
-      vaeModels: [],
-    });
-    const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', projectSettings);
+    const loader = backendGraph.nodes.model_loader!;
+    const metadata = Object.values(backendGraph.nodes).find((node) => node.type === 'core_metadata')!;
 
-    expect(sourceOf(original.backendGraph, key)).toBe(model.key);
-    expect(result?.values.componentSourceModel).toBeNull();
-    expect(sourceOf(recalled.backendGraph, key)).toBe(model.key);
+    expect(SOURCE_FIELDS.filter((field) => loader[field] !== undefined)).toEqual([]);
+    expect(RECORD_KEYS.filter((key) => key in metadata)).toEqual([]);
+  });
+
+  it('still sends and records the source of a single-file main, whose loader reads it', () => {
+    const { model, settings } = satisfiedSettingsFor('wan', { label: 'gguf', overrides: { format: 'gguf_quantized' } });
+    const source = { ...model, format: 'diffusers', key: 'wan-source', name: 'Source' } as MainModelConfig;
+    const { backendGraph } = compileGenerateGraph(
+      { ...settings, componentSourceModel: source },
+      model,
+      'gallery',
+      projectSettings
+    );
+    const metadata = Object.values(backendGraph.nodes).find((node) => node.type === 'core_metadata')!;
+
+    expect(backendGraph.nodes.model_loader!.component_source).toMatchObject({ key: source.key });
+    expect(metadata.wan_component_source).toMatchObject({ key: source.key });
   });
 });
 
@@ -2601,7 +2649,7 @@ describe('recall onto a panel holding unused standalone components', () => {
     };
   };
 
-  it('loads the VAE a Qwen-Image Diffusers main supplied ahead of its recorded source', () => {
+  it('loads the VAE a Qwen-Image Diffusers main supplied, not the panel pick, though a source sat in the panel', () => {
     const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };
     const { model, settings } = satisfiedSettingsFor('qwen-image', shape);
     const source = { ...model, key: 'qwen-image-fallback-source', name: 'Qwen-Image source' } as MainModelConfig;
@@ -2613,7 +2661,7 @@ describe('recall onto a panel holding unused standalone components', () => {
       vae: panelVae,
     });
 
-    expect(original).toEqual({ qwen_image_component_source: source.key });
+    expect(original).toEqual({});
     expect(rebuilt).toEqual(original);
   });
 
@@ -2815,6 +2863,38 @@ describe('recall onto a panel holding unused standalone components', () => {
     );
 
     it.each(['krea-2', 'qwen-image-2-1'] as const)(
+      'keeps the GGUF encoder and Vision Tower a %s panel holds when the recorded encoder is not installed',
+      (base) => {
+        const { model, settings } = satisfiedSettingsFor(base, {
+          ggufEncoder: true,
+          label: 'standalone-gguf-encoder',
+          overrides: { format: 'gguf_quantized' },
+        });
+        const ggufEncoder = settings.qwen3VLEncoderModel!;
+        // The run used a regular encoder, which takes no tower; the panel's catalog does not hold it.
+        const regular = { ...ggufEncoder, format: 'checkpoint', key: 'regular-encoder', name: 'Regular encoder' };
+        const recorded = { ...settings, qwen3VLEncoderModel: regular, qwen3VLVisionTowerModel: null };
+        const metadata = Object.values(
+          compileGenerateGraph(recorded, model, 'gallery', PROJECT_SETTINGS).backendGraph.nodes
+        ).find((node) => node.type === 'core_metadata');
+        const panel = recallCatalogFor(model, settings);
+        const values = buildImageRecallSettings({
+          currentValues: createValues({ ...settings, model, modelKey: model.key }),
+          image,
+          kind: 'all',
+          metadata,
+          models: panel.models,
+          supportedModels: [model],
+          vaeModels: panel.vaeModels,
+        })!.values;
+
+        expect(metadata).toHaveProperty('qwen3_vl_encoder');
+        expect(values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+        expect(values.qwen3VLVisionTowerModel?.key).toBe(settings.qwen3VLVisionTowerModel!.key);
+      }
+    );
+
+    it.each(['krea-2', 'qwen-image-2-1'] as const)(
       'clears the Vision Tower a %s panel holds when the recorded run used none',
       (base) => {
         const { model, settings } = satisfiedSettingsFor(base, {
@@ -2838,9 +2918,17 @@ describe('recall onto a panel holding unused standalone components', () => {
       const { settings: filled } = fullyFilledSettingsFor(base, shape);
       const source = { ...model, key: `${base}-uninstalled-source`, name: 'Uninstalled source' } as MainModelConfig;
       const recorded = { ...settings, componentSourceModel: source };
-      const metadata = Object.values(
+      const written = Object.values(
         compileGenerateGraph(recorded, model, 'gallery', PROJECT_SETTINGS).backendGraph.nodes
       ).find((node) => node.type === 'core_metadata');
+      // Records of releases whose Qwen-Image builder sent a source to a Diffusers main's loader still name it.
+      const metadata =
+        base === 'qwen-image'
+          ? {
+              ...written,
+              qwen_image_component_source: { base: model.base, key: source.key, name: source.name, type: 'main' },
+            }
+          : written;
       const panel = { ...filled, componentSourceModel: null, model, modelKey: model.key };
       const encoderKey = base === 'z-image' ? 'qwen3EncoderModel' : 'qwenVLEncoderModel';
       const values = buildImageRecallSettings({

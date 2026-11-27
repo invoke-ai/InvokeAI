@@ -4071,6 +4071,7 @@
         "rand_device": "Random device",
         "cfg_rescale_multiplier": "CFG rescale multiplier",
         "color_compensation": "Color compensation",
+        "tile_controlnet": "Tile ControlNet",
         "vae_precision": "Requested VAE precision",
         "pid_mode": "PiD mode",
         "pid_steps": "PiD steps",

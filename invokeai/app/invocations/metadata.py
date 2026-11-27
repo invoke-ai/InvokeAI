@@ -805,6 +805,10 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks",
     )
+    tile_controlnet: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Tile or Union ControlNet an upscale held the tiles to the source image with",
+    )
     # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
     # so this is a declared field rather than a static extra: the graph wires the builder's output to it
     # via an edge, capturing the exact caption encoded for each (possibly batched) image.

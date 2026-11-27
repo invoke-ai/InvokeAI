@@ -25,6 +25,7 @@ import type {
 import type { CompileCanvasGraphInput } from '@features/generation/core/canvas/types';
 
 import {
+  getComponentPolicyContext,
   getComponentSectionPolicy,
   getFlux2ComponentSource,
   getGenerationValidationReasons,
@@ -43,6 +44,7 @@ import {
   getGenerationDimensions,
   getGenerationUiPolicy,
   getSchedulerOptions,
+  isBundledFlux2Main,
   isVaeCompatibleWithGenerateModel,
   addReferenceImages,
 } from '@features/generation/settings';
@@ -701,13 +703,20 @@ const supplierCases = (failures: string[], gateBase: GateBase): Array<{ own: Gat
       return [];
     });
 
-/** Whether the policy lets the model take a component source: its own slot, or FLUX.2's implicit one. */
+/**
+ * Whether the loader can take a component source for the model: its own slot, or FLUX.2's implicit one. A main that
+ * bundles its components (a Diffusers pipeline) never reads one.
+ */
 const canTakeSource = (model: MainModelConfig, settings: GenerateSettings): boolean =>
-  getComponentSectionPolicy(model, settings).slots.some((slot) => slot.key === 'componentSourceModel') ||
-  acceptedCandidates(model, settings, 'componentSourceModel').some(
-    (candidate) =>
-      getFlux2ComponentSource(model, { ...settings, componentSourceModel: candidate as MainModelConfig }) !== undefined
-  );
+  getComponentSectionPolicy(model, settings).slots.some(
+    (slot) => slot.key === 'componentSourceModel' && !slot.neverLoaded?.(getComponentPolicyContext(model, settings))
+  ) ||
+  (!isBundledFlux2Main(model) &&
+    acceptedCandidates(model, settings, 'componentSourceModel').some(
+      (candidate) =>
+        getFlux2ComponentSource(model, { ...settings, componentSourceModel: candidate as MainModelConfig }) !==
+        undefined
+    ));
 
 // ---------------------------------------------------------------------------------------------------------------
 // Gate

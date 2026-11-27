@@ -776,6 +776,24 @@
             "label": "",
             "description": "",
             "value": null
+          },
+          "moss_image_layout_prompt": {
+            "name": "moss_image_layout_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "flux3_caption": {
+            "name": "flux3_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "tile_controlnet": {
+            "name": "tile_controlnet",
+            "label": "",
+            "description": "",
+            "value": null
           }
         },
         "isOpen": true,

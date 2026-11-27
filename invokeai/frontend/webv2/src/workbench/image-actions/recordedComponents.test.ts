@@ -200,21 +200,18 @@ describe('recorded components', () => {
   });
 
   it('records the tile ControlNet an Upscale graph loads, so another pick changes the record', () => {
-    const tileCases = UPSCALE_CASES.filter((testCase) => {
-      const { values } = valuesForCase(testCase);
-
-      return Object.keys(compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph.nodes).some(
-        (id) => id === 'controlnet_1' || id === 'tile_control'
-      );
-    });
+    // The nodes an architecture's tile control becomes, by the type its table names.
+    const tileNodes = (graph: BackendGraphContract) =>
+      Object.values(graph.nodes).filter(({ type }) => type === 'controlnet' || type === 'z_image_control');
     const record = (values: ReturnType<typeof valuesForCase>['values']) => {
       const compiled = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true });
-      const tileNode = Object.values(compiled.backendGraph.nodes).find(
-        ({ id }) => id === 'controlnet_1' || id === 'tile_control'
-      );
 
-      return { loaded: tileNode?.control_model, recorded: recordOf(compiled, values).tile_controlnet };
+      return {
+        loaded: tileNodes(compiled.backendGraph).map(({ control_model }) => control_model),
+        recorded: recordOf(compiled, values).tile_controlnet,
+      };
     };
+    const tileCases = UPSCALE_CASES.filter((testCase) => record(valuesForCase(testCase).values).loaded.length > 0);
 
     // SDXL (two ControlNet nodes) and Z-Image (its own control node) cover both builders.
     expect(tileCases.map(({ label }) => label)).toEqual(expect.arrayContaining(['sdxl', 'z-image']));
@@ -229,9 +226,12 @@ describe('recorded components', () => {
       const first = record(values);
       const second = record({ ...values, tileControlnetModel: other });
 
-      expect(first.recorded, testCase.label).toEqual(first.loaded);
-      expect(second.recorded, testCase.label).toEqual(second.loaded);
+      // Every node of the control holds the one model the record names.
+      expect(new Set(first.loaded.map((model) => JSON.stringify(model))), testCase.label).toEqual(
+        new Set([JSON.stringify(first.recorded)])
+      );
       expect(second.recorded, testCase.label).not.toEqual(first.recorded);
+      expect(second.recorded, testCase.label).toMatchObject({ key: other.key });
     }
   });
 

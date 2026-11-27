@@ -367,6 +367,276 @@
             "label": "",
             "description": "",
             "value": null
+          },
+          "negative_prompt": {
+            "name": "negative_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "rand_device": {
+            "name": "rand_device",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "cfg_rescale_multiplier": {
+            "name": "cfg_rescale_multiplier",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "scheduler": {
+            "name": "scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_x": {
+            "name": "seamless_x",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_y": {
+            "name": "seamless_y",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "clip_skip": {
+            "name": "clip_skip",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "controlnets": {
+            "name": "controlnets",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ipAdapters": {
+            "name": "ipAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "t2iAdapters": {
+            "name": "t2iAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "strength": {
+            "name": "strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "init_image": {
+            "name": "init_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "qwen3_encoder": {
+            "name": "qwen3_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "mistral_encoder": {
+            "name": "mistral_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ideogram4_caption": {
+            "name": "ideogram4_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "moss_image_layout_prompt": {
+            "name": "moss_image_layout_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "flux3_caption": {
+            "name": "flux3_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "last_frame_image": {
+            "name": "last_frame_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_start_frame": {
+            "name": "source_video_start_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_end_frame": {
+            "name": "source_video_end_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ltx2_context_frames": {
+            "name": "ltx2_context_frames",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_guidance_scale_low_noise": {
+            "name": "wan_guidance_scale_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_t5_encoder_model": {
+            "name": "wan_t5_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_transformer_low_noise": {
+            "name": "wan_transformer_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_component_source": {
+            "name": "wan_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_component_source": {
+            "name": "minimax_h3_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_base_model": {
+            "name": "minimax_h3_hybrid_base_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_start_block": {
+            "name": "minimax_h3_hybrid_start_block",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_references": {
+            "name": "minimax_h3_references",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_enabled": {
+            "name": "hrf_enabled",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_method": {
+            "name": "hrf_method",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_strength": {
+            "name": "hrf_strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "positive_style_prompt": {
+            "name": "positive_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_style_prompt": {
+            "name": "negative_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_model": {
+            "name": "refiner_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_cfg_scale": {
+            "name": "refiner_cfg_scale",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_steps": {
+            "name": "refiner_steps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_scheduler": {
+            "name": "refiner_scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_positive_aesthetic_score": {
+            "name": "refiner_positive_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_negative_aesthetic_score": {
+            "name": "refiner_negative_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_start": {
+            "name": "refiner_start",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "tile_controlnet": {
+            "name": "tile_controlnet",
+            "label": "",
+            "description": "",
+            "value": null
           }
         },
         "isOpen": true,

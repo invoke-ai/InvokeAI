@@ -300,6 +300,7 @@ describe('record rows of newer keys', () => {
           clip_l_model: { key: 'l', name: 'CLIP L model' },
           color_compensation: true,
           moss_image_uncond_skip_layers: [10, 22],
+          tile_controlnet: { key: 'tile', name: 'SDXL Tile', type: 'controlnet' },
           pid_mode: 'fit',
           pid_steps: 6,
           vae_precision: 'fp16',
@@ -314,6 +315,7 @@ describe('record rows of newer keys', () => {
       moss_image_uncond_skip_layers: '10, 22',
       pid_mode: 'fit',
       pid_steps: '6',
+      tile_controlnet: 'SDXL Tile',
       vae_precision: 'fp16',
     });
   });
