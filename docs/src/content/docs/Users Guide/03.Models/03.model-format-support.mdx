@@ -192,6 +192,10 @@ post-trained Qwen3-0.6B folder conditions differently.
 | Qwen-Image-2.1 | ✓ | ✓ | Qwen-Image-2.1 |
 | CogView4, LTX-2, MiniMax H3 | – | bundled | taken from the model's own folder |
 
+Wan VAE single files load in the diffusers layout and in the original Wan layout ComfyUI repackages use. A 48-channel
+file is always Wan 2.2's VAE. A 16-channel file is filed under Wan when its name contains `wan`; otherwise it goes to
+Anima (original layout) or Qwen-Image (diffusers layout).
+
 A standalone single-file LTX-2 or MiniMax H3 VAE, video or audio, is not identified and stays Unknown.
 
 Quantized VAE files (fp8, int8, nvfp4) are not supported; use the unquantized VAE. The SD 3, FLUX.2, Qwen-Image,

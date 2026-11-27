@@ -89,13 +89,12 @@ def _wan_vae_z_dim(state_dict: dict[str | int, Any]) -> int | None:
     """Return ``z_dim`` for a Wan-family VAE state dict, or ``None`` if it isn't one.
 
     Wan-family VAEs (AutoencoderKLWan) have 5D convolution weights and a
-    decoder.conv_in input channel count of 16 (Wan 2.1 / A14B / Qwen Image) or
-    48 (Wan 2.2 TI2V-5B's Wan2.2-VAE).
+    decoder input channel count of 16 (Wan 2.1 / A14B / Qwen Image) or
+    48 (Wan 2.2 TI2V-5B's Wan2.2-VAE). The first decoder convolution is
+    ``decoder.conv_in`` in the diffusers layout and ``decoder.conv1`` in the
+    original Wan layout that ComfyUI repacks ship.
     """
-    decoder_conv_in_key = "decoder.conv_in.weight"
-    if decoder_conv_in_key not in state_dict:
-        return None
-    weight = state_dict[decoder_conv_in_key]
+    weight = state_dict.get("decoder.conv_in.weight", state_dict.get("decoder.conv1.weight"))
     shape = getattr(weight, "shape", None)
     if shape is None or len(shape) != 5:
         return None
@@ -331,7 +330,8 @@ class VAE_Checkpoint_Wan_Config(Checkpoint_Config_Base, Config_Base):
     """Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).
 
     Distinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,
-    Wan2.2-VAE) via the input channel count of ``decoder.conv_in.weight``.
+    Wan2.2-VAE) via the input channel count of the first decoder convolution, in
+    either the diffusers or the original (ComfyUI) layout.
     """
 
     type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
@@ -360,7 +360,7 @@ class VAE_Checkpoint_Wan_Config(Checkpoint_Config_Base, Config_Base):
         latent_channels: int = z_dim
         if latent_channels == 16 and not _filename_suggests_wan(mod):
             raise NotAMatchError(
-                "16-channel AutoencoderKLWan VAE without 'wan' in filename — deferring to Qwen Image VAE config."
+                "16-channel AutoencoderKLWan VAE without 'wan' in filename — deferring to Qwen Image or Anima VAE config."
             )
 
         explicit = override_fields.pop("latent_channels", None)
@@ -447,6 +447,14 @@ class VAE_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _has_anima_vae_keys(state_dict):
             raise NotAMatchError("state dict does not look like an Anima QwenImage VAE")
+
+        # Wan 2.1 and 2.2 VAEs share these block names. Anima's VAE is the 16-channel one, and like
+        # the Qwen Image config this one leaves a 16-channel file named for Wan to the Wan config.
+        z_dim = _wan_vae_z_dim(state_dict)
+        if z_dim != 16:
+            raise NotAMatchError(f"{z_dim} latent channels is not the 16-channel Anima VAE")
+        if _filename_suggests_wan(mod):
+            raise NotAMatchError("filename suggests a Wan VAE, not Anima")
 
         return cls(**override_fields)
 
