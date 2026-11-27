@@ -6,6 +6,7 @@ import type {
   ModelIdentifierConfig,
   VaePrecision,
 } from '@features/generation/contracts';
+import type { ImageToImagePipelineBase } from '@features/generation/graph';
 import type { GenerateSubmissionSource, ProjectPromptDraft } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 
@@ -14,8 +15,12 @@ import {
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   getDefaultGenerateSettings,
+  getDenoisingStartClipping,
+  getGenerationDimensions,
   getGenerationUiPolicy,
+  getNegativePromptUsage,
   getSchedulerOptions,
+  isArchitectureDescribed,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isBundledFlux2Main,
@@ -28,6 +33,7 @@ import {
   isMossImageQwen35Encoder,
   isModelIdentifierConfig,
   isQwen3Vl4bEncoder,
+  isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
   isZImageQwen3Encoder,
@@ -43,73 +49,7 @@ import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleMode, UpscaleWidgetValues } from './types';
 
-// Schedules of nodes that clip `denoising_start` by step index (`indexClipping`); drop once they clip by value.
-
-/** First `steps` sigmas of a flow schedule shifted by `shift`, without the final 0 (diffusers: shift = exp(mu)). */
-const shiftedSigmas = (shift: number, steps: number): number[] =>
-  Array.from({ length: steps }, (_, index) => {
-    const t = 1 - index / steps;
-
-    return (shift * t) / (1 + (shift - 1) * t);
-  });
-
-/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
-const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
-const Z_IMAGE_SHIFT_MAX_SEQ_LEN = 4096;
-const Z_IMAGE_BASE_SHIFT = 0.5;
-const Z_IMAGE_MAX_SHIFT = 1.15;
-
-/** Z-Image's linear shift for a frame: one token per 16x16 pixels, as `z_image_denoise` patches it. */
-const zImageScheduleShift = ({ width, height }: { width: number; height: number }): number => {
-  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), Z_IMAGE_SHIFT_MAX_SEQ_LEN);
-  const slope = (Z_IMAGE_MAX_SHIFT - Z_IMAGE_BASE_SHIFT) / (Z_IMAGE_SHIFT_MAX_SEQ_LEN - Z_IMAGE_SHIFT_MIN_SEQ_LEN);
-
-  return Math.exp(seqLen * slope + Z_IMAGE_BASE_SHIFT - slope * Z_IMAGE_SHIFT_MIN_SEQ_LEN);
-};
-
-/** `ANIMA_SHIFT`: Anima's schedule is shifted by a constant, not by resolution. */
-const ANIMA_SCHEDULE_SHIFT = 3;
-
-/** `krea2/sampling_utils.py`: Turbo's fixed mu and Raw's token-count fit; Diffusers installs ship the same config. */
-const KREA2_DISTILLED_MU = 1.15;
-const KREA2_SHIFT_MIN_SEQ_LEN = 256;
-const KREA2_SHIFT_MAX_SEQ_LEN = 6400;
-const KREA2_BASE_SHIFT = 0.5;
-const KREA2_MAX_SHIFT = 1.15;
-
-/** `exp(mu)`, held at the fit's 6400-token end as `krea2_denoise` does; anything not Raw counts as distilled. */
-const krea2ScheduleShift = (model: MainModelConfig, { width, height }: { width: number; height: number }): number => {
-  if (model.variant !== 'krea2_base') {
-    return Math.exp(KREA2_DISTILLED_MU);
-  }
-
-  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), KREA2_SHIFT_MAX_SEQ_LEN);
-  const slope = (KREA2_MAX_SHIFT - KREA2_BASE_SHIFT) / (KREA2_SHIFT_MAX_SEQ_LEN - KREA2_SHIFT_MIN_SEQ_LEN);
-
-  return Math.exp(seqLen * slope + KREA2_BASE_SHIFT - slope * KREA2_SHIFT_MIN_SEQ_LEN);
-};
-
-/** `qwen_image_denoise`'s scheduler: mu 0.5 at 256 tokens to 0.9 at 8192, held at the end, stretched to 0.02. */
-const QWEN_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
-const QWEN_IMAGE_SHIFT_MAX_SEQ_LEN = 8192;
-const QWEN_IMAGE_BASE_SHIFT = 0.5;
-const QWEN_IMAGE_MAX_SHIFT = 0.9;
-const QWEN_IMAGE_SHIFT_TERMINAL = 0.02;
-
-/** As diffusers' FlowMatchEulerDiscreteScheduler builds them, including `stretch_shift_to_terminal`. */
-const qwenImageSigmas = ({ width, height }: { width: number; height: number }, steps: number): number[] => {
-  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), QWEN_IMAGE_SHIFT_MAX_SEQ_LEN);
-  const slope =
-    (QWEN_IMAGE_MAX_SHIFT - QWEN_IMAGE_BASE_SHIFT) / (QWEN_IMAGE_SHIFT_MAX_SEQ_LEN - QWEN_IMAGE_SHIFT_MIN_SEQ_LEN);
-  const shifted = shiftedSigmas(
-    Math.exp(seqLen * slope + (QWEN_IMAGE_BASE_SHIFT - slope * QWEN_IMAGE_SHIFT_MIN_SEQ_LEN)),
-    steps
-  );
-  const scale = (1 - (shifted[steps - 1] ?? 0)) / (1 - QWEN_IMAGE_SHIFT_TERMINAL);
-
-  return shifted.map((sigma) => 1 - (1 - sigma) / scale);
-};
-
+/** A text encoder the widget can be asked for; each is its own persisted field. */
 export type UpscaleComponentField =
   | 't5EncoderModel'
   | 'clipEmbedModel'
@@ -215,6 +155,8 @@ export interface UpscaleTileControlNet {
   readonly required: boolean;
   /** Checkpoints do not state their mode (Z-Image Tile and Union 2.1 are identical tensors), so the name decides. */
   readonly matchesName: (name: string) => boolean;
+  /** The node it runs as: SD's two `controlnet`s split across the schedule, or Z-Image's one `z_image_control`. */
+  readonly kind: 'controlnet' | 'z_image_control';
 }
 
 const nameIncludes =
@@ -222,29 +164,14 @@ const nameIncludes =
   (name: string): boolean =>
     needles.some((needle) => name.toLowerCase().includes(needle));
 
-export interface UpscaleIndexClipping {
-  /** Noisiest first, without the final 0. */
-  readonly sigmas: (
-    model: MainModelConfig,
-    size: { width: number; height: number },
-    steps: number
-  ) => readonly number[];
-  /** `int(start * steps)`, or Python's half-to-even `int(round(start * steps))`. */
-  readonly rounding: 'floor' | 'round';
-}
-
-/** Single source of truth: the compiler's `UPSCALE_PATH_BUILDERS` and validation both key off this record. */
+/** Upscale's own choices per architecture; the pass itself is Generation's image pipeline for the family. */
 export interface UpscaleArchitecture {
   /** Structure drives this ControlNet's weights; without one, Structure is hidden rather than inert. */
   readonly tileControlNet: UpscaleTileControlNet | null;
   /** The parts the loader refuses to run without; only bundled pipelines carry their own. */
   readonly components: (model: MainModelConfig) => UpscaleComponents;
-  /** Spandrel rounds to 8, which `flux_denoise` (multiple_of=16) rejects after the upscale; coarser grids resize. */
-  readonly denoiseGrid: number;
-  /** The served `FeaturesFacet` answer, pinned by test; `cfg-gated` reads it only above CFG 1. */
-  readonly negativePrompt: 'always' | 'cfg-gated' | 'never';
-  /** Lets the compiler start an index-clipping node where FLUX would for the same Creativity; null otherwise. */
-  readonly indexClipping: UpscaleIndexClipping | null;
+  /** SD denoises in overlapping tiles, hence its required tile ControlNet; the others run whole. */
+  readonly multiDiffusion: boolean;
   /**
    * Schedulers that start where Creativity puts the pass; null where all do. LCM on FLUX.1/Z-Image/Anima and
    * Anima's Heun build their own schedules past the blend. `test_upscale_index_clipped_starts.py` checks these.
@@ -260,15 +187,17 @@ export interface UpscaleArchitecture {
   readonly label: string;
 }
 
-const SD_TILE_CONTROLNET: UpscaleTileControlNet = { matchesName: nameIncludes('tile', 'union'), required: true };
+const SD_TILE_CONTROLNET: UpscaleTileControlNet = {
+  kind: 'controlnet',
+  matchesName: nameIncludes('tile', 'union'),
+  required: true,
+};
 
 export const UPSCALE_ARCHITECTURES = {
   'sd-1': {
     components: () => NO_COMPONENTS,
-    denoiseGrid: 8,
-    indexClipping: null,
     label: 'SD1.5',
-    negativePrompt: 'always',
+    multiDiffusion: true,
     schedulers: null,
     takesModelGuidance: false,
     takesModelSteps: false,
@@ -276,23 +205,21 @@ export const UPSCALE_ARCHITECTURES = {
   },
   sdxl: {
     components: () => NO_COMPONENTS,
-    denoiseGrid: 8,
-    indexClipping: null,
     label: 'SDXL',
-    negativePrompt: 'always',
+    multiDiffusion: true,
     schedulers: null,
     takesModelGuidance: false,
     takesModelSteps: false,
     tileControlNet: SD_TILE_CONTROLNET,
   },
   flux: {
-    // `flux_model_loader` refuses a bare transformer without T5, CLIP Embed and VAE; the backend checks SDNQ submodels.
+    // `flux_model_loader` needs T5, CLIP Embed and VAE unless an SDNQ pipeline lists them as submodels.
     components: (model) =>
-      model.format === 'sdnq_quantized' ? NO_COMPONENTS : { slots: [T5_ENCODER_SLOT, CLIP_EMBED_SLOT], vae: true },
-    denoiseGrid: 16,
-    indexClipping: null,
+      isSelfContainedSDNQFlux1Pipeline(model)
+        ? NO_COMPONENTS
+        : { slots: [T5_ENCODER_SLOT, CLIP_EMBED_SLOT], vae: true },
     label: 'FLUX.1',
-    negativePrompt: 'never',
+    multiDiffusion: false,
     // `flux/denoise.py` uses `z_image_denoise`'s schedulers, so this follows the backend contract's Z-Image list.
     schedulers: ['euler', 'heun'],
     takesModelGuidance: false,
@@ -305,11 +232,8 @@ export const UPSCALE_ARCHITECTURES = {
       isBundledFlux2Main(model)
         ? NO_COMPONENTS
         : { slots: [model.variant === 'dev' ? FLUX2_MISTRAL_SLOT : flux2KleinQwen3Slot(model)], vae: true },
-    denoiseGrid: 16,
-    // `flux2_denoise` clips by sigma value like FLUX.1, then re-spaces the window to the requested steps.
-    indexClipping: null,
     label: 'FLUX.2',
-    negativePrompt: 'never',
+    multiDiffusion: false,
     // With a start above zero `flux2_denoise` steps with Euler, whatever scheduler it is handed.
     schedulers: ['euler'],
     takesModelGuidance: true,
@@ -320,17 +244,12 @@ export const UPSCALE_ARCHITECTURES = {
     // `z_image_model_loader` falls back to a bundled main model's own VAE and Qwen3.
     components: (model) =>
       isBundledMainForBase('z-image')(model) ? NO_COMPONENTS : { slots: [Z_IMAGE_QWEN3_SLOT], vae: true },
-    denoiseGrid: 16,
-    indexClipping: {
-      rounding: 'floor',
-      sigmas: (_model, size, steps) => shiftedSigmas(zImageScheduleShift(size), steps),
-    },
     label: 'Z-Image',
-    negativePrompt: 'cfg-gated',
+    multiDiffusion: false,
     schedulers: ['euler', 'heun'],
     takesModelGuidance: true,
     takesModelSteps: false,
-    tileControlNet: { matchesName: nameIncludes('tile'), required: false },
+    tileControlNet: { kind: 'z_image_control', matchesName: nameIncludes('tile'), required: false },
   },
   anima: {
     // Anima-3.8B's semantic connector also reads Qwen3.5; no other Anima model does.
@@ -338,10 +257,8 @@ export const UPSCALE_ARCHITECTURES = {
       slots: model.variant === 'anima_qwen35' ? [ANIMA_QWEN3_SLOT, ANIMA_QWEN35_SLOT] : [ANIMA_QWEN3_SLOT],
       vae: true,
     }),
-    denoiseGrid: 8,
-    indexClipping: { rounding: 'floor', sigmas: (_model, _size, steps) => shiftedSigmas(ANIMA_SCHEDULE_SHIFT, steps) },
     label: 'Anima',
-    negativePrompt: 'cfg-gated',
+    multiDiffusion: false,
     schedulers: ['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde'],
     takesModelGuidance: true,
     takesModelSteps: false,
@@ -350,13 +267,8 @@ export const UPSCALE_ARCHITECTURES = {
   'krea-2': {
     // `krea2_model_loader` refuses a single-file or GGUF transformer without Qwen3-VL and VAE.
     components: (model) => (model.format === 'diffusers' ? NO_COMPONENTS : { slots: [KREA2_QWEN3_VL_SLOT], vae: true }),
-    denoiseGrid: 16,
-    indexClipping: {
-      rounding: 'round',
-      sigmas: (model, size, steps) => shiftedSigmas(krea2ScheduleShift(model, size), steps),
-    },
     label: 'Krea-2',
-    negativePrompt: 'cfg-gated',
+    multiDiffusion: false,
     // `krea2_denoise` has no scheduler input: it steps with Euler.
     schedulers: ['euler'],
     takesModelGuidance: true,
@@ -367,11 +279,8 @@ export const UPSCALE_ARCHITECTURES = {
     // `moss_image_model_loader` takes a Diffusers install's own Qwen3.5 and VAE; any other format needs both.
     components: (model) =>
       model.format === 'diffusers' ? NO_COMPONENTS : { slots: [MOSS_IMAGE_QWEN35_SLOT], vae: true },
-    denoiseGrid: 16,
-    // `moss_image_denoise` clips by sigma value like FLUX, then re-spaces the window to the requested steps.
-    indexClipping: null,
     label: 'MOSS-Image',
-    negativePrompt: 'cfg-gated',
+    multiDiffusion: false,
     // `moss_image_denoise` has no scheduler input: it steps its own shifted Euler schedule.
     schedulers: ['euler'],
     takesModelGuidance: true,
@@ -382,17 +291,16 @@ export const UPSCALE_ARCHITECTURES = {
   'qwen-image': {
     // The widget sends no component source, so any non-Diffusers format needs both.
     components: (model) => (model.format === 'diffusers' ? NO_COMPONENTS : { slots: [QWEN_IMAGE_VL_SLOT], vae: true }),
-    denoiseGrid: 16,
-    indexClipping: { rounding: 'round', sigmas: (_model, size, steps) => qwenImageSigmas(size, steps) },
     label: 'Qwen Image',
-    negativePrompt: 'cfg-gated',
+    multiDiffusion: false,
     // `qwen_image_denoise` has no scheduler input: it steps with Euler.
     schedulers: ['euler'],
     takesModelGuidance: true,
     takesModelSteps: false,
     tileControlNet: null,
   },
-} as const satisfies Record<string, UpscaleArchitecture>;
+  // A base without Generation's image pipeline fails here: Upscale has no detail pass of its own.
+} as const satisfies Partial<Record<ImageToImagePipelineBase, UpscaleArchitecture>>;
 
 export type UpscaleBase = keyof typeof UPSCALE_ARCHITECTURES;
 
@@ -418,14 +326,18 @@ export const upscaleComponentsFor = (model: MainModelConfig | null): UpscaleComp
 
 /** CFG-gated architectures need a negative branch above CFG 1; a switched-off negative prompt still gets one. */
 export const wiresUpscaleNegativePrompt = (model: MainModelConfig | null, cfgScale: number): boolean => {
-  const usage = upscaleArchitectureFor(model)?.negativePrompt;
+  const usage = upscaleNegativePromptUsage(model);
 
   return usage === 'always' || (usage === 'cfg-gated' && cfgScale > 1);
 };
 
+/** The served negative-prompt usage; `cfg-gated` reads it only above CFG 1. */
+export const upscaleNegativePromptUsage = (model: MainModelConfig | null) =>
+  model ? getNegativePromptUsage(model) : 'always';
+
 /** Index clipping starts on a whole step, so one step means pure noise or nothing; the pass needs two. */
 export const upscaleMinSteps = (model: MainModelConfig | null): number =>
-  upscaleArchitectureFor(model)?.indexClipping ? 2 : 1;
+  model && getDenoisingStartClipping(model)?.kind === 'step' ? 2 : 1;
 
 const UPSCALE_CFG_SCALE_MAX = 100;
 
@@ -455,6 +367,10 @@ export const coerceUpscaleScheduler = (model: MainModelConfig | null, scheduler:
 /** What Spandrel's autoscale produces: the scaled dimension floored to a multiple of 8. */
 export const spandrelAutoscaleDimension = (dimension: number, scale: number): number =>
   Math.floor(Math.trunc(dimension * scale) / 8) * 8;
+
+/** The served grid: Spandrel rounds to 8, which `flux_denoise` (multiple_of=16) rejects after the upscale. */
+export const upscaleDenoiseGrid = (model: MainModelConfig | null): number =>
+  model ? getGenerationDimensions(model).grid : 8;
 
 export const upscaleDenoiseDimension = (dimension: number, scale: number, grid: number): number =>
   Math.max(grid, Math.floor(spandrelAutoscaleDimension(dimension, scale) / grid) * grid);
@@ -922,6 +838,12 @@ export const getUpscaleValidationIssues = (
       message: `Upscale supports only ${supportedUpscaleArchitectureLabels()} main models.`,
       section: 'generation',
     });
+  } else if (!isArchitectureDescribed(values.model)) {
+    // Its grid and negative prompt come from the served row, and the fallbacks would build a graph the node refuses.
+    issues.push({
+      message: `The backend does not describe the ${architecture.label} architecture, so Upscale cannot run it.`,
+      section: 'generation',
+    });
   }
 
   // `flux_denoise` refuses a Fill model without fill conditioning, which an upscale never supplies.
@@ -1118,7 +1040,7 @@ export const getModelOnlyUpscaleFactors = (model: SpandrelModelConfig): number[]
   return [...presets, nativeScale].sort((a, b) => a - b);
 };
 
-/** Refine: Spandrel's frame floored to the pass grid. Model only: floored to 8, or the input size for a 1x model. */
+/** Refine: input times Scale, floored to the pass grid. Model only: Spandrel's frame, or the input for a 1x model. */
 export const getUpscaleOutputDimensions = (
   image: Pick<ImageWithDims, 'width' | 'height'>,
   values: Pick<UpscaleWidgetValues, 'mode' | 'model' | 'scale' | 'upscaleModel'>
@@ -1132,7 +1054,7 @@ export const getUpscaleOutputDimensions = (
     };
   }
 
-  const grid = upscaleArchitectureFor(values.model)?.denoiseGrid ?? 8;
+  const grid = upscaleDenoiseGrid(values.model);
 
   return {
     height: upscaleDenoiseDimension(image.height, values.scale, grid),
