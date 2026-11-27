@@ -59,25 +59,38 @@ class WeightDecomposedLayer(LoRALayerBase):
         self.direction_norm = direction_norm
 
     @staticmethod
-    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int) -> bool:
+    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int, in_features: int | None = None) -> bool:
         """Whether a ``.dora_scale`` holds one entry per output row.
 
         LyCORIS stores ``(out_features, 1)``, or ``(out_features, 1, 1, 1)`` for a conv layer, with
         ``wd_on_out=True`` (its default) and ``(1, in_features[, 1, 1])`` with ``wd_on_out=False``. The two
         shapes only coincide when ``out_features == in_features == 1``, where both conventions give the same
-        weight. A 1-D scale has no axis to tell from, so it keeps the input-axis reading.
+        weight.
+
+        LyCORIS never writes a 1-D scale, so a 1-D one comes from another writer or a squeezed file, and only its
+        length can tell the axis, which needs ``in_features``: ``(out_features,)`` is an output-axis scale when the
+        layer is not square, as PEFT's ``lora_magnitude_vector`` is. On a square layer both lengths are the same and
+        nothing in the file says which axis it indexes; it keeps the input-axis reading it has always had, the LyCORIS
+        ``dora_scale`` convention this key comes from. Without ``in_features`` every 1-D scale is read that way.
         """
+        if dora_scale.dim() == 1:
+            return in_features is not None and dora_scale.shape[0] == out_features != in_features
         return (
             dora_scale.dim() >= 2
             and dora_scale.shape[0] == out_features
             and all(size == 1 for size in dora_scale.shape[1:])
         )
 
-    def _residual(self, orig_weight: torch.Tensor, delta_v: torch.Tensor) -> torch.Tensor:
+    def _residual(self, orig_weight: torch.Tensor, delta_v: torch.Tensor, consume_delta: bool = False) -> torch.Tensor:
         """``W' - W`` for the original weight and the layer's scaled update, both promoted by the caller where a
-        low-precision dtype would round away a small update."""
+        low-precision dtype would round away a small update. With ``consume_delta`` the direction is formed in
+        ``delta_v``'s own storage, which saves a copy of the weight at the peak; the caller must hand over a tensor it
+        made and no longer reads."""
         # At this point, out_weight is the unnormalized direction matrix.
-        out_weight = orig_weight + delta_v
+        if consume_delta and torch.promote_types(delta_v.dtype, orig_weight.dtype) == delta_v.dtype:
+            out_weight = delta_v.add_(orig_weight)
+        else:
+            out_weight = orig_weight + delta_v
 
         if self.direction_norm is not None:
             direction_norm = self.direction_norm
@@ -101,7 +114,9 @@ class WeightDecomposedLayer(LoRALayerBase):
             )
             dora_scale = self.dora_scale
 
-        out_weight *= dora_scale / direction_norm
+        # A row whose direction is all zeros has no norm to divide by; LyCORIS adds its epsilon for the same reason.
+        # Clamping leaves every other norm bit-identical and that row's result 0 rather than NaN, at any strength.
+        out_weight *= dora_scale / direction_norm.clamp_min(torch.finfo(direction_norm.dtype).eps)
 
         return out_weight - orig_weight
 
@@ -168,7 +183,9 @@ class DoRALayer(WeightDecomposedLayer):
         )
 
         up = values["lora_up.weight"]
-        dora_scale, magnitude_is_out_dim = _magnitude_from_values(values, out_features=up.shape[0])
+        dora_scale, magnitude_is_out_dim = _magnitude_from_values(
+            values, out_features=up.shape[0], in_features=values["lora_down.weight"].shape[1]
+        )
 
         layer = cls(
             up=up,
@@ -256,13 +273,27 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
     """
 
     def __init__(self, layer: BaseLayerPatch, dora_scale: torch.Tensor, magnitude_is_out_dim: bool):
+        # The magnitude stays float32 like the direction norm: the residual is the small difference of two nearly
+        # equal magnitudes, and a low-precision one rounds that difference away.
+        if dora_scale.dtype in _LOW_PRECISION_DTYPES:
+            dora_scale = dora_scale.float()
         super().__init__(dora_scale=dora_scale, alpha=None, bias=None, magnitude_is_out_dim=magnitude_is_out_dim)
         self.layer = layer
 
     @classmethod
     def from_state_dict_values(cls, layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]):
-        """`layer`, built from `values` without their magnitude, with the magnitude in `values`."""
-        dora_scale, magnitude_is_out_dim = _magnitude_from_values(values, out_features=layer.out_features())
+        """`layer`, built from `values` without their magnitude, with the magnitude in `values`.
+
+        Raises ``ValueError`` for a magnitude that fits neither axis of the update's weight: it would otherwise fail
+        in the middle of a generation, or be applied as an elementwise factor."""
+        out_features, in_features = layer.out_features(), layer.in_features()
+        dora_scale, magnitude_is_out_dim = _magnitude_from_values(values, out_features, in_features)
+        if not _magnitude_fits(dora_scale, magnitude_is_out_dim, out_features, in_features):
+            raise ValueError(
+                f"A DoRA magnitude of shape {tuple(dora_scale.shape)} fits neither axis of the {out_features}x"
+                f"{in_features} weight the {type(layer).__name__} updates: it needs one entry per output row, "
+                f"({out_features},) or ({out_features}, 1), or per input column, ({in_features},) or (1, {in_features})."
+            )
         return cls(layer, dora_scale=dora_scale, magnitude_is_out_dim=magnitude_is_out_dim)
 
     def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
@@ -286,7 +317,8 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
 
         # The wrapped patch scales its update by its own alpha / rank.
         delta = layer.get_parameters(promoted, 1.0)
-        params = {"weight": self._residual(promoted["weight"], delta["weight"]) * weight}
+        # `delta` is the layer's own fresh tensor, which the residual forms its direction in.
+        params = {"weight": self._residual(promoted["weight"], delta.pop("weight"), consume_delta=True) * weight}
         if "bias" in delta:
             params["bias"] = delta["bias"] * weight
 
@@ -294,7 +326,9 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.layer.to(device=device, dtype=dtype)
-        self.dora_scale = self.dora_scale.to(device=device, dtype=dtype)
+        self.dora_scale = self.dora_scale.to(
+            device=device, dtype=torch.float32 if dtype in _LOW_PRECISION_DTYPES else dtype
+        )
 
     def calc_size(self) -> int:
         return self.layer.calc_size() + calc_tensors_size([self.dora_scale])
@@ -321,10 +355,26 @@ def _factor_tensors(patch: BaseLayerPatch) -> list[torch.Tensor]:
     return [tensor for _, _, tensor in patch_tensors(patch) if not tensor.is_sparse]
 
 
-def _magnitude_from_values(values: Dict[str, torch.Tensor], out_features: int) -> tuple[torch.Tensor, bool]:
+def _magnitude_from_values(
+    values: Dict[str, torch.Tensor], out_features: int, in_features: int
+) -> tuple[torch.Tensor, bool]:
     """The magnitude of a layer's state dict values and whether it indexes the output axis. ``dora_magnitude`` is the
     PEFT/ai-toolkit output-axis magnitude; ``dora_scale`` can index either axis."""
     if "dora_magnitude" in values:
         return values["dora_magnitude"], True
     dora_scale = values["dora_scale"]
-    return dora_scale, WeightDecomposedLayer._dora_scale_is_out_dim(dora_scale, out_features)
+    return dora_scale, WeightDecomposedLayer._dora_scale_is_out_dim(dora_scale, out_features, in_features)
+
+
+def _magnitude_fits(dora_scale: torch.Tensor, is_out_dim: bool, out_features: int, in_features: int) -> bool:
+    """Whether a magnitude read on an axis has one entry per output row, or per input column, of the update's
+    weight, and size 1 in every other dimension. `in_features` counts a conv's flattened input columns where the
+    factors do not show the kernel, so a conv's per-channel ``(1, channels, 1, 1)`` need only divide it."""
+    shape = tuple(dora_scale.shape)
+    if not shape:
+        return False
+    if is_out_dim:
+        return shape[0] == out_features and all(size == 1 for size in shape[1:])
+    if len(shape) == 1:
+        return shape[0] == in_features
+    return shape[0] == 1 and in_features % shape[1] == 0 and all(size == 1 for size in shape[2:])

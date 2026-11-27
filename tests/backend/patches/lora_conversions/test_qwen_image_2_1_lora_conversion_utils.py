@@ -174,8 +174,8 @@ def test_a_layer_of_any_kind_on_another_shape_is_refused(kind: str, side: str) -
         ({"lora_magnitude_vector.weight": _z(64)}, False),
         ({"dora_scale": _z(1, 4096)}, False),
         ({"dora_scale": _z(64, 1)}, False),
-        # A 1-D `dora_scale` has no axis to tell its orientation by, and is read per column.
-        ({"dora_scale": _z(4096)}, False),
+        # A 1-D `dora_scale` of a layer that is not square is read by its length: this one is per row.
+        ({"dora_scale": _z(4096)}, True),
     ],
     ids=[
         "peft-per-row",
@@ -186,7 +186,7 @@ def test_a_layer_of_any_kind_on_another_shape_is_refused(kind: str, side: str) -
         "peft-of-input-length",
         "lycoris-row-of-output-length",
         "lycoris-column-of-input-length",
-        "lycoris-1d-of-output-length",
+        "lycoris-1d-per-row",
     ],
 )
 def test_a_dora_magnitude_must_index_its_weights_rows_or_columns(magnitude: dict, fits: bool) -> None:

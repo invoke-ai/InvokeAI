@@ -180,3 +180,28 @@ def test_a_merged_lokr_sidecar_reserves_what_its_forward_allocates(
     weight_copy = _W * _W * torch.float32.itemsize
     excess = (reserved - peak) / weight_copy
     assert -0.1 < excess < 2, (reserved / weight_copy, peak / weight_copy)
+
+
+@pytest.mark.parametrize("kind", ["lokr", "loha"])
+def test_a_decomposed_layer_holds_no_spare_copy_of_its_update(kind: str) -> None:
+    """The magnitude of a LoKr or LoHa forms the direction in the update's own tensor, so the update the wrapped layer
+    returned does not stay alive beside the direction and the residual, as a third weight copy: the peak of one
+    application is a copy below what the update, direction and residual would hold, as for a low-rank DoRA."""
+    r = 2
+    magnitude = {"dora_scale": torch.rand(_W, 1) + 1}
+    values = {
+        "lokr": {"lokr_w1": torch.randn(4, 4), "lokr_w2": torch.randn(_W // 4, _W // 4)},
+        "loha": {
+            f"hada_w{i}_{s}": torch.randn(_W, r) if s == "a" else torch.randn(r, _W) for i in (1, 2) for s in "ab"
+        },
+    }[kind]
+    layer = any_lora_layer_from_state_dict({**values, **magnitude})
+    weight = torch.randn(_W, _W)
+
+    mode = _PeakAllocation()
+    with torch.no_grad(), mode:
+        layer.get_parameters({"weight": weight}, 1.0)
+
+    # A LoKr's update is the one tensor beside its direction and residual; a LoHa's two products come first.
+    held_copies = {"lokr": 2, "loha": 3}[kind]
+    assert mode.peak < (held_copies + 0.5) * weight.numel() * weight.element_size()

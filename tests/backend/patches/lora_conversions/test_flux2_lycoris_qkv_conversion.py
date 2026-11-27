@@ -15,6 +15,7 @@ from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_uti
     convert_bfl_lora_patch_to_diffusers,
     is_state_dict_likely_in_flux_bfl_peft_format,
     lora_model_from_flux2_bfl_peft_state_dict,
+    lora_model_from_flux_bfl_peft_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     lora_model_from_flux_kohya_state_dict,
@@ -365,3 +366,20 @@ def test_fused_qkv_layers_with_an_input_axis_magnitude_apply_as_the_plain_layer_
         ]
     )
     torch.testing.assert_close(actual, update)
+
+
+def test_the_input_axis_magnitude_warning_is_once_per_patch_not_per_generation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FLUX.2 converts the cached BFL-keyed patch again for every generation; the warning is about the patch."""
+    layer_state_dict, _ = _fused_factorized_state_dict("lokr_aligned")
+    layer_state_dict["dora_scale"] = _tensor((1, 6), 0.5)
+    state_dict = {f"diffusion_model.double_blocks.0.img_attn.qkv.{suffix}": v for suffix, v in layer_state_dict.items()}
+    warning = MagicMock()
+    monkeypatch.setattr(bfl_conversion.logger, "warning", warning)
+    patch = lora_model_from_flux_bfl_peft_state_dict(state_dict)
+
+    for _ in range(3):
+        convert_bfl_lora_patch_to_diffusers(patch)
+    warning.assert_called_once()
+
+    convert_bfl_lora_patch_to_diffusers(lora_model_from_flux_bfl_peft_state_dict(state_dict))
+    assert warning.call_count == 2

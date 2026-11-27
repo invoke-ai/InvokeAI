@@ -59,6 +59,13 @@ class LoKRLayer(LoRALayerBase):
             w2_rows = self.w2_a.shape[0]  # type: ignore[union-attr]
         return w1_rows * w2_rows
 
+    def in_features(self) -> int:
+        """The input columns of the update: those of kron(w1, w2). A conv without a Tucker core holds its kernel in
+        the columns of `w2_b`, so for it this counts the flattened columns."""
+        w1_cols = self.w1.shape[1] if self.w1 is not None else self.w1_b.shape[1]  # type: ignore[union-attr]
+        w2_cols = self.w2.shape[1] if self.w2 is not None else self.w2_b.shape[1]  # type: ignore[union-attr]
+        return w1_cols * w2_cols
+
     @classmethod
     def from_state_dict_values(
         cls,

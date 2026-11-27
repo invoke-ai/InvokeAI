@@ -396,9 +396,10 @@ def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(
     # LoKr/LoHa/full ones. Un-flattening a key whose suffix `_group_by_layer` cannot split back off used to
     # feed it a dotted path, whose blind `rsplit(".", 2)` fallback then cut inside the module name and fused
     # two modules into one unsupported layer — aborting the *entire* adapter at generation time.
-    # `alpha` is a scalar on disk and `dora_scale` a per-channel vector; giving them weight-shaped
-    # tensors would fail inside the layer for reasons that have nothing to do with the grouping.
-    shapes = {"alpha": torch.tensor(4.0), "dora_scale": torch.ones(4)}
+    # `alpha` is a scalar on disk and `dora_scale` a per-row column of LyCORIS' (the 4x4 factors make a 16 x 16
+    # weight); giving them weight-shaped tensors would fail inside the layer for reasons that have nothing to do
+    # with the grouping.
+    shapes = {"alpha": torch.tensor(4.0), "dora_scale": torch.ones(16, 1)}
     state_dict = {
         "lora_unet_blocks_0_attn_wv.lora_down.weight": torch.ones(2, 4),
         "lora_unet_blocks_0_attn_wv.lora_up.weight": torch.ones(4, 2),

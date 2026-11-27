@@ -791,7 +791,12 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(
         # it. On CPU the cast is the only move, so this also keeps the restore check below from passing vacuously.
         if force_sidecar:
             assert {placement_device.type for placement_device, _ in _placements(patch)} == {device}
-            assert {placement_dtype for _, placement_dtype in _placements(patch)} == {torch.bfloat16}
+            # The magnitude of a weight-decomposed LoKr stays float32, like the norm it is divided by.
+            magnitudes = {
+                id(layer.dora_scale) for layer in patch.layers.values() if isinstance(layer, FactorizedDoRALayer)
+            }
+            assert {tensor.dtype for tensor in _tensors(patch) if id(tensor) not in magnitudes} == {torch.bfloat16}
+            assert all(tensor.dtype == torch.float32 for tensor in _tensors(patch) if id(tensor) in magnitudes)
 
     assert _placements(patch) == before
     assert all(now is original for now, original in zip(_tensors(patch), before_tensors, strict=True))

@@ -339,13 +339,49 @@ def test_qwen3_keys_include_model_prefix():
 
 
 def test_lokr_dora_keys_make_weight_decomposed_lokr_layers():
-    """Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2); each such layer keeps its magnitude."""
-    state_dict = keys_to_mock_state_dict(anima_lokr_keys)
+    """Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2); each such layer keeps its magnitude,
+    and applies to its real module: the cross-attention K (2048 x 1024) reads a 1-D magnitude per output row, the
+    square Q (2048 x 2048) per input column."""
+    with accelerate.init_empty_weights():
+        transformer = AnimaTransformer(**{**ANIMA_TRANSFORMER_CONFIG, "num_blocks": 1})
+    g = torch.Generator().manual_seed(0)
+    state_dict = {
+        key: torch.ones(shape, dtype=torch.float64)
+        if key.endswith(".alpha")
+        else torch.rand(shape, generator=g, dtype=torch.float64) + 0.5
+        if key.endswith(".dora_scale")
+        else torch.randn(shape, generator=g, dtype=torch.float64) * 0.05
+        for key, shape in anima_lokr_keys.items()
+    }
+
     lora_model = lora_model_from_anima_state_dict(state_dict)
-    decomposed = [layer for layer in lora_model.layers.values() if isinstance(layer, FactorizedDoRALayer)]
-    assert len(decomposed) == sum(key.endswith(".dora_scale") for key in anima_lokr_keys) > 0
-    assert all(isinstance(layer.layer, LoKRLayer) and layer.dora_scale.shape == (2048,) for layer in decomposed)
-    assert all(isinstance(layer, LoKRLayer) for layer in lora_model.layers.values() if layer not in decomposed)
+
+    expected_axes = {"blocks.0.cross_attn.k_proj": True, "blocks.0.cross_attn.q_proj": False}
+    decomposed = {
+        key.removeprefix(ANIMA_LORA_TRANSFORMER_PREFIX): layer
+        for key, layer in lora_model.layers.items()
+        if isinstance(layer, FactorizedDoRALayer)
+    }
+    assert {name: layer.magnitude_is_out_dim for name, layer in decomposed.items()} == expected_axes
+    assert all(isinstance(layer.layer, LoKRLayer) for layer in decomposed.values())
+    assert all(isinstance(layer, LoKRLayer) for layer in lora_model.layers.values() if layer not in decomposed.values())
+
+    for name, layer in decomposed.items():
+        module = transformer.get_submodule(name)
+        weight = torch.randn(module.weight.shape, generator=g, dtype=torch.float64)
+        prefix = f"diffusion_model.{name}"
+        # kron(w1, w2) of the file's factors, the weight's shape; and the LyCORIS decomposition in float64.
+        w1, w2 = state_dict[f"{prefix}.lokr_w1"], state_dict[f"{prefix}.lokr_w2"]
+        update = torch.einsum("ij,kl->ikjl", w1, w2).reshape(w1.shape[0] * w2.shape[0], w1.shape[1] * w2.shape[1])
+        assert update.shape == weight.shape
+        magnitude = state_dict[f"{prefix}.dora_scale"]
+        direction = weight + update
+        if expected_axes[name]:
+            expected = magnitude[:, None] * direction / direction.norm(dim=1, keepdim=True) - weight
+        else:
+            expected = magnitude[None, :] * direction / direction.norm(dim=0, keepdim=True) - weight
+
+        torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
 
 
 def test_peft_keys_get_transformer_prefix():

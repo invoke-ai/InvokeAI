@@ -219,8 +219,31 @@ def test_low_precision_factors_and_weight_are_promoted_to_float32(dtype: torch.d
     assert params["weight"].dtype == torch.float32
     # The reference sees the same rounded inputs.
     update = _kron(w1.to(dtype).to(F64), w2.to(dtype).to(F64))
-    expected = _reference_residual(half_weight.to(F64), update, magnitude.to(dtype).to(F64), out_axis=True)
+    expected = _reference_residual(half_weight.to(F64), update, magnitude, out_axis=True)
     torch.testing.assert_close(params["weight"].to(F64), expected, rtol=1e-4, atol=1e-6)
+
+
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_the_magnitude_stays_float32_beside_low_precision_factors(dtype: torch.dtype) -> None:
+    """The residual is the small difference between two nearly equal magnitudes, so a magnitude rounded to the model's
+    dtype would erase it: with a magnitude within 1% of the norm of the weight and an update of 1% of it, rounding it
+    to bfloat16 moves the residual by about its own size."""
+    g = torch.Generator().manual_seed(11)
+    w1, w2 = _randn(g, 8, 8), _randn(g, 8, 6)
+    weight = _randn(g, 64, 48)
+    w1 = w1 * (0.01 * weight.norm() / _kron(w1, w2).norm())
+    half_weight = weight.to(dtype)
+    update = _kron(w1.to(dtype).to(F64), w2.to(dtype).to(F64))
+    direction = half_weight.to(F64) + update
+    magnitude = direction.norm(dim=1, keepdim=True) * (1 + 0.01 * (torch.rand(64, 1, generator=g, dtype=F64) - 0.5))
+    layer = any_lora_layer_from_state_dict({"lokr_w1": w1, "lokr_w2": w2, "dora_scale": magnitude})
+    layer.to(dtype=dtype)
+
+    params = layer.get_parameters({"weight": half_weight}, 1.0)
+
+    assert layer.dora_scale.dtype == torch.float32
+    expected = _reference_residual(half_weight.to(F64), update, magnitude, out_axis=True)
+    torch.testing.assert_close(params["weight"].to(F64), expected, rtol=0, atol=1e-4 * float(expected.abs().max()))
 
 
 def test_moving_the_layer_does_not_move_a_shared_copy() -> None:
@@ -354,3 +377,96 @@ def test_direct_patching_merges_the_residual_and_restores_the_weight() -> None:
     ):
         torch.testing.assert_close(model.proj.weight.data, weight + expected.float(), rtol=1e-4, atol=1e-4)
     torch.testing.assert_close(model.proj.weight.data, weight)
+
+
+def _lokr_square(g: torch.Generator) -> Case:
+    w1, w2 = _randn(g, 3, 3), _randn(g, 4, 4)
+    return Case({"lokr_w1": w1, "lokr_w2": w2}, (12, 12), _kron(w1, w2))
+
+
+def test_a_1d_magnitude_of_the_output_length_is_read_per_row() -> None:
+    """A vector with one entry per output row, whose length is not the input size, is output-axis, as a PEFT magnitude
+    is. Read per column it would not even broadcast onto the weight."""
+    g = torch.Generator().manual_seed(21)
+    case = _lokr_whole(g)  # 12 x 8
+    magnitude = torch.rand(12, generator=g, dtype=F64) + 0.5
+    weight = _randn(g, *case.weight_shape)
+
+    layer = any_lora_layer_from_state_dict({**case.state_dict, "dora_scale": magnitude})
+
+    assert isinstance(layer, FactorizedDoRALayer) and layer.magnitude_is_out_dim
+    expected = _reference_residual(weight, case.update, magnitude[:, None], out_axis=True)
+    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
+
+
+def test_a_1d_magnitude_of_the_input_length_is_read_per_column() -> None:
+    g = torch.Generator().manual_seed(22)
+    case = _lokr_whole(g)  # 12 x 8
+    magnitude = torch.rand(8, generator=g, dtype=F64) + 0.5
+    weight = _randn(g, *case.weight_shape)
+
+    layer = any_lora_layer_from_state_dict({**case.state_dict, "dora_scale": magnitude})
+
+    assert isinstance(layer, FactorizedDoRALayer) and not layer.magnitude_is_out_dim
+    expected = _reference_residual(weight, case.update, magnitude[None, :], out_axis=False)
+    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
+
+
+def test_a_1d_magnitude_of_a_square_layer_is_read_per_column() -> None:
+    """Nothing in the file says which axis a 1-D vector of a square layer indexes. LyCORIS never writes one, so the
+    reading is that of its `dora_scale` key, as for a low-rank DoRA: per input column."""
+    g = torch.Generator().manual_seed(23)
+    case = _lokr_square(g)
+    magnitude = torch.rand(12, generator=g, dtype=F64) + 0.5
+    weight = _randn(g, *case.weight_shape)
+
+    layer = any_lora_layer_from_state_dict({**case.state_dict, "dora_scale": magnitude})
+
+    assert isinstance(layer, FactorizedDoRALayer) and not layer.magnitude_is_out_dim
+    expected = _reference_residual(weight, case.update, magnitude[None, :], out_axis=False)
+    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
+
+
+@pytest.mark.parametrize("key", ["dora_scale", "dora_magnitude"])
+@pytest.mark.parametrize("shape", [(5, 1), (1, 7), (12, 8), (13,), (12, 2), (2, 12), (1,), ()])
+def test_a_magnitude_that_fits_neither_axis_is_refused_at_load(key: str, shape: tuple[int, ...]) -> None:
+    """Applied, such a magnitude fails in the middle of a generation, or a full (out, in) one is multiplied in as an
+    elementwise factor. The weight is 12 x 8."""
+    case = _lokr_whole(torch.Generator().manual_seed(24))
+
+    with pytest.raises(ValueError, match="fits neither axis"):
+        any_lora_layer_from_state_dict({**case.state_dict, key: torch.ones(shape, dtype=F64)})
+
+
+@pytest.mark.parametrize("out_axis", [True, False], ids=["out_axis", "in_axis"])
+@pytest.mark.parametrize("case_name", ["lokr_whole", "loha"])
+def test_a_row_of_zero_norm_gives_zero_not_nan_at_any_strength(case_name: str, out_axis: bool) -> None:
+    """A base row (or column) of zeros that the update leaves untouched has no norm to divide by; its residual is 0
+    rather than NaN, which would survive a strength of 0 as NaN * 0."""
+    g = torch.Generator().manual_seed(25)
+    case = CASES[case_name](g)
+    sd = {key: value.clone() for key, value in case.state_dict.items()}
+    weight = _randn(g, *case.weight_shape)
+    if case_name == "lokr_whole":
+        # kron(w1, w2): a zero first row of w1 zeroes the first 4 rows, a zero first column the first 2 columns.
+        if out_axis:
+            sd["lokr_w1"][0] = 0
+            weight[:4] = 0
+        else:
+            sd["lokr_w1"][:, 0] = 0
+            weight[:, :2] = 0
+    elif out_axis:
+        sd["hada_w1_a"][0] = 0
+        weight[0] = 0
+    else:
+        sd["hada_w1_b"][:, 0] = 0
+        weight[:, 0] = 0
+    layer = any_lora_layer_from_state_dict({**sd, "dora_scale": _magnitude(g, case.weight_shape, out_axis=out_axis)})
+
+    for strength in (1.0, 0.0):
+        residual = layer.get_parameters({"weight": weight}, strength)["weight"]
+        assert torch.isfinite(residual).all()
+        zeroed = {("lokr_whole", True): 4, ("lokr_whole", False): 2, ("loha", True): 1, ("loha", False): 1}
+        count = zeroed[case_name, out_axis]
+        zero_part = residual[:count] if out_axis else residual[:, :count]
+        assert torch.equal(zero_part, torch.zeros_like(zero_part))

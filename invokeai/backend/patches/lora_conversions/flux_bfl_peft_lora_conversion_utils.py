@@ -20,6 +20,7 @@ and is common for FLUX.2 Klein LoRAs.
 """
 
 import re
+import weakref
 from typing import Dict
 
 import torch
@@ -313,9 +314,15 @@ def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
         converted = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer, unsplittable)
         for diff_key, diff_layer in converted:
             new_layers[f"{prefix}{diff_key}"] = diff_layer
-    _warn_unsplittable_magnitudes(unsplittable)
+    # Each generation converts the cached patch again; its layers' warning is for the patch, not for every conversion.
+    if patch not in _warned_patches:
+        _warned_patches.add(patch)
+        _warn_unsplittable_magnitudes(unsplittable)
 
     return ModelPatchRaw(layers=new_layers)
+
+
+_warned_patches: weakref.WeakSet[ModelPatchRaw] = weakref.WeakSet()
 
 
 def _warn_unsplittable_magnitudes(unsplittable: list[str]) -> None:

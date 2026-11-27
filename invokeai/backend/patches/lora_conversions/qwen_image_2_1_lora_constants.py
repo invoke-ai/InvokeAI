@@ -208,7 +208,8 @@ def _magnitude_fits(layer: dict[str, Any], out_features: int, in_features: int) 
 
     PEFT's and ai-toolkit's magnitude is one per output row, `(out,)` or `(out, 1)`: rows, as the fused gate_up's
     split cuts it along its first dimension. LyCORIS's `dora_scale` is per output row only in the shapes
-    `DoRALayer._dora_scale_is_out_dim` reads as such; any other is one per input column, `(1, in)` or `(in,)`.
+    `DoRALayer._dora_scale_is_out_dim` reads as such, a 1-D `(out,)` of a non-square layer among them; any other is one
+    per input column, `(1, in)` or `(in,)`.
     """
     if "dora_magnitude" in layer:
         shape = _shape(layer["dora_magnitude"])
@@ -218,7 +219,7 @@ def _magnitude_fits(layer: dict[str, Any], out_features: int, in_features: int) 
         from invokeai.backend.patches.layers.dora_layer import DoRALayer
 
         scale = layer["dora_scale"]
-        if isinstance(scale, torch.Tensor) and DoRALayer._dora_scale_is_out_dim(scale, out_features):
+        if isinstance(scale, torch.Tensor) and DoRALayer._dora_scale_is_out_dim(scale, out_features, in_features):
             return True
         return _shape(scale) in {(1, in_features), (in_features,)}
     return True
