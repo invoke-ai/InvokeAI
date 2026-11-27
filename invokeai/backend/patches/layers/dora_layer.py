@@ -1,4 +1,5 @@
 import copy
+import math
 from typing import Dict, Optional
 
 import torch
@@ -59,7 +60,7 @@ class WeightDecomposedLayer(LoRALayerBase):
         self.direction_norm = direction_norm
 
     @staticmethod
-    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int, in_features: int | None = None) -> bool:
+    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int, in_features: int) -> bool:
         """Whether a ``.dora_scale`` holds one entry per output row.
 
         LyCORIS stores ``(out_features, 1)``, or ``(out_features, 1, 1, 1)`` for a conv layer, with
@@ -70,11 +71,12 @@ class WeightDecomposedLayer(LoRALayerBase):
         LyCORIS never writes a 1-D scale, so a 1-D one comes from another writer or a squeezed file, and only its
         length can tell the axis, which needs ``in_features``: ``(out_features,)`` is an output-axis scale when the
         layer is not square, as PEFT's ``lora_magnitude_vector`` is. On a square layer both lengths are the same and
-        nothing in the file says which axis it indexes; it keeps the input-axis reading it has always had, the LyCORIS
-        ``dora_scale`` convention this key comes from. Without ``in_features`` every 1-D scale is read that way.
+        nothing in the file says which axis it indexes; a low-rank ``DoRALayer`` keeps the input-axis reading it has
+        always had, the LyCORIS ``dora_scale`` convention this key comes from. A LoKr or LoHa has no such history and
+        does not guess (see ``FactorizedDoRALayer.from_state_dict_values``).
         """
         if dora_scale.dim() == 1:
-            return in_features is not None and dora_scale.shape[0] == out_features != in_features
+            return dora_scale.shape[0] == out_features != in_features
         return (
             dora_scale.dim() >= 2
             and dora_scale.shape[0] == out_features
@@ -281,20 +283,23 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
         self.layer = layer
 
     @classmethod
-    def from_state_dict_values(cls, layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]):
+    def from_state_dict_values(
+        cls, layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]
+    ) -> "FactorizedDoRALayer | LoKRLayer | LoHALayer":
         """`layer`, built from `values` without their magnitude, with the magnitude in `values`.
 
         Raises ``ValueError`` for a magnitude that fits neither axis of the update's weight: it would otherwise fail
-        in the middle of a generation, or be applied as an elementwise factor."""
-        out_features, in_features = layer.out_features(), layer.in_features()
-        dora_scale, magnitude_is_out_dim = _magnitude_from_values(values, out_features, in_features)
-        if not _magnitude_fits(dora_scale, magnitude_is_out_dim, out_features, in_features):
-            raise ValueError(
-                f"A DoRA magnitude of shape {tuple(dora_scale.shape)} fits neither axis of the {out_features}x"
-                f"{in_features} weight the {type(layer).__name__} updates: it needs one entry per output row, "
-                f"({out_features},) or ({out_features}, 1), or per input column, ({in_features},) or (1, {in_features})."
-            )
-        return cls(layer, dora_scale=dora_scale, magnitude_is_out_dim=magnitude_is_out_dim)
+        in the middle of a generation, or be applied as an elementwise factor. A 1-D magnitude of a square layer is
+        returned as the plain `layer`, with a warning: its length fits both axes and nothing in the file tells which
+        it indexes. PEFT and ai-toolkit store 1-D output-axis vectors and ComfyUI reads a square 1-D one per output
+        row, but no known writer emits a 1-D ``dora_scale`` for a LoKr or LoHa, so a guess could apply it on the wrong
+        axis; the update without a magnitude, as before this layer existed, is the safe reading."""
+        is_out_dim = _factorized_magnitude_axis(layer, values)
+        if is_out_dim is None:
+            _warn_magnitude_ambiguous_once(layer)
+            return layer
+        magnitude = values["dora_magnitude"] if "dora_magnitude" in values else values["dora_scale"]
+        return cls(layer, dora_scale=magnitude, magnitude_is_out_dim=is_out_dim)
 
     def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         if any(p.device.type == "meta" for p in orig_parameters.values()):
@@ -337,6 +342,21 @@ class FactorizedDoRALayer(WeightDecomposedLayer):
         return (*(tensor for _, _, tensor in patch_tensors(self.layer)), self.dora_scale)
 
 
+_magnitude_ambiguous_warned = False
+
+
+def _warn_magnitude_ambiguous_once(layer: LoKRLayer | LoHALayer) -> None:
+    global _magnitude_ambiguous_warned
+    if not _magnitude_ambiguous_warned:
+        _magnitude_ambiguous_warned = True
+        size = layer.out_features()
+        logger.warning(
+            f"A {type(layer).__name__} layer of a LoRA has a 1-D DoRA magnitude of length {size} on a square "
+            f"{size}x{size} weight, which fits both the output and the input axis; no known writer emits one, so the "
+            "magnitude is ignored for it and every layer like it, and the update is applied as plain LoKr/LoHa."
+        )
+
+
 _magnitude_unreadable_warned = False
 
 
@@ -366,15 +386,46 @@ def _magnitude_from_values(
     return dora_scale, WeightDecomposedLayer._dora_scale_is_out_dim(dora_scale, out_features, in_features)
 
 
-def _magnitude_fits(dora_scale: torch.Tensor, is_out_dim: bool, out_features: int, in_features: int) -> bool:
-    """Whether a magnitude read on an axis has one entry per output row, or per input column, of the update's
-    weight, and size 1 in every other dimension. `in_features` counts a conv's flattened input columns where the
-    factors do not show the kernel, so a conv's per-channel ``(1, channels, 1, 1)`` need only divide it."""
-    shape = tuple(dora_scale.shape)
-    if not shape:
-        return False
-    if is_out_dim:
-        return shape[0] == out_features and all(size == 1 for size in shape[1:])
-    if len(shape) == 1:
-        return shape[0] == in_features
-    return shape[0] == 1 and in_features % shape[1] == 0 and all(size == 1 for size in shape[2:])
+def _factorized_magnitude_axis(layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]) -> bool | None:
+    """Whether the magnitude in `values` indexes the output axis of the weight `layer` updates; None where it fits both
+    (a 1-D vector of a square layer). Raises ``ValueError`` where it fits neither.
+
+    The shapes are those LyCORIS and PEFT write: ``(out, 1[, 1, 1])`` per output row (PEFT's also ``(out,)``) and
+    ``(1, in[, 1, 1])`` per input column. The input axis is matched exactly: a magnitude that merely divides the
+    columns would fail when applied, or scale a column of the wrong group. A 1-D or 2-D per-column magnitude does not
+    exist for a conv whose factors show its kernel (`has_kernel`). Factors that do not show one could still be a
+    conv's, flattened: for them a 4-D magnitude has to split the flattened columns into channels and a square kernel.
+    """
+    out_features, in_features, has_kernel = layer.out_features(), layer.in_features(), layer.has_kernel()
+    is_peft = "dora_magnitude" in values
+    shape = tuple((values["dora_magnitude"] if is_peft else values["dora_scale"]).shape)
+    per_row = bool(shape) and shape[0] == out_features and all(size == 1 for size in shape[1:])
+    if is_peft:
+        if per_row:
+            return True
+    elif len(shape) == 1:
+        if shape[0] == out_features == in_features:
+            return None
+        if per_row:
+            return True
+        if shape[0] == in_features and not has_kernel:
+            return False
+    elif per_row:
+        return True
+    elif len(shape) == 2:
+        if shape == (1, in_features) and not has_kernel:
+            return False
+    elif len(shape) == 4 and shape[0] == 1 and shape[2:] == (1, 1):
+        channels = shape[1]
+        if has_kernel:
+            if channels == in_features:
+                return False
+        elif in_features % channels == 0 and in_features // channels > 1:
+            kernel = math.isqrt(in_features // channels)
+            if kernel * kernel == in_features // channels:
+                return False
+    raise ValueError(
+        f"A DoRA magnitude of shape {shape} fits neither axis of the {out_features}x{in_features} weight the "
+        f"{type(layer).__name__} updates: it needs one entry per output row, ({out_features},) or ({out_features}, 1), "
+        f"or per input column, ({in_features},) or (1, {in_features}), in the layouts LyCORIS and PEFT write."
+    )

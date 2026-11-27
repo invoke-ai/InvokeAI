@@ -412,23 +412,32 @@ def test_a_1d_magnitude_of_the_input_length_is_read_per_column() -> None:
     torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
 
 
-def test_a_1d_magnitude_of_a_square_layer_is_read_per_column() -> None:
-    """Nothing in the file says which axis a 1-D vector of a square layer indexes. LyCORIS never writes one, so the
-    reading is that of its `dora_scale` key, as for a low-rank DoRA: per input column."""
+def test_a_1d_magnitude_of_a_square_layer_is_ignored_with_one_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The length of a 1-D vector on a square layer fits both axes and nothing in the file says which it indexes. No
+    known writer emits one for a LoKr or LoHa, so the layer applies as the plain LoKr, as before magnitudes were read,
+    rather than on a guessed axis; the warning is once per process."""
+    warning = MagicMock()
+    monkeypatch.setattr(dora_module.logger, "warning", warning)
+    monkeypatch.setattr(dora_module, "_magnitude_ambiguous_warned", False)
     g = torch.Generator().manual_seed(23)
     case = _lokr_square(g)
-    magnitude = torch.rand(12, generator=g, dtype=F64) + 0.5
     weight = _randn(g, *case.weight_shape)
 
-    layer = any_lora_layer_from_state_dict({**case.state_dict, "dora_scale": magnitude})
+    layers = [
+        any_lora_layer_from_state_dict({**case.state_dict, "dora_scale": torch.rand(12, generator=g, dtype=F64) + 0.5})
+        for _ in range(2)
+    ]
 
-    assert isinstance(layer, FactorizedDoRALayer) and not layer.magnitude_is_out_dim
-    expected = _reference_residual(weight, case.update, magnitude[None, :], out_axis=False)
-    torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
+    assert all(type(layer) is LoKRLayer for layer in layers)
+    torch.testing.assert_close(layers[0].get_parameters({"weight": weight}, 0.5)["weight"], case.update * 0.5)
+    warning.assert_called_once()
+    assert "12x12" in warning.call_args.args[0]
 
 
 @pytest.mark.parametrize("key", ["dora_scale", "dora_magnitude"])
-@pytest.mark.parametrize("shape", [(5, 1), (1, 7), (12, 8), (13,), (12, 2), (2, 12), (1,), ()])
+@pytest.mark.parametrize(
+    "shape", [(5, 1), (1, 7), (12, 8), (13,), (12, 2), (2, 12), (1,), (), (1, 4), (1, 2), (1, 1), (1, 8, 1, 1)]
+)
 def test_a_magnitude_that_fits_neither_axis_is_refused_at_load(key: str, shape: tuple[int, ...]) -> None:
     """Applied, such a magnitude fails in the middle of a generation, or a full (out, in) one is multiplied in as an
     elementwise factor. The weight is 12 x 8."""
@@ -470,3 +479,56 @@ def test_a_row_of_zero_norm_gives_zero_not_nan_at_any_strength(case_name: str, o
         count = zeroed[case_name, out_axis]
         zero_part = residual[:count] if out_axis else residual[:, :count]
         assert torch.equal(zero_part, torch.zeros_like(zero_part))
+
+
+def _conv_state_dict(variant: str, out_channels: int) -> dict[str, torch.Tensor]:
+    """A LoKr of a 3x3 conv from 8 channels: with a Tucker core (its factors show the kernel), or without one, where
+    `w2_b` holds the flattened kernel and a Linear's factors look the same."""
+    g = torch.Generator().manual_seed(31)
+    rank, w1_rows = 2, out_channels // 4
+    if variant == "tucker":
+        return {
+            "lokr_w1": _randn(g, w1_rows, 2),
+            "lokr_t2": _randn(g, rank, rank, 3, 3),
+            "lokr_w2_a": _randn(g, rank, 4),
+            "lokr_w2_b": _randn(g, rank, 4),
+        }
+    return {"lokr_w1": _randn(g, w1_rows, 2), "lokr_w2_a": _randn(g, 4, rank), "lokr_w2_b": _randn(g, rank, 4 * 9)}
+
+
+@pytest.mark.parametrize(
+    ("variant", "shape"),
+    [
+        ("flat", (1, 9, 1, 1)),
+        ("flat", (1, 24, 1, 1)),
+        ("tucker", (8,)),
+        ("tucker", (1, 8)),
+        ("tucker", (1, 72, 1, 1)),
+    ],
+)
+def test_a_conv_magnitude_that_is_not_one_of_its_layouts_is_refused(variant: str, shape: tuple[int, ...]) -> None:
+    """On a conv of 8 channels (8 -> 16) a per-column magnitude is `(1, 8, 1, 1)`, whatever the factors: divisors of
+    the flattened columns, a 2-D one and, where the factors show the kernel, a 1-D one do not fit."""
+    state_dict = _conv_state_dict(variant, 16)
+
+    with pytest.raises(ValueError, match="fits neither axis"):
+        any_lora_layer_from_state_dict({**state_dict, "dora_scale": torch.ones(shape, dtype=F64)})
+
+
+@pytest.mark.parametrize("variant", ["flat", "tucker"])
+@pytest.mark.parametrize("shape", [(16,), (16, 1, 1, 1), (1, 8, 1, 1)])
+def test_a_conv_magnitude_in_a_lycoris_layout_loads_and_applies(variant: str, shape: tuple[int, ...]) -> None:
+    # Without a Tucker core the 8 channels and the 3x3 kernel are the 72 flattened columns of the factors.
+    state_dict = _conv_state_dict(variant, 16)
+    layer = any_lora_layer_from_state_dict({**state_dict, "dora_scale": torch.rand(shape, dtype=F64) + 0.5})
+
+    assert isinstance(layer, FactorizedDoRALayer)
+    params = layer.get_parameters({"weight": _randn(torch.Generator().manual_seed(32), 16, 8, 3, 3)}, 1.0)
+    assert torch.isfinite(params["weight"]).all()
+
+
+def test_a_square_conv_1d_magnitude_falls_back_whether_or_not_the_kernel_shows() -> None:
+    """Tucker or not, an 8-entry vector on an 8 -> 8 conv fits both axes of the layer's channels."""
+    layer = any_lora_layer_from_state_dict({**_conv_state_dict("tucker", 8), "dora_scale": torch.ones(8, dtype=F64)})
+
+    assert type(layer) is LoKRLayer

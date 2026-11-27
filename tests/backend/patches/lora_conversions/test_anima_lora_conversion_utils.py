@@ -1,7 +1,10 @@
+from unittest.mock import MagicMock
+
 import accelerate
 import pytest
 import torch
 
+import invokeai.backend.patches.layers.dora_layer as dora_module
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
 from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.patches.layers.dora_layer import FactorizedDoRALayer
@@ -338,10 +341,10 @@ def test_qwen3_keys_include_model_prefix():
             )
 
 
-def test_lokr_dora_keys_make_weight_decomposed_lokr_layers():
-    """Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2); each such layer keeps its magnitude,
-    and applies to its real module: the cross-attention K (2048 x 1024) reads a 1-D magnitude per output row, the
-    square Q (2048 x 2048) per input column."""
+def test_lokr_dora_keys_make_weight_decomposed_lokr_layers(monkeypatch: pytest.MonkeyPatch):
+    """Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2). A 1-D magnitude of the cross-attention
+    K (2048 x 1024) can only be per output row, keeps it, and applies to its real module. The same vector on the square
+    Q (2048 x 2048) fits both axes, so Q applies as the plain LoKr, with a warning."""
     with accelerate.init_empty_weights():
         transformer = AnimaTransformer(**{**ANIMA_TRANSFORMER_CONFIG, "num_blocks": 1})
     g = torch.Generator().manual_seed(0)
@@ -354,9 +357,16 @@ def test_lokr_dora_keys_make_weight_decomposed_lokr_layers():
         for key, shape in anima_lokr_keys.items()
     }
 
+    warning = MagicMock()
+    monkeypatch.setattr(dora_module.logger, "warning", warning)
+    monkeypatch.setattr(dora_module, "_magnitude_ambiguous_warned", False)
+
     lora_model = lora_model_from_anima_state_dict(state_dict)
 
-    expected_axes = {"blocks.0.cross_attn.k_proj": True, "blocks.0.cross_attn.q_proj": False}
+    warning.assert_called_once()
+    assert "2048x2048" in warning.call_args.args[0]
+    assert type(lora_model.layers[f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.cross_attn.q_proj"]) is LoKRLayer
+    expected_axes = {"blocks.0.cross_attn.k_proj": True}
     decomposed = {
         key.removeprefix(ANIMA_LORA_TRANSFORMER_PREFIX): layer
         for key, layer in lora_model.layers.items()
@@ -376,10 +386,7 @@ def test_lokr_dora_keys_make_weight_decomposed_lokr_layers():
         assert update.shape == weight.shape
         magnitude = state_dict[f"{prefix}.dora_scale"]
         direction = weight + update
-        if expected_axes[name]:
-            expected = magnitude[:, None] * direction / direction.norm(dim=1, keepdim=True) - weight
-        else:
-            expected = magnitude[None, :] * direction / direction.norm(dim=0, keepdim=True) - weight
+        expected = magnitude[:, None] * direction / direction.norm(dim=1, keepdim=True) - weight
 
         torch.testing.assert_close(layer.get_parameters({"weight": weight}, 1.0)["weight"], expected)
 

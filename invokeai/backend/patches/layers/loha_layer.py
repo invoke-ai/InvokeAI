@@ -39,10 +39,15 @@ class LoHALayer(LoRALayerBase):
         """The output rows of the update. A Tucker core's `w1_a` is (rank, rows)."""
         return self.w1_a.shape[1] if self.t1 is not None else self.w1_a.shape[0]
 
+    def has_kernel(self) -> bool:
+        """Whether the factors show that the update is a conv's, with a kernel: a Tucker core or a 4-D `w1_b`. Other
+        factors are flattened, and cannot be told from a Linear's."""
+        return self.t1 is not None or self.w1_b.dim() == 4
+
     def in_features(self) -> int:
-        """The input columns of the update. A Tucker core's `w1_b` is (rank, columns); without one a conv's kernel is
-        in the columns of `w1_b`, so for it this counts the flattened columns."""
-        return self.w1_b.shape[1] if self.t1 is not None else self.w1_b[0].numel()
+        """The input columns of the update: the input channels of a conv whose factors show its kernel (see
+        `has_kernel`) and the flattened columns, kernel included, of one whose factors do not."""
+        return self.w1_b.shape[1]
 
     @classmethod
     def from_state_dict_values(
