@@ -3469,6 +3469,10 @@ export type GenerationValidationMode = ExternalGenerationMode | 'outpaint' | 'ca
 const FLUX_FILL_MODE_REASON =
   'FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.';
 
+// `flux_model_loader` rejects a FLUX.1 Diffusers folder; only the SDNQ pipeline (`sdnq_quantized`) loads as one.
+const FLUX1_DIFFUSERS_REASON =
+  'Generate cannot run FLUX.1 models in Diffusers format. Install a checkpoint, GGUF, BnB NF4 or SDNQ version instead.';
+
 export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -3575,6 +3579,10 @@ export const getGenerationValidationIssues = (
 
   if (isFluxFillModel(model) && (mode === 'txt2img' || mode === 'img2img')) {
     issues.push(issue('model:fluxFillMode', 'fluxFillMode', FLUX_FILL_MODE_REASON, MODEL_TARGET));
+  }
+
+  if (model.base === 'flux' && model.format === 'diffusers') {
+    issues.push(issue('model:flux1Diffusers', 'flux1Diffusers', FLUX1_DIFFUSERS_REASON, MODEL_TARGET));
   }
 
   issues.push(...getModelFamilyValidationIssues(model, settings));

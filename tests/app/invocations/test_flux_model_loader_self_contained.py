@@ -6,14 +6,17 @@ users to install duplicates of components the pipeline already shipped. Models t
 supply the parts (single-file / GGUF / BnB) must still say so, and say which parts are missing.
 """
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from invokeai.app.invocations.flux.flux_model_loader import FluxModelLoaderInvocation
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.backend.model_manager.configs.main import Main_SDNQ_Diffusers_FLUX_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_FLUX_Config,
+    Main_Diffusers_FLUX_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
+)
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     FluxVariantType,
@@ -44,7 +47,7 @@ def _context(config) -> MagicMock:
 
 
 def _sdnq_pipeline(submodels: dict | None = None) -> Main_SDNQ_Diffusers_FLUX_Config:
-    # A real config object, because the invocation asserts on its type before reading `variant`.
+    # A real config object, because the invocation checks its type before reading `variant`.
     return Main_SDNQ_Diffusers_FLUX_Config.model_construct(
         format=ModelFormat.SDNQQuantized,
         submodels=_FLUX1_PIPELINE_SUBMODELS if submodels is None else submodels,
@@ -52,8 +55,8 @@ def _sdnq_pipeline(submodels: dict | None = None) -> Main_SDNQ_Diffusers_FLUX_Co
     )
 
 
-def _single_file() -> SimpleNamespace:
-    return SimpleNamespace(format=ModelFormat.Checkpoint, submodels=None, variant="dev")
+def _single_file() -> Main_Checkpoint_FLUX_Config:
+    return Main_Checkpoint_FLUX_Config.model_construct(variant=FluxVariantType.Dev)
 
 
 def _invoke(main, **components):
@@ -117,3 +120,17 @@ def test_an_incomplete_sdnq_pipeline_without_t5_still_requires_one() -> None:
         invocation.invoke(_context(_sdnq_pipeline(partial)))
 
     assert "T5 Encoder" in str(excinfo.value)
+
+
+def test_a_diffusers_folder_is_rejected_with_its_format_named() -> None:
+    """The node cannot load a FLUX.1 Diffusers transformer; it must say so, even with every component selected."""
+    invocation = _invoke(
+        _identifier("flux-diffusers"),
+        t5=_identifier("t5", ModelType.T5Encoder),
+        clip=_identifier("clip", ModelType.CLIPEmbed),
+        vae=_identifier("vae", ModelType.VAE),
+    )
+    config = Main_Diffusers_FLUX_Config.model_construct(format=ModelFormat.Diffusers, variant=FluxVariantType.Schnell)
+
+    with pytest.raises(ValueError, match="flux-diffusers: its format is diffusers"):
+        invocation.invoke(_context(config))

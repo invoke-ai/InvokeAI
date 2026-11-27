@@ -3731,6 +3731,7 @@
         "capabilitiesUnavailable": "Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.",
         "componentNotInstalled": "$t(widgets.generate.switchSubjects.{{component}}) \"{{name}}\" is not installed. Choose another, or clear it.",
         "conceptNotInstalled": "Concept \"{{name}}\" is not installed. Remove it, or reinstall it.",
+        "flux1Diffusers": "Generate cannot run FLUX.1 models in Diffusers format. Install a checkpoint, GGUF, BnB NF4 or SDNQ version instead.",
         "fluxFillMode": "FLUX Fill only inpaints and outpaints: add an inpaint mask on the Canvas, or move the frame past the image edge.",
         "heightGrid": "Height must be a multiple of {{grid}}.",
         "heightRange": "Height must be between {{min}} and {{max}}.",
