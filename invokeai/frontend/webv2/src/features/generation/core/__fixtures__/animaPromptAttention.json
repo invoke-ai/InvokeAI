@@ -1,0 +1,3229 @@
+{
+  "oracle": "Compel 2.4.0 prompt_parser.py; attention subset only. ASCII whitespace is preserved rather than normalized. Unclosed enclosing groups are wholly literal. Unsupported operations retain punctuation with attention-active arguments.",
+  "cases": [
+    {
+      "input": "red+(blue)2",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.1],
+        ["blue", 2.0]
+      ]
+    },
+    {
+      "input": "(red)++(blue)2",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["blue", 2.0]
+      ]
+    },
+    {
+      "input": "red++(blue)2",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["blue", 2.0]
+      ]
+    },
+    {
+      "input": "(red)2_blue",
+      "text": "red _blue",
+      "fragments": [
+        ["red", 2.0],
+        ["_blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2/blue",
+      "text": "red /blue",
+      "fragments": [
+        ["red", 2.0],
+        ["/blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2!blue",
+      "text": "red !blue",
+      "fragments": [
+        ["red", 2.0],
+        ["!blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2.blue",
+      "text": "red blue",
+      "fragments": [
+        ["red", 2.0],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2,blue",
+      "text": "red , blue",
+      "fragments": [
+        ["red", 2.0],
+        [", blue", 1.0]
+      ]
+    },
+    {
+      "input": "red+-",
+      "text": "red -",
+      "fragments": [
+        ["red", 1.1],
+        ["-", 1.0]
+      ]
+    },
+    {
+      "input": "red++--",
+      "text": "red --",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["--", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2--",
+      "text": "red --",
+      "fragments": [
+        ["red", 2.0],
+        ["--", 1.0]
+      ]
+    },
+    {
+      "input": "red_(blue)",
+      "text": "red_(blue)",
+      "fragments": [["red_(blue)", 1.0]]
+    },
+    {
+      "input": "red/(blue)",
+      "text": "red/(blue)",
+      "fragments": [["red/(blue)", 1.0]]
+    },
+    {
+      "input": "red()blue",
+      "text": "red()blue",
+      "fragments": [["red()blue", 1.0]]
+    },
+    {
+      "input": "red+()blue",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.1],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)(blue)",
+      "text": "red blue",
+      "fragments": [["red blue", 1.0]]
+    },
+    {
+      "input": "(red)2blue",
+      "text": "red blue",
+      "fragments": [
+        ["red", 2.0],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "\"red blue\"+",
+      "text": "red blue",
+      "fragments": [["red blue", 1.1]]
+    },
+    {
+      "input": "\"red blue\"2",
+      "text": "red blue",
+      "fragments": [["red blue", 2.0]]
+    },
+    {
+      "input": "(\"red blue\")2",
+      "text": "red blue",
+      "fragments": [["red blue", 2.0]]
+    },
+    {
+      "input": "\"red+ blue\"",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.1],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "\"red\"",
+      "text": "red",
+      "fragments": [["red", 1.0]]
+    },
+    {
+      "input": "\"red (blue)2\"+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.1],
+        ["blue", 2.2]
+      ]
+    },
+    {
+      "input": "red\"blue\"+",
+      "text": "red\"blue\"+",
+      "fragments": [["red\"blue\"+", 1.0]]
+    },
+    {
+      "input": "\"red blue",
+      "text": "\"red blue",
+      "fragments": [["\"red blue", 1.0]]
+    },
+    {
+      "input": "red blue\"+",
+      "text": "red blue\"+",
+      "fragments": [["red blue\"+", 1.0]]
+    },
+    {
+      "input": "red\\+",
+      "text": "red\\+",
+      "fragments": [["red\\+", 1.0]]
+    },
+    {
+      "input": "red\\-",
+      "text": "red\\-",
+      "fragments": [["red\\-", 1.0]]
+    },
+    {
+      "input": "red\\++",
+      "text": "red\\+",
+      "fragments": [["red\\+", 1.1]]
+    },
+    {
+      "input": "red\\--",
+      "text": "red\\-",
+      "fragments": [["red\\-", 0.9]]
+    },
+    {
+      "input": "red\\.blue+",
+      "text": "red\\.blue",
+      "fragments": [["red\\.blue", 1.1]]
+    },
+    {
+      "input": "red\\=blue+",
+      "text": "red\\=blue",
+      "fragments": [["red\\=blue", 1.1]]
+    },
+    {
+      "input": "red\\\"blue+",
+      "text": "red\"blue",
+      "fragments": [["red\"blue", 1.1]]
+    },
+    {
+      "input": "\"red\\\"blue\"+",
+      "text": "red\"blue",
+      "fragments": [["red\"blue", 1.1]]
+    },
+    {
+      "input": "red\\,blue+",
+      "text": "red\\, blue",
+      "fragments": [
+        ["red\\,", 1.0],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "\\(red\\)+",
+      "text": "(red)",
+      "fragments": [["(red)", 1.1]]
+    },
+    {
+      "input": "red\\\\blue+",
+      "text": "red\\\\blue",
+      "fragments": [["red\\\\blue", 1.1]]
+    },
+    {
+      "input": "\\(red\\)2",
+      "text": "(red)2",
+      "fragments": [["(red)2", 1.0]]
+    },
+    {
+      "input": "red\\(blue\\)+",
+      "text": "red(blue)",
+      "fragments": [["red(blue)", 1.1]]
+    },
+    {
+      "input": "red\\",
+      "text": "red\\",
+      "fragments": [["red\\", 1.0]]
+    },
+    {
+      "input": "foo.bar+",
+      "text": "foo.bar+",
+      "fragments": [["foo.bar+", 1.0]]
+    },
+    {
+      "input": "foo=bar+",
+      "text": "foo=bar+",
+      "fragments": [["foo=bar+", 1.0]]
+    },
+    {
+      "input": "foo,bar+",
+      "text": "foo, bar",
+      "fragments": [
+        ["foo,", 1.0],
+        ["bar", 1.1]
+      ]
+    },
+    {
+      "input": "hair!+",
+      "text": "hair!",
+      "fragments": [["hair!", 1.1]]
+    },
+    {
+      "input": "blue-green+",
+      "text": "blue-green",
+      "fragments": [["blue-green", 1.1]]
+    },
+    {
+      "input": "a+b+",
+      "text": "a+b",
+      "fragments": [["a+b", 1.1]]
+    },
+    {
+      "input": "foo/bar+",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 1.1]]
+    },
+    {
+      "input": "(foo.bar+)2",
+      "text": "foo . bar",
+      "fragments": [
+        ["foo .", 2.0],
+        ["bar", 2.2]
+      ]
+    },
+    {
+      "input": "(foo=bar+)2",
+      "text": "(foo=bar+)2",
+      "fragments": [["(foo=bar+)2", 1.0]]
+    },
+    {
+      "input": "(foo,bar+)2",
+      "text": "foo , bar",
+      "fragments": [
+        ["foo ,", 2.0],
+        ["bar", 2.2]
+      ]
+    },
+    {
+      "input": "(blue...green+)2",
+      "text": "blue . . . green",
+      "fragments": [
+        ["blue . . .", 2.0],
+        ["green", 2.2]
+      ]
+    },
+    {
+      "input": "(blue.green)2",
+      "text": "blue . green",
+      "fragments": [["blue . green", 2.0]]
+    },
+    {
+      "input": "a:+",
+      "text": "a:",
+      "fragments": [["a:", 1.1]]
+    },
+    {
+      "input": "a;+",
+      "text": "a;",
+      "fragments": [["a;", 1.1]]
+    },
+    {
+      "input": "a?+",
+      "text": "a?",
+      "fragments": [["a?", 1.1]]
+    },
+    {
+      "input": "a_+",
+      "text": "a_",
+      "fragments": [["a_", 1.1]]
+    },
+    {
+      "input": "a😀+",
+      "text": "a😀",
+      "fragments": [["a😀", 1.1]]
+    },
+    {
+      "input": "á+",
+      "text": "á",
+      "fragments": [["á", 1.1]]
+    },
+    {
+      "input": "red\nblue+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.0],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "red\tblue+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.0],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": " red  blue+ ",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.0],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "( red  blue )2",
+      "text": "red blue",
+      "fragments": [["red blue", 2.0]]
+    },
+    {
+      "input": "(red)\n2",
+      "text": "red 2",
+      "fragments": [["red 2", 1.0]]
+    },
+    {
+      "input": "(red)\t2",
+      "text": "red 2",
+      "fragments": [["red 2", 1.0]]
+    },
+    {
+      "input": "(red) 2",
+      "text": "red 2",
+      "fragments": [["red 2", 1.0]]
+    },
+    {
+      "input": "red blue+",
+      "text": "red blue",
+      "fragments": [["red blue", 1.1]]
+    },
+    {
+      "input": "red blue+",
+      "text": "red blue",
+      "fragments": [["red blue", 1.1]]
+    },
+    {
+      "input": "(red blue)2",
+      "text": "red blue",
+      "fragments": [["red blue", 2.0]]
+    },
+    {
+      "input": "(red) 2",
+      "text": "red  2",
+      "fragments": [["red  2", 1.0]]
+    },
+    {
+      "input": "red\u000bblue+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "red\fblue+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "\n(red)2\n",
+      "text": "red",
+      "fragments": [["red", 2.0]]
+    },
+    {
+      "input": "(red",
+      "text": "(red",
+      "fragments": [["(red", 1.0]]
+    },
+    {
+      "input": "red)",
+      "text": "red)",
+      "fragments": [["red)", 1.0]]
+    },
+    {
+      "input": "((red)2",
+      "text": "((red)2",
+      "fragments": [["((red)2", 1.0]]
+    },
+    {
+      "input": "(red))2",
+      "text": "red )2",
+      "fragments": [["red )2", 1.0]]
+    },
+    {
+      "input": "(red (blue)2",
+      "text": "(red (blue)2",
+      "fragments": [["(red (blue)2", 1.0]]
+    },
+    {
+      "input": "((red)2 blue",
+      "text": "((red)2 blue",
+      "fragments": [["((red)2 blue", 1.0]]
+    },
+    {
+      "input": "((red)2)",
+      "text": "red",
+      "fragments": [["red", 2.0]]
+    },
+    {
+      "input": "(red)",
+      "text": "red",
+      "fragments": [["red", 1.0]]
+    },
+    {
+      "input": "()",
+      "text": "",
+      "fragments": []
+    },
+    {
+      "input": "( )",
+      "text": "",
+      "fragments": []
+    },
+    {
+      "input": "()2blue",
+      "text": "blue",
+      "fragments": [["blue", 1.0]]
+    },
+    {
+      "input": "( )2blue",
+      "text": "blue",
+      "fragments": [["blue", 1.0]]
+    },
+    {
+      "input": "()++",
+      "text": "",
+      "fragments": []
+    },
+    {
+      "input": "((red)2)0.5",
+      "text": "red",
+      "fragments": [["red", 1.0]]
+    },
+    {
+      "input": "(red (blue)2)0.5",
+      "text": "red blue",
+      "fragments": [
+        ["red", 0.5],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red:2)",
+      "text": "red:2",
+      "fragments": [["red:2", 1.0]]
+    },
+    {
+      "input": "(red:2)3",
+      "text": "red:2",
+      "fragments": [["red:2", 3.0]]
+    },
+    {
+      "input": "(red).5",
+      "text": "red",
+      "fragments": [["red", 0.5]]
+    },
+    {
+      "input": "(red)1.",
+      "text": "red",
+      "fragments": [["red", 1.0]]
+    },
+    {
+      "input": "(red)00.50",
+      "text": "red",
+      "fragments": [["red", 0.5]]
+    },
+    {
+      "input": "(red)2.5.6",
+      "text": "red .6",
+      "fragments": [
+        ["red", 2.5],
+        [".6", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2e3",
+      "text": "red e3",
+      "fragments": [
+        ["red", 2.0],
+        ["e3", 1.0]
+      ]
+    },
+    {
+      "input": "(red)+2",
+      "text": "red 2",
+      "fragments": [
+        ["red", 1.1],
+        ["2", 1.0]
+      ]
+    },
+    {
+      "input": "(red)+.5",
+      "text": "red .5",
+      "fragments": [
+        ["red", 1.1],
+        [".5", 1.0]
+      ]
+    },
+    {
+      "input": "(red)++--",
+      "text": "red --",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["--", 1.0]
+      ]
+    },
+    {
+      "input": "(red)--++",
+      "text": "red ++",
+      "fragments": [
+        ["red", 0.81],
+        ["++", 1.0]
+      ]
+    },
+    {
+      "input": "(red)-+",
+      "text": "red +",
+      "fragments": [
+        ["red", 0.9],
+        ["+", 1.0]
+      ]
+    },
+    {
+      "input": "red--++",
+      "text": "red ++",
+      "fragments": [
+        ["red", 0.81],
+        ["++", 1.0]
+      ]
+    },
+    {
+      "input": "red-+",
+      "text": "red +",
+      "fragments": [
+        ["red", 0.9],
+        ["+", 1.0]
+      ]
+    },
+    {
+      "input": "red+blue",
+      "text": "red+blue",
+      "fragments": [["red+blue", 1.0]]
+    },
+    {
+      "input": "red++blue",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["blue", 1.0]
+      ]
+    },
+    {
+      "input": "(red)0",
+      "text": "red",
+      "fragments": [["red", 0.0]]
+    },
+    {
+      "input": "(red)6",
+      "text": "red",
+      "fragments": [["red", 6.0]]
+    },
+    {
+      "input": "(red)65504",
+      "text": "red",
+      "fragments": [["red", 65504.0]]
+    },
+    {
+      "input": "red.attend(2)",
+      "text": "red",
+      "fragments": [["red", 2.0]]
+    },
+    {
+      "input": "(red blue).attend(2)",
+      "text": "red blue",
+      "fragments": [["red blue", 2.0]]
+    },
+    {
+      "input": "\"red blue\".attend(++)",
+      "text": "red blue",
+      "fragments": [["red blue", 1.2100000000000002]]
+    },
+    {
+      "input": "(red)+",
+      "text": "red",
+      "fragments": [["red", 1.1]]
+    },
+    {
+      "input": "((red)+)0.5",
+      "text": "red",
+      "fragments": [["red", 0.55]]
+    },
+    {
+      "input": "a (red)+ b",
+      "text": "a red b",
+      "fragments": [
+        ["a", 1.0],
+        ["red", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(red)+(sky)2",
+      "text": "red sky",
+      "fragments": [
+        ["red", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(red)+_sky",
+      "text": "red _sky",
+      "fragments": [
+        ["red", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(red)+",
+      "text": "word red",
+      "fragments": [["word red", 1.1]]
+    },
+    {
+      "input": "(red)--",
+      "text": "red",
+      "fragments": [["red", 0.81]]
+    },
+    {
+      "input": "((red)--)0.5",
+      "text": "red",
+      "fragments": [["red", 0.405]]
+    },
+    {
+      "input": "a (red)-- b",
+      "text": "a red b",
+      "fragments": [
+        ["a", 1.0],
+        ["red", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(red)--(sky)2",
+      "text": "red sky",
+      "fragments": [
+        ["red", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(red)--_sky",
+      "text": "red _sky",
+      "fragments": [
+        ["red", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(red)--",
+      "text": "word red",
+      "fragments": [
+        ["word", 1.1],
+        ["red", 0.81]
+      ]
+    },
+    {
+      "input": "((red).5)0.5",
+      "text": "red",
+      "fragments": [["red", 0.25]]
+    },
+    {
+      "input": "a (red).5 b",
+      "text": "a red b",
+      "fragments": [
+        ["a", 1.0],
+        ["red", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(red).5(sky)2",
+      "text": "red sky",
+      "fragments": [
+        ["red", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(red).5_sky",
+      "text": "red _sky",
+      "fragments": [
+        ["red", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(red).5",
+      "text": "word red",
+      "fragments": [
+        ["word", 1.1],
+        ["red", 0.5]
+      ]
+    },
+    {
+      "input": "((red)1.)0.5",
+      "text": "red",
+      "fragments": [["red", 0.5]]
+    },
+    {
+      "input": "a (red)1. b",
+      "text": "a red b",
+      "fragments": [["a red b", 1.0]]
+    },
+    {
+      "input": "(red)1.(sky)2",
+      "text": "red sky",
+      "fragments": [
+        ["red", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(red)1._sky",
+      "text": "red _sky",
+      "fragments": [["red _sky", 1.0]]
+    },
+    {
+      "input": "word+(red)1.",
+      "text": "word red",
+      "fragments": [
+        ["word", 1.1],
+        ["red", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2",
+      "text": "red",
+      "fragments": [["red", 2.0]]
+    },
+    {
+      "input": "a (red)2 b",
+      "text": "a red b",
+      "fragments": [
+        ["a", 1.0],
+        ["red", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(red)2(sky)2",
+      "text": "red sky",
+      "fragments": [["red sky", 2.0]]
+    },
+    {
+      "input": "(red)2_sky",
+      "text": "red _sky",
+      "fragments": [
+        ["red", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(red)2",
+      "text": "word red",
+      "fragments": [
+        ["word", 1.1],
+        ["red", 2.0]
+      ]
+    },
+    {
+      "input": "(blue-green)+",
+      "text": "blue-green",
+      "fragments": [["blue-green", 1.1]]
+    },
+    {
+      "input": "((blue-green)+)0.5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.55]]
+    },
+    {
+      "input": "a (blue-green)+ b",
+      "text": "a blue-green b",
+      "fragments": [
+        ["a", 1.0],
+        ["blue-green", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(blue-green)+(sky)2",
+      "text": "blue-green sky",
+      "fragments": [
+        ["blue-green", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(blue-green)+_sky",
+      "text": "blue-green _sky",
+      "fragments": [
+        ["blue-green", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(blue-green)+",
+      "text": "word blue-green",
+      "fragments": [["word blue-green", 1.1]]
+    },
+    {
+      "input": "(blue-green)--",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.81]]
+    },
+    {
+      "input": "((blue-green)--)0.5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.405]]
+    },
+    {
+      "input": "a (blue-green)-- b",
+      "text": "a blue-green b",
+      "fragments": [
+        ["a", 1.0],
+        ["blue-green", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(blue-green)--(sky)2",
+      "text": "blue-green sky",
+      "fragments": [
+        ["blue-green", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(blue-green)--_sky",
+      "text": "blue-green _sky",
+      "fragments": [
+        ["blue-green", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(blue-green)--",
+      "text": "word blue-green",
+      "fragments": [
+        ["word", 1.1],
+        ["blue-green", 0.81]
+      ]
+    },
+    {
+      "input": "(blue-green).5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.5]]
+    },
+    {
+      "input": "((blue-green).5)0.5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.25]]
+    },
+    {
+      "input": "a (blue-green).5 b",
+      "text": "a blue-green b",
+      "fragments": [
+        ["a", 1.0],
+        ["blue-green", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(blue-green).5(sky)2",
+      "text": "blue-green sky",
+      "fragments": [
+        ["blue-green", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(blue-green).5_sky",
+      "text": "blue-green _sky",
+      "fragments": [
+        ["blue-green", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(blue-green).5",
+      "text": "word blue-green",
+      "fragments": [
+        ["word", 1.1],
+        ["blue-green", 0.5]
+      ]
+    },
+    {
+      "input": "(blue-green)1.",
+      "text": "blue-green",
+      "fragments": [["blue-green", 1.0]]
+    },
+    {
+      "input": "((blue-green)1.)0.5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 0.5]]
+    },
+    {
+      "input": "a (blue-green)1. b",
+      "text": "a blue-green b",
+      "fragments": [["a blue-green b", 1.0]]
+    },
+    {
+      "input": "(blue-green)1.(sky)2",
+      "text": "blue-green sky",
+      "fragments": [
+        ["blue-green", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(blue-green)1._sky",
+      "text": "blue-green _sky",
+      "fragments": [["blue-green _sky", 1.0]]
+    },
+    {
+      "input": "word+(blue-green)1.",
+      "text": "word blue-green",
+      "fragments": [
+        ["word", 1.1],
+        ["blue-green", 1.0]
+      ]
+    },
+    {
+      "input": "(blue-green)2",
+      "text": "blue-green",
+      "fragments": [["blue-green", 2.0]]
+    },
+    {
+      "input": "((blue-green)2)0.5",
+      "text": "blue-green",
+      "fragments": [["blue-green", 1.0]]
+    },
+    {
+      "input": "a (blue-green)2 b",
+      "text": "a blue-green b",
+      "fragments": [
+        ["a", 1.0],
+        ["blue-green", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(blue-green)2(sky)2",
+      "text": "blue-green sky",
+      "fragments": [["blue-green sky", 2.0]]
+    },
+    {
+      "input": "(blue-green)2_sky",
+      "text": "blue-green _sky",
+      "fragments": [
+        ["blue-green", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(blue-green)2",
+      "text": "word blue-green",
+      "fragments": [
+        ["word", 1.1],
+        ["blue-green", 2.0]
+      ]
+    },
+    {
+      "input": "(hair!)+",
+      "text": "hair!",
+      "fragments": [["hair!", 1.1]]
+    },
+    {
+      "input": "((hair!)+)0.5",
+      "text": "hair!",
+      "fragments": [["hair!", 0.55]]
+    },
+    {
+      "input": "a (hair!)+ b",
+      "text": "a hair! b",
+      "fragments": [
+        ["a", 1.0],
+        ["hair!", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(hair!)+(sky)2",
+      "text": "hair! sky",
+      "fragments": [
+        ["hair!", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(hair!)+_sky",
+      "text": "hair! _sky",
+      "fragments": [
+        ["hair!", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(hair!)+",
+      "text": "word hair!",
+      "fragments": [["word hair!", 1.1]]
+    },
+    {
+      "input": "(hair!)--",
+      "text": "hair!",
+      "fragments": [["hair!", 0.81]]
+    },
+    {
+      "input": "((hair!)--)0.5",
+      "text": "hair!",
+      "fragments": [["hair!", 0.405]]
+    },
+    {
+      "input": "a (hair!)-- b",
+      "text": "a hair! b",
+      "fragments": [
+        ["a", 1.0],
+        ["hair!", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(hair!)--(sky)2",
+      "text": "hair! sky",
+      "fragments": [
+        ["hair!", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(hair!)--_sky",
+      "text": "hair! _sky",
+      "fragments": [
+        ["hair!", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(hair!)--",
+      "text": "word hair!",
+      "fragments": [
+        ["word", 1.1],
+        ["hair!", 0.81]
+      ]
+    },
+    {
+      "input": "(hair!).5",
+      "text": "hair!",
+      "fragments": [["hair!", 0.5]]
+    },
+    {
+      "input": "((hair!).5)0.5",
+      "text": "hair!",
+      "fragments": [["hair!", 0.25]]
+    },
+    {
+      "input": "a (hair!).5 b",
+      "text": "a hair! b",
+      "fragments": [
+        ["a", 1.0],
+        ["hair!", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(hair!).5(sky)2",
+      "text": "hair! sky",
+      "fragments": [
+        ["hair!", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(hair!).5_sky",
+      "text": "hair! _sky",
+      "fragments": [
+        ["hair!", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(hair!).5",
+      "text": "word hair!",
+      "fragments": [
+        ["word", 1.1],
+        ["hair!", 0.5]
+      ]
+    },
+    {
+      "input": "(hair!)1.",
+      "text": "hair!",
+      "fragments": [["hair!", 1.0]]
+    },
+    {
+      "input": "((hair!)1.)0.5",
+      "text": "hair!",
+      "fragments": [["hair!", 0.5]]
+    },
+    {
+      "input": "a (hair!)1. b",
+      "text": "a hair! b",
+      "fragments": [["a hair! b", 1.0]]
+    },
+    {
+      "input": "(hair!)1.(sky)2",
+      "text": "hair! sky",
+      "fragments": [
+        ["hair!", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(hair!)1._sky",
+      "text": "hair! _sky",
+      "fragments": [["hair! _sky", 1.0]]
+    },
+    {
+      "input": "word+(hair!)1.",
+      "text": "word hair!",
+      "fragments": [
+        ["word", 1.1],
+        ["hair!", 1.0]
+      ]
+    },
+    {
+      "input": "(hair!)2",
+      "text": "hair!",
+      "fragments": [["hair!", 2.0]]
+    },
+    {
+      "input": "((hair!)2)0.5",
+      "text": "hair!",
+      "fragments": [["hair!", 1.0]]
+    },
+    {
+      "input": "a (hair!)2 b",
+      "text": "a hair! b",
+      "fragments": [
+        ["a", 1.0],
+        ["hair!", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(hair!)2(sky)2",
+      "text": "hair! sky",
+      "fragments": [["hair! sky", 2.0]]
+    },
+    {
+      "input": "(hair!)2_sky",
+      "text": "hair! _sky",
+      "fragments": [
+        ["hair!", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(hair!)2",
+      "text": "word hair!",
+      "fragments": [
+        ["word", 1.1],
+        ["hair!", 2.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)+",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 1.1]]
+    },
+    {
+      "input": "((foo/bar)+)0.5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.55]]
+    },
+    {
+      "input": "a (foo/bar)+ b",
+      "text": "a foo/bar b",
+      "fragments": [
+        ["a", 1.0],
+        ["foo/bar", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)+(sky)2",
+      "text": "foo/bar sky",
+      "fragments": [
+        ["foo/bar", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)+_sky",
+      "text": "foo/bar _sky",
+      "fragments": [
+        ["foo/bar", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(foo/bar)+",
+      "text": "word foo/bar",
+      "fragments": [["word foo/bar", 1.1]]
+    },
+    {
+      "input": "(foo/bar)--",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.81]]
+    },
+    {
+      "input": "((foo/bar)--)0.5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.405]]
+    },
+    {
+      "input": "a (foo/bar)-- b",
+      "text": "a foo/bar b",
+      "fragments": [
+        ["a", 1.0],
+        ["foo/bar", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)--(sky)2",
+      "text": "foo/bar sky",
+      "fragments": [
+        ["foo/bar", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)--_sky",
+      "text": "foo/bar _sky",
+      "fragments": [
+        ["foo/bar", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(foo/bar)--",
+      "text": "word foo/bar",
+      "fragments": [
+        ["word", 1.1],
+        ["foo/bar", 0.81]
+      ]
+    },
+    {
+      "input": "(foo/bar).5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.5]]
+    },
+    {
+      "input": "((foo/bar).5)0.5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.25]]
+    },
+    {
+      "input": "a (foo/bar).5 b",
+      "text": "a foo/bar b",
+      "fragments": [
+        ["a", 1.0],
+        ["foo/bar", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(foo/bar).5(sky)2",
+      "text": "foo/bar sky",
+      "fragments": [
+        ["foo/bar", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(foo/bar).5_sky",
+      "text": "foo/bar _sky",
+      "fragments": [
+        ["foo/bar", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(foo/bar).5",
+      "text": "word foo/bar",
+      "fragments": [
+        ["word", 1.1],
+        ["foo/bar", 0.5]
+      ]
+    },
+    {
+      "input": "(foo/bar)1.",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 1.0]]
+    },
+    {
+      "input": "((foo/bar)1.)0.5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 0.5]]
+    },
+    {
+      "input": "a (foo/bar)1. b",
+      "text": "a foo/bar b",
+      "fragments": [["a foo/bar b", 1.0]]
+    },
+    {
+      "input": "(foo/bar)1.(sky)2",
+      "text": "foo/bar sky",
+      "fragments": [
+        ["foo/bar", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)1._sky",
+      "text": "foo/bar _sky",
+      "fragments": [["foo/bar _sky", 1.0]]
+    },
+    {
+      "input": "word+(foo/bar)1.",
+      "text": "word foo/bar",
+      "fragments": [
+        ["word", 1.1],
+        ["foo/bar", 1.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)2",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 2.0]]
+    },
+    {
+      "input": "((foo/bar)2)0.5",
+      "text": "foo/bar",
+      "fragments": [["foo/bar", 1.0]]
+    },
+    {
+      "input": "a (foo/bar)2 b",
+      "text": "a foo/bar b",
+      "fragments": [
+        ["a", 1.0],
+        ["foo/bar", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(foo/bar)2(sky)2",
+      "text": "foo/bar sky",
+      "fragments": [["foo/bar sky", 2.0]]
+    },
+    {
+      "input": "(foo/bar)2_sky",
+      "text": "foo/bar _sky",
+      "fragments": [
+        ["foo/bar", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(foo/bar)2",
+      "text": "word foo/bar",
+      "fragments": [
+        ["word", 1.1],
+        ["foo/bar", 2.0]
+      ]
+    },
+    {
+      "input": "(café)+",
+      "text": "café",
+      "fragments": [["café", 1.1]]
+    },
+    {
+      "input": "((café)+)0.5",
+      "text": "café",
+      "fragments": [["café", 0.55]]
+    },
+    {
+      "input": "a (café)+ b",
+      "text": "a café b",
+      "fragments": [
+        ["a", 1.0],
+        ["café", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(café)+(sky)2",
+      "text": "café sky",
+      "fragments": [
+        ["café", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(café)+_sky",
+      "text": "café _sky",
+      "fragments": [
+        ["café", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(café)+",
+      "text": "word café",
+      "fragments": [["word café", 1.1]]
+    },
+    {
+      "input": "(café)--",
+      "text": "café",
+      "fragments": [["café", 0.81]]
+    },
+    {
+      "input": "((café)--)0.5",
+      "text": "café",
+      "fragments": [["café", 0.405]]
+    },
+    {
+      "input": "a (café)-- b",
+      "text": "a café b",
+      "fragments": [
+        ["a", 1.0],
+        ["café", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(café)--(sky)2",
+      "text": "café sky",
+      "fragments": [
+        ["café", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(café)--_sky",
+      "text": "café _sky",
+      "fragments": [
+        ["café", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(café)--",
+      "text": "word café",
+      "fragments": [
+        ["word", 1.1],
+        ["café", 0.81]
+      ]
+    },
+    {
+      "input": "(café).5",
+      "text": "café",
+      "fragments": [["café", 0.5]]
+    },
+    {
+      "input": "((café).5)0.5",
+      "text": "café",
+      "fragments": [["café", 0.25]]
+    },
+    {
+      "input": "a (café).5 b",
+      "text": "a café b",
+      "fragments": [
+        ["a", 1.0],
+        ["café", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(café).5(sky)2",
+      "text": "café sky",
+      "fragments": [
+        ["café", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(café).5_sky",
+      "text": "café _sky",
+      "fragments": [
+        ["café", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(café).5",
+      "text": "word café",
+      "fragments": [
+        ["word", 1.1],
+        ["café", 0.5]
+      ]
+    },
+    {
+      "input": "(café)1.",
+      "text": "café",
+      "fragments": [["café", 1.0]]
+    },
+    {
+      "input": "((café)1.)0.5",
+      "text": "café",
+      "fragments": [["café", 0.5]]
+    },
+    {
+      "input": "a (café)1. b",
+      "text": "a café b",
+      "fragments": [["a café b", 1.0]]
+    },
+    {
+      "input": "(café)1.(sky)2",
+      "text": "café sky",
+      "fragments": [
+        ["café", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(café)1._sky",
+      "text": "café _sky",
+      "fragments": [["café _sky", 1.0]]
+    },
+    {
+      "input": "word+(café)1.",
+      "text": "word café",
+      "fragments": [
+        ["word", 1.1],
+        ["café", 1.0]
+      ]
+    },
+    {
+      "input": "(café)2",
+      "text": "café",
+      "fragments": [["café", 2.0]]
+    },
+    {
+      "input": "((café)2)0.5",
+      "text": "café",
+      "fragments": [["café", 1.0]]
+    },
+    {
+      "input": "a (café)2 b",
+      "text": "a café b",
+      "fragments": [
+        ["a", 1.0],
+        ["café", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(café)2(sky)2",
+      "text": "café sky",
+      "fragments": [["café sky", 2.0]]
+    },
+    {
+      "input": "(café)2_sky",
+      "text": "café _sky",
+      "fragments": [
+        ["café", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(café)2",
+      "text": "word café",
+      "fragments": [
+        ["word", 1.1],
+        ["café", 2.0]
+      ]
+    },
+    {
+      "input": "(猫)+",
+      "text": "猫",
+      "fragments": [["猫", 1.1]]
+    },
+    {
+      "input": "((猫)+)0.5",
+      "text": "猫",
+      "fragments": [["猫", 0.55]]
+    },
+    {
+      "input": "a (猫)+ b",
+      "text": "a 猫 b",
+      "fragments": [
+        ["a", 1.0],
+        ["猫", 1.1],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(猫)+(sky)2",
+      "text": "猫 sky",
+      "fragments": [
+        ["猫", 1.1],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(猫)+_sky",
+      "text": "猫 _sky",
+      "fragments": [
+        ["猫", 1.1],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(猫)+",
+      "text": "word 猫",
+      "fragments": [["word 猫", 1.1]]
+    },
+    {
+      "input": "(猫)--",
+      "text": "猫",
+      "fragments": [["猫", 0.81]]
+    },
+    {
+      "input": "((猫)--)0.5",
+      "text": "猫",
+      "fragments": [["猫", 0.405]]
+    },
+    {
+      "input": "a (猫)-- b",
+      "text": "a 猫 b",
+      "fragments": [
+        ["a", 1.0],
+        ["猫", 0.81],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(猫)--(sky)2",
+      "text": "猫 sky",
+      "fragments": [
+        ["猫", 0.81],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(猫)--_sky",
+      "text": "猫 _sky",
+      "fragments": [
+        ["猫", 0.81],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(猫)--",
+      "text": "word 猫",
+      "fragments": [
+        ["word", 1.1],
+        ["猫", 0.81]
+      ]
+    },
+    {
+      "input": "(猫).5",
+      "text": "猫",
+      "fragments": [["猫", 0.5]]
+    },
+    {
+      "input": "((猫).5)0.5",
+      "text": "猫",
+      "fragments": [["猫", 0.25]]
+    },
+    {
+      "input": "a (猫).5 b",
+      "text": "a 猫 b",
+      "fragments": [
+        ["a", 1.0],
+        ["猫", 0.5],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(猫).5(sky)2",
+      "text": "猫 sky",
+      "fragments": [
+        ["猫", 0.5],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(猫).5_sky",
+      "text": "猫 _sky",
+      "fragments": [
+        ["猫", 0.5],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(猫).5",
+      "text": "word 猫",
+      "fragments": [
+        ["word", 1.1],
+        ["猫", 0.5]
+      ]
+    },
+    {
+      "input": "(猫)1.",
+      "text": "猫",
+      "fragments": [["猫", 1.0]]
+    },
+    {
+      "input": "((猫)1.)0.5",
+      "text": "猫",
+      "fragments": [["猫", 0.5]]
+    },
+    {
+      "input": "a (猫)1. b",
+      "text": "a 猫 b",
+      "fragments": [["a 猫 b", 1.0]]
+    },
+    {
+      "input": "(猫)1.(sky)2",
+      "text": "猫 sky",
+      "fragments": [
+        ["猫", 1.0],
+        ["sky", 2.0]
+      ]
+    },
+    {
+      "input": "(猫)1._sky",
+      "text": "猫 _sky",
+      "fragments": [["猫 _sky", 1.0]]
+    },
+    {
+      "input": "word+(猫)1.",
+      "text": "word 猫",
+      "fragments": [
+        ["word", 1.1],
+        ["猫", 1.0]
+      ]
+    },
+    {
+      "input": "(猫)2",
+      "text": "猫",
+      "fragments": [["猫", 2.0]]
+    },
+    {
+      "input": "((猫)2)0.5",
+      "text": "猫",
+      "fragments": [["猫", 1.0]]
+    },
+    {
+      "input": "a (猫)2 b",
+      "text": "a 猫 b",
+      "fragments": [
+        ["a", 1.0],
+        ["猫", 2.0],
+        ["b", 1.0]
+      ]
+    },
+    {
+      "input": "(猫)2(sky)2",
+      "text": "猫 sky",
+      "fragments": [["猫 sky", 2.0]]
+    },
+    {
+      "input": "(猫)2_sky",
+      "text": "猫 _sky",
+      "fragments": [
+        ["猫", 2.0],
+        ["_sky", 1.0]
+      ]
+    },
+    {
+      "input": "word+(猫)2",
+      "text": "word 猫",
+      "fragments": [
+        ["word", 1.1],
+        ["猫", 2.0]
+      ]
+    },
+    {
+      "input": "a(b)2",
+      "text": "a(b)2",
+      "fragments": [["a(b)2", 1.0]]
+    },
+    {
+      "input": "(a(b)2)",
+      "text": "a b",
+      "fragments": [
+        ["a", 1.0],
+        ["b", 2.0]
+      ]
+    },
+    {
+      "input": "a(red)2 blue+",
+      "text": "a(red)2 blue",
+      "fragments": [
+        ["a(red)2", 1.0],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "red .attend (2)",
+      "text": "red",
+      "fragments": [["red", 2.0]]
+    },
+    {
+      "input": "\"red blue\" .attend (++)",
+      "text": "red blue",
+      "fragments": [["red blue", 1.2100000000000002]]
+    },
+    {
+      "input": "(red) .attend (--)",
+      "text": "red",
+      "fragments": [["red", 0.81]]
+    },
+    {
+      "input": "target.attend(0)",
+      "text": "target",
+      "fragments": [["target", 0.0]]
+    },
+    {
+      "input": "target.attend(.5)",
+      "text": "target",
+      "fragments": [["target", 0.5]]
+    },
+    {
+      "input": "target .attend(2)",
+      "text": "target",
+      "fragments": [["target", 2.0]]
+    },
+    {
+      "input": "target.attend (2)",
+      "text": "target",
+      "fragments": [["target", 2.0]]
+    },
+    {
+      "input": "target .attend ( 2 )",
+      "text": "target",
+      "fragments": [["target", 2.0]]
+    },
+    {
+      "input": "(red).attend ( ++ )",
+      "text": "red",
+      "fragments": [["red", 1.2100000000000002]]
+    },
+    {
+      "input": "redblue+",
+      "text": "redblue",
+      "fragments": [["redblue", 1.1]]
+    },
+    {
+      "input": "(cat)! dog",
+      "text": "cat ! dog",
+      "fragments": [["cat ! dog", 1.0]]
+    },
+    {
+      "input": "(cat)😀 dog",
+      "text": "cat 😀 dog",
+      "fragments": [["cat 😀 dog", 1.0]]
+    },
+    {
+      "input": "(cat)2next",
+      "text": "cat next",
+      "fragments": [
+        ["cat", 2.0],
+        ["next", 1.0]
+      ]
+    },
+    {
+      "input": "cat)2",
+      "text": "cat)2",
+      "fragments": [["cat)2", 1.0]]
+    },
+    {
+      "input": "red\\+ neutral",
+      "text": "red\\+ neutral",
+      "fragments": [["red\\+ neutral", 1.0]]
+    },
+    {
+      "input": "foo\\(bar\\)+ cat",
+      "text": "foo(bar) cat",
+      "fragments": [
+        ["foo(bar)", 1.1],
+        ["cat", 1.0]
+      ]
+    },
+    {
+      "input": "(cat)1 dog--",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 1.0],
+        ["dog", 0.81]
+      ]
+    },
+    {
+      "input": "(cat)2\n\nnext",
+      "text": "cat next",
+      "fragments": [
+        ["cat", 2.0],
+        ["next", 1.0]
+      ]
+    },
+    {
+      "input": "red++blue+",
+      "text": "red blue",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["blue", 1.1]
+      ]
+    },
+    {
+      "input": "red++--blue+",
+      "text": "red --blue+",
+      "fragments": [
+        ["red", 1.2100000000000002],
+        ["--blue+", 1.0]
+      ]
+    },
+    {
+      "input": "",
+      "text": "",
+      "fragments": [["", 1.0]]
+    },
+    {
+      "input": "plain  prompt\nnext",
+      "text": "plain prompt next",
+      "fragments": [["plain prompt next", 1.0]]
+    },
+    {
+      "input": "redblue",
+      "text": "redblue",
+      "fragments": [["redblue", 1.0]]
+    },
+    {
+      "input": "((red)2 blue+",
+      "text": "((red)2 blue+",
+      "fragments": [["((red)2 blue+", 1.0]]
+    },
+    {
+      "input": "((foo=bar+)2)3",
+      "text": "((foo=bar+)2)3",
+      "fragments": [["((foo=bar+)2)3", 1.0]]
+    },
+    {
+      "input": "\"(foo=bar)2\"+",
+      "text": "\"(foo=bar)2\"+",
+      "fragments": [["\"(foo=bar)2\"+", 1.0]]
+    },
+    {
+      "input": "((++x+)2)3",
+      "text": "((++x+)2)3",
+      "fragments": [["((++x+)2)3", 1.0]]
+    },
+    {
+      "input": ".and(dog+)",
+      "text": ".and(dog)",
+      "fragments": [
+        [".and(", 1],
+        ["dog", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": ".and(dog+",
+      "text": ".and(dog",
+      "fragments": [
+        [".and(", 1],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": ".and(.blend(dog+))",
+      "text": ".and(.blend(dog))",
+      "fragments": [
+        [".and(.blend(", 1],
+        ["dog", 1.1],
+        ["))", 1]
+      ]
+    },
+    {
+      "input": "((red, blue).and() cat)2",
+      "text": "red , blue.and() cat",
+      "fragments": [["red , blue.and() cat", 2]]
+    },
+    {
+      "input": "(red, blue).and(dog+)",
+      "text": "red , blue.and(dog)",
+      "fragments": [
+        ["red , blue.and(", 1],
+        ["dog", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": ".and((dog)2",
+      "text": ".and(dog",
+      "fragments": [
+        [".and(", 1],
+        ["dog", 2]
+      ]
+    },
+    {
+      "input": "(red).and((dog)2, cat+)",
+      "text": "red.and(dog , cat)",
+      "fragments": [
+        ["red.and(", 1],
+        ["dog", 2],
+        [" , ", 1],
+        ["cat", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": "(cat)2.and(dog+)",
+      "text": "cat.and(dog)",
+      "fragments": [
+        ["cat", 2],
+        [".and(", 1],
+        ["dog", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": "(\"cat(\")2",
+      "text": "(\"cat(\")2",
+      "fragments": [["(\"cat(\")2", 1.0]]
+    },
+    {
+      "input": "(\"cat(\")65505",
+      "text": "(\"cat(\")65505",
+      "fragments": [["(\"cat(\")65505", 1.0]]
+    },
+    {
+      "input": "(\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+      "text": "(\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+      "fragments": [
+        [
+          "(\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+          1.0
+        ]
+      ]
+    },
+    {
+      "input": "((\"cat(\")2)65505",
+      "text": "((\"cat(\")2)65505",
+      "fragments": [["((\"cat(\")2)65505", 1.0]]
+    },
+    {
+      "input": "(\"cat)\")2",
+      "text": "(\"cat)\")2",
+      "fragments": [["(\"cat)\")2", 1.0]]
+    },
+    {
+      "input": "(\"cat\\n(\")65505",
+      "text": "(\"cat\\n(\")65505",
+      "fragments": [["(\"cat\\n(\")65505", 1.0]]
+    },
+    {
+      "input": "\"cat\\n(dog\"2",
+      "text": "\"cat\\n(dog\"2",
+      "fragments": [["\"cat\\n(dog\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\ndog\"2",
+      "text": "cat dog",
+      "fragments": [["cat dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\ndog+\"2",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\ndog+\"",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\ndog+",
+      "text": "cat\\ndog",
+      "fragments": [["cat\\ndog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\ndog\"2",
+      "text": "cat\\ dog",
+      "fragments": [["cat\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\ndog+\"2",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\ndog+\"",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\ndog+",
+      "text": "cat\\\\ndog",
+      "fragments": [["cat\\\\ndog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\ndog\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [["cat\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\ndog+\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\ndog+\"",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\ndog+",
+      "text": "cat\\\\\\ndog",
+      "fragments": [["cat\\\\\\ndog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\ndog\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [["cat\\\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\ndog+\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\\\ndog+\"",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\\\ndog+",
+      "text": "cat\\\\\\\\ndog",
+      "fragments": [["cat\\\\\\\\ndog", 1.1]]
+    },
+    {
+      "input": "\"cat\\tdog\"2",
+      "text": "cat dog",
+      "fragments": [["cat dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\tdog+\"2",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\tdog+\"",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\tdog+",
+      "text": "cat\\tdog",
+      "fragments": [["cat\\tdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\tdog\"2",
+      "text": "cat\\ dog",
+      "fragments": [["cat\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\tdog+\"2",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\tdog+\"",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\tdog+",
+      "text": "cat\\\\tdog",
+      "fragments": [["cat\\\\tdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\tdog\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [["cat\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\tdog+\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\tdog+\"",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\tdog+",
+      "text": "cat\\\\\\tdog",
+      "fragments": [["cat\\\\\\tdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\tdog\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [["cat\\\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\tdog+\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\\\tdog+\"",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\\\tdog+",
+      "text": "cat\\\\\\\\tdog",
+      "fragments": [["cat\\\\\\\\tdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\rdog\"2",
+      "text": "cat dog",
+      "fragments": [["cat dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\rdog+\"2",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\rdog+\"",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\rdog+",
+      "text": "cat\\rdog",
+      "fragments": [["cat\\rdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\rdog\"2",
+      "text": "cat\\ dog",
+      "fragments": [["cat\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\rdog+\"2",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\rdog+\"",
+      "text": "cat\\ dog",
+      "fragments": [
+        ["cat\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\rdog+",
+      "text": "cat\\\\rdog",
+      "fragments": [["cat\\\\rdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\rdog\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [["cat\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\rdog+\"2",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\rdog+\"",
+      "text": "cat\\\\ dog",
+      "fragments": [
+        ["cat\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\rdog+",
+      "text": "cat\\\\\\rdog",
+      "fragments": [["cat\\\\\\rdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\rdog\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [["cat\\\\\\ dog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\rdog+\"2",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\\\\\\\rdog+\"",
+      "text": "cat\\\\\\ dog",
+      "fragments": [
+        ["cat\\\\\\", 1.0],
+        ["dog", 1.1]
+      ]
+    },
+    {
+      "input": "cat\\\\\\\\rdog+",
+      "text": "cat\\\\\\\\rdog",
+      "fragments": [["cat\\\\\\\\rdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\fdog\"2",
+      "text": "\"cat\\fdog\"2",
+      "fragments": [["\"cat\\fdog\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"2",
+      "text": "\"cat\\fdog+\"2",
+      "fragments": [["\"cat\\fdog+\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"",
+      "text": "\"cat\\fdog+\"",
+      "fragments": [["\"cat\\fdog+\"", 1.0]]
+    },
+    {
+      "input": "cat\\fdog+",
+      "text": "cat\\fdog",
+      "fragments": [["cat\\fdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\fdog\"2",
+      "text": "\"cat\\\\fdog\"2",
+      "fragments": [["\"cat\\\\fdog\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\fdog+\"2",
+      "text": "\"cat\\\\fdog+\"2",
+      "fragments": [["\"cat\\\\fdog+\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\fdog+\"",
+      "text": "\"cat\\\\fdog+\"",
+      "fragments": [["\"cat\\\\fdog+\"", 1.0]]
+    },
+    {
+      "input": "cat\\\\fdog+",
+      "text": "cat\\\\fdog",
+      "fragments": [["cat\\\\fdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\fdog\"2",
+      "text": "\"cat\\\\\\fdog\"2",
+      "fragments": [["\"cat\\\\\\fdog\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\\\fdog+\"2",
+      "text": "\"cat\\\\\\fdog+\"2",
+      "fragments": [["\"cat\\\\\\fdog+\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\\\fdog+\"",
+      "text": "\"cat\\\\\\fdog+\"",
+      "fragments": [["\"cat\\\\\\fdog+\"", 1.0]]
+    },
+    {
+      "input": "cat\\\\\\fdog+",
+      "text": "cat\\\\\\fdog",
+      "fragments": [["cat\\\\\\fdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\fdog\"2",
+      "text": "\"cat\\\\\\\\fdog\"2",
+      "fragments": [["\"cat\\\\\\\\fdog\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\fdog+\"2",
+      "text": "\"cat\\\\\\\\fdog+\"2",
+      "fragments": [["\"cat\\\\\\\\fdog+\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\fdog+\"",
+      "text": "\"cat\\\\\\\\fdog+\"",
+      "fragments": [["\"cat\\\\\\\\fdog+\"", 1.0]]
+    },
+    {
+      "input": "cat\\\\\\\\fdog+",
+      "text": "cat\\\\\\\\fdog",
+      "fragments": [["cat\\\\\\\\fdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\vdog\"2",
+      "text": "cat\\vdog",
+      "fragments": [["cat\\vdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\vdog+\"2",
+      "text": "cat\\vdog",
+      "fragments": [["cat\\vdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\vdog+\"",
+      "text": "cat\\vdog",
+      "fragments": [["cat\\vdog", 1.1]]
+    },
+    {
+      "input": "cat\\vdog+",
+      "text": "cat\\vdog",
+      "fragments": [["cat\\vdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\vdog\"2",
+      "text": "cat\\\\vdog",
+      "fragments": [["cat\\\\vdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\vdog+\"2",
+      "text": "cat\\\\vdog",
+      "fragments": [["cat\\\\vdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\vdog+\"",
+      "text": "cat\\\\vdog",
+      "fragments": [["cat\\\\vdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\vdog+",
+      "text": "cat\\\\vdog",
+      "fragments": [["cat\\\\vdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\vdog\"2",
+      "text": "cat\\\\\\vdog",
+      "fragments": [["cat\\\\\\vdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\vdog+\"2",
+      "text": "cat\\\\\\vdog",
+      "fragments": [["cat\\\\\\vdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\vdog+\"",
+      "text": "cat\\\\\\vdog",
+      "fragments": [["cat\\\\\\vdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\vdog+",
+      "text": "cat\\\\\\vdog",
+      "fragments": [["cat\\\\\\vdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\vdog\"2",
+      "text": "cat\\\\\\\\vdog",
+      "fragments": [["cat\\\\\\\\vdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\vdog+\"2",
+      "text": "cat\\\\\\\\vdog",
+      "fragments": [["cat\\\\\\\\vdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\\\vdog+\"",
+      "text": "cat\\\\\\\\vdog",
+      "fragments": [["cat\\\\\\\\vdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\\\vdog+",
+      "text": "cat\\\\\\\\vdog",
+      "fragments": [["cat\\\\\\\\vdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\adog\"2",
+      "text": "cat\\adog",
+      "fragments": [["cat\\adog", 2.0]]
+    },
+    {
+      "input": "\"cat\\adog+\"2",
+      "text": "cat\\adog",
+      "fragments": [["cat\\adog", 2.2]]
+    },
+    {
+      "input": "\"cat\\adog+\"",
+      "text": "cat\\adog",
+      "fragments": [["cat\\adog", 1.1]]
+    },
+    {
+      "input": "cat\\adog+",
+      "text": "cat\\adog",
+      "fragments": [["cat\\adog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\adog\"2",
+      "text": "cat\\\\adog",
+      "fragments": [["cat\\\\adog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\adog+\"2",
+      "text": "cat\\\\adog",
+      "fragments": [["cat\\\\adog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\adog+\"",
+      "text": "cat\\\\adog",
+      "fragments": [["cat\\\\adog", 1.1]]
+    },
+    {
+      "input": "cat\\\\adog+",
+      "text": "cat\\\\adog",
+      "fragments": [["cat\\\\adog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\adog\"2",
+      "text": "cat\\\\\\adog",
+      "fragments": [["cat\\\\\\adog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\adog+\"2",
+      "text": "cat\\\\\\adog",
+      "fragments": [["cat\\\\\\adog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\adog+\"",
+      "text": "cat\\\\\\adog",
+      "fragments": [["cat\\\\\\adog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\adog+",
+      "text": "cat\\\\\\adog",
+      "fragments": [["cat\\\\\\adog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\adog\"2",
+      "text": "cat\\\\\\\\adog",
+      "fragments": [["cat\\\\\\\\adog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\adog+\"2",
+      "text": "cat\\\\\\\\adog",
+      "fragments": [["cat\\\\\\\\adog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\\\adog+\"",
+      "text": "cat\\\\\\\\adog",
+      "fragments": [["cat\\\\\\\\adog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\\\adog+",
+      "text": "cat\\\\\\\\adog",
+      "fragments": [["cat\\\\\\\\adog", 1.1]]
+    },
+    {
+      "input": "\"cat\\bdog\"2",
+      "text": "cat\\bdog",
+      "fragments": [["cat\\bdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\bdog+\"2",
+      "text": "cat\\bdog",
+      "fragments": [["cat\\bdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\bdog+\"",
+      "text": "cat\\bdog",
+      "fragments": [["cat\\bdog", 1.1]]
+    },
+    {
+      "input": "cat\\bdog+",
+      "text": "cat\\bdog",
+      "fragments": [["cat\\bdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\bdog\"2",
+      "text": "cat\\\\bdog",
+      "fragments": [["cat\\\\bdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\bdog+\"2",
+      "text": "cat\\\\bdog",
+      "fragments": [["cat\\\\bdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\bdog+\"",
+      "text": "cat\\\\bdog",
+      "fragments": [["cat\\\\bdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\bdog+",
+      "text": "cat\\\\bdog",
+      "fragments": [["cat\\\\bdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\bdog\"2",
+      "text": "cat\\\\\\bdog",
+      "fragments": [["cat\\\\\\bdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\bdog+\"2",
+      "text": "cat\\\\\\bdog",
+      "fragments": [["cat\\\\\\bdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\bdog+\"",
+      "text": "cat\\\\\\bdog",
+      "fragments": [["cat\\\\\\bdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\bdog+",
+      "text": "cat\\\\\\bdog",
+      "fragments": [["cat\\\\\\bdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\\\\\\\bdog\"2",
+      "text": "cat\\\\\\\\bdog",
+      "fragments": [["cat\\\\\\\\bdog", 2.0]]
+    },
+    {
+      "input": "\"cat\\\\\\\\bdog+\"2",
+      "text": "cat\\\\\\\\bdog",
+      "fragments": [["cat\\\\\\\\bdog", 2.2]]
+    },
+    {
+      "input": "\"cat\\\\\\\\bdog+\"",
+      "text": "cat\\\\\\\\bdog",
+      "fragments": [["cat\\\\\\\\bdog", 1.1]]
+    },
+    {
+      "input": "cat\\\\\\\\bdog+",
+      "text": "cat\\\\\\\\bdog",
+      "fragments": [["cat\\\\\\\\bdog", 1.1]]
+    },
+    {
+      "input": "\"cat\\n.attend\\t(2)\"",
+      "text": "cat",
+      "fragments": [["cat", 2.0]]
+    },
+    {
+      "input": "\"cat\\n(dog+)2\"2",
+      "text": "cat dog",
+      "fragments": [
+        ["cat", 2.0],
+        ["dog", 4.4]
+      ]
+    },
+    {
+      "input": "\"cat\\t,dog+\"2",
+      "text": "cat , dog",
+      "fragments": [
+        ["cat ,", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "\"cat\\ndog++mouse+\"2",
+      "text": "cat dog mouse",
+      "fragments": [
+        ["cat", 2.0],
+        ["dog", 2.4200000000000004],
+        ["mouse", 2.2]
+      ]
+    },
+    {
+      "input": ".and((\"cat(\")65505, dog+)",
+      "text": ".and((\"cat(\")65505 , dog)",
+      "fragments": [
+        [".and((\"cat(\")65505 , ", 1],
+        ["dog", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": ".and((\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999, dog+)",
+      "text": ".and((\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 , dog)",
+      "fragments": [
+        [
+          ".and((\"cat(\")9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 , ",
+          1
+        ],
+        ["dog", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": "\"\\f\"2",
+      "text": "",
+      "fragments": [["", 2.0]]
+    },
+    {
+      "input": "\" \\n\\f\\t\"2",
+      "text": "",
+      "fragments": [["", 2.0]]
+    },
+    {
+      "input": "\"\\f\" .attend(2)",
+      "text": "",
+      "fragments": [["", 2.0]]
+    },
+    {
+      "input": "\"cat\\nfoo\\fdog+\"2",
+      "text": "\"cat\\nfoo\\fdog+\"2",
+      "fragments": [["\"cat\\nfoo\\fdog+\"2", 1.0]]
+    },
+    {
+      "input": "foo\"cat\\ndog+\"2",
+      "text": "foo\"cat\\ndog+\"2",
+      "fragments": [["foo\"cat\\ndog+\"2", 1.0]]
+    },
+    {
+      "input": "foo+\"cat\\ndog+\"2",
+      "text": "foo cat dog",
+      "fragments": [
+        ["foo", 1.1],
+        ["cat", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "foo++\"cat\\tdog+\"2",
+      "text": "foo cat dog",
+      "fragments": [
+        ["foo", 1.2100000000000002],
+        ["cat", 2.0],
+        ["dog", 2.2]
+      ]
+    },
+    {
+      "input": "(foo\"cat\\rdog+\"2)3",
+      "text": "foo cat dog",
+      "fragments": [
+        ["foo", 3.0],
+        ["cat", 6.0],
+        ["dog", 6.6000000000000005]
+      ]
+    },
+    {
+      "input": "foo\"cat\\n.attend\\t(2)\"",
+      "text": "foo\"cat\\n.attend\\t(2)\"",
+      "fragments": [["foo\"cat\\n.attend\\t(2)\"", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 bird+",
+      "text": "\"cat\\fdog+\"2 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2bird+",
+      "text": "\"cat\\fdog+\"2bird+",
+      "fragments": [["\"cat\\fdog+\"2bird+", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"2(bird)2",
+      "text": "\"cat\\fdog+\"2(bird)2",
+      "fragments": [["\"cat\\fdog+\"2(bird)2", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 (bird)2",
+      "text": "\"cat\\fdog+\"2 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2\"bird\"2",
+      "text": "\"cat\\fdog+\"2\"bird\"2",
+      "fragments": [["\"cat\\fdog+\"2\"bird\"2", 1.0]]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 \"bird\"2",
+      "text": "\"cat\\fdog+\"2 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2,bird+",
+      "text": "\"cat\\fdog+\"2, bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2,", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 bird.attend(2)",
+      "text": "\"cat\\fdog+\"2 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat(\"2 bird+",
+      "text": "\"cat(\"2 bird",
+      "fragments": [
+        ["\"cat(\"2", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat(\"2bird+",
+      "text": "\"cat(\"2bird+",
+      "fragments": [["\"cat(\"2bird+", 1.0]]
+    },
+    {
+      "input": "\"cat(\"2(bird)2",
+      "text": "\"cat(\"2(bird)2",
+      "fragments": [["\"cat(\"2(bird)2", 1.0]]
+    },
+    {
+      "input": "\"cat(\"2 (bird)2",
+      "text": "\"cat(\"2 bird",
+      "fragments": [
+        ["\"cat(\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat(\"2\"bird\"2",
+      "text": "\"cat(\"2\"bird\"2",
+      "fragments": [["\"cat(\"2\"bird\"2", 1.0]]
+    },
+    {
+      "input": "\"cat(\"2 \"bird\"2",
+      "text": "\"cat(\"2 bird",
+      "fragments": [
+        ["\"cat(\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat(\"2,bird+",
+      "text": "\"cat(\"2, bird",
+      "fragments": [
+        ["\"cat(\"2,", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat(\"2 bird.attend(2)",
+      "text": "\"cat(\"2 bird",
+      "fragments": [
+        ["\"cat(\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat)\"2 bird+",
+      "text": "\"cat)\"2 bird",
+      "fragments": [
+        ["\"cat)\"2", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat)\"2bird+",
+      "text": "\"cat)\"2bird+",
+      "fragments": [["\"cat)\"2bird+", 1.0]]
+    },
+    {
+      "input": "\"cat)\"2(bird)2",
+      "text": "\"cat)\"2(bird)2",
+      "fragments": [["\"cat)\"2(bird)2", 1.0]]
+    },
+    {
+      "input": "\"cat)\"2 (bird)2",
+      "text": "\"cat)\"2 bird",
+      "fragments": [
+        ["\"cat)\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat)\"2\"bird\"2",
+      "text": "\"cat)\"2\"bird\"2",
+      "fragments": [["\"cat)\"2\"bird\"2", 1.0]]
+    },
+    {
+      "input": "\"cat)\"2 \"bird\"2",
+      "text": "\"cat)\"2 bird",
+      "fragments": [
+        ["\"cat)\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat)\"2,bird+",
+      "text": "\"cat)\"2, bird",
+      "fragments": [
+        ["\"cat)\"2,", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat)\"2 bird.attend(2)",
+      "text": "\"cat)\"2 bird",
+      "fragments": [
+        ["\"cat)\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat=dog\"2 bird+",
+      "text": "\"cat=dog\"2 bird",
+      "fragments": [
+        ["\"cat=dog\"2", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat=dog\"2bird+",
+      "text": "\"cat=dog\"2bird+",
+      "fragments": [["\"cat=dog\"2bird+", 1.0]]
+    },
+    {
+      "input": "\"cat=dog\"2(bird)2",
+      "text": "\"cat=dog\"2(bird)2",
+      "fragments": [["\"cat=dog\"2(bird)2", 1.0]]
+    },
+    {
+      "input": "\"cat=dog\"2 (bird)2",
+      "text": "\"cat=dog\"2 bird",
+      "fragments": [
+        ["\"cat=dog\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat=dog\"2\"bird\"2",
+      "text": "\"cat=dog\"2\"bird\"2",
+      "fragments": [["\"cat=dog\"2\"bird\"2", 1.0]]
+    },
+    {
+      "input": "\"cat=dog\"2 \"bird\"2",
+      "text": "\"cat=dog\"2 bird",
+      "fragments": [
+        ["\"cat=dog\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat=dog\"2,bird+",
+      "text": "\"cat=dog\"2, bird",
+      "fragments": [
+        ["\"cat=dog\"2,", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat=dog\"2 bird.attend(2)",
+      "text": "\"cat=dog\"2 bird",
+      "fragments": [
+        ["\"cat=dog\"2", 1.0],
+        ["bird", 2.0]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2\tbird+",
+      "text": "\"cat\\fdog+\"2 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"65505 bird+",
+      "text": "\"cat\\fdog+\"65505 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"65505", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 bird+",
+      "text": "\"cat\\fdog+\"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999 bird",
+      "fragments": [
+        [
+          "\"cat\\fdog+\"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+          1.0
+        ],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 \"cat\\ndog+\"2 bird+",
+      "text": "\"cat\\fdog+\"2 cat dog bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2", 1.0],
+        ["cat", 2.0],
+        ["dog", 2.2],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2 \"other\\fbug\"3 bird+",
+      "text": "\"cat\\fdog+\"2 \"other\\fbug\"3 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2 \"other\\fbug\"3", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2\"other\\fbug\"3 bird+",
+      "text": "\"cat\\fdog+\"2\"other\\fbug\"3 bird",
+      "fragments": [
+        ["\"cat\\fdog+\"2\"other\\fbug\"3", 1.0],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\f dog+\"2 bird+",
+      "text": "\"cat\\f dog+\"2 bird",
+      "fragments": [
+        ["\"cat\\f dog+\"2 ", 1],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\n dog+\"2 bird+",
+      "text": "\"cat\n dog+\"2 bird",
+      "fragments": [
+        ["\"cat\n dog+\"2 ", 1],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "(\"cat\\fdog+\"2 bird+)3 sky+",
+      "text": "(\"cat\\fdog+\"2 bird+)3 sky",
+      "fragments": [
+        ["(\"cat\\fdog+\"2 bird+)3 ", 1],
+        ["sky", 1.1]
+      ]
+    },
+    {
+      "input": ".and(\"cat\\fdog+\"2, bird+)",
+      "text": ".and(\"cat\\fdog+\"2, bird)",
+      "fragments": [
+        [".and(\"cat\\fdog+\"2, ", 1],
+        ["bird", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": ".and((\"cat\\fdog+\"2)65505, bird+)",
+      "text": ".and((\"cat\\fdog+\"2)65505 , bird)",
+      "fragments": [
+        [".and((\"cat\\fdog+\"2)65505 , ", 1],
+        ["bird", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": ".and(.blend(\"cat\\fdog+\"2, bird+))",
+      "text": ".and(.blend(\"cat\\fdog+\"2, bird))",
+      "fragments": [
+        [".and(.blend(\"cat\\fdog+\"2, ", 1],
+        ["bird", 1.1],
+        ["))", 1]
+      ]
+    },
+    {
+      "input": ".and(\"cat\\fdog+\"2 bird+",
+      "text": ".and(\"cat\\fdog+\"2 bird",
+      "fragments": [
+        [".and(\"cat\\fdog+\"2 ", 1],
+        ["bird", 1.1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+\"2.and(bird+)",
+      "text": "\"cat\\fdog+\"2.and(bird)",
+      "fragments": [
+        ["\"cat\\fdog+\"2.and(", 1],
+        ["bird", 1.1],
+        [")", 1]
+      ]
+    },
+    {
+      "input": "\"cat\\fdog+ bird+",
+      "text": "\"cat\\fdog+ bird+",
+      "fragments": [["\"cat\\fdog+ bird+", 1]]
+    },
+    {
+      "input": "(\"cat\\fdog+\"2 bird+",
+      "text": "(\"cat\\fdog+\"2 bird+",
+      "fragments": [["(\"cat\\fdog+\"2 bird+", 1]]
+    }
+  ]
+}

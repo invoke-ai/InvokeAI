@@ -35,8 +35,12 @@ class FakeQwen3Tokenizer:
     pad_token_id = 0
     eos_token_id = 0
 
+    def __init__(self):
+        self.prompt: str | None = None
+
     def __call__(self, prompt, **kwargs):
-        del prompt, kwargs
+        self.prompt = prompt
+        del kwargs
         return SimpleNamespace(
             input_ids=torch.tensor([[1, 2, 3]], dtype=torch.long),
             attention_mask=torch.tensor([[1, 1, 1]], dtype=torch.long),
@@ -44,9 +48,16 @@ class FakeQwen3Tokenizer:
 
 
 class FakeT5Tokenizer:
+    def __init__(self):
+        self.prompt: str | None = None
+
     def __call__(self, prompt, **kwargs):
-        del prompt, kwargs
-        return SimpleNamespace(input_ids=torch.tensor([[1, 2, 3]], dtype=torch.long))
+        self.prompt = prompt
+        result = SimpleNamespace(input_ids=torch.tensor([[1, 2, 3]], dtype=torch.long))
+        if kwargs.get("return_offsets_mapping"):
+            result.offset_mapping = torch.tensor([[[0, 1], [2, 11], [0, 0]]], dtype=torch.long)
+            result.special_tokens_mask = torch.tensor([[0, 0, 1]], dtype=torch.long)
+        return result
 
 
 class FakeLoadedModel:
@@ -63,10 +74,13 @@ class FakeLoadedModel:
         yield (None, self.model)
 
 
-def _run_encode(monkeypatch, compute_device: torch.device) -> FakeQwen3Encoder:
+def _run_encode(
+    monkeypatch, compute_device: torch.device, prompt: str = "test prompt"
+) -> tuple[FakeQwen3Encoder, FakeQwen3Tokenizer, FakeT5Tokenizer, torch.Tensor | None]:
     module_path = "invokeai.app.invocations.text_encoder.anima_text_encoder"
     text_encoder = FakeQwen3Encoder()
     tokenizer = FakeQwen3Tokenizer()
+    t5_tokenizer = FakeT5Tokenizer()
 
     mock_context = MagicMock()
     mock_context.models.load.side_effect = [
@@ -80,16 +94,16 @@ def _run_encode(monkeypatch, compute_device: torch.device) -> FakeQwen3Encoder:
     monkeypatch.setattr(f"{module_path}.PreTrainedTokenizerBase", FakeQwen3Tokenizer)
     monkeypatch.setattr(f"{module_path}.LayerPatcher.apply_smart_model_patches", lambda **kwargs: nullcontext())
     # Step 2 tokenizes with the bundled T5-XXL tokenizer; avoid touching the real bundled files.
-    monkeypatch.setattr(f"{module_path}.load_bundled_t5_tokenizer", lambda: FakeT5Tokenizer())
+    monkeypatch.setattr(f"{module_path}.load_bundled_t5_tokenizer", lambda: t5_tokenizer)
 
     invocation = AnimaTextEncoderInvocation.model_construct(
-        prompt="test prompt",
+        prompt=prompt,
         qwen3_encoder=SimpleNamespace(text_encoder=SimpleNamespace(), tokenizer=SimpleNamespace(), loras=[]),
         mask=None,
     )
 
-    invocation._encode_prompt(mock_context)
-    return text_encoder
+    _, _, weights = invocation._encode_prompt(mock_context)
+    return text_encoder, tokenizer, t5_tokenizer, weights
 
 
 def test_anima_qwen3_encode_uses_compute_device(monkeypatch):
@@ -97,11 +111,26 @@ def test_anima_qwen3_encode_uses_compute_device(monkeypatch):
     # compute device is the accelerator. The encode must run on the intended compute device, not the current
     # residency, or the whole encode silently runs on the CPU.
     compute_device = torch.device("meta")
-    text_encoder = _run_encode(monkeypatch, compute_device)
+    text_encoder, _, _, _ = _run_encode(monkeypatch, compute_device)
     assert text_encoder.forward_input_device == compute_device
 
 
 def test_anima_qwen3_encode_uses_cpu_for_cpu_only_model(monkeypatch):
     # A cpu_only encoder has compute_device == CPU; the encode must run on the CPU.
-    text_encoder = _run_encode(monkeypatch, torch.device("cpu"))
+    text_encoder, _, _, _ = _run_encode(monkeypatch, torch.device("cpu"))
     assert text_encoder.forward_input_device == torch.device("cpu")
+
+
+def test_anima_qwen3_and_t5_receive_the_same_cleaned_prompt(monkeypatch) -> None:
+    _, qwen_tokenizer, t5_tokenizer, weights = _run_encode(monkeypatch, torch.device("cpu"), "a (long hair)2")
+
+    assert qwen_tokenizer.prompt == t5_tokenizer.prompt == "a long hair"
+    assert weights is not None
+    torch.testing.assert_close(weights, torch.tensor([1.0, 2.0, 1.0]))
+
+
+def test_anima_unweighted_prompt_keeps_none_weights(monkeypatch) -> None:
+    _, qwen_tokenizer, t5_tokenizer, weights = _run_encode(monkeypatch, torch.device("cpu"))
+
+    assert qwen_tokenizer.prompt == t5_tokenizer.prompt == "test prompt"
+    assert weights is None

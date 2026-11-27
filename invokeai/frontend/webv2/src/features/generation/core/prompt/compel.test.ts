@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCompelPromptNodeType, supportsPromptAttentionSyntax } from './compel';
+import { getCompelPromptNodeType, getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './compel';
 
 describe('supportsPromptAttentionSyntax', () => {
-  it.each(['sd-1', 'sd-2', 'sdxl'])('reads attention syntax for %s', (base) => {
+  it.each(['sd-1', 'sd-2', 'sdxl', 'anima'])('reads attention syntax for %s', (base) => {
     expect(supportsPromptAttentionSyntax(base)).toBe(true);
   });
 
@@ -15,6 +15,14 @@ describe('supportsPromptAttentionSyntax', () => {
     expect(supportsPromptAttentionSyntax(undefined)).toBe(false);
     expect(supportsPromptAttentionSyntax(null)).toBe(false);
     expect(supportsPromptAttentionSyntax('constructor')).toBe(false);
+  });
+});
+
+describe('getPromptSyntaxProfile', () => {
+  it('separates Compel features from Anima attention and models without prompt syntax', () => {
+    expect(getPromptSyntaxProfile('sdxl')).toBe('compel');
+    expect(getPromptSyntaxProfile('anima')).toBe('anima');
+    expect(getPromptSyntaxProfile('flux')).toBe('none');
   });
 });
 

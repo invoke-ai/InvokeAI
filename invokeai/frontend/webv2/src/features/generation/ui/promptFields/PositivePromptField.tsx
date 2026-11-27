@@ -4,7 +4,7 @@ import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
-import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
+import { getPromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import { getEffectivePositivePrompt, getPositivePromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
@@ -102,7 +102,8 @@ export const PositivePromptField = ({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
-  const readsAttentionSyntax = supportsPromptAttentionSyntax(selectedModel?.base);
+  const syntaxProfile = getPromptSyntaxProfile(selectedModel?.base);
+  const readsAttentionSyntax = syntaxProfile !== 'none';
   const { commitDraftValue, draftValue, flushDraftValue, readDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -258,7 +259,7 @@ export const PositivePromptField = ({
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
-        attentionSyntax={readsAttentionSyntax}
+        syntaxProfile={syntaxProfile}
         batchCount={batchCount}
         droppedImage={droppedImage}
         dynamicPrompts={dynamicPrompts}
@@ -290,7 +291,7 @@ export const PositivePromptField = ({
       loras,
       projectId,
       promptEditor,
-      readsAttentionSyntax,
+      syntaxProfile,
       savedPromptModels,
       selectedModel,
       showSyntaxHighlighting,
@@ -325,6 +326,7 @@ export const PositivePromptField = ({
           {...autocomplete.comboboxProps}
           aria-label={t('widgets.generate.positivePrompt')}
           attentionSyntax={readsAttentionSyntax ? 'edit' : 'none'}
+          syntaxProfile={syntaxProfile}
           defaultHeightPx={heightPx}
           minHeightPx={96}
           resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
