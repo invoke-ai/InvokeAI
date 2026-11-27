@@ -1,8 +1,14 @@
 import json
 import os
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, replace
 from pathlib import Path
+from stat import S_ISREG
+from threading import local
 from typing import Any, Optional, TypeAlias
 
+import gguf
 import safetensors.torch
 import torch
 from gguf import GGUFValueType
@@ -12,7 +18,7 @@ from safetensors import safe_open
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_header_state_dict
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_reader_state_dict
 from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -136,6 +142,51 @@ def _is_sdnq_safetensors(path: Path) -> bool:
     return False
 
 
+@dataclass
+class _GGUFProbeCache:
+    identity: tuple[int, int, int, int, int] | None = None
+    metadata: dict[str, Any] | None = None
+    metadata_error: str | None = None
+    state_dict: StateDict | None = None
+
+
+def _gguf_file_identity(path: Path) -> tuple[int, int, int, int, int] | None:
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    if not S_ISREG(info.st_mode):
+        return None
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+class GGUFFileChangedError(RuntimeError):
+    """The file at the identification path changed while its header was in use."""
+
+
+@dataclass
+class _GGUFHeaderScope:
+    path: Path
+    stack: ExitStack
+    cache: _GGUFProbeCache
+    reader: gguf.GGUFReader | None = None
+    changed: bool = False
+
+    def check_identity(self) -> None:
+        if self.changed or _gguf_file_identity(self.path) != self.cache.identity:
+            self.changed = True
+            raise GGUFFileChangedError(
+                f"{self.path.name} changed during GGUF identification. Retry with a stable file."
+            )
+
+
+class _GGUFIdentification(local):
+    scope: _GGUFHeaderScope | None = None
+
+
+_ModelOnDiskState: TypeAlias = dict[str, Any] | tuple[dict[str, Any] | None, dict[str, Any]]
+
+
 class ModelOnDisk:
     """A utility class representing a model stored on disk."""
 
@@ -151,6 +202,27 @@ class ModelOnDisk:
         self._state_dict_cache: dict[Path, Any] = {}
         self._metadata_cache: dict[Path, Any] = {}
         self._metadata_errors: dict[Path, str] = {}
+        self._gguf_probe_cache: dict[Path, _GGUFProbeCache] = {}
+        self._gguf_identification = _GGUFIdentification()
+
+    def __getstate__(self) -> _ModelOnDiskState:
+        state = object.__getstate__(self)
+        attributes, slots = state if isinstance(state, tuple) else (state, None)
+        attributes = (attributes or {}).copy()
+        attributes.pop("_gguf_identification", None)
+        if slots is None:
+            return attributes
+        slots.pop("_gguf_identification", None)
+        return attributes, slots
+
+    def __setstate__(self, state: _ModelOnDiskState) -> None:
+        attributes, slots = state if isinstance(state, tuple) else (state, {})
+        self._gguf_probe_cache = {}
+        if attributes is not None:
+            self.__dict__.update(attributes)
+        for name, value in slots.items():
+            setattr(self, name, value)
+        self._gguf_identification = _GGUFIdentification()
 
     def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
@@ -166,6 +238,79 @@ class ModelOnDisk:
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
+    def _gguf_scope(self, path: Path) -> _GGUFHeaderScope | None:
+        scope = self._gguf_identification.scope
+        # WindowsPath equality can fold two separate filenames in a case-sensitive directory.
+        return scope if scope is not None and os.fspath(scope.path) == os.fspath(path) else None
+
+    def _gguf_cache(self, path: Path) -> _GGUFProbeCache:
+        scope = self._gguf_scope(path)
+        if scope is not None:
+            return scope.cache
+        identity = _gguf_file_identity(path)
+        cache = self._gguf_probe_cache.get(path)
+        if cache is None or cache.identity != identity:
+            cache = self._gguf_probe_cache[path] = _GGUFProbeCache(identity)
+        return cache
+
+    @contextmanager
+    def reuse_gguf_header(self) -> Iterator[None]:
+        """Share a lazy reader for this model's primary file during synchronous identification."""
+        path = self.path
+        identity = _gguf_file_identity(path) if path.suffix == ".gguf" else None
+        if identity is None:
+            yield
+            return
+
+        # A nested identification has its own scope. Other threads cannot borrow this scope's mapping.
+        previous = self._gguf_identification.scope
+        cached = self._gguf_probe_cache.get(path)
+        cache = replace(cached) if cached is not None and cached.identity == identity else _GGUFProbeCache(identity)
+        scope = _GGUFHeaderScope(path, ExitStack(), cache)
+        completed = False
+        try:
+            with scope.stack:
+                self._gguf_identification.scope = scope
+                try:
+                    yield
+                finally:
+                    self._gguf_identification.scope = previous
+                    scope.reader = None
+            completed = True
+        finally:
+            # Keep detached caches on ordinary errors, as before, but discard them if the file changed.
+            scope.changed |= os.fspath(self.path) != os.fspath(path)
+            try:
+                scope.check_identity()
+            except GGUFFileChangedError:
+                published = self._gguf_probe_cache.get(path)
+                if published is not None and published.identity == identity:
+                    self._gguf_probe_cache.pop(path, None)
+                # A changed file invalidates the cache even when an exception is already unwinding.
+                if completed:
+                    raise
+            else:
+                self._gguf_probe_cache[path] = cache
+
+    @contextmanager
+    def open_gguf_header(self, path: Path, *, strict: bool = False) -> Iterator[gguf.GGUFReader]:
+        """Read a header, reusing the active identification's reader for this exact model and path."""
+        scope = self._gguf_scope(path)
+        if scope is not None:
+            scope.check_identity()
+            if scope.reader is None:
+                scope.reader = gguf.GGUFReader(path) if strict else scope.stack.enter_context(WrappedGGUFReader(path))
+            if not strict or type(scope.reader) is gguf.GGUFReader:
+                yield scope.reader
+                return
+
+        if strict:
+            # A strict probe still rejects files for which the regular reader needed the duplicate-header retry.
+            yield gguf.GGUFReader(path)
+        else:
+            with WrappedGGUFReader(path) as reader:
+                yield reader
+
     def metadata(self, path: Optional[Path] = None) -> dict[str, Any]:
         """The file's metadata: safetensors' string map, or a GGUF's scalar fields.
 
@@ -174,11 +319,15 @@ class ModelOnDisk:
         and they are most of a header's size.
         """
         path = path or self.path
-        if path in self._metadata_cache:
+        gguf_cache = self._gguf_cache(path) if path.suffix == ".gguf" else None
+        if gguf_cache is not None:
+            if gguf_cache.metadata is not None:
+                return gguf_cache.metadata
+        elif path in self._metadata_cache:
             return self._metadata_cache[path]
         try:
-            if path.suffix == ".gguf":
-                with WrappedGGUFReader(path) as reader:
+            if gguf_cache is not None:
+                with self.open_gguf_header(path) as reader:
                     metadata = {
                         name: field.contents()
                         for name, field in reader.fields.items()
@@ -191,9 +340,16 @@ class ModelOnDisk:
         except Exception as e:
             metadata = {}
             # The message only: a stored exception would pin the traceback frames.
-            self._metadata_errors[path] = f"{type(e).__name__}: {e}"
+            error = f"{type(e).__name__}: {e}"
+            if gguf_cache is not None:
+                gguf_cache.metadata_error = error
+            else:
+                self._metadata_errors[path] = error
 
-        self._metadata_cache[path] = metadata
+        if gguf_cache is not None:
+            gguf_cache.metadata = metadata
+        else:
+            self._metadata_cache[path] = metadata
         return metadata
 
     def metadata_read_error(self, path: Optional[Path] = None) -> Optional[str]:
@@ -204,6 +360,8 @@ class ModelOnDisk:
         """
         path = path or self.path
         self.metadata(path)
+        if path.suffix == ".gguf":
+            return self._gguf_cache(path).metadata_error
         return self._metadata_errors.get(path)
 
     def repo_variant(self) -> Optional[ModelRepoVariant]:
@@ -224,12 +382,15 @@ class ModelOnDisk:
         return ModelRepoVariant.Default
 
     def load_state_dict(self, path: Optional[Path] = None) -> StateDict:
-        if path in self._state_dict_cache:
+        if path is not None and path.suffix != ".gguf" and path in self._state_dict_cache:
             return self._state_dict_cache[path]
 
         path = self.resolve_weight_file(path)
-
-        if path in self._state_dict_cache:
+        gguf_cache = self._gguf_cache(path) if path.suffix == ".gguf" else None
+        if gguf_cache is not None:
+            if gguf_cache.state_dict is not None:
+                return gguf_cache.state_dict
+        elif path in self._state_dict_cache:
             return self._state_dict_cache[path]
 
         with SilenceWarnings():
@@ -257,11 +418,12 @@ class ModelOnDisk:
                 # needs the shapes, not the weights, and torch skips reading the storages entirely.
                 checkpoint = torch.load(path, map_location="meta")
                 assert isinstance(checkpoint, dict)
-            elif path.suffix.endswith(".gguf"):
+            elif gguf_cache is not None:
                 # Shapes and quantization types from the header, like the safetensors branch: the tensor data
                 # is never read. Whether a Q8_CR or Q4_CR file's quantization is supported is decided from its
                 # metadata by `ModelConfigFactory`, once, not per candidate.
-                checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
+                with self.open_gguf_header(path) as reader:
+                    checkpoint = gguf_reader_state_dict(reader, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
@@ -282,7 +444,10 @@ class ModelOnDisk:
 
         state_dict = normalize_peft_adapter_names(state_dict)
 
-        self._state_dict_cache[path] = state_dict
+        if gguf_cache is not None:
+            gguf_cache.state_dict = state_dict
+        else:
+            self._state_dict_cache[path] = state_dict
         return state_dict
 
     def resolve_weight_file(self, path: Optional[Path] = None) -> Path:

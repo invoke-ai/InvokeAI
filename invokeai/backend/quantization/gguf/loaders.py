@@ -271,19 +271,24 @@ def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, 
     from the metadata. The reader maps the file but touches only the header.
     """
     with WrappedGGUFReader(path) as reader:
-        orig_shapes = _read_comfy_orig_shapes(reader)
-        sd: dict[str, torch.Tensor] = {}
-        for tensor in reader.tensors:
-            shape = _logical_shape(tensor, orig_shapes)
-            stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
-            stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
-            sd[tensor.name] = GGMLTensor(
-                torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
-                ggml_quantization_type=tensor.tensor_type,
-                tensor_shape=shape,
-                compute_dtype=compute_dtype,
-            )
-        return sd
+        return gguf_reader_state_dict(reader, compute_dtype)
+
+
+def gguf_reader_state_dict(reader: gguf.GGUFReader, compute_dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """Build the header state dict from an already-open reader without retaining any mapped data."""
+    orig_shapes = _read_comfy_orig_shapes(reader)
+    sd: dict[str, torch.Tensor] = {}
+    for tensor in reader.tensors:
+        shape = _logical_shape(tensor, orig_shapes)
+        stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
+        stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
+        sd[tensor.name] = GGMLTensor(
+            torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
+            ggml_quantization_type=tensor.tensor_type,
+            tensor_shape=shape,
+            compute_dtype=compute_dtype,
+        )
+    return sd
 
 
 def gguf_sd_loader(

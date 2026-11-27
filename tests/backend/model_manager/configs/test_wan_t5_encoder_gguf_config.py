@@ -219,15 +219,28 @@ def _write_llamacpp_t5_encoder_gguf(path: Path, *, vocab_size: int, bias_in_ever
     ids=["umt5", "t5_v1_1"],
 )
 def test_a_real_gguf_identifies_from_its_header_alone(
-    tmp_path: Path, vocab_size: int, bias_in_every_block: bool, expected: type
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, vocab_size: int, bias_in_every_block: bool, expected: type
 ) -> None:
     path = tmp_path / "encoder.gguf"
     _write_llamacpp_t5_encoder_gguf(path, vocab_size=vocab_size, bias_in_every_block=bias_in_every_block)
     mod = ModelOnDisk(path)
 
+    reader_init = gguf.GGUFReader.__init__
+    opened_paths: list[Path] = []
+
+    def count_open(reader: gguf.GGUFReader, reader_path: Path) -> None:
+        opened_paths.append(reader_path)
+        reader_init(reader, reader_path)
+
+    monkeypatch.setattr(gguf.GGUFReader, "__init__", count_open)
     result = ModelConfigFactory.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
     assert result.match_count == 1
     assert isinstance(result.config, expected)
+    assert opened_paths == [path]
     # What the configs probed is what production identification reads: the header, not the tensor data.
-    assert all(tensor.quantized_data.is_meta for tensor in mod.load_state_dict().values())
+    state_dict = mod.load_state_dict()
+    assert all(tensor.quantized_data.is_meta for tensor in state_dict.values())
+    assert state_dict["token_embd.weight"].tensor_shape == (vocab_size, 1)
+    # Keep the model and classification result alive. Windows cannot rename a still-mapped file.
+    path.rename(tmp_path / "moved.gguf")
