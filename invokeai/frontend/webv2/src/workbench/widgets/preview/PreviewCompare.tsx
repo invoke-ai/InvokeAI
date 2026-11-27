@@ -13,15 +13,99 @@ import {
   useState,
   type FocusEvent,
   type PointerEvent,
+  type ReactNode,
+  type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { PreviewDensity } from './previewDensity';
 import type { PreviewComparisonMode } from './previewSettings';
 
 import { getPreviewDockBarHeight, PREVIEW_DOCK_BAR_PROPS } from './previewDockBar';
 import { previewStageStore, usePreviewStageDensity } from './previewHeaderStore';
 import { getFittedFrameCss, getPreviewStagePadding, PreviewStage } from './PreviewStage';
 import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
+
+export const PreviewComparisonBadges = ({ leftLabel, rightLabel }: { leftLabel: string; rightLabel: string }) => (
+  <>
+    <Badge left="2" maxW="45%" pointerEvents="none" position="absolute" top="2" truncate variant="solid" zIndex="1">
+      {leftLabel}
+    </Badge>
+    <Badge maxW="45%" pointerEvents="none" position="absolute" right="2" top="2" truncate variant="solid" zIndex="1">
+      {rightLabel}
+    </Badge>
+  </>
+);
+
+export const PreviewComparisonDock = ({
+  children,
+  density,
+  exitRef,
+  onExit,
+  onSwap,
+}: {
+  children?: ReactNode;
+  density: PreviewDensity;
+  exitRef?: Ref<HTMLButtonElement>;
+  onExit: () => void;
+  onSwap: () => void;
+}) => {
+  const { t } = useTranslation();
+  const swapLabel = t('common.swap');
+  const exitLabel = t('widgets.preview.exitCompare');
+
+  return (
+    <Flex
+      {...PREVIEW_DOCK_BAR_PROPS}
+      align="center"
+      columnGap="1"
+      flexWrap="wrap"
+      justify="safe center"
+      minH={getPreviewDockBarHeight(density)}
+      overflowX="auto"
+      py="1"
+      rowGap="1"
+    >
+      {children}
+      {density === 'full' ? (
+        <>
+          <Button size="sm" variant="outline" onClick={onSwap}>
+            <ArrowLeftRightIcon />
+            {swapLabel}
+          </Button>
+          <Button ref={exitRef} size="sm" variant="outline" onClick={onExit}>
+            <XIcon />
+            {exitLabel}
+          </Button>
+        </>
+      ) : (
+        <>
+          <IconButton
+            aria-label={swapLabel}
+            size="sm"
+            tooltip={swapLabel}
+            tooltipPlacement="top"
+            variant="outline"
+            onClick={onSwap}
+          >
+            <ArrowLeftRightIcon />
+          </IconButton>
+          <IconButton
+            ref={exitRef}
+            aria-label={exitLabel}
+            size="sm"
+            tooltip={exitLabel}
+            tooltipPlacement="top"
+            variant="outline"
+            onClick={onExit}
+          >
+            <XIcon />
+          </IconButton>
+        </>
+      )}
+    </Flex>
+  );
+};
 
 const { setStageElement } = previewStageStore;
 
@@ -208,7 +292,10 @@ export const PreviewCompare = ({
               transform="translateX(-50%)"
               w="2px"
             />
-            <ComparisonBadges compareLabel={t('widgets.preview.compare')} viewingLabel={t('widgets.preview.viewing')} />
+            <PreviewComparisonBadges
+              leftLabel={t('widgets.preview.compare')}
+              rightLabel={t('widgets.preview.viewing')}
+            />
           </Box>
         ) : mode === 'hover' ? (
           <HoverCompareFrame baseImage={baseImage} compareImage={compareImage} />
@@ -229,19 +316,7 @@ export const PreviewCompare = ({
           </HStack>
         )}
       </PreviewStage>
-      {/* Docked where the filmstrip docks, on the same surface. Narrow widths turn swap and exit into icons, then wrap;
-          `safe` keeps a row wider than the bar scrollable from its start. */}
-      <Flex
-        {...PREVIEW_DOCK_BAR_PROPS}
-        align="center"
-        columnGap="1"
-        flexWrap="wrap"
-        justify="safe center"
-        minH={getPreviewDockBarHeight(density)}
-        overflowX="auto"
-        py="1"
-        rowGap="1"
-      >
+      <PreviewComparisonDock density={density} onExit={onExit} onSwap={onSwap}>
         <SegmentGroup.Root value={mode} onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
           {COMPARISON_MODES.map((item) => (
@@ -251,42 +326,7 @@ export const PreviewCompare = ({
             </SegmentGroup.Item>
           ))}
         </SegmentGroup.Root>
-        {density === 'full' ? (
-          <>
-            <Button size="sm" variant="outline" onClick={onSwap}>
-              <ArrowLeftRightIcon />
-              {t('common.swap')}
-            </Button>
-            <Button size="sm" variant="outline" onClick={onExit}>
-              <XIcon />
-              {t('widgets.preview.exitCompare')}
-            </Button>
-          </>
-        ) : (
-          <>
-            <IconButton
-              aria-label={t('common.swap')}
-              size="sm"
-              tooltip={t('common.swap')}
-              tooltipPlacement="top"
-              variant="outline"
-              onClick={onSwap}
-            >
-              <ArrowLeftRightIcon />
-            </IconButton>
-            <IconButton
-              aria-label={t('widgets.preview.exitCompare')}
-              size="sm"
-              tooltip={t('widgets.preview.exitCompare')}
-              tooltipPlacement="top"
-              variant="outline"
-              onClick={onExit}
-            >
-              <XIcon />
-            </IconButton>
-          </>
-        )}
-      </Flex>
+      </PreviewComparisonDock>
     </Stack>
   );
 };
@@ -408,21 +448,10 @@ const HoverCompareFrame = ({
           width={compareImage.width}
         />
       </Box>
-      <ComparisonBadges compareLabel={t('widgets.preview.compare')} viewingLabel={t('widgets.preview.viewing')} />
+      <PreviewComparisonBadges leftLabel={t('widgets.preview.compare')} rightLabel={t('widgets.preview.viewing')} />
     </Box>
   );
 };
-
-const ComparisonBadges = ({ compareLabel, viewingLabel }: { compareLabel: string; viewingLabel: string }) => (
-  <>
-    <Badge left="2" pointerEvents="none" position="absolute" top="2" variant="solid">
-      {compareLabel}
-    </Badge>
-    <Badge pointerEvents="none" position="absolute" right="2" top="2" variant="solid">
-      {viewingLabel}
-    </Badge>
-  </>
-);
 
 const CompareSidePane = ({
   image,

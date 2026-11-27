@@ -45,6 +45,7 @@ export const PreviewActionStrip = ({
   onCancelCompare,
   onCopyCurrentFrame,
   onOpenMenu,
+  onSelectVideoForCompare,
 }: {
   actions: ImageActions;
   density: PreviewDensity;
@@ -55,6 +56,7 @@ export const PreviewActionStrip = ({
   /** Set only while Select for compare waits for a second image, which shows it pressed; switches it off. */
   onCancelCompare?: () => void;
   onCopyCurrentFrame?: () => void;
+  onSelectVideoForCompare?: () => void;
   /** Opens the view's image context menu at viewport coordinates, leaving out what the strip already offers. */
   onOpenMenu: ((x: number, y: number, variant: ImageContextMenuVariant) => void) | null;
 }) => {
@@ -71,9 +73,11 @@ export const PreviewActionStrip = ({
         onCancelCompare?.();
       } else if (image) {
         actions.selectForCompare(image);
+      } else {
+        onSelectVideoForCompare?.();
       }
     },
-    [actions, image, onCancelCompare]
+    [actions, image, onCancelCompare, onSelectVideoForCompare]
   );
   const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
   const hasItemMenus = density !== 'minimal';
@@ -129,18 +133,25 @@ export const PreviewActionStrip = ({
 
   return (
     <HStack flexShrink={0} gap="0.5">
-      {/* Lead with the labelled next steps; videos have no Edit or compare, matching context-menu eligibility. */}
       {image ? <EditMenu actions={actions} image={image} /> : null}
       <UseMenu actions={actions} item={item} />
-      {image ? (
-        // A fixed name with the state in aria-pressed, as the routing lock is: pressed, it waits for a second image.
+      {image || onSelectVideoForCompare ? (
+        // A fixed name with the state in aria-pressed. Pressed means it waits for a second item.
         <ToggleIconButton
           bg={isCompareArmed ? 'accent.subtle' : undefined}
           checked={isCompareArmed}
           color={isCompareArmed ? 'accent.fg' : 'fg.muted'}
           icon={ImagesIcon}
           label={t('widgets.preview.selectForCompare')}
-          tooltip={isCompareArmed ? t('widgets.preview.compareArmedTooltip') : undefined}
+          tooltip={
+            isCompareArmed
+              ? t(
+                  item.kind === 'video'
+                    ? 'widgets.preview.videoCompareArmedTooltip'
+                    : 'widgets.preview.compareArmedTooltip'
+                )
+              : undefined
+          }
           variant="ghost"
           onCheckedChange={toggleCompare}
         />

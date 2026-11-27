@@ -4,6 +4,7 @@ import type { ResolvedShortcutHint } from '@workbench/hotkeys/shortcutHints';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, Flex, Icon, Popover, Stack, Text, usePopoverContext, VisuallyHidden } from '@chakra-ui/react';
+import { getGalleryCompareItem, getSelectedGalleryItemFromValues } from '@features/gallery/contracts';
 import { Button } from '@platform/ui';
 import { chipLabelStyles } from '@theme/recipes';
 import { useCurrentWorkbenchFocusTarget } from '@workbench/focusRegions';
@@ -26,6 +27,7 @@ import {
   useCompactWidgetCapacityResource,
 } from '@workbench/widget-frame/compactWidgetCapacity';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { KeyboardIcon } from 'lucide-react';
 import { type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -74,6 +76,15 @@ const SURFACE_HINTS: Record<string, ShortcutHintSnapshot> = {
   },
 };
 
+const VIDEO_PREVIEW_HINTS: ShortcutHintSnapshot = {
+  hints: [],
+  titleKey: 'widgets.labels.preview',
+};
+const VIDEO_COMPARE_HINTS: ShortcutHintSnapshot = {
+  hints: [{ commandId: 'viewer.exitCompare', labelKey: 'widgets.preview.commands.exitCompare' }],
+  titleKey: 'widgets.labels.preview',
+};
+
 export const ShortcutGuide = ({ presentation = 'compact' }: Pick<WidgetViewProps, 'presentation'> = {}) => {
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   return <ConnectedShortcutGuide key={project.projectId} presentation={presentation} project={project} />;
@@ -90,6 +101,15 @@ const ConnectedShortcutGuide = ({
   const element = useShortcutFocusElement();
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
+  const previewingVideo = useActiveProjectSelector((activeProject) => {
+    const values = getProjectWidgetValues(activeProject, 'gallery');
+
+    return getSelectedGalleryItemFromValues(values)?.kind !== 'video'
+      ? null
+      : getGalleryCompareItem(values)?.kind === 'video'
+        ? 'comparing'
+        : 'single';
+  });
   const target = useMemo(
     () => resolveHotkeyTarget({ focusTarget, project, targetWidget: getHotkeyTargetWidget(element) }),
     [element, focusTarget, project]
@@ -109,7 +129,13 @@ const ConnectedShortcutGuide = ({
   const onCanvas =
     canvasHints !== null &&
     (isProperties || (target.activeWidgetTypeId === 'canvas' && isEditableHotkeyTarget(element)));
-  const snapshot = canvasHints ?? SURFACE_HINTS[target.activeWidgetTypeId ?? ''] ?? GLOBAL_HINTS;
+  const surfaceHints =
+    target.activeWidgetTypeId === 'preview' && previewingVideo
+      ? previewingVideo === 'comparing'
+        ? VIDEO_COMPARE_HINTS
+        : VIDEO_PREVIEW_HINTS
+      : SURFACE_HINTS[target.activeWidgetTypeId ?? ''];
+  const snapshot = canvasHints ?? surfaceHints ?? GLOBAL_HINTS;
   const resolved = useMemo(() => {
     const hints: readonly ShortcutHint[] = canvasHints
       ? snapshot.hints.filter((hint) => !onCanvas || !('commandId' in hint))

@@ -75,6 +75,7 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryCompareItem,
   getGalleryDefaultDestinationBoardId,
   getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
