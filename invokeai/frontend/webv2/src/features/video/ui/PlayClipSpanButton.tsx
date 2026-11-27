@@ -11,8 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { useVideoUiActions } from './VideoUiContext';
 
 /**
- * Controls only its own playback token. Every play requests the current trim from its start; pausing leaves the
- * loop armed for native resume. Playback remains available while editing is disabled.
+ * Controls only its own playback token. Every play requests the current trim from its start; pausing leaves the loop
+ * armed for native resume. Playback remains available while editing is disabled.
  */
 
 export const PlayClipSpanButton = memo(function PlayClipSpanButton({ clip }: { clip: VideoSourceClip }) {

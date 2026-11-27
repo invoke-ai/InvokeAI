@@ -9,6 +9,7 @@ import {
   invalidateGallery,
   patchGalleryItemCaches,
 } from '@features/gallery/data/queryCache';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useEffect } from 'react';
@@ -30,8 +31,8 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
 }));
 
 const TOTAL = 12_000;
-const settings = getGallerySettings({ paginationMode: 'infinite' });
-const paginatedSettings = getGallerySettings({ paginationMode: 'paginated' });
+const settings = getGallerySettings(resolvedValues({ paginationMode: 'infinite' }));
+const paginatedSettings = getGallerySettings(resolvedValues({ paginationMode: 'paginated' }));
 let latestData: GalleryData | null = null;
 
 const readRequests = () =>
@@ -509,8 +510,8 @@ describe('useGalleryData sparse page subscriptions', () => {
   });
 
   it('stops reconciling when the requested page and the shown page keep reporting different totals', async () => {
-    // A server whose reads never agree: the first page counts 61 items, which puts the request on page 1, while
-    // page 1 counts 60, which clamps it back to page 0.
+    // A server whose reads never agree: the first page counts 61 items, which puts the request on page 1, while page 1
+    // counts 60, which clamps it back to page 0.
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
       const total = offset === 0 ? 61 : 60;
 
@@ -937,8 +938,8 @@ describe('useGalleryData sparse page subscriptions', () => {
         const readsBeforeMutation = refreshReads();
         let rollback: () => void = () => undefined;
         await act(() => {
-          // The mutation is still pending: its trailing invalidation has not run yet. Removing a middle item
-          // patches every cached page's total, including the unobserved newest page.
+          // The mutation is still pending: its trailing invalidation has not run yet. Removing a middle item patches
+          // every cached page's total, including the unobserved newest page.
           rollback = patchGalleryItemCaches(queryClient!, {
             kind: 'delete',
             result: { failed: [], succeeded: [{ kind: deletedItem.kind, name: deletedItem.name }] },

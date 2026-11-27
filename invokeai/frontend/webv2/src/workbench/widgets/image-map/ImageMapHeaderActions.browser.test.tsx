@@ -92,7 +92,6 @@ describe('image map header actions', () => {
 
     expect(filterIndex, 'media filter did not render in the header').toBeGreaterThanOrEqual(0);
     expect(buttons[filterIndex]?.getAttribute('data-media-filter')).toBe('image');
-    // The view's "Show all media" hands focus to this id.
     expect(buttons[filterIndex]?.id).toBe('image-map-media-filter-trigger');
     expect(settingsIndex, 'settings button did not render').toBe(filterIndex + 1);
 

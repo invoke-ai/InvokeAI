@@ -36,23 +36,12 @@ export type ProjectDocumentV3 = Omit<
   lastFloatingGeometry?: Project['lastFloatingGeometry'];
   /** Optional and additive, so schema 3 holds: a build that predates it ignores it and leaves it out of its next save. */
   presetWorkingLayouts?: Project['presetWorkingLayouts'];
-  /**
-   * Present once the document's layerable settings were coerced to pins (see `migrateProjectDocument`); every save
-   * of this build writes `SETTINGS_LAYERING_VERSION`. Additive like `presetWorkingLayouts`. A build predating the
-   * marker drops it on save. The next load then coerces again: a pin equal to the built-in is dropped, and the
-   * project follows the user's default for that setting. Accepted: only a project edited in such a build, and only
-   * pins equal to the built-in. A higher marker from a newer build counts as layered here, but this build's saves
-   * write its own version, so the newer build re-runs its steps above that version.
-   */
+  /** Additive; an older build drops it, and the next load coerces again (accepted: pins equal to the built-in). */
   settingsLayering?: number;
   workflows: ProjectWorkflowCollection;
 };
 
-/**
- * The `settingsLayering` marker's value. This build accepts a higher marker but saves this one, so a newer build
- * re-runs every step above it on a document it already migrated: each future step must be idempotent (re-running it
- * changes nothing). Another drop of values equal to the built-in, say, would damage pins set in the newer build.
- */
+/** Newer builds re-run steps above this on documents they already migrated: every step must be idempotent. */
 export const SETTINGS_LAYERING_VERSION = 1;
 
 export const stripSessionScopedGalleryState = (project: Project): Project => {
@@ -79,10 +68,7 @@ export const stripSessionScopedGalleryState = (project: Project): Project => {
   return didChange ? { ...project, widgetInstances } : project;
 };
 
-/**
- * The durable shape server persistence writes: an allowlist of editable fields. Queue runs, events, undo and workflow
- * histories are session state and never appear.
- */
+/** An allowlist of editable fields; queue runs, events, undo and workflow histories never appear. */
 export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 => {
   const persistent = stripSessionScopedGalleryState(project);
   const document: ProjectDocumentV3 = {
@@ -116,10 +102,7 @@ export const serializeProjectDocumentV3Json = (
   return { byteSize: new TextEncoder().encode(documentJson).byteLength, document, documentJson };
 };
 
-/**
- * The transfer shape export, import and duplication write: every field a loaded project carries except session
- * state, so a document authored with fields this client does not know keeps them, stamped with the current schema.
- */
+/** Keeps fields this client does not know, minus session state, stamped with the current schema. */
 export const serializeProjectDocument = (project: Project): Record<string, unknown> => {
   const {
     events: _events,
@@ -152,10 +135,6 @@ const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/**
- * Drops `values` keys the owner read as the built-in when settings first layered (`getLayeredSettings`, frozen at that
- * version); null when none does.
- */
 const withoutBuiltInValues = (
   values: Record<string, unknown>,
   layered: Readonly<Record<string, LayeredSettingKey>>
@@ -197,12 +176,7 @@ const coerceProjectSettings = (settings: Record<string, unknown>): Record<string
   return withoutBuiltInValues(rest, getLayeredSettings().projectSettings) ?? rest;
 };
 
-/**
- * Before settings layered over the user's defaults, a stored value equal to the built-in read the same as an absent
- * one, so a document without the marker drops those (widget values its owner's settings edit, and the generation
- * flags) and the retired per-project antialias flag: what is left is what the project chose. With the marker (this
- * version, or a newer build's higher one) the document's values are its pins and stay as they are.
- */
+/** Without the marker, stored values equal to the built-in read as absent before layering, so they are dropped. */
 const coerceSettingsLayering = (document: Record<string, unknown>): Record<string, unknown> => {
   if (typeof document.settingsLayering === 'number' && document.settingsLayering >= SETTINGS_LAYERING_VERSION) {
     return document;
@@ -220,12 +194,7 @@ export type ProjectDocumentMigration =
   | { status: 'migrated'; document: Record<string, unknown> }
   | { status: 'malformed'; reason: string };
 
-/**
- * The migration boundary: any supported older document comes out as schema 3. A document without a version is
- * schema 1; schema 2 owned one `projectGraph`, which becomes the first, active workflow. Collections that would
- * lose a workflow if repaired are refused instead. A document without `settingsLayering` has its stored built-in
- * settings values dropped once (see `coerceSettingsLayering`). Callers check for a future version before calling this.
- */
+/** Any supported older document comes out as schema 3; callers check for a future version first. */
 export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDocumentMigration => {
   const version = data.documentSchemaVersion;
 
@@ -295,10 +264,7 @@ const patchGalleryValues = (
   ...(selectBoard ? { selectedBoardId: boardId } : {}),
 });
 
-/**
- * Cache the server-authoritative board ID in either persisted widget shape. selectBoard selects it on first open;
- * rehydration preserves the user's destination. Leave documents without gallery state untouched.
- */
+/** Cache the server-authoritative board ID; rehydration preserves the user's destination. */
 export const applyAuthoritativeProjectBoard = (
   projectDocument: Record<string, unknown>,
   boardId: string,

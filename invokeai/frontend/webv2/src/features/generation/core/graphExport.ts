@@ -8,30 +8,28 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
-import type { ArchitectureCapabilitiesRow } from './architectureCapabilities';
 import type { ComponentPolicyContext, ComponentSlotPolicy } from './baseGenerationPolicies';
 import type { ControlLayerGraphInput } from './canvas/addControlLayers';
 import type { CanvasCompositingSettings, CanvasScalingSettings } from './canvas/types';
 import type { BackendGraphContract, GenerationProjectSettings, ResultDestination } from './contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateWidgetValues } from './types';
 
-import { resetArchitectureCapabilities, setArchitectureCapabilities } from './architectureCapabilities';
 import {
+  addReferenceImages,
   coerceSchedulerForGraph,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentPolicyContext,
+  getClosedComponentSettings,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
-  getReferenceImageUnavailableReason,
+  getModelDefaultComponents,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isLoraSupported,
-  isReferenceImageSupported,
   getRecallDefaultVae,
   resolveModelDefaultVae,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import {
@@ -39,6 +37,7 @@ import {
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './canvas/controlValidation';
+import { servesAsType } from './componentCompatibility';
 import { expandsDynamicPrompts, planGenerateSubmission, type GenerateSubmissionPrompts } from './dynamicPrompts';
 import { compileGenerateGraph } from './graph';
 import { stabilizeBackendGraphNodeIds } from './previewGraph';
@@ -131,17 +130,6 @@ const listKeys = (keys: readonly string[]): string => (keys.length > 0 ? keys.jo
 
 const listModelKeys = (models: readonly ModelConfig[]): string => listKeys(models.map((model) => model.key));
 
-/** Hold `rows` as the capability table, which every Generation policy reads, while `run` compiles. */
-export const withArchitectureCapabilities = <T>(rows: readonly ArchitectureCapabilitiesRow[], run: () => T): T => {
-  setArchitectureCapabilities(rows);
-
-  try {
-    return run();
-  } finally {
-    resetArchitectureCapabilities();
-  }
-};
-
 const getSelectableModel = (key: string, models: readonly ModelConfig[]): GenerateModelConfig => {
   const selectable = models.filter(isGenerateModelSelectable).filter(isArchitectureDescribed);
   const model = selectable.find((candidate) => candidate.key === key);
@@ -153,16 +141,21 @@ const getSelectableModel = (key: string, models: readonly ModelConfig[]): Genera
   return model;
 };
 
-/** Selecting the model, then its default VAE by recall's policy (`getRecallDefaultVae`); otherwise the selection's. */
+/**
+ * Selecting the model, then its default components and its default VAE by recall's policy (`getRecallDefaultVae`);
+ * otherwise the selection's VAE.
+ */
 const getModelDefaultValues = (model: GenerateModelConfig, models: readonly ModelConfig[]): GenerateWidgetValues => {
   const { settings } = getGenerateModelSelectionResult({
     currentValues: getDefaultGenerateSettings(model),
     model,
     models,
   });
-  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, models.filter(isVaeModelConfig)));
+  // Components first: a default component source can bundle the VAE the default VAE then falls back to.
+  const withComponents = { ...settings, ...getModelDefaultComponents(model, settings, models, { replace: true }) };
+  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, models.filter(isVaeModelConfig)));
 
-  return { ...settings, model, vae: vae === undefined ? settings.vae : vae };
+  return { ...withComponents, model, vae: vae === undefined ? withComponents.vae : vae };
 };
 
 const withCaseValues = (values: GenerateWidgetValues, input: GraphExportCase): GenerateWidgetValues => ({
@@ -195,7 +188,8 @@ const withSettingsOverrides = (
 };
 
 const fitsSlot = (slot: ComponentSlotPolicy, candidate: ModelConfig, ctx: ComponentPolicyContext): boolean =>
-  (slot.modelTypes as readonly string[]).includes(candidate.type) && (!slot.filter || slot.filter(candidate, ctx));
+  (slot.modelTypes as readonly string[]).some((type) => servesAsType(candidate, type)) &&
+  (!slot.filter || slot.filter(candidate, ctx));
 
 /** The value the component picker commits for `model`, by the slot's value kind. */
 const toSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig): ComponentModelConfig | null => {
@@ -207,6 +201,38 @@ const toSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig): ComponentMo
     case 'component':
       return isModelIdentifierConfig(model) ? model : null;
   }
+};
+
+/** The slot a pick of `slotKey` fills and the installed model it names, or the error that tells why it cannot. */
+const resolveComponentPick = (
+  values: GenerateWidgetValues,
+  slotKey: string,
+  modelKey: string,
+  models: readonly ModelConfig[]
+): { slot: ComponentSlotPolicy; value: ComponentModelConfig } => {
+  const { slots } = getComponentSectionPolicy(values.model, values);
+  const slot = slots.find((candidate) => candidate.key === slotKey);
+
+  if (!slot) {
+    const validSlots = listKeys(slots.map((candidate) => candidate.key));
+
+    throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
+  }
+
+  const ctx = getComponentPolicyContext(values.model, values);
+  const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
+  const pick = fitting.find((candidate) => candidate.key === modelKey);
+  const value = pick ? toSlotValue(slot, pick) : null;
+
+  if (!value) {
+    const problem = models.some((candidate) => candidate.key === modelKey)
+      ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
+      : `model key "${modelKey}" is not installed`;
+
+    throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
+  }
+
+  return { slot, value };
 };
 
 const withComponentPicks = (
@@ -226,31 +252,21 @@ const withComponentPicks = (
       pending.findIndex(([key]) => slots.some((candidate) => candidate.key === key))
     );
     const [slotKey, modelKey] = pending.splice(index, 1)[0]!;
-    const slot = slots.find((candidate) => candidate.key === slotKey);
-
-    if (!slot) {
-      const validSlots = listKeys(slots.map((candidate) => candidate.key));
-
-      throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
-    }
-
-    const ctx = getComponentPolicyContext(next.model, next);
-    const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
-    const pick = fitting.find((candidate) => candidate.key === modelKey);
-    const value = pick ? toSlotValue(slot, pick) : null;
-
-    if (!value) {
-      const problem = models.some((candidate) => candidate.key === modelKey)
-        ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
-        : `model key "${modelKey}" is not installed`;
-
-      throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
-    }
+    const { slot, value } = resolveComponentPick(next, slotKey, modelKey, models);
 
     next = { ...next, [slot.key]: value };
   }
 
-  return next;
+  // A later pick can close the slot of an earlier one (a safetensors encoder after the default GGUF encoder's tower),
+  // so the picks are judged together, in the settings they all lead to.
+  for (const [slotKey, modelKey] of Object.entries(picks)) {
+    resolveComponentPick(next, slotKey, modelKey, models);
+  }
+
+  // Inherited picks whose slot a pick closed go too, as the model switch clears them: the graph never loads them.
+  const closed = getClosedComponentSettings(values.model, values, next);
+
+  return closed.length === 0 ? next : { ...next, ...Object.fromEntries(closed.map((key) => [key, null])) };
 };
 
 /** Pick the first installed model for the first required slot that is unfilled; null when none can be filled. */
@@ -323,30 +339,34 @@ const withReferenceImages = (
   }
 
   const { model } = values;
+  const { dropped, limit, referenceImages, refusal, unavailableReason } = addReferenceImages({
+    additions: input.referenceImages.map((imageName, index) => ({
+      id: `reference_image_${index + 1}`,
+      // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
+      image: { original: { image: { height: input.height, image_name: imageName, width: input.width } } },
+    })),
+    components: values,
+    mode: 'strict',
+    model,
+    models,
+    referenceImages: values.referenceImages,
+  });
 
-  if (!isReferenceImageSupported(model, values)) {
+  if (refusal && refusal !== 'full') {
     throw new Error(
       `reference_images: ${model.name} takes no reference images${
-        getReferenceImageUnavailableReason(model, values)
+        unavailableReason
           ? ' without a vision tower (a Diffusers model, a safetensors Qwen3-VL 8B encoder, or a GGUF one with its Vision Tower)'
           : ''
       }.`
     );
   }
 
-  return {
-    ...values,
-    referenceImages: withAddedReferenceImages(
-      model,
-      models,
-      values.referenceImages,
-      input.referenceImages.map((imageName, index) => ({
-        id: `reference_image_${index + 1}`,
-        // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
-        image: { original: { image: { height: input.height, image_name: imageName, width: input.width } } },
-      }))
-    ),
-  };
+  if (dropped > 0) {
+    throw new Error(`reference_images: ${model.name} takes at most ${limit} reference image${limit === 1 ? '' : 's'}.`);
+  }
+
+  return { ...values, referenceImages };
 };
 
 /** The widget reconciles after every commit; reconciliation can pick a FLUX.2 component source. */
@@ -456,7 +476,9 @@ export const compileGraphExportCase = (
 ): CompiledGraphExportCase => {
   assertModeInputs(input);
 
-  const { models } = env;
+  // A registered model whose files are gone is listed but cannot be loaded: the case sees the usable ones only, as
+  // Generate's pickers do, and a case that names a missing one fails like one that names an unknown model.
+  const models = env.models.filter((candidate) => !candidate.is_missing);
   let values = withCaseValues(getModelDefaultValues(getSelectableModel(input.modelKey, models), models), input);
   values = withSettingsOverrides(values, input.settings);
   values = withComponentPicks(values, input.components, models);

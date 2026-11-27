@@ -47,8 +47,6 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadText: harness.downloadText }));
-// Exposes whether the host keeps the dialog mounted (the real one needs that to animate out); like the real dialog,
-// it closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
   ConfirmDialog: ({
     body,

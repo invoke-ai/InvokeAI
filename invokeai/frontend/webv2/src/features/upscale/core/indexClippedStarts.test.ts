@@ -1,7 +1,9 @@
 /** The starts the widget sends index-clipping denoise nodes, recorded for the backend to replay. */
 
 import type { MainModelConfig } from '@features/generation/contracts';
+import type { StepClipping } from '@features/generation/settings';
 
+import { getDenoisingStartClipping } from '@features/generation/settings';
 import { describe, expect, it } from 'vitest';
 
 import type { UpscaleBase } from './settings';
@@ -11,8 +13,8 @@ import { UPSCALE_ARCHITECTURES } from './settings';
 
 const CREATIVITIES = [-10, -5, 0, 5, 8, 10];
 const STEP_COUNTS = [8, 30];
-// Z-Image's shift follows the frame up to one megapixel, Krea-2 Raw's up to 1280x1280 and Qwen Image's up to
-// 8192 tokens (about 1448x1448), each held above; Anima's and Krea-2 Turbo's are fixed.
+// Z-Image's shift follows the frame up to one megapixel, Krea-2 Raw's up to 1280x1280 and Qwen Image's up to 8192
+// tokens (about 1448x1448), each held above; Anima's and Krea-2 Turbo's are fixed.
 const MODELS: readonly { base: UpscaleBase; variant: string | null; sides: readonly number[] }[] = [
   { base: 'anima', sides: [1024], variant: null },
   { base: 'krea-2', sides: [1024], variant: 'krea2_turbo' },
@@ -24,9 +26,9 @@ const BASES = [...new Set(MODELS.map((model) => model.base))];
 
 describe('index-clipped denoising starts', () => {
   it('covers every architecture whose denoise node clips by index', () => {
-    const indexClipped = Object.entries(UPSCALE_ARCHITECTURES)
-      .filter(([, architecture]) => architecture.indexClipping)
-      .map(([base]) => base);
+    const indexClipped = Object.keys(UPSCALE_ARCHITECTURES).filter(
+      (base) => getDenoisingStartClipping({ base, type: 'main' })?.kind === 'step'
+    );
 
     expect([...BASES].sort()).toEqual(indexClipped.sort());
   });
@@ -37,8 +39,8 @@ describe('index-clipped denoising starts', () => {
         STEP_COUNTS.flatMap((steps) =>
           CREATIVITIES.map((creativity) => {
             const valueStart = getUpscaleDenoisingStart(creativity);
-            const clipping = UPSCALE_ARCHITECTURES[base].indexClipping!;
-            const model = { base, variant } as MainModelConfig;
+            const model = { base, type: 'main', variant } as MainModelConfig;
+            const clipping = getDenoisingStartClipping(model) as StepClipping;
             const sigmas = clipping.sigmas(model, { height: side, width: side }, steps);
 
             return {

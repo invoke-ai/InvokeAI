@@ -4,6 +4,7 @@ import type {
   SamPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
+import type { RenderController } from '@workbench/canvas-engine/controllers/renderController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
@@ -40,6 +41,7 @@ export interface CreateCompositeFrameDeps {
   readonly backend: RasterBackend;
   readonly diagnostics: CanvasDiagnostics;
   readonly raster: Pick<RasterController, 'beginFrame' | 'enforceBudget'>;
+  readonly maskScratch: Pick<RenderController, 'getMaskScratch' | 'releaseMaskScratch'>;
   readonly previews: PreviewStateController;
   readonly stores: EngineStores;
   readonly viewport: Viewport;
@@ -67,6 +69,7 @@ export interface CreateCompositeFrameDeps {
  */
 const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
   control: false,
+  vector: true,
   inpaint_mask: false,
   regional_guidance: false,
 };
@@ -77,18 +80,23 @@ const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
  */
 export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: string | null): boolean => {
   const stack = nodeId ? getDocumentIndex(doc).byId.get(nodeId)?.stack : undefined;
-  return stack !== undefined && isOverlayStack(stack);
+  return stack !== undefined && isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
 };
 
 /**
- * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack
- * shown. A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame
- * keeps it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new
- * layer, move drags whatever caches exist.
+ * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack shown.
+ * A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame keeps
+ * it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new layer,
+ * move drags whatever caches exist.
  */
 const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
   const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
-  return leaf && isOverlayStack(leaf.stack) && isLeafDrawableForScreen(leaf, false) ? leaf : null;
+  return leaf &&
+    isOverlayStack(leaf.stack) &&
+    !STAGING_OVERLAY_STACKS[leaf.stack] &&
+    isLeafDrawableForScreen(leaf, false)
+    ? leaf
+    : null;
 };
 
 export interface CompositeFrame {
@@ -126,8 +134,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
 
   /**
-   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may
-   * exceed persisted bounds. Rasterization owns bounds changes.
+   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may exceed
+   * persisted bounds. Rasterization owns bounds changes.
    */
   const ensureLayerCaches = (
     doc: CanvasDocumentContractV3,
@@ -167,8 +175,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     };
   };
 
-  // The frame description is reused until the document, isolation or override contents change; each leaf's
-  // bounds until its contract, placement, live cache extent or the document size does.
+  // The frame description is reused until the document, isolation or override contents change; each leaf's bounds until
+  // its contract, placement, live cache extent or the document size does.
   let preparation: CompositePreparation | null = null;
   // A bounded or empty repaint reads only part of the working set; the usage window stays open from the last full
   // repaint so artifacts it skipped are not evicted as unused.
@@ -272,6 +280,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         fullFrameUsage = usage;
       }
 
+      let usedMaskScratch = false;
       compositeDocument(screen, doc, layerCache, view, {
         damage: frameDamage,
         adjustedSurface: deps.getAdjustedSurface,
@@ -282,7 +291,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
-        // Pixels in flight, drawn directly above the layer they were cut from.
         floatingSelection: isolatedGuard ? null : (floatFrame?.composite ?? null),
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
         isolationLayerId: isolatedGuard?.layerId ?? null,
@@ -291,6 +299,13 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         preparation: frame,
         // Screen frames are display-time: the region tint may draw, except over a staged result.
         regionOverlays: !staging,
+        screenMask: {
+          dpr: viewport.getDpr(),
+          getScratch: (width, height) => {
+            usedMaskScratch = true;
+            return deps.maskScratch.getMaskScratch(width, height);
+          },
+        },
         showOverlayStacks,
         // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:
@@ -306,11 +321,14 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
                 surface: stagedPreview.surface,
               }
             : null,
-        // Skip the edited text layer because its portal renders live content.
         skipLayerId: stores.textEditSession.get()?.layerId ?? null,
         transformOverrides: overrides,
       });
 
+      // A bounded repaint can miss a pattern that is still on screen.
+      if (frameDamage.kind === 'full' && !usedMaskScratch) {
+        deps.maskScratch.releaseMaskScratch();
+      }
       enforceBudget(activeFrameLayerIds, fullFrameUsage);
     },
   };

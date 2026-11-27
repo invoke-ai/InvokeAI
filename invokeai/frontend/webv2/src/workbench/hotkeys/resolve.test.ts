@@ -25,7 +25,6 @@ describe('resolveHotkey', () => {
     expect(toPlatformHotkey('mod+arrowup', false)).toBe('ctrl+arrowup');
     expect(toPlatformHotkey('shift+mod+a', true)).toBe('meta+shift+a');
 
-    // The runtime hands over whichever spelling's binding fired first.
     const platformSpelling = toPlatformHotkey('mod+arrowup');
     const globalHotkey: RegisteredHotkey = {
       ...base,
@@ -180,18 +179,14 @@ describe('resolveHotkey', () => {
     const resolve = (hotkeys: RegisteredHotkey[]) =>
       resolveHotkey({ context: floating, event, hotkeys, matchedKey: 'x' })?.commandId;
 
-    // The dock-specific shortcut never matches; the rest keep their priority order.
     expect(resolve([global, rightOnly])).toBe('global');
     expect(resolve([global, rightOnly, anyRegion])).toBe('any-region');
     expect(resolve([global, rightOnly, anyRegion, widget])).toBe('widget');
     expect(resolve([global, rightOnly, anyRegion, widget, instance])).toBe('instance');
     expect(resolve([rightOnly])).toBeUndefined();
-    // A floating widget's own focused-region shortcut follows its window, at focused-region priority: above
-    // global, below a widget-scoped binding on the same key, exactly as when it is docked.
     expect(resolve([global, otherWindow, thisWindow])).toBe('this-window');
     expect(resolve([global, otherWindow])).toBe('global');
     expect(resolve([thisWindow, widget])).toBe('widget');
-    // Modal suppression is unchanged by where focus is.
     expect(
       resolveHotkey({
         context: { ...floating, isModalPresent: true },
@@ -292,7 +287,6 @@ describe('resolveHotkey', () => {
       scope,
       title: id,
     });
-    // Catalog order: the default binding comes first, as a first-party hotkey precedes a later one on the same key.
     const recallSeed = applyCustomHotkeys(
       definition('recall', ['s'], { kind: 'widget', typeIds: ['preview', 'gallery'] }),
       {}
@@ -306,7 +300,6 @@ describe('resolveHotkey', () => {
 
     expect(resolve([recallSeed, starredOnly])).toBe('starred');
     expect(resolve([recallSeed, starredByDefault])).toBe('recall');
-    // Scope priority still comes first: a custom binding on a less specific scope does not jump ahead.
     const customGlobal = applyCustomHotkeys(definition('global', [], { kind: 'global' }), { global: ['s'] });
     expect(resolve([customGlobal, recallSeed])).toBe('recall');
   });

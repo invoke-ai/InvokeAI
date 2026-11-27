@@ -3,8 +3,7 @@ import type { AxisRanges } from './imageMapViewport';
 import { zoomFactorFromWheel, zoomRangesAroundFraction } from './imageMapViewport';
 
 /**
- * Custom wheel/pinch zoom replaces Plotly scrollZoom for Safari/trackpad behavior, following PhotoMapAI.
- * Single-touch pan remains native.
+ * Wheel/pinch zoom replaces Plotly scrollZoom for Safari/trackpads, after PhotoMapAI; single-touch pan stays native.
  */
 
 interface ZoomHost {
@@ -24,14 +23,12 @@ const touchDistance = (touches: TouchList): number => {
 };
 
 export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => void) => {
-  // A wheel emits far faster than a frame, and each applied zoom is a plotly
-  // relayout over the whole scene. Applying one per event queued relayouts
-  // behind the cursor on a large map; coalescing into the next frame caps it
-  // at one, and costs nothing on a map small enough not to care.
+  // A wheel emits far faster than a frame, and each applied zoom is a plotly relayout over the whole scene. Applying
+  // one per event queued relayouts behind the cursor on a large map; coalescing into the next frame caps it at one, and
+  // costs nothing on a map small enough not to care.
   //
-  // Factors multiply, so a frame's worth of events composes into a single
-  // equivalent zoom. The anchor is the newest pointer position: events inside
-  // one frame are milliseconds apart, so it has barely moved.
+  // Factors multiply, so a frame's worth of events composes into a single equivalent zoom. The anchor is the newest
+  // pointer position: events inside one frame are milliseconds apart, so it has barely moved.
   let queuedFactor = 1;
   let queuedClientX = 0;
   let queuedClientY = 0;
@@ -50,8 +47,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
 
   const queueZoom = (clientX: number, clientY: number, factor: number) => {
     if (factor === 1) {
-      // A horizontal-only wheel scales nothing; scheduling a frame for it
-      // would cost a callback per event to apply no change.
+      // A horizontal-only wheel scales nothing; a frame for it would cost a callback per event for no change.
       return;
     }
 
@@ -89,8 +85,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
 
   let pinchDistance: number | null = null;
 
-  // Rebaseline every transition into two touches; movement during a third-finger pause must not cause a zoom jump
-  // on resume.
+  // Rebaseline every transition into two touches so movement during a third-finger pause cannot jump the zoom.
   const handleTouchStart = (event: TouchEvent) => {
     if (event.touches.length === 2) {
       pinchDistance = touchDistance(event.touches);
@@ -102,16 +97,15 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
       return;
     }
 
-    // Coincident touches at gesture start would make the first factor 0 and
-    // collapse the viewport; use the first separated move as the baseline.
+    // Coincident touches at gesture start would make the first factor 0 and collapse the viewport; use the first
+    // separated move as the baseline.
     if (pinchDistance === 0) {
       pinchDistance = touchDistance(event.touches);
 
       return;
     }
 
-    // Capture-phase + stopPropagation keeps plotly's own touch handling from
-    // fighting the pinch (it would pan with one of the two fingers).
+    // Capture phase + stopPropagation stops plotly's touch handling fighting the pinch (it pans with one finger).
     event.preventDefault();
     event.stopPropagation();
     const distance = touchDistance(event.touches);
@@ -134,8 +128,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
 
     if (pinchDistance !== null) {
       pinchDistance = null;
-      // Stamp gesture end too: a pinch held still before lifting would
-      // otherwise let plotly's synthetic click through.
+      // Stamp gesture end too: a pinch held still before lifting would otherwise let plotly's synthetic click through.
       host.onPinch?.();
     }
   };

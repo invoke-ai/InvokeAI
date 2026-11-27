@@ -18,6 +18,8 @@ const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
 export interface ModelFilterSortOption<Field extends ModelSortField = ModelSortField> {
   field: Field;
+  /** Direction a first selection of this field sorts in; ascending when omitted. */
+  initialDirection?: 'asc' | 'desc';
   labelKey: string;
 }
 
@@ -28,6 +30,7 @@ export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
   { field: 'base', labelKey: 'models.sort.base' },
   { field: 'type', labelKey: 'models.sort.type' },
   { field: 'size', labelKey: 'models.sort.size' },
+  { field: 'added', initialDirection: 'desc', labelKey: 'models.sort.added' },
   { field: 'format', labelKey: 'models.sort.format' },
   { field: 'path', labelKey: 'models.sort.path' },
 ];
@@ -77,8 +80,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   const isAllTypes = typeAllChecked ?? typeFilter === null;
   const sortLabelKey = sortFields.find((option) => option.field === sortField)?.labelKey;
   const sortDirectionLabel = sortDirection === 'asc' ? t('common.asc') : t('common.desc');
-  // `default` is the catalog's own order, so a direction on it would name
-  // something the user cannot act on.
+  // `default` is the catalog's own order, so a direction on it would name something the user cannot act on.
   const sortSummary = sortLabelKey
     ? sortField === 'default'
       ? t(sortLabelKey)
@@ -133,10 +135,11 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
             </FilterSubMenu>
             <Menu.Separator />
             <FilterSubMenu icon={ArrowUpDownIcon} label={t('models.sortBy')} summary={sortSummary}>
-              {sortFields.map(({ field, labelKey }) => (
+              {sortFields.map(({ field, initialDirection, labelKey }) => (
                 <SortFilterMenuItem
                   key={field}
                   field={field}
+                  initialDirection={initialDirection}
                   labelKey={labelKey}
                   sortDirection={sortDirection}
                   sortField={sortField}
@@ -291,12 +294,14 @@ const BaseFilterMenuItem = memo(function BaseFilterMenuItem({
 
 const SortFilterMenuItem = memo(function SortFilterMenuItem({
   field,
+  initialDirection = 'asc',
   labelKey,
   sortDirection,
   sortField,
   onSortChange,
 }: {
   field: ModelSortField;
+  initialDirection?: 'asc' | 'desc';
   labelKey: string;
   sortDirection: 'asc' | 'desc';
   sortField: ModelSortField;
@@ -309,7 +314,9 @@ const SortFilterMenuItem = memo(function SortFilterMenuItem({
       isChecked={sortField === field}
       label={t(labelKey)}
       value={`sort-${field}`}
-      onSelect={() => onSortChange(field, sortField === field ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc')}
+      onSelect={() =>
+        onSortChange(field, sortField === field ? (sortDirection === 'asc' ? 'desc' : 'asc') : initialDirection)
+      }
       trailing={sortField === field ? (sortDirection === 'asc' ? t('common.asc') : t('common.desc')) : undefined}
     />
   );

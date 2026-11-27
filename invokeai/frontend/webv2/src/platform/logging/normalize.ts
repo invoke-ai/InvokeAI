@@ -284,8 +284,8 @@ const readErrorField = (error: object, key: string): unknown => {
     return own.value;
   }
 
-  // Standard fields (`name`, `message`, `stack`) are inherited data properties or engine-installed accessors
-  // on Error instances; reading them is safe.
+  // Standard fields (`name`, `message`, `stack`) are inherited data properties or engine-installed accessors on Error
+  // instances; reading them is safe.
   try {
     return (error as Record<string, unknown>)[key];
   } catch {

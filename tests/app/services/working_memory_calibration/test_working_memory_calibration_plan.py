@@ -14,6 +14,7 @@ from diffusers import AutoencoderKL, AutoencoderKLFlux2
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_records.missing_models import is_model_missing
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import _vae_dtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
@@ -25,6 +26,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     build_plan,
     case_sides,
 )
+from invokeai.backend.model_manager.configs.base import ModelRole
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.flux import (
     Flux2DiffusersModel,
@@ -73,10 +75,13 @@ QWEN3_8B = _model("qwen3-8b", BaseModelType.Any, ModelType.Qwen3Encoder, variant
 """The standalone text encoder Generate fills in for a FLUX.2 Klein 9B model, or one without a variant, that is no
 pipeline: without one, or a pipeline whose encoder fits, its graph does not compile."""
 
-SD3_T5 = _model("t5", BaseModelType.Any, ModelType.T5Encoder)
-SD3_CLIP_L = _model("clip-l", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.L)
-SD3_CLIP_G = _model("clip-g", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.G)
-SD3_ENCODERS = [SD3_T5, SD3_CLIP_L, SD3_CLIP_G]
+QWEN3_4B = _model("qwen3-4b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_4B)
+
+T5 = _model("t5", BaseModelType.Any, ModelType.T5Encoder)
+CLIP_L = _model("clip-l", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.L)
+CLIP_G = _model("clip-g", BaseModelType.Any, ModelType.CLIPEmbed, variant=ClipVariantType.G)
+FLUX1_ENCODERS = [T5, CLIP_L]
+SD3_ENCODERS = [*FLUX1_ENCODERS, CLIP_G]
 """The standalone encoders Generate fills in for an SD3 model that is no Diffusers pipeline: without all three its
 graph does not compile."""
 
@@ -148,7 +153,7 @@ def test_an_sdxl_model_runs_three_sizes_per_vae_precision() -> None:
 )
 def test_each_covered_base_plans_the_lines_its_decode_runs(base, precision, estimator, lines) -> None:
     vae_base = BaseModelType.Flux if base == BaseModelType.ZImage else base
-    models = [_model("vae", vae_base, ModelType.VAE), QWEN3_8B, *SD3_ENCODERS]
+    models = [_model("vae", vae_base, ModelType.VAE), QWEN3_4B, QWEN3_8B, *SD3_ENCODERS]
     plan = _plan(_model("main", base), models, precision=precision)
 
     assert plan.supported and plan.estimators == [estimator]
@@ -168,7 +173,10 @@ def _shipped_untiled_decode(estimator: str, height: int, width: int, dtype: str)
 @pytest.mark.parametrize(
     "target, models",
     [
-        (_model("flux", BaseModelType.Flux), [_model("ae", BaseModelType.Flux, ModelType.VAE)]),
+        (
+            _model("flux", BaseModelType.Flux),
+            [_model("ae", BaseModelType.Flux, ModelType.VAE), *FLUX1_ENCODERS],
+        ),
         (
             _model("flux2-vae", BaseModelType.Flux2, ModelType.VAE),
             [_model("klein", BaseModelType.Flux2, format="diffusers")],
@@ -257,10 +265,10 @@ def test_a_pipeline_decodes_in_the_dtype_its_own_vae_loads_in(pipeline, line) ->
 def test_a_flux_sdnq_pipeline_without_the_t5_pair_decodes_with_a_standalone_vae() -> None:
     """Generate requires FLUX.1's `vae` slot unless the SDNQ pipeline ships every component, T5 included."""
     partial = _model("flux-sdnq", BaseModelType.Flux, format=ModelFormat.SDNQQuantized, submodels=_PIPELINE_SUBMODELS)
-    vae = [_model("ae", BaseModelType.Flux, ModelType.VAE)]
+    models = [_model("ae", BaseModelType.Flux, ModelType.VAE), *FLUX1_ENCODERS]
 
-    assert {case.line for case in _plan(partial, vae, vae_dtypes=FP32_VAES).cases} == {"decode_fp32"}
-    assert {case.line for case in _plan(partial, vae).cases} == {"decode_bf16"}
+    assert {case.line for case in _plan(partial, models, vae_dtypes=FP32_VAES).cases} == {"decode_fp32"}
+    assert {case.line for case in _plan(partial, models).cases} == {"decode_bf16"}
 
 
 GGUF_KLEIN_9B = _model("klein-9b-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Klein9B)
@@ -295,7 +303,6 @@ def test_a_flux2_model_without_its_own_vae_decodes_with_its_component_source_vae
 
 KLEIN_4B_SDNQ = _sdnq_pipeline("klein-4b-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Klein4B)
 FLUX2_VAE = _model("flux2-vae", BaseModelType.Flux2, ModelType.VAE)
-QWEN3_4B = _model("qwen3-4b", BaseModelType.Any, ModelType.Qwen3Encoder, variant=Qwen3VariantType.Qwen3_4B)
 GGUF_DEV = _model("dev-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Dev)
 SDNQ_DEV = _sdnq_pipeline("dev-sdnq", BaseModelType.Flux2, variant=Flux2VariantType.Dev)
 MISTRAL = _model("mistral", BaseModelType.Any, ModelType.MistralEncoder, variant=MistralVariantType.Mistral24B)
@@ -376,6 +383,22 @@ def test_a_flux2_model_without_a_text_encoder_generate_can_use_cannot_be_calibra
     assert "text encoder" in (plan.reason or "") and f"{encoder} encoder" in (plan.reason or "")
 
 
+def _text_llm_serving_qwen3(key: str, variant: Qwen3VariantType) -> SimpleNamespace:
+    role = ModelRole(type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder, variant=variant)
+    return _model(key, BaseModelType.Any, ModelType.TextLLM, roles=[role])
+
+
+def test_a_text_llm_serving_as_the_klein_qwen3_encoder_is_a_standalone_encoder() -> None:
+    """Generate offers such a folder in the Qwen3 Encoder picker, and the loader node asks for it in that role."""
+    right_size = _text_llm_serving_qwen3("llm-8b", Qwen3VariantType.Qwen3_8B)
+    wrong_size = _text_llm_serving_qwen3("llm-4b", Qwen3VariantType.Qwen3_4B)
+
+    assert _plan(GGUF_KLEIN_9B, [FLUX2_VAE, right_size]).supported
+    plan = _plan(GGUF_KLEIN_9B, [FLUX2_VAE, wrong_size])
+    assert not plan.supported and "Qwen3 8B encoder" in (plan.reason or "")
+    assert not _plan(GGUF_KLEIN_9B, [FLUX2_VAE, _model("llm", BaseModelType.Any, ModelType.TextLLM)]).supported
+
+
 def test_a_flux2_vae_is_calibrated_through_a_main_model_whose_graph_compiles() -> None:
     """The GGUF model sorts first but has no encoder; the 4B pipeline brings its own and takes the `vae` pick."""
     gguf = _model("a-klein-9b-gguf", BaseModelType.Flux2, format="gguf_quantized", variant=Flux2VariantType.Klein9B)
@@ -406,7 +429,7 @@ def test_a_standalone_flux_vae_is_not_calibrated_through_an_sdnq_pipeline_that_d
     sdnq = _sdnq_pipeline("a-flux-sdnq", BaseModelType.Flux)
     flux = _model("b-flux", BaseModelType.Flux)
 
-    plan = _plan(flux_vae, [sdnq, flux], vae_dtypes=FP32_VAES)
+    plan = _plan(flux_vae, [sdnq, flux, *FLUX1_ENCODERS], vae_dtypes=FP32_VAES)
     alone = _plan(flux_vae, [sdnq])
 
     assert (plan.calibrated_through, _lines_of(plan)) == ("b-flux", {("decode_fp32", (("vae", "ae"),))})
@@ -564,7 +587,9 @@ def test_a_card_that_cannot_hold_a_small_decode_with_headroom_is_unsupported() -
     small = DeviceClass(vendor="nvidia", name="Test GPU 2GB", total_mib=2048, backend="cuda", arch="sm_75")
 
     plan = _plan(
-        _model("flux", BaseModelType.Flux), [_model("ae", BaseModelType.Flux, ModelType.VAE)], device_class=small
+        _model("flux", BaseModelType.Flux),
+        [_model("ae", BaseModelType.Flux, ModelType.VAE), *FLUX1_ENCODERS],
+        device_class=small,
     )
 
     assert not plan.supported and "Test GPU 2GB cannot hold" in (plan.reason or "") and plan.cases == []
@@ -599,7 +624,7 @@ def test_a_standalone_vae_is_calibrated_through_a_compatible_main_model() -> Non
     sdxl_vae = _model("sdxl-vae", BaseModelType.StableDiffusionXL, ModelType.VAE)
     sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
 
-    flux_plan = _plan(flux_vae, [z_image, sdxl])
+    flux_plan = _plan(flux_vae, [z_image, sdxl, QWEN3_4B])
     sd_plan = _plan(sdxl_vae, [z_image, sdxl])
 
     # Z-Image decodes with a FLUX.1 VAE, through its `vae` slot.
@@ -617,8 +642,10 @@ def test_a_main_model_picks_a_gpu_vae_where_generate_could_fill_in_one_on_the_cp
     cpu = _model("a-cpu-vae", BaseModelType.Flux, ModelType.VAE, cpu_only=True)
     gpu = _model("b-gpu-vae", BaseModelType.Flux, ModelType.VAE, cpu_only=False)
 
-    assert {tuple(case.components.items()) for case in _plan(flux, [cpu, gpu]).cases} == {(("vae", "b-gpu-vae"),)}
-    assert {tuple(case.components.items()) for case in _plan(flux, [gpu]).cases} == {()}
+    assert {tuple(case.components.items()) for case in _plan(flux, [cpu, gpu, *FLUX1_ENCODERS]).cases} == {
+        (("vae", "b-gpu-vae"),)
+    }
+    assert {tuple(case.components.items()) for case in _plan(flux, [gpu, *FLUX1_ENCODERS]).cases} == {()}
 
 
 def _with_default_vae(model: SimpleNamespace, vae_key: str) -> SimpleNamespace:
@@ -867,9 +894,11 @@ def test_a_model_that_needs_a_standalone_vae_and_has_none_on_the_gpu_cannot_be_c
     cpu_vae = _model("cpu-vae", vae_base, ModelType.VAE, cpu_only=True)
 
     for models in ([cpu_vae], []):
-        plan = _plan(main, [*models, QWEN3_8B])
+        plan = _plan(main, [*models, QWEN3_8B, QWEN3_4B, *FLUX1_ENCODERS])
         assert not plan.supported and plan.cases == [] and "GPU" in (plan.reason or "")
-    assert _plan(main, [cpu_vae, _model("gpu-vae", vae_base, ModelType.VAE), QWEN3_8B]).supported
+    assert _plan(
+        main, [cpu_vae, _model("gpu-vae", vae_base, ModelType.VAE), QWEN3_8B, QWEN3_4B, *FLUX1_ENCODERS]
+    ).supported
 
 
 def test_a_pipeline_with_its_own_vae_needs_no_gpu_vae_beside_it() -> None:
@@ -890,10 +919,10 @@ SD3_VAE = _model("sd3-vae", BaseModelType.StableDiffusion3, ModelType.VAE)
     "encoders, install",
     [
         ([], "Install a T5 encoder, a CLIP-L encoder and a CLIP-G encoder."),
-        ([SD3_T5, SD3_CLIP_L], "Install a CLIP-G encoder."),
+        ([T5, CLIP_L], "Install a CLIP-G encoder."),
         # A CLIP-L does not fill the CLIP-G slot, nor a CLIP-G the CLIP-L one.
-        ([SD3_T5, SD3_CLIP_G], "Install a CLIP-L encoder."),
-        ([SD3_CLIP_L, SD3_CLIP_G], "Install a T5 encoder."),
+        ([T5, CLIP_G], "Install a CLIP-L encoder."),
+        ([CLIP_L, CLIP_G], "Install a T5 encoder."),
     ],
     ids=["none", "no-clip-g", "no-clip-l", "no-t5"],
 )
@@ -920,7 +949,7 @@ def test_an_sd3_vae_is_calibrated_through_a_main_model_whose_graph_compiles() ->
 
 
 def test_an_sd3_vae_whose_only_main_model_is_a_gguf_without_encoders_cannot_be_calibrated() -> None:
-    plan = _plan(SD3_VAE, [SD3_GGUF, SD3_T5])
+    plan = _plan(SD3_VAE, [SD3_GGUF, T5])
 
     assert not plan.supported and plan.cases == []
     assert "A-SD3-GGUF holds only the SD3 transformer" in (plan.reason or "")
@@ -987,6 +1016,8 @@ def test_a_flux2_diffusers_pipelines_own_vae_loads_in_the_dtype_the_plan_sizes_f
     _save_tiny_vae(tmp_path / "vae", AutoencoderKLFlux2, torch.float32)
     (tmp_path / "model_index.json").write_text(json.dumps({"vae": ["diffusers", "AutoencoderKLFlux2"]}))
     loader = Flux2DiffusersModel.__new__(Flux2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     loader._apply_fp8_layerwise_casting = lambda model, config, submodel_type: model
 
     vae = loader._load_model(SimpleNamespace(path=str(tmp_path), repo_variant=None), SubModelType.VAE)
@@ -1018,3 +1049,197 @@ def test_the_service_tells_an_sdnq_quantized_vae_folder_where_the_loader_looks(t
 
     assert vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq", submodels=None))
     assert not vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq-plain", submodels=None))
+
+
+def _with_default_components(model: SimpleNamespace, **components: str) -> SimpleNamespace:
+    return SimpleNamespace(**{**vars(model), "default_settings": SimpleNamespace(vae=None, components=components)})
+
+
+@pytest.mark.parametrize(
+    "target, encoders, install",
+    [
+        (_model("flux", BaseModelType.Flux, format="checkpoint"), [], "a T5 encoder and a CLIP-L encoder"),
+        (_model("flux", BaseModelType.Flux, format="gguf_quantized"), [CLIP_L], "a T5 encoder"),
+        (
+            _model("flux", BaseModelType.Flux, format=ModelFormat.SDNQQuantized, submodels=_PIPELINE_SUBMODELS),
+            [T5, CLIP_G],
+            "a CLIP-L encoder",
+        ),
+    ],
+    ids=["missing-both", "missing-t5", "partial-sdnq-with-wrong-clip"],
+)
+def test_a_flux1_model_without_its_standalone_encoders_cannot_be_calibrated(target, encoders, install) -> None:
+    vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    plan = _plan(target, [vae, *encoders])
+
+    assert not plan.supported and plan.cases == []
+    assert (plan.reason or "").endswith(f"Install {install}.")
+    assert _plan(target, [vae, *FLUX1_ENCODERS]).supported
+
+
+@pytest.mark.parametrize(
+    "source_key, encoders",
+    [
+        (None, []),
+        ("missing", [QWEN3_8B]),
+        ("partial", [_text_llm_serving_qwen3("llm-06b", Qwen3VariantType.Qwen3_06B)]),
+        ("wrong-base", [_model("llm", BaseModelType.Any, ModelType.TextLLM, variant=Qwen3VariantType.Qwen3_4B)]),
+    ],
+    ids=["unselected-source", "stale-source-and-qwen3-8b", "partial-source-and-role-06b", "wrong-base-and-no-role"],
+)
+def test_a_split_z_image_model_needs_a_default_bundled_source_or_qwen3_4b(source_key, encoders) -> None:
+    target = _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized")
+    if source_key is not None:
+        target = _with_default_components(target, component_source=source_key)
+    models = [
+        _model("ae", BaseModelType.Flux, ModelType.VAE),
+        _model("bundled", BaseModelType.ZImage, format="diffusers"),
+        _model("partial", BaseModelType.ZImage, format=ModelFormat.SDNQQuantized, submodels={SubModelType.VAE: None}),
+        _model("wrong-base", BaseModelType.Flux2, format="diffusers"),
+        *encoders,
+    ]
+    plan = _plan(target, models)
+
+    assert not plan.supported and plan.cases == []
+    assert "Install a Qwen3 4B encoder" in (plan.reason or "")
+
+
+def test_a_plain_flux1_diffusers_main_cannot_be_calibrated_even_with_its_standalone_components() -> None:
+    diffusers = _model("flux-diffusers", BaseModelType.Flux, format=ModelFormat.Diffusers, variant=FluxVariantType.Dev)
+    vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+
+    plan = _plan(diffusers, [vae, *FLUX1_ENCODERS])
+
+    assert not plan.supported and plan.cases == []
+    assert "FLUX.1 Diffusers" in (plan.reason or "") and "loader" in (plan.reason or "")
+
+
+def test_a_flux_vae_skips_a_plain_flux1_diffusers_main() -> None:
+    vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    # Both graphs have their required components. The Diffusers main sorts first but its invocation fails.
+    diffusers = _model("a-diffusers", BaseModelType.Flux, format=ModelFormat.Diffusers, variant=FluxVariantType.Dev)
+    checkpoint = _model("b-checkpoint", BaseModelType.Flux, format=ModelFormat.Checkpoint, variant=FluxVariantType.Dev)
+
+    plan = _plan(vae, [diffusers, checkpoint, *FLUX1_ENCODERS], vae_dtypes=FP32_VAES)
+    assert (plan.supported, plan.calibrated_through) == (True, checkpoint.key)
+    assert {(case.model_key, case.line, tuple(case.components.items())) for case in plan.cases} == {
+        (checkpoint.key, "decode_fp32", (("vae", vae.key),))
+    }
+
+    blocked = _plan(vae, [diffusers, *FLUX1_ENCODERS])
+    assert not blocked.supported and blocked.cases == [] and "FLUX.1 Diffusers" in (blocked.reason or "")
+
+
+def test_a_qwen3_4b_role_satisfies_z_image_calibration() -> None:
+    target = _model("z-image", BaseModelType.ZImage, format="checkpoint")
+    llm = _text_llm_serving_qwen3("llm-4b", Qwen3VariantType.Qwen3_4B)
+    target = _with_default_components(target, qwen3_encoder=llm.key)
+    vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+
+    assert _lines_of(_plan(target, [vae, llm])) == {("decode_bf16", ())}
+
+
+@pytest.mark.parametrize("base, encoder", [(BaseModelType.Flux, "T5"), (BaseModelType.ZImage, "Qwen3 4B")])
+def test_a_flux_vae_skips_a_main_model_without_its_encoders(base, encoder) -> None:
+    vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    split = _model("a-split", base, format="gguf_quantized")
+    bundled = _model("b-z-image", BaseModelType.ZImage, format="diffusers")
+
+    plan = _plan(vae, [split, bundled], vae_dtypes=FP32_VAES)
+    assert (plan.supported, plan.calibrated_through) == (True, bundled.key)
+    assert {(case.model_key, case.line, tuple(case.components.items())) for case in plan.cases} == {
+        (bundled.key, "decode_fp32", (("vae", vae.key),))
+    }
+
+    blocked = _plan(vae, [split])
+    assert not blocked.supported and blocked.cases == []
+    assert f"Install a {encoder} encoder" in (blocked.reason or "")
+
+
+@pytest.mark.parametrize(
+    "pipeline, bundled_line",
+    [
+        (_model("z-image", BaseModelType.ZImage, format="diffusers"), "decode_bf16"),
+        (_sdnq_pipeline("z-image", BaseModelType.ZImage), "decode_fp32"),
+    ],
+    ids=["diffusers", "sdnq"],
+)
+def test_a_z_image_model_decodes_with_the_vae_of_its_default_component_source(pipeline, bundled_line) -> None:
+    """Selecting the model fills its `component_source` slot (a Z-Image pipeline), whose own VAE the model loader node
+    then takes where no VAE is set: under `precision: float32` the pipeline's VAE loads in bf16 where a standalone FLUX
+    VAE stays fp32, and the case needs no VAE pick."""
+    gguf = _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    with_source = _with_default_components(gguf, component_source="z-image")
+
+    assert _lines_of(_plan(with_source, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {(bundled_line, ())}
+    # A default VAE is set beside the source and wins, as the loader takes a picked VAE first.
+    with_vae = SimpleNamespace(
+        **{
+            **vars(with_source),
+            "default_settings": SimpleNamespace(vae="ae", components={"component_source": "z-image"}),
+        }
+    )
+    assert _lines_of(_plan(with_vae, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+
+
+def test_a_self_contained_z_image_pipeline_decodes_with_the_vae_of_its_default_component_source() -> None:
+    """The Z-Image loader takes a source's VAE over the self-contained pipeline's own, and the slot is offered for it."""
+    sdnq = _sdnq_pipeline("z-image-sdnq", BaseModelType.ZImage)
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers")
+
+    assert _lines_of(_plan(sdnq, [pipeline], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    assert _lines_of(
+        _plan(_with_default_components(sdnq, component_source="z-image"), [pipeline], vae_dtypes=FP32_VAES)
+    ) == {("decode_bf16", ())}
+
+
+def test_a_z_image_default_source_whose_files_are_gone_sizes_no_case(tmp_path: Path, mock_invoker: Invoker) -> None:
+    """Generate skips a registered model whose files moved, so the graph decodes with the VAE it would without it."""
+    models_dir = tmp_path / "models"
+    (models_dir / "z-image").mkdir(parents=True)
+    (models_dir / "z-image-gguf.gguf").touch()
+    (models_dir / "ae.safetensors").touch()
+    (models_dir / "qwen3.safetensors").touch()
+    gguf = _with_default_components(
+        _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized", path="z-image-gguf.gguf"),
+        component_source="z-image",
+    )
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers", path="z-image")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE, format="checkpoint", path="ae.safetensors")
+
+    qwen3 = _model(
+        "qwen3-4b",
+        BaseModelType.Any,
+        ModelType.Qwen3Encoder,
+        variant=Qwen3VariantType.Qwen3_4B,
+        format=ModelFormat.Qwen3Encoder,
+        path="qwen3.safetensors",
+    )
+
+    def get_plan(models: list):
+        model_manager = MagicMock()
+        model_manager.store.get_model.return_value = gguf
+        model_manager.store.all_models.return_value = [gguf, *models]
+        mock_invoker.services.model_manager = model_manager
+        mock_invoker.services.configuration.models_dir = models_dir
+        service = calibration_service(
+            tmp_path,
+            untiled_decode_reservation=lambda estimator, h, w, dtype, device: 1000 * h * w,
+            vae_dtypes=FP32_VAES,
+            is_model_missing=is_model_missing,
+        )
+        service.start(mock_invoker)
+        try:
+            return service.get_plan(gguf.key)
+        finally:
+            service.stop(mock_invoker)
+
+    assert _lines_of(get_plan([pipeline, flux_vae])) == {("decode_bf16", ())}
+    (models_dir / "z-image").rmdir()
+
+    plan = get_plan([pipeline, flux_vae])
+    assert not plan.supported and plan.cases == []
+    assert "Install a Qwen3 4B encoder" in (plan.reason or "")
+    # With a standalone encoder, the standalone FLUX VAE the model falls back to stays fp32.
+    assert _lines_of(get_plan([pipeline, flux_vae, qwen3])) == {("decode_fp32", ())}

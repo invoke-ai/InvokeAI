@@ -52,14 +52,12 @@ export type QueueActionId =
   | 'clear-finished'
   | 'clear-queue';
 
-/** How menus group the actions: what stops work, what steers the processor, what deletes history. */
 export type QueueActionGroup = 'cancel' | 'processor' | 'clear';
 
 export interface QueueAction {
   id: QueueActionId;
   group: QueueActionGroup;
   label: string;
-  /** A second line saying the state the action changes, e.g. "Processor paused, 3 items waiting". */
   hint?: string;
   icon: LucideIcon;
   disabled: boolean;
@@ -75,13 +73,9 @@ interface QueueActionDescriptor extends Omit<QueueAction, 'trigger'> {
   confirmation: QueueActionConfirmationCopy | null;
 }
 
-/**
- * The counts an action reports and confirms with, as far as it reaches for this viewer: unfinished work is the
- * viewer's own, or everyone's for an administrator; history is null where the server cannot count the viewer's part.
- */
+/** Unfinished work is the viewer's own (everyone's for admins); history is null where the server cannot count it. */
 export interface QueueActionCounts {
   history: { canceled: number; completed: number; failed: number; total: number } | null;
-  /** Whether the scope holds any history at all, for enabling the clears when `history` is unknown. */
   hasHistory: boolean;
   inProgress: number;
   pending: number;
@@ -109,16 +103,12 @@ export const getQueueActionCounts = (
 const getFinishedCount = (history: NonNullable<QueueActionCounts['history']>): number =>
   history.completed + history.canceled + history.failed;
 
-/** Cancel-all-except-current says the running item keeps going only when there is one it can see. */
 const withRunningItemKept = (t: TFunction, text: string, keepsRunningItem: boolean): string =>
   keepsRunningItem ? `${text} ${t('widgets.queue.runningItemKeepsGoing')}` : text;
 
 /**
- * The confirmation policy, shared by the top bar, the queue widget, its menus and shortcuts. Cancelling the running
- * item is cheap and a Retry brings it back, so it never asks. Anything that stops or deletes many items asks first,
- * naming its scope and how many items it reaches; the way out never reads "Cancel" next to a cancel. Both bulk cancels
- * also stop this tab's runs the backend has not accepted yet, so they stay available offline while there are any;
- * such a run is never the current item, so cancel-all-except-current stops all of them.
+ * Cancelling the running item never asks (Retry brings it back); bulk stops and deletes ask with scope and count.
+ * Bulk cancels also stop this tab's unaccepted runs, so they stay available offline.
  */
 export const getQueueActionDescriptors = ({
   canManageProcessor,
@@ -134,13 +124,11 @@ export const getQueueActionDescriptors = ({
 }: {
   canManageProcessor: boolean;
   counts: QueueActionCounts;
-  /** What cancel-current would stop (`getCancelCurrentTarget`): the running item, the next waiting one, or nothing. */
   cancelCurrentTarget: 'in_progress' | 'pending' | null;
   hasRunningItem: boolean;
   includeOpenQueue: boolean;
   isConnected: boolean;
   isPaused: boolean;
-  /** This tab's runs in scope that the backend has not accepted. */
   localUnsubmitted: number;
   scope: QueueActionScope;
   t: TFunction;
@@ -168,7 +156,6 @@ export const getQueueActionDescriptors = ({
       group: 'cancel',
       icon: XIcon,
       id: 'cancel-current',
-      // Says which it will stop: between items it is the next one waiting.
       label:
         cancelCurrentTarget === 'pending' ? t('widgets.queue.cancelNextItem') : t('widgets.queue.cancelCurrentItem'),
     },
@@ -261,7 +248,6 @@ export const getQueueActionDescriptors = ({
     },
     {
       confirmation: {
-        // Clearing also stops what still runs; say so, with how much.
         body:
           serverUnfinished > 0
             ? `${clearQueueBody} ${t('widgets.queue.clearQueueStopsWork', { count: serverUnfinished })}`
@@ -283,10 +269,7 @@ export const getQueueActionDescriptors = ({
 const reportFailure = (notify: QueueUiNotificationPort, title: string, fallback: string) => (error: unknown) =>
   notify.error(title, getApiErrorMessage(error, fallback));
 
-/**
- * Records a cancel this tab announces before sending it, so the run it ends reports once; drops the record when the
- * request fails, so a later cancel by someone else still reports.
- */
+/** Dropped when the request fails, so a later cancel by someone else still reports. */
 const withCancelNote = async (request: QueueCancelRequest, send: () => Promise<void>): Promise<void> => {
   const drop = noteQueueCancelRequested(request);
 
@@ -298,7 +281,6 @@ const withCancelNote = async (request: QueueCancelRequest, send: () => Promise<v
   }
 };
 
-/** The queue's actions for the viewer, bound to the active scope. */
 export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue?: boolean } = {}): QueueAction[] => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -335,10 +317,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   const runners = useMemo<Record<QueueActionId, () => Promise<void>>>(() => {
     // Each result repeats the counts its confirmation named: both come from the model the trigger was built with.
     const originPrefix = queryScope.originPrefix ?? null;
-    /**
-     * Stops this tab's runs the backend has not accepted, then the server's items when it holds any in reach, and
-     * reports the combined count. Local runs are never the current item, so every bulk cancel stops all of them.
-     */
+    /** Local runs are never the current item, so every bulk cancel stops all of them. */
     const cancelInBulk = async (
       serverCount: number,
       cancelOnServer: () => Promise<void>,
@@ -572,7 +551,6 @@ const GroupLabel = ({ children }: { children: string }) => (
   </Menu.ItemGroupLabel>
 );
 
-/** Menu entries for the actions; `includeClear` adds the history clean-up the queue widget's menu offers. */
 export const QueueMenuItems = ({
   actions,
   includeClear = false,

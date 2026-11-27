@@ -96,10 +96,3 @@ export const createGenerateWidgetSyncRuntime = (deps: GenerateWidgetSyncRuntimeD
     },
   };
 };
-
-export {
-  ensureArchitectureCapabilitiesLoaded,
-  getArchitectureCapabilitiesSnapshot,
-  subscribeArchitectureCapabilities,
-  type ArchitectureCapabilitiesSnapshot,
-} from './data/architectureCapabilitiesStore';

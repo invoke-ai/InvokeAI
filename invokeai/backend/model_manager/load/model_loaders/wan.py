@@ -91,6 +91,8 @@ class WanDiffusersModel(GenericDiffusersLoader):
     class for each submodel via the parent loader's ``get_hf_load_class``.
     """
 
+    _fixed_dtype = torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -137,12 +139,13 @@ class WanDiffusersModel(GenericDiffusersLoader):
 
         # bfloat16 across the board: matches Diffusers WanPipeline reference and
         # avoids the fp16 instability seen in the Wan VAE.
+        dtype = self._decision(config, submodel_type).dtype
         try:
-            result: AnyModel = _load_with_variant_fallback({"dtype": torch.bfloat16})
+            result: AnyModel = _load_with_variant_fallback({"dtype": dtype})
         except TypeError:
             # Older diffusers releases use torch_dtype instead of dtype.
-            result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
-        _copy_tensors_left_on_the_mapping(result, torch.bfloat16)
+            result = _load_with_variant_fallback({"torch_dtype": dtype})
+        _copy_tensors_left_on_the_mapping(result, dtype)
 
         # This override exists to force bfloat16, and in doing so it replaced the parent's whole
         # `_load_model` -- including the cast at `GenericDiffusersLoader._load_model`, which every
@@ -545,10 +548,14 @@ class WanCheckpointModel(ModelLoader):
     ``float8_e4m3fn`` weights with no scales (cast the same way as any other non-bf16 dtype). ComfyUI
     ``int8_tensorwise`` (convrot) builds keep their marked layers in int8 as ``Int8ConvrotLinear`` and dequantize
     them per forward; layers the model reads outside a matmul (``condition_embedder``) are widened at load instead.
+    FP8 Storage leaves an int8 build as loaded.
 
     Like the GGUF loader, one file is one expert; A14B pairing happens at the
     WanModelLoaderInvocation layer.
     """
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+    _bfloat16_safe = True
 
     def _load_model(
         self,
@@ -576,8 +583,7 @@ class WanCheckpointModel(ModelLoader):
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         model_path = Path(config.path)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         # Everything up to the read -- the prefix, what is dropped, how the file is quantized, the reservation -- is
         # decided on the header's `meta` tensors, so a bundled VAE or text encoder is never read and the cache makes

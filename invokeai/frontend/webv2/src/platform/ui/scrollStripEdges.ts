@@ -1,8 +1,8 @@
 import type { RefCallback } from 'react';
 
 /**
- * A row that scrolls sideways without a scrollbar: the wheel (`wheelScrollsHorizontally`), focus and the content cut off
- * at its edges carry it.
+ * A row that scrolls sideways without a scrollbar: the wheel (`wheelScrollsHorizontally`), focus and the content cut
+ * off at its edges carry it.
  */
 export const HIDDEN_SCROLLBAR_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 

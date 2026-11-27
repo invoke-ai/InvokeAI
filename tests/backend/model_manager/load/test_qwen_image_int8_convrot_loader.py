@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.load.model_loaders.qwen_image import QwenIma
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
-from tests.fixtures.loader_seams import Seam, SeamRun, prepare
+from tests.fixtures.loader_seams import Seam, SeamRun, assert_fp8_storage_declined, logged_info, prepare
 from tests.fixtures.quantized_payloads import (
     INT8_LEVELS,
     comfy_quant_marker,
@@ -226,21 +226,52 @@ def test_the_reservation_is_one_call_made_before_the_split_and_the_cast_widen_an
     assert widening_steps == [("split_int8_convrot_layers", 1), ("cast_unquantized", 1)]
 
 
-def test_fp8_storage_leaves_the_int8_layers_int8(monkeypatch, tmp_path) -> None:
-    """The model-level storage cast walks the dense remainder; the int8 buffers are not layers it casts."""
+@pytest.mark.parametrize("dtype,later_dtype", [(torch.float32, torch.bfloat16), (torch.bfloat16, torch.float32)])
+def test_int8_loading_uses_the_dtype_captured_for_its_cache_key(monkeypatch, tmp_path, dtype, later_dtype) -> None:
     state_dict, expected = _state_dict()
-    run, config = _run(monkeypatch, tmp_path, state_dict, fp8_storage=True)
-    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
-    run.loader._torch_dtype = COMPUTE_DTYPE
+    run, config = _run(monkeypatch, tmp_path, state_dict)
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: dtype))
+    key = run.loader._get_cache_key(config, SubModelType.Transformer)
+    monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: later_dtype))
 
     model = run.loader._load_model(config, SubModelType.Transformer)
 
-    for path in expected:
+    assert model.img_in.weight.dtype is dtype
+    torch.testing.assert_close(model.img_in.weight, state_dict["img_in.weight"].to(dtype))
+    for path, weight in expected.items():
         layer = model.get_submodule(path)
         assert isinstance(layer, Int8ConvrotLinear), path
         assert layer.weight.dtype is torch.int8, path
         assert layer.weight_scale.dtype is torch.float32, path
-    assert model.img_in.weight.dtype is torch.float8_e4m3fn
+        x = torch.arange(64, dtype=torch.float32).reshape(1, 64) / 64
+        bias = state_dict[f"{path}.bias"].to(dtype).float()
+        torch.testing.assert_close(layer(x), torch.nn.functional.linear(x, weight, bias), rtol=1e-4, atol=1e-4)
+    # Packed codes and fp32 column scales are fixed; only the dense remainder follows the captured dtype.
+    int8 = sum(out * inp for out, inp in LAYERS.values())
+    scales = sum(out for out, _ in LAYERS.values()) * 4
+    dense = sum(out for out, _ in LAYERS.values()) + 2 * (128 * 64 + 128)
+    assert run.reserved == [int8 + scales + dense * dtype.itemsize]
+    assert run.loader._get_cache_key(config, SubModelType.Transformer) == key
+
+
+def test_fp8_storage_leaves_an_int8_build_as_loaded(monkeypatch, tmp_path) -> None:
+    """The int8 layers stay int8 and the dense remainder (`img_in`, the modulation) stays at the compute dtype: the
+    build is the same tensor for tensor as the load without FP8 Storage."""
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
+    loaded = {}
+    for fp8_storage in (False, True):
+        state_dict, expected = _state_dict()
+        run, config = _run(monkeypatch, tmp_path, state_dict, fp8_storage=fp8_storage)
+        run.loader._torch_dtype = COMPUTE_DTYPE
+        loaded[fp8_storage] = (run.loader._load_model(config, SubModelType.Transformer), run)
+
+    model, run = loaded[True]
+    for path in expected:
+        layer = model.get_submodule(path)
+        assert isinstance(layer, Int8ConvrotLinear), path
+        assert layer.weight.dtype is torch.int8, path
+    assert model.img_in.weight.dtype is COMPUTE_DTYPE
+    assert_fp8_storage_declined(model, loaded[False][0], logged_info(run.loader._logger), config.name)
 
 
 def test_a_marked_layer_the_model_needs_dense_is_widened_with_its_scale_applied(monkeypatch, tmp_path) -> None:

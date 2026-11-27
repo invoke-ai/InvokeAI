@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   getModelsDir: vi.fn(),
   listMissingModels: vi.fn(),
+  listModelKeysByDateAdded: vi.fn(),
   listModels: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ describe('models store loading', () => {
     vi.resetModules();
     api.getModelsDir.mockReset().mockResolvedValue('/models');
     api.listMissingModels.mockReset().mockResolvedValue([]);
+    api.listModelKeysByDateAdded.mockReset();
     api.listModels.mockReset();
   });
 
@@ -45,6 +47,45 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the library fresh with file availability, and lists every model present when detection fails', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    const { listModelsWithAvailability } = await import('./modelsStore');
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, { ...b, is_missing: true }]);
+
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockRejectedValueOnce(new Error('down'));
+    await expect(listModelsWithAvailability()).resolves.toEqual([a, b]);
+  });
+
+  it('flags a registered model whose files are gone on its catalog entry', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+
+    expect(store.getModelsSnapshot().models).toEqual([a, { ...b, is_missing: true }]);
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true });
+  });
+
+  it('keeps a missing model flagged when a server response replaces its record', async () => {
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    store.replaceModelInStore({ ...b, name: 'Renamed' } as ModelConfig);
+
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true, name: 'Renamed' });
+  });
+
   it('keeps the by-key index in lockstep with every models write', async () => {
     api.listModels.mockResolvedValueOnce([
       { base: 'sdxl', key: 'a', name: 'A', type: 'main' },
@@ -61,6 +102,53 @@ describe('models store loading', () => {
     store.removeModelsFromStore(['b']);
     expect(store.getModelsSnapshot().modelsByKey.has('b')).toBe(false);
     expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
+  });
+
+  it('reads install order only once it is asked for, even mid-refresh, then with every refresh', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValue([a, b]);
+    api.listModelKeysByDateAdded
+      // Outlasts the refresh already in flight, so only waiting for the trailing read can answer true.
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve(['b', 'a']));
+          })
+      )
+      .mockResolvedValueOnce(['a', 'b']);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    expect(api.listModelKeysByDateAdded).not.toHaveBeenCalled();
+    expect(store.getModelsSnapshot().dateAddedRanks).toBeNull();
+
+    void store.refreshModels();
+    await expect(store.ensureDateAddedOrderLoaded()).resolves.toBe(true);
+    expect([...store.getModelsSnapshot().dateAddedRanks!]).toEqual([
+      ['b', 0],
+      ['a', 1],
+    ]);
+    expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a', 'b']);
+
+    await store.refreshModels();
+    expect([...store.getModelsSnapshot().dateAddedRanks!]).toEqual([
+      ['a', 0],
+      ['b', 1],
+    ]);
+  });
+
+  it('reports a failed install-order read without failing the library, and retries when asked again', async () => {
+    api.listModels.mockResolvedValue([{ base: 'sdxl', key: 'a', name: 'A', type: 'main' }]);
+    api.listModelKeysByDateAdded.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(['a']);
+    const store = await import('./modelsStore');
+
+    await expect(store.ensureDateAddedOrderLoaded()).resolves.toBe(false);
+    expect(store.getModelsSnapshot()).toMatchObject({ dateAddedRanks: null, error: null, status: 'loaded' });
+    expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
+
+    await expect(store.ensureDateAddedOrderLoaded()).resolves.toBe(true);
+    expect([...store.getModelsSnapshot().dateAddedRanks!]).toEqual([['a', 0]]);
   });
 
   it.each(['replace', 'patch', 'delete', 'cover'] as const)(
@@ -196,7 +284,6 @@ describe('models store loading', () => {
           resolveB = resolve;
         })
       )
-      // The join during user B's flight queues a trailing rerun.
       .mockResolvedValueOnce([modelB]);
     const userARefresh = modelsStore.refreshModels();
 
@@ -213,7 +300,6 @@ describe('models store loading', () => {
 
     expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
 
-    // The mid-flight join re-fetches once more after the shared flight settles.
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });

@@ -31,11 +31,15 @@ afterEach(() => {
 });
 
 describe('isCivitaiUrl', () => {
-  it('matches the civitai host and its subdomains only', () => {
+  it('matches the civitai hosts and their subdomains only', () => {
     expect(isCivitaiUrl('https://civitai.com/models/1')).toBe(true);
     expect(isCivitaiUrl('https://api.civitai.com/download')).toBe(true);
+    expect(isCivitaiUrl('https://civitai.red/api/download/models/1')).toBe(true);
+    expect(isCivitaiUrl('https://www.civitai.red/models/1')).toBe(true);
     expect(isCivitaiUrl('https://not-civitai.com/models/1')).toBe(false);
+    expect(isCivitaiUrl('https://not-civitai.red/models/1')).toBe(false);
     expect(isCivitaiUrl('https://civitai.com.evil.example/models/1')).toBe(false);
+    expect(isCivitaiUrl('https://civitai.red.evil.example/models/1')).toBe(false);
   });
 
   it('rejects malformed URLs and plain paths', () => {
@@ -81,6 +85,7 @@ describe('getAccessTokenForSource', () => {
   it('returns the saved key only for civitai URLs', () => {
     setCivitaiApiKey('key-a');
     expect(getAccessTokenForSource('https://civitai.com/api/download/models/1')).toBe('key-a');
+    expect(getAccessTokenForSource('https://civitai.red/api/download/models/1')).toBe('key-a');
     expect(getAccessTokenForSource('https://huggingface.co/owner/repo')).toBeUndefined();
   });
 

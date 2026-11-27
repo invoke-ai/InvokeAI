@@ -8,7 +8,6 @@ import { createPaintTool } from '@workbench/canvas-engine/tools/paintTool';
 
 import type { Tool } from './tool';
 
-/** Creates a fresh eraser tool with its own gesture state. */
 export const createEraserTool = (): Tool =>
   createPaintTool({
     color: () => '#000000',

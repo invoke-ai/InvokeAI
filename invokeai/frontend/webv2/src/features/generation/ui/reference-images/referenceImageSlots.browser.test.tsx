@@ -5,14 +5,14 @@ import type { GenerateModelConfig, GenerateReferenceImage } from '@features/gene
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, MouseSensor, pointerWithin, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { getGalleryItemDragData } from '@features/gallery/utility';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
   getDefaultGenerateSettings,
   getGenerateInvocationIssues,
-  getMaxReferenceImages,
+  getReferenceImageRoom,
 } from '@features/generation/core/baseGenerationPolicies';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssuesProvider } from '@features/generation/ui/shared/GenerateIssues';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
@@ -39,7 +39,6 @@ vi.mock('@features/gallery', async (importOriginal) => ({
 }));
 
 const i18n = i18next.createInstance();
-// The shipped copy, so the counts read as a user sees them.
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
@@ -50,8 +49,7 @@ await i18n.use(initReactI18next).init({
 seedArchitectureCapabilities();
 
 const SDXL: GenerateModelConfig = { base: 'sdxl', format: 'diffusers', key: 'sdxl', name: 'SDXL', type: 'main' };
-/** Read inside each test: the capability table is seeded per test. */
-const max = () => getMaxReferenceImages(SDXL);
+const max = () => getReferenceImageRoom(SDXL, {}, []).limit;
 const NO_MODELS: [] = [];
 const NO_VISION_COMPONENTS = {};
 const reference = (id: string): GenerateReferenceImage => ({
@@ -60,7 +58,6 @@ const reference = (id: string): GenerateReferenceImage => ({
     clipVisionModel: 'ViT-H',
     image: { original: { image: { height: 512, image_name: `${id}.png`, width: 512 } } },
     method: 'full',
-    // With its adapter chosen, a row starts with its settings closed.
     model: { base: 'sdxl', key: 'ip-adapter-sdxl', name: 'IP Adapter SDXL', type: 'ip_adapter' },
     type: 'ip_adapter',
     weight: 1,
@@ -73,7 +70,6 @@ const info = vi.fn();
 const undoable = vi.fn();
 const patchGenerateSettings = vi.fn();
 let storedValues: Record<string, unknown> | null = null;
-/** The installed models as the store holds them now, which an Undo reads when it runs. */
 let catalog: readonly { base: string; key: string; name: string; type: string }[] = [];
 const ADAPTER = {
   gallery: { findImage: vi.fn() },
@@ -87,7 +83,6 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** Stands in for a Gallery selection being dragged. */
 const DraggedSelection = ({ count }: { count: number }) => {
   const { listeners, setNodeRef } = useDraggable({
     data: getGalleryItemDragData(
@@ -203,7 +198,6 @@ describe('removing every reference', () => {
     expect(onCommitImmediate).toHaveBeenCalledExactlyOnceWith({ referenceImages: [] });
     expect(undoable).toHaveBeenCalledOnce();
 
-    // Since then the user switched to SDXL and added references of their own.
     const added = Array.from({ length: max() }, (_, index) => reference(`new-${index}`));
     storedValues = { ...getDefaultGenerateSettings(SDXL), model: SDXL, modelKey: SDXL.key, referenceImages: added };
     await act(() => undoable.mock.calls[0]![1].onUndo());
@@ -231,7 +225,6 @@ describe('undoing a removal after a model switch', () => {
     type: 'main',
   };
   const FLUX_IP_ADAPTER = { base: 'flux', key: 'ip-adapter-flux', name: 'IP Adapter FLUX', type: 'ip_adapter' };
-  /** Removes the reference from its row, as Delete does there; the commit applies at once, as the form's does. */
   const renderAndRemove = async (removed: GenerateReferenceImage) => {
     let settings = { ...getDefaultGenerateSettings(SDXL), referenceImages: [removed] };
     const onCommit = (update: unknown) => {
@@ -248,7 +241,6 @@ describe('undoing a removal after a model switch', () => {
     expect(undoable).toHaveBeenCalledOnce();
   };
   const restoredAfterSwitchTo = async (model: GenerateModelConfig) => {
-    // Since the removal the user switched to `model`, which left no references.
     storedValues = { ...getDefaultGenerateSettings(model), model, modelKey: model.key, referenceImages: [] };
     await act(() => undoable.mock.calls[0]![1].onUndo());
 
@@ -259,7 +251,6 @@ describe('undoing a removal after a model switch', () => {
     const removed = reference('palette');
 
     await renderAndRemove(removed);
-    // Installed after the removal: the Undo reads the catalog as it is when it runs.
     catalog = [FLUX_IP_ADAPTER];
 
     const restored = await restoredAfterSwitchTo(FLUX);
@@ -279,7 +270,6 @@ describe('undoing a removal after a model switch', () => {
         isEnabled: true,
       },
     ]);
-    // Nothing about the references holds Invoke back (the bare FLUX fixture still lacks its encoders).
     expect(
       getGenerateInvocationIssues({
         ...getDefaultGenerateSettings(FLUX),
@@ -314,7 +304,6 @@ describe('reference image slots', () => {
 
   it('adds what fits from a larger drop and says how many did not', async () => {
     const referenceImages = references(max() - 1);
-    // The form applies a reference update to its settings at once, as this does.
     const onCommit = vi.fn((update: unknown) =>
       typeof update === 'function' ? update({ referenceImages }) : undefined
     );
@@ -400,17 +389,14 @@ describe('reference image slots', () => {
     const secondRow = host!.querySelector<HTMLElement>('[data-reference-image-id="ref-1"]')!;
     const icon = secondRow.querySelector<HTMLButtonElement>('button[data-issue-ids]')!;
 
-    // Only the row with an issue shows the icon, beside its switch, named by what is wrong.
     expect(firstRow.querySelector('[data-issue-ids]')).toBeNull();
     expect(icon.getAttribute('aria-label')).toBe(`1 issue: ${cardIssue.message}`);
     expect(icon.closest('[role="group"]')?.querySelector('[data-scope="switch"]')).not.toBeNull();
     expect(secondRow.textContent).not.toContain(cardIssue.message);
-    // The group's issue sits above the list, outside every row.
     expect(notes).toHaveLength(1);
     expect(notes[0]?.closest('[role="list"]')).toBeNull();
     expect(notes[0]?.textContent).toBe(limitIssue.message);
 
-    // The tooltip reads exactly as the icon's name, so assistive tech says it once.
     await act(() => userEvent.hover(icon));
     await expect
       .poll(() => [...document.querySelectorAll('[role="tooltip"]')].map((tooltip) => tooltip.textContent))
@@ -421,12 +407,10 @@ describe('reference image slots', () => {
     await expect.poll(() => popover()?.textContent).toContain(cardIssue.message);
     expect(popover()?.querySelector('[data-issue-fix]')?.textContent).toBe('Turn off');
 
-    // Escape closes it and gives focus back to the icon.
     await act(() => userEvent.keyboard('{Escape}'));
     await expect.poll(() => popover()).toBeNull();
     expect(document.activeElement).toBe(icon);
 
-    // The keyboard opens it too; Turn off applies the fix.
     await act(() => userEvent.keyboard('{Enter}'));
     await expect.poll(() => popover()?.querySelector('[data-issue-fix]')).not.toBeNull();
     await act(() => popover()!.querySelector<HTMLButtonElement>('[data-issue-fix]')!.click());

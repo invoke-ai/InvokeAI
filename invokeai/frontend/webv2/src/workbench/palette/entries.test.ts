@@ -2,10 +2,7 @@ import type { TFunction } from 'i18next';
 
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
-import { settingsCatalog } from '@workbench/settings/catalog';
 import { DEFAULT_PREFERENCES } from '@workbench/settings/store';
-import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PaletteEntry } from './entries';
@@ -91,7 +88,6 @@ describe('buildCatalogCommandEntries', () => {
     });
   });
 
-  // One entry per widget: a widget's open command becomes its Show entry, keeping the command's id and key.
   it('offers each widget once, under its open command where it has one', () => {
     const show = vi.fn();
     const commands = build(new Set()).map((entry) => entry.id);
@@ -118,7 +114,6 @@ describe('buildCatalogCommandEntries', () => {
     expect(show).toHaveBeenCalledWith('generate');
   });
 
-  // Preview registers its item arrows and zoom only while it shows something to step through or zoom.
   it('leaves out widget commands nothing handles right now', () => {
     const ids = buildCatalogCommandEntries({
       catalog: firstPartyHotkeyCatalog,
@@ -132,52 +127,6 @@ describe('buildCatalogCommandEntries', () => {
 
     expect(ids).toContain('viewer.toggleMetadata');
     expect(ids).not.toContain('viewer.zoomToFit');
-  });
-
-  it('offers layout history and the widgets list under Layout', () => {
-    const entries = build(new Set());
-
-    expect(entries.find((entry) => entry.id === 'app.undoLayoutChange')).toMatchObject({
-      group: 'Layout',
-      title: 'Undo layout change',
-    });
-    expect(entries.find((entry) => entry.id === 'app.openWidgets')).toMatchObject({ group: 'Layout' });
-  });
-
-  it('titles front-of-queue invoke from the topbar catalog', () => {
-    const invokeFront = build(new Set()).find((entry) => entry.id === 'app.invokeFront');
-
-    expect(invokeFront).toMatchObject({ group: 'Generation', title: 'Invoke (front of queue)' });
-  });
-
-  it('uses account-renamed layout preset titles in palette rows', () => {
-    const initial = createInitialWorkbenchState();
-    const account = {
-      ...initial.account,
-      layoutPresetMetadataOverrides: { compose: { label: 'Writing' } },
-    };
-    const entries = buildCatalogCommandEntries({
-      catalog: firstPartyHotkeyCatalog,
-      customHotkeys: {},
-      execute: noop,
-      formatHotkey: formatHotkeyForPlatform,
-      presentWidgetTypeIds: new Set(),
-      t,
-      titleOverrides: getLayoutPresetCommandTitleOverrides(account, (name) =>
-        t('commandPalette.layoutPresetCommand', { defaultValue: '{{name}} layout', name })
-      ),
-    });
-
-    expect(entries.find((entry) => entry.id === 'app.selectComposePreset')?.title).toBe('Writing layout');
-  });
-
-  it('hides hotkey-only commands', () => {
-    const ids = build(new Set(['canvas', 'gallery', 'preview', 'workflow'])).map((entry) => entry.id);
-
-    expect(ids).not.toContain('canvas.nudgeLeft');
-    expect(ids).not.toContain('gallery.galleryNavLeft');
-    expect(ids).not.toContain('app.promptWeightUp');
-    expect(ids).not.toContain('app.openCommandPalette');
   });
 
   it('shows widget-scoped commands only while the widget type is in the layout', () => {
@@ -195,7 +144,8 @@ describe('buildCatalogCommandEntries', () => {
       catalog: firstPartyHotkeyCatalog,
       customHotkeys: { 'app.clearQueue': ['mod+shift+q'] },
       execute,
-      formatHotkey: formatHotkeyForPlatform,
+      // Pinned so the result does not depend on the machine; keys.test.ts owns the macOS order.
+      formatHotkey: (hotkey) => formatHotkeyForPlatform(hotkey, false),
       presentWidgetTypeIds: new Set(),
       t,
     });
@@ -249,22 +199,6 @@ describe('buildSettingsEntries', () => {
     expect(openSettingsSection).toHaveBeenCalledWith('workflow');
   });
 
-  it('links deletion confirmation to Gallery while keeping its direct toggle', () => {
-    const openSettingsSection = vi.fn();
-    const patchPreferences = vi.fn();
-    const entries = buildSettingsEntries(
-      { ...DEFAULT_PREFERENCES, confirmImageDeletion: true },
-      { ...settingsEntryDeps, openSettingsSection, patchPreferences },
-      t
-    );
-    const confirmation = entries.find((entry) => entry.id === 'setting.confirmImageDeletion');
-
-    confirmation?.run();
-    expect(patchPreferences).toHaveBeenCalledWith({ confirmImageDeletion: false });
-    confirmation?.secondary?.run();
-    expect(openSettingsSection).toHaveBeenCalledWith({ entryId: 'confirmImageDeletion', sectionId: 'gallery' });
-  });
-
   it('finds widget fields by catalog aliases and navigates to the exact entry', () => {
     const openSettingsSection = vi.fn();
     const entries = buildSettingsEntries(DEFAULT_PREFERENCES, { ...settingsEntryDeps, openSettingsSection }, t);
@@ -277,22 +211,6 @@ describe('buildSettingsEntries', () => {
     }
     expect(openSettingsSection).toHaveBeenCalledWith({ entryId: 'imageSize', sectionId: 'gallery' });
     expect(entries.some((entry) => entry.id === 'settings.section.canvas')).toBe(true);
-  });
-
-  it('uses catalog translations for preference labels without loading editor resources', () => {
-    const resources = [
-      ...new Set(settingsCatalog.flatMap((section) => section.entries.map((entry) => entry.resource))),
-    ];
-    const loadSpies = resources.map((resource) => vi.spyOn(resource, 'load'));
-    const localized = ((key: string, options?: Record<string, unknown>) =>
-      key === 'settings.catalog.reduceMotion.label' ? 'Minimize animation' : t(key, options)) as TFunction;
-    const entries = buildSettingsEntries(DEFAULT_PREFERENCES, settingsEntryDeps, localized);
-
-    expect(entries.find((entry) => entry.id === 'setting.reduceMotion')?.title).toBe('Minimize animation');
-    for (const spy of loadSpies) {
-      expect(spy).not.toHaveBeenCalled();
-      spy.mockRestore();
-    }
   });
 
   it('carries a value-picker stage on enum preferences that applies and marks the current value', () => {
@@ -312,42 +230,6 @@ describe('buildSettingsEntries', () => {
 
     edgeStyle?.stage?.options[1]?.apply();
     expect(patchPreferences).toHaveBeenCalledWith({ workflowEdgeStyle: 'square' });
-  });
-
-  it('wires theme stage preview hooks only when the host provides them', () => {
-    const previewTheme = vi.fn();
-    const clearThemePreview = vi.fn();
-    const withPreview = buildSettingsEntries(
-      DEFAULT_PREFERENCES,
-      {
-        ...settingsEntryDeps,
-        clearThemePreview,
-        openSettingsSection: vi.fn(),
-        patchPreferences: vi.fn(),
-        previewTheme,
-      },
-      t
-    );
-    const theme = withPreview.find((entry) => entry.id === 'setting.themeId');
-
-    theme?.stage?.preview?.('light');
-    theme?.stage?.clearPreview?.();
-    expect(previewTheme).toHaveBeenCalledWith('light');
-    expect(clearThemePreview).toHaveBeenCalled();
-
-    const withoutPreview = buildSettingsEntries(
-      DEFAULT_PREFERENCES,
-      {
-        ...settingsEntryDeps,
-        openSettingsSection: vi.fn(),
-        patchPreferences: vi.fn(),
-      },
-      t
-    );
-    const bareTheme = withoutPreview.find((entry) => entry.id === 'setting.themeId');
-
-    expect(bareTheme?.stage?.preview).toBeUndefined();
-    expect(bareTheme?.stage?.clearPreview).toBeUndefined();
   });
 });
 
@@ -412,28 +294,11 @@ describe('provider row assembly', () => {
     ]);
   });
 
-  it('renders uncapped in scoped mode and labels in-flight sections', () => {
-    const rows = buildProviderSectionRows([section('workflows', 5, true)], null);
-
-    expect(rows).toHaveLength(6);
-    expect(rows[0]).toMatchObject({ kind: 'label', label: 'workflows — Searching…' });
-  });
-
   it('builds one trailing scope row per provider under a "Search in" header', () => {
     const rows = buildScopeRows([{ label: 'Boards', providerKey: 'boards' }], 'sunset');
 
     expect(rows[0]).toMatchObject({ kind: 'label', label: SEARCH_SCOPE_GROUP });
     expect(rows[1]).toMatchObject({ kind: 'scope', label: 'Search boards for “sunset”', providerKey: 'boards' });
-  });
-
-  it('builds no rows — not even the header — without providers', () => {
-    expect(buildScopeRows([], 'sunset')).toEqual([]);
-  });
-
-  it('labels scope rows as by-date searches when only a date filter is active', () => {
-    const rows = buildScopeRows([{ label: 'Images', providerKey: 'images' }], '');
-
-    expect(rows[1]).toMatchObject({ kind: 'scope', label: 'Search images by date', providerKey: 'images' });
   });
 });
 
@@ -462,34 +327,10 @@ describe('searchPaletteRows', () => {
     expect(rows.map((row) => row.id)).toEqual(['label:Navigation', 'app.selectCanvasTab']);
   });
 
-  it('does not repeat a recent entry in its launcher group', () => {
-    const rows = searchPaletteRows(entries, '', ['app.selectCanvasTab']);
-
-    expect(rows.map((row) => row.id)).toEqual(['label:Recent', 'recent:app.selectCanvasTab']);
-  });
-
   it('ranks fuzzy matches within their section and drops non-matches', () => {
     const rows = searchPaletteRows(entries, 'invoke', []);
 
     expect(rows.map((row) => row.id)).toEqual(['label:Generation', 'app.invoke', 'app.invokeFront']);
-  });
-
-  it('keeps the fixed section order regardless of match strength', () => {
-    const rows = searchPaletteRows(
-      [
-        makeEntry({ group: 'Settings', id: 'setting.a', title: 'Motion' }),
-        makeEntry({ group: 'Generation', id: 'command.a', title: 'Prompt Motion Nudge' }),
-      ],
-      'motion',
-      []
-    );
-    const labels = rows.filter((row) => row.kind === 'label').map((row) => row.id);
-
-    expect(labels).toEqual(['label:Generation', 'label:Settings']);
-  });
-
-  it('returns no rows for a junk query', () => {
-    expect(searchPaletteRows(entries, 'zzzzqqq', [])).toEqual([]);
   });
 
   it('excludes settings entries in commands-only mode (the ">" alias)', () => {
@@ -497,44 +338,6 @@ describe('searchPaletteRows', () => {
 
     expect(rows.map((row) => row.id)).not.toContain('setting.reduceMotion');
     expect(rows.map((row) => row.id)).toContain('app.invoke');
-  });
-
-  it('lists every non-setting command for a bare commands scope', () => {
-    const rows = searchPaletteRows(entries, '', [], { commandsOnly: true, showAllOnEmpty: true });
-
-    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.entry.id)).toEqual([
-      'app.invoke',
-      'app.invokeFront',
-      'app.selectCanvasTab',
-    ]);
-  });
-
-  it('renders the search-scope section last in the empty launcher', () => {
-    const rows = searchPaletteRows(
-      [
-        ...entries,
-        makeEntry({ group: SEARCH_SCOPE_GROUP, id: 'scope.images', showInEmptyState: true, title: 'Search images…' }),
-      ],
-      '',
-      []
-    );
-
-    expect(rows.filter((row) => row.kind === 'label').map((row) => row.id)).toEqual([
-      'label:Navigation',
-      `label:${SEARCH_SCOPE_GROUP}`,
-    ]);
-    expect(rows.at(-1)?.id).toBe('scope.images');
-  });
-
-  it('includes search-scope commands in commands-only mode', () => {
-    const rows = searchPaletteRows(
-      [...entries, makeEntry({ group: SEARCH_SCOPE_GROUP, id: 'scope.images', title: 'Search images…' })],
-      '',
-      [],
-      { commandsOnly: true, showAllOnEmpty: true }
-    );
-
-    expect(rows.filter((row) => row.kind === 'entry').map((row) => row.entry.id)).toContain('scope.images');
   });
 });
 

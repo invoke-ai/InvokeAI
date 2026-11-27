@@ -21,7 +21,16 @@ describe('getProjectCanvasSchemaRequirement', () => {
 });
 
 describe('isCanvasSchemaVersionSupported', () => {
-  it('opens projects needing schema 3 through 6, including control-layer derivation, and refuses the rest', () => {
-    expect([2, 3, 4, 5, 6, 7].map(isCanvasSchemaVersionSupported)).toEqual([false, true, true, true, true, false]);
+  it('opens projects needing schema 3 through 8 and refuses the rest', () => {
+    expect([2, 3, 4, 5, 6, 7, 8, 9].map(isCanvasSchemaVersionSupported)).toEqual([
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
   });
 });

@@ -401,7 +401,8 @@ export const GenerateAdvancedFields = ({
           <GenerateFieldContextMenu
             fieldLabel={t('widgets.generate.hiDiffusionT1Ratio')}
             copyValue={() => String(settings.hiDiffusionT1Ratio ?? t('widgets.generate.hiDiffusionRatioAutoValue'))}
-            // A disabled ratio is not sent (HiDiffusion or RAU-Net off, or automatic ratios), so it is no change to undo.
+            // A disabled ratio is not sent (HiDiffusion or RAU-Net off, or automatic ratios), so it is no change to
+            // undo.
             isAtDefault={hiDiffusionT1Disabled || manualHiDiffusionRatios.t1 === defaultHiDiffusionT1Ratio}
             onReset={() => onCommit({ hiDiffusionT1Ratio: defaultHiDiffusionT1Ratio })}
           >
@@ -464,7 +465,6 @@ export const GenerateAdvancedFields = ({
                   const mode = value[0];
 
                   if (isPidMode(mode)) {
-                    // Commit immediately because native mode changes the valid dimension grid.
                     onCommitImmediate({ pidMode: mode });
                   }
                 }}

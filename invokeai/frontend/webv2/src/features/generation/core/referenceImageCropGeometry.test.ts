@@ -15,7 +15,6 @@ const constraints = (ratio: number | null, image = IMAGE): ReferenceCropConstrai
   minDimensionPx: 64,
   ratio,
 });
-/** The pixel ratio a percent box has on an image. */
 const pixelRatio = (box: { height: number; width: number }, image = IMAGE): number =>
   (box.width * image.width) / (box.height * image.height);
 const drag = (
@@ -103,7 +102,6 @@ describe('resolveReferenceCropDrag', () => {
 
   it.each(['nw', 'ne', 'sw', 'se'] as const)('shrinks the %s corner with either single-axis gesture', (mode) => {
     const image = { width: 600, height: 800 };
-    // A 240px square on a portrait source.
     const box = { x: 30, y: 30, width: 40, height: 30 };
     const from = { x: mode.includes('w') ? 30 : 70, y: mode.includes('n') ? 30 : 60 };
     for (const to of [

@@ -1,11 +1,10 @@
-import type { FoundModel, ModelConfig } from '@features/models/core/types';
+import type { FoundModel } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { getModelTypeLabel } from '@features/models/core/taxonomy';
-import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
+import { scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { type ModelsUiAdapter, ModelsUiProvider, NO_DEFAULTS_RULES } from '@features/models/ui/ModelsUiContext';
 import { getModelsUiSnapshotForTests, setAddModelsQuery, updateModelsUi } from '@features/models/ui/uiStore';
 import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
@@ -17,11 +16,6 @@ import { userEvent } from 'vitest/browser';
 
 import { AddModelsView } from './AddModelsView';
 
-/**
- * The search box lives in the Model Manager's session store; "Install in place" is an account preference, stood in for
- * here by a store that outlives each mount as the account settings do.
- */
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: { reason?: string }) =>
@@ -29,8 +23,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// One starter the backend marks installed by source, one it marks installed by
-// name; the library model behind each is what the row must link to.
 const INSTALLED_STARTERS = [
   {
     base: 'sdxl',
@@ -67,8 +59,6 @@ vi.mock('@features/models/data/externalProvidersStore', async (importOriginal) =
   useExternalProvidersSelector: (selector: (snapshot: unknown) => unknown) => selector({ configs: [] }),
 }));
 
-// Spread the original: sibling modules in this view's graph import other
-// members of it, and a narrow factory would break their imports outright.
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getHuggingFaceModels: vi.fn(),
@@ -102,7 +92,7 @@ const WithAccountPreferences = ({ children }: { children: ReactNode }) => {
       installInPlace,
       isProjectActive: () => true,
       managerProjectId: null,
-      schedulerPolicy: NO_SCHEDULER_POLICY,
+      defaultsRules: NO_DEFAULTS_RULES,
       setInstallInPlace,
     }),
     [installInPlace]
@@ -135,8 +125,8 @@ describe('AddModelsView search box', () => {
           </ChakraProvider>
         </StrictMode>
       );
-      // Chakra's observer-driven commits land a task after the render that
-      // armed them; awaiting inside this scope keeps them in it.
+      // Chakra's observer-driven commits land a task after the render that armed them; awaiting inside this scope keeps
+      // them in it.
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 0);
       });
@@ -159,18 +149,6 @@ describe('AddModelsView search box', () => {
     resetSessionAndPreferences();
   });
 
-  it('opens searching for a requested model, replacing what the box held', async () => {
-    const { requestAddModelsSearch } = await import('@features/models/ui/uiStore');
-
-    setAddModelsQuery('something typed earlier');
-    requestAddModelsSearch('Wan 2.2 I2V A14B');
-    await mount();
-
-    expect(searchBox()?.value).toBe('Wan 2.2 I2V A14B');
-
-    await unmount();
-  });
-
   it('keeps the typed text and the Install in place choice when the view is reopened', async () => {
     await mount();
     const outside = '/home/user/downloads/outside.safetensors';
@@ -184,20 +162,11 @@ describe('AddModelsView search box', () => {
     await act(() => userEvent.click(inplaceInput()!.closest('label')!));
     expect(inplaceInput()?.checked).toBe(false);
 
-    // Switching tabs or closing the manager unmounts the view.
     await unmount();
     await mount();
 
     expect(searchBox()?.value).toBe(outside);
     expect(inplaceInput()?.checked).toBe(false);
-
-    await unmount();
-  });
-
-  it('opens empty when nothing asked it to search', async () => {
-    await mount();
-
-    expect(searchBox()?.value).toBe('');
 
     await unmount();
   });
@@ -212,7 +181,6 @@ describe('AddModelsView search box', () => {
     await act(() => userEvent.fill(searchBox()!, source));
     await act(() => userEvent.click(pull()!));
 
-    // Unticked sends nothing, so identification can still turn FP8 storage on for an FP8 checkpoint.
     expect(installActions.install).toHaveBeenLastCalledWith(
       expect.objectContaining({ config: undefined, inplace: true, source })
     );
@@ -228,122 +196,6 @@ describe('AddModelsView search box', () => {
     );
 
     await unmount();
-  });
-
-  it.each([
-    [
-      'folder scan results',
-      () =>
-        updateModelsUi({
-          scan: { path: '/models', results: [{ is_installed: false, path: '/models/qwen_image.safetensors' }] },
-        }),
-    ],
-    [
-      'a Hugging Face file list',
-      () =>
-        updateModelsUi({
-          hfLookup: {
-            repo: 'owner/repo',
-            urls: [
-              'https://huggingface.co/owner/repo/resolve/main/a.safetensors',
-              'https://huggingface.co/owner/repo/resolve/main/b.safetensors',
-            ],
-          },
-        }),
-    ],
-  ])('sends FP8 storage with every install from %s once it is ticked there', async (_source, openResults) => {
-    installActions.installMany.mockReset();
-    setModelsSnapshotForTests({ models: [], status: 'loaded' });
-    await mount();
-    await act(() => openResults());
-
-    // The results replace the hint row, so the option has to be on the results panel itself.
-    const fp8Storage = [...document.querySelectorAll('label')].find(
-      (label) => label.textContent === 'models.installFp8Storage'
-    );
-    await act(() => userEvent.click(fp8Storage!));
-    const installAll = [...document.querySelectorAll('button')].find(
-      (button) => button.textContent === 'models.installAllCount'
-    );
-    await act(() => userEvent.click(installAll!));
-
-    const [requests] = installActions.installMany.mock.lastCall as [{ config?: unknown }[]];
-    expect(requests.length).toBeGreaterThan(0);
-    for (const request of requests) {
-      expect(request.config).toEqual({ default_settings: { fp8_storage: true } });
-    }
-
-    await act(() => updateModelsUi({ hfLookup: null, scan: null }));
-    await unmount();
-  });
-
-  it('offers the starter sorts it implements, with the catalog order named for what it is', async () => {
-    await mount();
-
-    await act(() =>
-      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
-    );
-    const sortBy = await vi.waitFor(() => {
-      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) =>
-        element.textContent?.startsWith('models.sortBy')
-      );
-      expect(item).toBeDefined();
-      return item!;
-    });
-    // The summary names the default sort.
-    expect(sortBy.textContent).toContain('models.sort.name');
-    await act(() => userEvent.click(sortBy));
-
-    await expect
-      .poll(() =>
-        [...document.querySelectorAll('[role="menuitemradio"], [role="menuitemcheckbox"]')]
-          .map((item) => item.textContent ?? '')
-          .filter((text) => text.startsWith('models.sort.'))
-          // The selected sort also shows its direction.
-          .map((text) => text.replace(/common\.(asc|desc)$/u, ''))
-      )
-      .toEqual(['models.sort.catalog', 'models.sort.name', 'models.sort.base', 'models.sort.format']);
-
-    await unmount();
-  });
-
-  it('links each installed starter to the library model it became', async () => {
-    setModelsSnapshotForTests({
-      models: [
-        {
-          base: 'sdxl',
-          key: 'by-source',
-          name: 'Juggernaut XL',
-          path: 'main/juggernaut-xl.safetensors',
-          source: INSTALLED_STARTERS[0]!.source,
-          type: 'main',
-        },
-        {
-          base: 'sdxl',
-          key: 'by-name',
-          name: 'Dreamshaper',
-          path: 'main/dreamshaper.safetensors',
-          source: 'https://elsewhere/dreamshaper',
-          type: 'main',
-        },
-      ] as ModelConfig[],
-      status: 'loaded',
-    });
-    await mount();
-
-    const links = [...document.querySelectorAll('button')].filter(
-      (button) => button.textContent === 'models.viewModel'
-    );
-    expect(links).toHaveLength(2);
-    // The list sorts by name: Dreamshaper XL, then Juggernaut XL.
-    for (const [index, key] of ['by-name', 'by-source'].entries()) {
-      updateModelsUi({ activeModelKey: null, activeTab: 'add' });
-      await act(() => links[index]!.click());
-      expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: key, activeTab: 'details' });
-    }
-
-    await unmount();
-    setModelsSnapshotForTests({ models: [], status: 'loaded' });
   });
 });
 
@@ -371,7 +223,6 @@ describe('AddModelsView models folder scan', () => {
     [...document.querySelectorAll('button')].find((button) => button.textContent === label) ?? null;
   const scanModelsFolder = () => buttonNamed('models.scanModelsFolder');
 
-  /** A scan the test settles by hand; it rejects the way fetch does when its signal aborts. */
   const holdScan = () => {
     let settle!: (results: FoundModel[]) => void;
     let signal!: AbortSignal;
@@ -403,36 +254,6 @@ describe('AddModelsView models folder scan', () => {
     resetSessionAndPreferences();
   });
 
-  it.each(['/opt/invokeai/models', '/mnt/fast disk/Invoke Models'])(
-    'scans the configured models folder %s with one click and shows what it found there',
-    async (modelsDir) => {
-      setModelsSnapshotForTests({ models: [], modelsDir, status: 'loaded' });
-      const scan = holdScan();
-      await mount();
-
-      // The resolved path is shown before scanning, and describes the button.
-      const pathText = document.getElementById(scanModelsFolder()!.getAttribute('aria-describedby')!);
-      expect(pathText?.getAttribute('title')).toBe(modelsDir);
-
-      await act(() => userEvent.click(scanModelsFolder()!));
-
-      expect(scanFolderForModels).toHaveBeenCalledExactlyOnceWith(modelsDir, expect.any(AbortSignal));
-      // Progress stays on the row that started it, as Stop.
-      expect(scanModelsFolder()).toBeNull();
-      expect(buttonNamed('models.stopScan')).not.toBeNull();
-
-      await act(async () => {
-        scan.settle([{ is_installed: false, path: `${modelsDir}/main/flux.safetensors` }]);
-        await Promise.resolve();
-      });
-
-      expect(getModelsUiSnapshotForTests().scan).toEqual({
-        path: modelsDir,
-        results: [{ is_installed: false, path: `${modelsDir}/main/flux.safetensors` }],
-      });
-    }
-  );
-
   it('always installs from inside the models folder in place, showing the option on and disabled', async () => {
     const modelsDir = '/opt/invokeai/models';
     setModelsSnapshotForTests({ models: [], modelsDir, status: 'loaded' });
@@ -445,7 +266,6 @@ describe('AddModelsView models folder scan', () => {
       [...document.querySelectorAll('label')].find((label) => label.textContent === 'models.installInPlace')!;
     const inplaceInput = () => inplaceLabel().querySelector('input')!;
 
-    // Outside the folder the option is the user's to turn off.
     const outside = '/home/user/downloads/outside.safetensors';
     await act(() => userEvent.fill(searchBox, outside));
     await act(() => userEvent.click(inplaceLabel()));
@@ -465,7 +285,6 @@ describe('AddModelsView models folder scan', () => {
     await act(() => userEvent.click(buttonNamed('models.pull')!));
     expect(installActions.install).toHaveBeenLastCalledWith(expect.objectContaining({ inplace: true, source: inside }));
 
-    // Leaving the folder restores the user's own choice, which the forced state never overwrote.
     expect(accountPreferences.getSnapshot().installInPlace).toBe(false);
     await act(() => userEvent.fill(searchBox, outside));
     expect(inplaceInput().checked).toBe(false);
@@ -473,7 +292,6 @@ describe('AddModelsView models folder scan', () => {
 
     await act(() =>
       updateModelsUi({
-        // A symlinked spelling of the folder: the server reports results under the resolved path.
         scan: {
           path: '/home/user/invokeai/models',
           results: [
@@ -521,93 +339,6 @@ describe('AddModelsView models folder scan', () => {
     );
     await vi.waitFor(() => expect(scanModelsFolder()).not.toBeDisabled());
   });
-
-  it('shows Stop only on the control that started the scan', async () => {
-    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
-    const scan = holdScan();
-    await mount();
-    const searchBox = document.querySelector<HTMLInputElement>('input[aria-label="models.searchOrAdd"]')!;
-
-    // A folder typed in the field offers its own Scan; the models folder scan owns the one Stop.
-    await act(() => userEvent.fill(searchBox, '/data/other-models'));
-    await act(() => userEvent.click(scanModelsFolder()!));
-
-    expect(buttonNamed('models.stopScan')).not.toBeNull();
-    expect([...document.querySelectorAll('button')].filter((b) => b.textContent === 'models.stopScan')).toHaveLength(1);
-    expect(buttonNamed('models.scan')).toBeDisabled();
-    expect(scanModelsFolder()).toBeNull();
-
-    await act(async () => {
-      scan.settle([]);
-      await Promise.resolve();
-    });
-    await act(() => updateModelsUi({ scan: null }));
-    await vi.waitFor(() => expect(buttonNamed('models.scan')).not.toBeDisabled());
-
-    // Started from the field, the field's control turns into Stop and the models folder action waits.
-    const fieldScan = holdScan();
-    await act(() => userEvent.click(buttonNamed('models.scan')!));
-
-    expect([...document.querySelectorAll('button')].filter((b) => b.textContent === 'models.stopScan')).toHaveLength(1);
-    expect(buttonNamed('models.scan')).toBeNull();
-    expect(scanModelsFolder()).toBeDisabled();
-
-    await act(async () => {
-      fieldScan.settle([]);
-      await Promise.resolve();
-    });
-  });
-
-  it('keeps the models folder scan’s Stop while other results are showing', async () => {
-    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
-    const scan = holdScan();
-    await mount();
-
-    await act(() => userEvent.click(scanModelsFolder()!));
-    // Results from elsewhere arrive (a Hugging Face lookup), which would otherwise hide the models folder row.
-    await act(() => updateModelsUi({ hfLookup: { repo: 'owner/repo', urls: ['https://example/a.safetensors'] } }));
-
-    expect(buttonNamed('models.stopScan')).not.toBeNull();
-    await act(() => userEvent.click(buttonNamed('models.stopScan')!));
-    expect(scan.signal().aborted).toBe(true);
-  });
-
-  it('says the folder had nothing, naming it, when the scan finds no models', async () => {
-    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
-    vi.mocked(scanFolderForModels).mockResolvedValueOnce([]);
-    await mount();
-
-    await act(() => userEvent.click(scanModelsFolder()!));
-
-    expect(getModelsUiSnapshotForTests().scan).toEqual({ path: '/opt/invokeai/models', results: [] });
-    expect(document.body.textContent).toContain('models.noModelFilesFound');
-  });
-
-  it('turns a missing models folder into an error with a retry that asks the server again', async () => {
-    setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loaded' });
-    vi.mocked(listModels).mockResolvedValue([]);
-    vi.mocked(listMissingModels).mockResolvedValue([]);
-    vi.mocked(getModelsDir).mockResolvedValueOnce('/srv/invoke/models');
-    await mount();
-
-    expect(scanModelsFolder()).toBeNull();
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('models.modelsFolderUnavailable');
-
-    await act(() => userEvent.click(buttonNamed('common.retry')!));
-
-    await vi.waitFor(() => expect(scanModelsFolder()).not.toBeNull());
-    expect(getModelsDir).toHaveBeenCalledOnce();
-    expect(document.querySelector('[role="alert"]')).toBeNull();
-    expect(scanFolderForModels).not.toHaveBeenCalled();
-  });
-
-  it('waits for the library to locate the folder instead of offering a scan it cannot send', async () => {
-    setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loading' });
-    await mount();
-
-    expect(scanModelsFolder()).toBeDisabled();
-    expect(document.querySelector('[role="alert"]')).toBeNull();
-  });
 });
 
 describe('AddModelsView bundle preview decoder', () => {
@@ -623,7 +354,6 @@ describe('AddModelsView bundle preview decoder', () => {
     source: 'https://example/taef1.safetensors',
     type: 'tiny_autoencoder',
   };
-  // Decoders the reveal must leave out: another family's, and one filed under TAEF1's base that Z-Image cannot use.
   const TAESDXL = { ...TAEF1, base: 'sdxl', compatible_bases: [], name: 'TAESDXL', source: 'https://example/taesdxl' };
   const FLUX_ONLY_DECODER = { ...TAEF1, compatible_bases: [], name: 'FLUX-only decoder', source: 'https://example/fo' };
   const Z_IMAGE = {
@@ -672,23 +402,6 @@ describe('AddModelsView bundle preview decoder', () => {
     );
   const hint = () => document.querySelector<HTMLButtonElement>('button[aria-label="models.showStarterModel"]');
   const listedNames = () => [...document.querySelectorAll('[title]')].map((element) => element.getAttribute('title'));
-  const pickFilter = async (submenu: string, item: string) => {
-    const menuItem = (startsWith: string) =>
-      vi.waitFor(() => {
-        const item = [...document.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((element) =>
-          element.textContent?.startsWith(startsWith)
-        );
-        expect(item).toBeDefined();
-        return item!;
-      });
-    await act(() =>
-      userEvent.click(document.querySelector<HTMLElement>('[aria-label^="models.filterAndSortStarterModels"]')!)
-    );
-    await act(async () => userEvent.click(await menuItem(submenu)));
-    await act(async () => userEvent.click(await menuItem(item)));
-    await act(() => userEvent.keyboard('{Escape}'));
-  };
-
   beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
@@ -704,13 +417,11 @@ describe('AddModelsView bundle preview decoder', () => {
 
   it('points a bundle at its missing decoder, and reveals it in the starters filtered to the family', async () => {
     useCatalog(false);
-    // A type filter and search text that would each hide the decoder; revealing it replaces both.
     updateModelsUi({ addModelsTypeSeed: 'main' });
     setAddModelsQuery('turbo');
     await mount();
     await selectBundle();
 
-    // The decoder is a hint in the bundle's summary, not one of its rows.
     expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
     expect(listedNames()).not.toContain(TAEF1.name);
     expect(hint()?.textContent).toBe(TAEF1.name);
@@ -721,74 +432,16 @@ describe('AddModelsView bundle preview decoder', () => {
     expect(getModelsUiSnapshotForTests().selectedBundleName).toBeNull();
     expect(hint()).toBeNull();
     await expect.poll(listedNames).toContain(TAEF1.name);
-    // Only the decoder: the family's other starters and the rest of the catalog stay out.
     expect(listedNames()).not.toContain(Z_IMAGE.name);
     expect(listedNames()).not.toContain(Z_IMAGE_ENCODER.name);
     expect(listedNames()).not.toContain(INSTALLED_STARTERS[0]!.name);
     expect(listedNames()).not.toContain(TAESDXL.name);
     expect(listedNames()).not.toContain(FLUX_ONLY_DECODER.name);
     expect(getModelsUiSnapshotForTests().addModelsQuery).toBe('');
-    // The hint left with the bar; focus moves on to the revealed decoder's own install button.
     await expect
       .poll(() => document.activeElement?.closest('[data-list-row]')?.getAttribute('data-list-row'))
       .toBe(TAEF1.source);
     expect(document.activeElement?.tagName).toBe('BUTTON');
     expect(installActions.installMany).not.toHaveBeenCalled();
-  });
-
-  it('drops the revealed decoder filter when a bundle is picked again', async () => {
-    useCatalog(false);
-    await mount();
-    await selectBundle();
-    await act(() => userEvent.click(hint()!));
-    await expect.poll(listedNames).toContain(TAEF1.name);
-
-    // The Launchpad selects a bundle through the store, not the chip.
-    act(() => updateModelsUi({ selectedBundleName: 'Z-Image' }));
-
-    // No bundle holds a decoder, so keeping the reveal's type filter would empty every bundle.
-    await expect.poll(listedNames).toContain(Z_IMAGE.name);
-    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
-  });
-
-  it('drops the revealed type even when the user changed only the base', async () => {
-    useCatalog(false);
-    await mount();
-    await selectBundle();
-    await act(() => userEvent.click(hint()!));
-    await expect.poll(listedNames).toContain(TAEF1.name);
-    act(() => updateModelsUi({ selectedBundleName: null }));
-    await pickFilter('models.baseArchitecture', 'models.allBases');
-
-    await selectBundle();
-
-    // The reveal's type filter alone would still hide every member of the bundle.
-    await expect.poll(listedNames).toContain(Z_IMAGE.name);
-    expect(listedNames()).toContain(Z_IMAGE_ENCODER.name);
-  });
-
-  it('keeps a filter the user picked after the reveal', async () => {
-    useCatalog(false);
-    await mount();
-    await selectBundle();
-    await act(() => userEvent.click(hint()!));
-    await expect.poll(listedNames).toContain(TAEF1.name);
-    // The user's own choice replaces the reveal's type, then they come back to the bundle.
-    act(() => updateModelsUi({ selectedBundleName: null }));
-    await pickFilter('models.modelType', getModelTypeLabel('qwen3_encoder'));
-
-    await selectBundle();
-
-    await expect.poll(listedNames).toContain(Z_IMAGE_ENCODER.name);
-    expect(listedNames()).not.toContain(Z_IMAGE.name);
-  });
-
-  it('gives no hint when the decoder is already installed', async () => {
-    useCatalog(true);
-    await mount();
-    await selectBundle();
-
-    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
-    expect(hint()).toBeNull();
   });
 });

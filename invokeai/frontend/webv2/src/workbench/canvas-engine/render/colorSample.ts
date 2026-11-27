@@ -20,7 +20,10 @@ export interface RgbaSample {
   a: number;
 }
 
-export type ColorSampleProviders = Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
+export type ColorSampleProviders = Pick<
+  CompositeOptions,
+  'adjustedSurface' | 'derivedSurfaces' | 'groupSurface' | 'showOverlayStacks'
+>;
 
 const RAW_PIXELS: ColorSampleProviders = {};
 
@@ -33,9 +36,9 @@ export interface ColorSampleArea {
 
 export interface ColorSampler {
   /**
-   * Floors document coordinates to a pixel; transformed content remains pickable outside document dimensions.
-   * Returns null for zero-alpha coverage. Repeating a pixel of an unchanged document and cache revision reuses the
-   * previous result.
+   * Floors document coordinates to a pixel; transformed content remains pickable outside document dimensions. Returns
+   * null for zero-alpha coverage. Repeating a pixel of an unchanged document and cache revision reuses the previous
+   * result.
    */
   sample(
     doc: CanvasDocumentContractV3,

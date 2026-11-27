@@ -1,8 +1,3 @@
-/**
- * Selection Fill, Erase, Delete and Cut, and mask transforms, on a real engine in Chromium: the commands the Canvas
- * runs, through the engine's own pixel editor and history.
- */
-
 import type { CanvasEditRefusal, CanvasLayerContract } from '@workbench/canvas-engine/api';
 
 import {
@@ -17,7 +12,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { copyCanvasSelection } from './canvasClipboard';
-import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
+import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -26,7 +21,6 @@ afterEach(async () => {
   }
 });
 
-/** A 64×64 PNG: opaque blue on its left half, transparent on its right. */
 const halfBluePng = (): Promise<Blob> => {
   const canvas = new OffscreenCanvas(64, 64);
   const ctx = canvas.getContext('2d')!;
@@ -37,7 +31,6 @@ const halfBluePng = (): Promise<Blob> => {
 
 const MASK_BITMAP = { height: 64, imageName: 'mask.png', width: 64 };
 
-/** A real engine over `layers` with `selected` selected, attached to on-page canvases. */
 const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][], selected: string) => {
   const store = createWorkbenchStore();
   const projectId = store.getState().activeProjectId;
@@ -78,7 +71,6 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
     return current.type === 'inpaint_mask' ? current.mask.bitmap : null;
   };
 
-  /** Marquee-selects the document rect from (x0, y0) to (x1, y1), replacing the selection. */
   const select = (x0: number, y0: number, x1: number, y1: number) => {
     engine.tools.setTool('marquee');
     const view = engine.viewport.getViewport();
@@ -102,7 +94,6 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
     fire('pointerup', x1, y1, 0);
   };
 
-  /** RGBA of `id`'s pixels at document (x, y), read through its export (layer-local, so placed by its transform). */
   const pixelAt = async (id: string, x: number, y: number): Promise<number[]> => {
     const exported = await engine.exports.exportLayerPixels(id, { includeDisabled: true });
     if (exported.status !== 'ok') {
@@ -121,7 +112,6 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
     }
   };
 
-  /** Waits until `id`'s pixels have loaded, as an edit needs. */
   const loaded = async (id: string) => {
     await vi.waitFor(async () => {
       expect((await engine.exports.exportLayerPixels(id, { includeDisabled: true })).status).toBe('ok');
@@ -136,7 +126,11 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
       document: doc(),
       engine,
       hasMultipleStagingSlots: false,
-      notifyLayerDuplicateFailed: vi.fn(),
+      layerCommands: {
+        engine,
+        reportError: vi.fn(),
+        t: ((key: string) => key) as CanvasHotkeyContext['layerCommands']['t'],
+      },
       pasteFromClipboard: vi.fn(),
       reportLayerOperation: vi.fn(),
       reportMergeDownRefusal: vi.fn(),
@@ -149,7 +143,7 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
       t: (key) => key,
     });
 
-  return { doc, engine, layer, loaded, maskBitmap, pixelAt, refusals, runCommand, select, sourceType };
+  return { doc, engine, layer, loaded, maskBitmap, overlay, pixelAt, refusals, runCommand, select, sourceType };
 };
 
 const mask = () =>
@@ -164,6 +158,37 @@ const photo = (overrides: Partial<CanvasLayerContract> = {}) =>
     source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
     ...overrides,
   } as Partial<CanvasLayerContract>);
+
+it('picks the raster color beneath a visible inpaint mask through the engine', async () => {
+  const inpaint = mask();
+  if (inpaint.type !== 'inpaint_mask') {
+    throw new Error('Expected an inpaint mask fixture');
+  }
+  inpaint.mask.fill.style = 'solid';
+  const { engine, loaded, overlay } = await setup([inpaint, photo()], 'mask');
+  await loaded('mask');
+  await loaded('photo');
+
+  const point = engine.viewport.getViewport().documentToScreen({ x: 10.5, y: 10.5 });
+  const { left, top } = overlay.getBoundingClientRect();
+  const sampled = engine.tools.requestColorSample();
+  for (const [type, buttons] of [
+    ['pointerdown', 1],
+    ['pointerup', 0],
+  ] as const) {
+    overlay.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        buttons,
+        clientX: left + point.x,
+        clientY: top + point.y,
+        isPrimary: true,
+        pointerId: 1,
+      })
+    );
+  }
+  await expect(sampled).resolves.toBe('#0000ff');
+});
 
 describe('selection edits on a real engine', () => {
   it('Delete and Cut remove a mask’s selected coverage, one undoable step each', async () => {
@@ -206,7 +231,6 @@ describe('selection edits on a real engine', () => {
     expect(write).not.toHaveBeenCalled();
     const refusal = { layerId: 'group', layerName: 'group', status: 'selection-erase-unsupported' };
     expect(h.refusals).toEqual([refusal, refusal]);
-    // Only the marquee's own step: nothing was erased.
     expect(h.engine.history.getEntries().past).toEqual(['Select']);
   });
 
@@ -250,7 +274,6 @@ describe('selection edits on a real engine', () => {
     h.engine.layers.applyTransform();
     const moved = { rotation: 0, scaleX: 2, scaleY: 1, x: 30, y: 0 };
     expect(h.layer('mask').transform).toEqual(moved);
-    // Not baked: the mask keeps its own image.
     expect(h.maskBitmap('mask')).toEqual(MASK_BITMAP);
 
     await h.engine.history.undo();

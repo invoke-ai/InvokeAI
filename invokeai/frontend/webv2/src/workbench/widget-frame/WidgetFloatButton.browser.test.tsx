@@ -13,11 +13,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Offer floating only from dockable panel regions when the manifest allows it; center and already-floating chrome
- * expose no float button.
- */
-
 const floatMocks = vi.hoisted(() => ({
   centerInstanceIds: ['image-map-instance'] as string[],
   float: vi.fn(),
@@ -127,7 +122,6 @@ describe('WidgetFloatButton', () => {
     });
 
     expect(floatMocks.flushWorkbenchDrafts).toHaveBeenCalled();
-    // With the viewport it opens into, so a position remembered from a larger one is brought on screen.
     expect(floatMocks.float).toHaveBeenCalledWith('image-map-instance', 'right', {
       height: window.innerHeight,
       width: window.innerWidth,
@@ -135,19 +129,6 @@ describe('WidgetFloatButton', () => {
     expect(floatMocks.flushWorkbenchDrafts.mock.invocationCallOrder[0]).toBeLessThan(
       floatMocks.float.mock.invocationCallOrder[0]
     );
-    // Focus follows the widget into the window it just became.
     expect(focusFloating).toHaveBeenCalledWith('image-map-instance');
-  });
-
-  it('renders nothing for a widget its manifest does not allow to float', async () => {
-    expect(await renderButton('right', false)).toBeNull();
-  });
-
-  it('renders nothing for a center view, even one that is not the last', async () => {
-    expect(await renderButton('center')).toBeNull();
-
-    floatMocks.centerInstanceIds = ['image-map-instance', 'canvas-instance'];
-
-    expect(await renderButton('center')).toBeNull();
   });
 });

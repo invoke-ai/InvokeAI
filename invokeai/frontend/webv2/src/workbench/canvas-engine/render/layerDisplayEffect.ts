@@ -1,8 +1,8 @@
 /**
  * Floating selections need the same raster adjustments/control transparency as their layer. Per-pixel effects are
- * region independent, so a display copy baked once at lift, at the cut's layer-local origin, matches the pixels it
- * left (noise included). Spatial adjustments are not: they depend on the whole layer the float will land in, so the
- * float previews the per-pixel part only and committing re-evaluates the layer. Transform changes do not affect it;
+ * region independent, so a display copy baked once at lift, at the cut's layer-local origin, matches the pixels it left
+ * (noise included). Spatial adjustments are not: they depend on the whole layer the float will land in, so the float
+ * previews the per-pixel part only and committing re-evaluates the layer. Transform changes do not affect it;
  * appearance changes cancel the float.
  */
 

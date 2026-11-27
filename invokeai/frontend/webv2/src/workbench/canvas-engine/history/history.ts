@@ -1,9 +1,9 @@
 /**
  * Engine-owned undo/redo stacks for pixel, selection and structural edits. An edit is admitted before it mutates
  * anything: admission reserves byte capacity (without clearing redo or evicting older steps), so an edit that could
- * never keep its undo entry is refused up front. Publication consumes the admission, clears redo and evicts the
- * oldest entries beyond {@link HISTORY_MAX_ENTRIES} or the byte budget. Replay is asynchronous and failure-atomic:
- * an entry moves to the opposite stack only after its callback completes.
+ * never keep its undo entry is refused up front. Publication consumes the admission, clears redo and evicts the oldest
+ * entries beyond {@link HISTORY_MAX_ENTRIES} or the byte budget. Replay is asynchronous and failure-atomic: an entry
+ * moves to the opposite stack only after its callback completes.
  */
 
 import { collectRestorableAssetRefs } from '@workbench/mediaReferences';
@@ -38,8 +38,8 @@ export interface HistoryEntry {
   /** Retained size in bytes; publication requires it to fit the admission. */
   readonly bytes: number;
   /**
-   * Media names this entry can restore after they leave the current document; cleanup keeps them while the entry is
-   * on either stack.
+   * Media names this entry can restore after they leave the current document; cleanup keeps them while the entry is on
+   * either stack.
    */
   readonly heldAssetRefs: HeldAssetRefs;
   /** Releases resources retained only by this entry when it is permanently dropped. */
@@ -61,8 +61,8 @@ export interface HistoryAdmission {
   /** Reserves `bytes` more; false (and unchanged) when the larger entry could never be retained. */
   grow(bytes: number): boolean;
   /**
-   * Records `entry`, which must fit the admission, and consumes it. With `replacing`, the entry takes the place of
-   * that top entry instead (coalescing); callers check {@link History.top} first.
+   * Records `entry`, which must fit the admission, and consumes it. With `replacing`, the entry takes the place of that
+   * top entry instead (coalescing); callers check {@link History.top} first.
    */
   publish(entry: HistoryEntry, replacing?: HistoryEntryToken): HistoryEntryToken;
   /** Returns unpublished capacity. Idempotent; a no-op after `publish`. */
@@ -73,7 +73,6 @@ export type HistoryReplayResult =
   | { status: 'applied' | 'empty' | 'busy' }
   | { status: 'failed'; label: string; error: unknown };
 
-/** Options for {@link createHistory}. */
 export interface CreateHistoryOptions {
   /** Undo-entry cap (default {@link HISTORY_MAX_ENTRIES}). */
   maxEntries?: number;
@@ -83,11 +82,9 @@ export interface CreateHistoryOptions {
   dropped?: number;
 }
 
-/** The imperative history handle. */
 export interface History {
   /** Reserves capacity for an edit's entry, or null when an entry that size could never be retained. */
   admit(bytes: number): HistoryAdmission | null;
-  /** The newest undo entry, or null. */
   top(): HistoryEntryToken | null;
   /** Reverts the newest entry. Resolves `busy` while another replay runs. */
   undo(): Promise<HistoryReplayResult>;
@@ -104,11 +101,10 @@ export interface History {
   /** Evicts oldest entries until retained bytes are at or below `budgetBytes`. */
   trimToBytes(budgetBytes: number): void;
   /**
-   * Labels of every retained step: `past` oldest-first (its last element is
-   * what `undo()` reverts), `future` next-redo-first. Fresh arrays per call.
-   * `evicted` counts the oldest steps dropped to stay within the entry cap or
-   * byte budget since the stacks were last cleared; `dropped`, present while
-   * nonzero, the steps a previous history took with it, until the next clear.
+   * Labels of every retained step: `past` oldest-first (its last element is what `undo()` reverts), `future`
+   * next-redo-first. Fresh arrays per call. `evicted` counts the oldest steps dropped to stay within the entry cap or
+   * byte budget since the stacks were last cleared; `dropped`, present while nonzero, the steps a previous history took
+   * with it, until the next clear.
    */
   entries(): { past: readonly string[]; future: readonly string[]; evicted: number; dropped?: number };
   /** Union of media references retained by undo and redo entries. */
@@ -124,7 +120,6 @@ interface StackRecord {
 
 const normalizedBytes = (bytes: number): number => (Number.isFinite(bytes) ? Math.max(0, Math.ceil(bytes)) : Infinity);
 
-/** Creates a bounded history stack. */
 export const createHistory = (opts: CreateHistoryOptions = {}): History => {
   const maxEntries = Math.max(1, opts.maxEntries ?? HISTORY_MAX_ENTRIES);
   const byteBudget = Math.max(0, opts.byteBudget ?? HISTORY_BYTE_BUDGET);
@@ -143,8 +138,8 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     try {
       entry.dispose?.();
     } catch {
-      // Stack ownership has already ended. Resource cleanup cannot restore the
-      // entry and must not prevent the remaining history from being released.
+      // Stack ownership has already ended. Resource cleanup cannot restore the entry and must not prevent the remaining
+      // history from being released.
     }
   };
 
@@ -153,8 +148,8 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
       try {
         listener();
       } catch {
-        // Stack mutation is already complete. One faulty observer must neither
-        // report a false operation failure nor block later subscribers.
+        // Stack mutation is already complete. One faulty observer must neither report a false operation failure nor
+        // block later subscribers.
       }
     }
   };

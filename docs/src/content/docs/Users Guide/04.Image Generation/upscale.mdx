@@ -142,7 +142,7 @@ Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores
     - **CFG scale**: set when you pick the model: 3.
     - **Steps**: kept as you set it, 30 by default, not the 50 the model uses for a full image. MOSS-Image runs all of **Steps** in the detail pass, so 30 steps really run 30 times, each at the enlarged size and, above CFG 1, as two network passes. Lower it if the pass is slow.
     - **Components**: a **Qwen3.5 Encoder** (9B, not the 4B Anima-3.8B uses) and a FLUX.2 **VAE**. A Diffusers install brings its own.
-    - **Not supported**: LoRAs, which MOSS-Image has no loader for.
+    - **LoRAs**: MOSS-Image LoRAs apply to the detail pass, on the transformer only.
   </TabItem>
 </Tabs>
 
@@ -197,7 +197,7 @@ Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only m
 | 4× | Runs 2× 2 times | Runs 4× once |
 | 8× | Runs 2× 3 times | Runs 4× 2 times, then resizes to 8× |
 
-When **Scale** equals the native scale the note is left out. A 1× model (a restoration model) keeps the input size, so **Scale** has no effect. In Refine mode the panel shows no native scale. FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 and Qwen Image resize the upscaler's result to **Scale** before the detail pass; SD1.5 and SDXL keep the upscaler's size, so with a 1× model their result stays at the source size.
+When **Scale** equals the native scale the note is left out. In Model only mode a 1× model (a restoration model) keeps the input size, so **Scale** has no effect. In Refine mode the panel shows no native scale: every main model (SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2, Qwen Image and MOSS-Image) resizes the upscaler's result to **Scale** before the detail pass, so a 1× model's result still comes out at **Scale**.
 
 A Model only result's metadata is the source image's metadata plus the upscaler and the **Scale**, so **Recall** on it restores how the source was made.
 

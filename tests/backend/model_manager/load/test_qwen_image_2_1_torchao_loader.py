@@ -16,6 +16,11 @@ from invokeai.backend.model_manager.load.model_loaders import qwen_image_2_1
 from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21CheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from tests.fixtures.loader_seams import Seam, prepare
+from tests.fixtures.safetensors_files import (
+    needs_mapping_that_shows_file_writes,
+    record_reads,
+    tensors_reading_the_file,
+)
 
 FP8 = torch.float8_e4m3fn
 
@@ -45,11 +50,10 @@ SEAM = Seam(
     module=qwen_image_2_1,
     entry="_load_model",
     compute_dtype=torch.bfloat16,
-    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-    load_file_host=safetensors.torch,
     patches_device=True,
 )
 
+CHECKPOINT = "Qwen-Image-2.1-FP8.safetensors"
 QUANTIZED = ("transformer_blocks.0.attn.to_q", "norm_out.linear")
 # ComfyUI-layout fused projection, gate rows first; the loader splits it into `gate_layer` and `proj`.
 FUSED = "transformer_blocks.0.img_mlp.gate_up"
@@ -82,19 +86,11 @@ def _checkpoint() -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], dic
 def _load(
     monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool
 ) -> tuple[torch.nn.Module, dict[str, torch.Tensor]]:
-    """The model, and the tensors `load_file` returned for the real file the loader read."""
+    """The model, and the tensors the loader read from the real file."""
     state_dict, _, _ = _checkpoint()
-    checkpoint = tmp_path / "Qwen-Image-2.1-FP8.safetensors"
+    checkpoint = tmp_path / CHECKPOINT
     safetensors.torch.save_file(state_dict, checkpoint)
-    loaded: dict[str, torch.Tensor] = {}
-    real_load_file = safetensors.torch.load_file
-
-    def recording_load_file(path):
-        tensors = real_load_file(path)
-        loaded.update(tensors)
-        return tensors
-
-    monkeypatch.setattr(safetensors.torch, "load_file", recording_load_file)
+    loaded = record_reads(monkeypatch).tensors
     config = Main_Checkpoint_QwenImage21_Config.model_construct(
         path=str(checkpoint), name="qwen21", default_settings=MainModelDefaultSettings(fp8_storage=False)
     )
@@ -142,15 +138,14 @@ def test_a_folded_layer_is_exactly_the_codes_times_the_scale(monkeypatch, tmp_pa
 PREFIX = "model.diffusion_model."
 
 
-def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(monkeypatch, tmp_path) -> None:
-    """`img_in` is stored in the compute dtype, so neither the fold nor the cast replaces it; assigned as a parameter it
-    would be a slice of the file's mapping, which the cache's size calculation cannot see."""
-    model, loaded = _load(monkeypatch, tmp_path, keep_fp8=False)
+@needs_mapping_that_shows_file_writes
+@pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
+def test_no_parameter_reads_the_file_after_the_load(monkeypatch, tmp_path, keep_fp8: bool) -> None:
+    """`img_in` is stored in the compute dtype, so neither the fold nor the cast replaces it, and a kept load leaves the
+    fp8 codes as read too. A parameter that is still a slice of the file's mapping pins the whole file."""
+    model, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
 
-    for name in ("img_in.weight", "img_in.bias"):
-        parameter = model.get_parameter(name)
-        assert parameter.data_ptr() != loaded[PREFIX + name].data_ptr(), name
-        assert torch.equal(parameter, loaded[PREFIX + name])
+    assert tensors_reading_the_file(model, tmp_path / CHECKPOINT) == []
 
 
 def test_a_kept_fp8_load_does_not_copy_the_codes(monkeypatch, tmp_path) -> None:

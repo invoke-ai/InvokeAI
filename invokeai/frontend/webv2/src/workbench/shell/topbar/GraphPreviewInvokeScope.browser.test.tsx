@@ -17,11 +17,6 @@ import { page, userEvent } from 'vitest/browser';
 import { GraphPreviewInvokeScope } from './GraphPreviewInvokeScope';
 import { InvokeButton } from './InvokeButton';
 
-/**
- * The View graph dialog's Invoke: the top bar's control bound to the previewed source's route. The route state is the
- * workbench's (`useInvocationState`, tested on its own); here it is the state a blocked or ready Canvas route
- * publishes, so the control, its card and the dialog meet as they do in the app.
- */
 const harness = vi.hoisted(() => ({
   requestedSources: [] as (string | undefined)[],
   revealed: [] as string[],
@@ -42,11 +37,9 @@ vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: () => {} }) }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', async (importOriginal) => ({
   ...(await importOriginal<typeof UseShortcutBindingModule>()),
-  // The app's Invoke shortcut is bound, as it is by default.
   useShortcutBinding: (commandId: string) =>
     commandId === 'app.invoke' ? { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] } : null,
 }));
-// Each layer issue offers a fix that stays and a way to the layer that leads away, as the real actions do.
 vi.mock('@workbench/shell/topbar/invokeIssueActions', () => ({
   useInvokeIssueActions: () => (issue: InvocationIssue) =>
     issue.target.kind === 'layer'
@@ -178,7 +171,6 @@ describe('a graph preview’s Invoke', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onOpenChange: ReturnType<typeof vi.fn<(isOpen: boolean) => void>>;
-  /** The top bar's own Invoke, for the active route, mounted beside the dialog as in the app. */
   let topBarState: InvocationState;
 
   const render = (state: InvocationState) => {
@@ -239,7 +231,6 @@ describe('a graph preview’s Invoke', () => {
     expect(previewInvoke()?.textContent).toContain('topbar.invoke.invoke');
     const editAsWorkflow = footer()!.querySelector<HTMLElement>('[data-graph-preview-edit-as-workflow]')!;
     expect(previewInvoke()!.getBoundingClientRect().height).toBe(editAsWorkflow.getBoundingClientRect().height);
-    // On one line with the status.
     const status = footer()!.querySelector<HTMLElement>('[data-graph-preview-status]')!.getBoundingClientRect();
     const button = previewInvoke()!.getBoundingClientRect();
     expect(Math.abs(status.top + status.height / 2 - (button.top + button.height / 2))).toBeLessThan(2);
@@ -275,17 +266,13 @@ describe('a graph preview’s Invoke', () => {
     await vi.waitFor(() => expect(card()?.textContent).toContain('Choose a model.'));
     await settle();
 
-    // Above the dialog: what is under the card's centre is the card.
     const box = card()!.getBoundingClientRect();
     expect(card()!.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
     expect(dialogContent()?.contains(card())).toBe(false);
-    // The route is the preview's: shown, with nothing to switch or lock.
     expect(card()!.querySelector('[data-invoke-route-fixed]')).not.toBeNull();
     expect(card()!.querySelector('[data-routing-lock]')).toBeNull();
-    // Focus went into the card, past the dialog's trap.
     expect(card()!.contains(document.activeElement)).toBe(true);
 
-    // A fix acts in place: the card and the dialog stay.
     await act(() => userEvent.click([...card()!.querySelectorAll('button')].find((b) => b.textContent === 'Fix')!));
     expect(harness.fixed).toEqual(['control-2']);
     expect(onOpenChange).not.toHaveBeenCalled();

@@ -3,6 +3,7 @@ import type {
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
+  CanvasLayerContract,
   CanvasLayerSourceContract,
   CanvasMaskFillContract,
   CanvasPixelSourceContract,
@@ -13,17 +14,57 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
-export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
-  '#799ddb',
-  '#83d683',
-  '#fae150',
-  '#dc9065',
+export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = '#83d683';
+const MASK_FILL_COLORS = [
   '#e07575',
-  '#d58bca',
-  '#a178d6',
-];
+  DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
+  '#f59e42',
+  '#f4d35e',
+  '#38c9c5',
+  '#62b5f5',
+  '#637be8',
+  '#ad80e8',
+  '#ed79ba',
+  '#b7d65a',
+] as const;
 
-const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
+type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
+
+// Keep top-level code side-effect free (no spreads, member reads or account registration): the eager editor bundle
+// imports the Canvas API, which would otherwise keep this module. The engine registry registers the account reset.
+// New canvases already contain a coral inpaint mask.
+const nextColorIndex = { inpaint_mask: 1, regional_guidance: 1 };
+
+export const nextMaskFillColor = (
+  kind: MaskLayerKind,
+  offset = 0,
+  layers: readonly CanvasLayerContract[] = []
+): string => {
+  const used = new Set(layers.flatMap((layer) => (layer.type === kind ? [layer.mask.fill.color.toLowerCase()] : [])));
+  const start = nextColorIndex[kind];
+  let available = 0;
+  for (let step = 0; step < MASK_FILL_COLORS.length; step += 1) {
+    const color = MASK_FILL_COLORS[(start + step) % MASK_FILL_COLORS.length]!;
+    if (!used.has(color)) {
+      if (available === offset) {
+        return color;
+      }
+      available += 1;
+    }
+  }
+  return MASK_FILL_COLORS[(start + offset - available) % MASK_FILL_COLORS.length]!;
+};
+
+export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
+  nextColorIndex[kind] = (nextColorIndex[kind] + count) % MASK_FILL_COLORS.length;
+};
+
+export const resetMaskFillColors = (): void => {
+  nextColorIndex.inpaint_mask = 1;
+  nextColorIndex.regional_guidance = 1;
+};
+
+export const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
   const expression = new RegExp(`^${prefix} (\\d+)$`);
   const used = new Set(
     existingNames
@@ -41,10 +82,6 @@ export const nextInpaintMaskName = (names: readonly string[]): string => nextNum
 export const nextControlLayerName = (names: readonly string[]): string => nextNumberedName('Control Layer', names);
 export const nextRegionalGuidanceName = (names: readonly string[]): string =>
   nextNumberedName('Regional Guidance', names);
-export const nextRegionalGuidanceFillColor = (count: number): string =>
-  REGIONAL_GUIDANCE_FILL_COLORS[(count + 1) % REGIONAL_GUIDANCE_FILL_COLORS.length] ??
-  REGIONAL_GUIDANCE_FILL_COLORS[0]!;
-
 export interface CreateMaskLayerFromImageInput {
   image: CanvasImageRef;
   rect: Rect;

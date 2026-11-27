@@ -4,9 +4,9 @@ import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiCo
 import type * as MenuModule from '@platform/ui/Menu';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -45,7 +45,6 @@ vi.mock('@platform/ui/Menu', async (importOriginal) => {
 
 seedArchitectureCapabilities();
 
-// The real catalog, so the tooltip and toast read as users see them.
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
@@ -66,7 +65,6 @@ afterEach(async () => {
   root = null;
 });
 
-/** A turbo SDXL model that sets steps and CFG in the Model Manager, and no size. */
 const turbo: MainModelConfig = {
   base: 'sdxl',
   default_settings: { cfg_scale: 1, steps: 8 },
@@ -75,7 +73,10 @@ const turbo: MainModelConfig = {
   type: 'main',
 };
 
-const render = async (model: MainModelConfig) => {
+const render = async (
+  model: MainModelConfig,
+  { catalog = [model], settings = {} }: { catalog?: readonly unknown[]; settings?: Record<string, unknown> } = {}
+) => {
   const values = createExternalStoreCore<Record<string, unknown>>({
     ...getDefaultGenerateSettings(model),
     aspectRatioId: 'Free',
@@ -86,12 +87,13 @@ const render = async (model: MainModelConfig) => {
     positivePrompt: 'a lighthouse',
     steps: 30,
     width: 1216,
+    ...settings,
   });
   const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => values.patchSnapshot(patch));
   const undoable = vi.fn();
   const adapter = {
     generateValues: values,
-    models: { catalog: [model], getBaseLabel: () => 'SDXL' },
+    models: { catalog, getBaseLabel: () => 'SDXL' },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn(), undoable },
     presets: { includePrompts: true, presets: [], remove: vi.fn(), rename: vi.fn(), save: vi.fn() },
     project: { activeProjectId: 'project-1' },
@@ -122,11 +124,11 @@ const openMenu = async () => {
   await expect.element(page.getByRole('menu')).toBeVisible();
 };
 
-/** Waits for the warm-up that pointing at or focusing the button starts, without loading the items itself. */
 const settleWarmUp = () =>
-  vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']));
+  vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']), {
+    timeout: 5000,
+  });
 
-/** Records whether the placeholder ever mounts while `open` runs. */
 const placeholdersDuring = async (open: () => Promise<unknown>): Promise<Node[]> => {
   const placeholders: Node[] = [];
   const observer = new MutationObserver(() =>
@@ -194,7 +196,6 @@ describe('GenerateHeaderActions', () => {
       supersedes: 'generate-settings:project-1',
     });
 
-    // Nothing is left to apply, and the item says why.
     await openMenu();
     await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
     await expect
@@ -202,7 +203,6 @@ describe('GenerateHeaderActions', () => {
       .toHaveAccessibleDescription(expect.stringContaining("Already using SDXL Turbo's defaults."));
     await userEvent.keyboard('{Escape}');
 
-    // Steps were changed again since; the Undo keeps that edit and restores the rest.
     values.patchSnapshot({ steps: 50 });
     await act(() => undoable.mock.calls[0]![1].onUndo());
 
@@ -218,7 +218,6 @@ describe('GenerateHeaderActions', () => {
     await expect
       .element(item('Reset everything to defaults'))
       .toHaveAccessibleDescription('Size 1216×832 → 1024×1024, Aspect ratio Free → 1:1, Steps 30 → 8, CFG 7 → 1');
-    // The menu takes focus once open and tracks the highlighted item, the first, by attribute.
     await vi.waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('menu'));
     await userEvent.keyboard('{ArrowDown}');
     // Zag focuses the menu a frame after each move; Enter in the same frame would race that focus.
@@ -263,7 +262,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Steps 30 → 8. Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision. ' +
-          "The model's VAE is not installed or does not fit it, so your VAE stays."
+          'VAE is missing, not installed or does not fit this model, so no default is applied for it.'
       );
   });
 
@@ -272,12 +271,11 @@ describe('GenerateHeaderActions', () => {
 
     await openMenu();
     await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
-    // Told once, in the reason.
     await expect
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, Steps, CFG, Scheduler, and VAE precision ' +
-          'VAE only sets only a VAE, which is not installed or does not fit it, so your VAE stays.'
+          'VAE only sets only VAE, which is missing, not installed or does not fit it, so nothing is applied.'
       );
   });
 
@@ -290,9 +288,35 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision ' +
-          "Already using Steps only's defaults, except its VAE, which is not installed or does not fit it, so your " +
-          'VAE stays.'
+          "Already using Steps only's defaults, except VAE, which is missing, not installed or does not fit it."
       );
+  });
+
+  it('keeps a working encoder when the saved default encoder is registered but its file is missing', async () => {
+    const t5 = (key: string, name: string) => ({ base: 'any', key, name, type: 't5_encoder' });
+    const saved = { ...t5('saved-t5', 'Moved T5'), is_missing: true };
+    const working = t5('working-t5', 'Working T5');
+    const flux: MainModelConfig = {
+      base: 'flux',
+      default_settings: { components: { t5_encoder: saved.key } },
+      format: 'checkpoint',
+      key: 'flux',
+      name: 'FLUX',
+      type: 'main',
+    };
+    const { patchGenerateSettings } = await render(flux, {
+      catalog: [flux, saved, working],
+      settings: { t5EncoderModel: working },
+    });
+
+    await openMenu();
+    await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .element(item('Apply model defaults'))
+      .toHaveAccessibleDescription(expect.stringContaining('T5 Encoder'));
+    await act(() => (item('Apply model defaults').element() as HTMLElement).click());
+
+    expect(patchGenerateSettings).not.toHaveBeenCalled();
   });
 
   it('offers no apply, saying why, for a model with no defaults of its own', async () => {

@@ -40,7 +40,6 @@ describe('DonationMenuItem', () => {
     host.remove();
   });
 
-  // The app menu's usage: the link leads its own group.
   const render = () =>
     act(() =>
       root.render(
@@ -98,7 +97,6 @@ describe('DonationMenuItem', () => {
         );
       }
       expect(document.querySelector('a[href="https://github.com/sponsors/invoke-ai"]')).toBeNull();
-      // A hidden link takes its separator with it, or the menu would show two in a row.
       expect(document.querySelector('[role="separator"]')).toBeNull();
     }
   );

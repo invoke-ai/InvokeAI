@@ -4,10 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy
+import pytest
 import torch
 from PIL import Image, ImageFilter
 
-from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
+from invokeai.app.invocations.image import (
+    ImageField,
+    MaskFromAlphaInvocation,
+    OklabUnsharpMaskInvocation,
+    OklchImageHueAdjustmentInvocation,
+)
 from invokeai.app.invocations.primitives import ImageCollectionInvocation
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
@@ -32,6 +38,7 @@ _COMPOSITION_NODES_SPEC.loader.exec_module(composition_nodes)
 InvokeAdjustImageHuePlusInvocation = composition_nodes.InvokeAdjustImageHuePlusInvocation
 InvokeImageBlendInvocation = composition_nodes.InvokeImageBlendInvocation
 InvokeImageDilateOrErodeInvocation = composition_nodes.InvokeImageDilateOrErodeInvocation
+InvokeImageValueThresholdsInvocation = composition_nodes.InvokeImageValueThresholdsInvocation
 
 
 def _build_context(input_image: Image.Image) -> MagicMock:
@@ -47,6 +54,79 @@ def _max_abs_diff_uint8(left: Image.Image, right: Image.Image) -> int:
     left_arr = numpy.asarray(left, dtype=numpy.int16)
     right_arr = numpy.asarray(right, dtype=numpy.int16)
     return int(numpy.abs(left_arr - right_arr).max())
+
+
+def _invoke_mask_from_alpha(input_image: Image.Image, invert: bool = False, expected_mode: str = "L") -> list[int]:
+    context = MagicMock()
+    # Like the real context, convert to the requested mode.
+    context.images.get_pil.side_effect = lambda image_name, mode=None: (
+        input_image.convert(mode) if mode else input_image.copy()
+    )
+    context.images.save.side_effect = lambda image, image_category: SimpleNamespace(
+        image_name="out", width=image.width, height=image.height
+    )
+
+    MaskFromAlphaInvocation(image=ImageField(image_name="in"), invert=invert).invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+
+    assert saved_image.mode == expected_mode
+    return numpy.asarray(saved_image).reshape(-1).tolist()
+
+
+def test_mask_from_alpha_uses_the_alpha_channel() -> None:
+    input_image = Image.new("RGBA", (3, 1))
+    input_image.putdata([(10, 20, 30, 0), (10, 20, 30, 128), (10, 20, 30, 255)])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 128, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 127, 0]
+
+
+def test_mask_from_alpha_uses_the_alpha_channel_of_a_grayscale_image_with_alpha() -> None:
+    input_image = Image.new("LA", (3, 1))
+    input_image.putdata([(10, 0), (10, 128), (10, 255)])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 128, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 127, 0]
+
+
+def test_mask_from_alpha_uses_a_grayscale_image_as_the_mask() -> None:
+    input_image = Image.new("L", (3, 1))
+    input_image.putdata([0, 64, 200])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 64, 200]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 191, 55]
+
+
+def test_mask_from_alpha_uses_a_one_bit_image_as_the_mask() -> None:
+    input_image = Image.new("1", (3, 1))
+    input_image.putdata([0, 255, 0])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 255, 0]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 0, 255]
+
+
+def test_mask_from_alpha_uses_a_16_bit_grayscale_image_as_the_mask() -> None:
+    input_image = Image.fromarray(numpy.array([[0, 300, 40000]], dtype=numpy.uint16))
+    assert input_image.mode == "I;16"
+
+    assert _invoke_mask_from_alpha(input_image, expected_mode="I;16") == [0, 300, 40000]
+
+
+def test_mask_from_alpha_treats_an_rgb_image_as_opaque() -> None:
+    input_image = Image.new("RGB", (3, 1))
+    input_image.putdata([(255, 0, 0), (0, 255, 0), (0, 0, 64)])
+
+    assert _invoke_mask_from_alpha(input_image) == [255, 255, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [0, 0, 0]
+
+
+def test_mask_from_alpha_uses_palette_transparency() -> None:
+    palette_image = Image.new("P", (3, 1))
+    palette_image.putpalette([0, 0, 0, 255, 255, 255])
+    palette_image.putdata([0, 1, 0])
+    palette_image.info["transparency"] = 0
+
+    assert _invoke_mask_from_alpha(palette_image) == [0, 255, 0]
 
 
 def test_image_collection_invocation_preserves_existing_collection_values() -> None:
@@ -449,3 +529,23 @@ def test_dilate_keeps_16_bit_grayscale_mode() -> None:
     assert saved_image.mode == "I;16"
     saved = numpy.asarray(saved_image)
     assert saved[2, 1] == 40000 and saved[1, 2] == 40000 and saved[0, 0] == 0
+
+
+@pytest.mark.parametrize("lightness_only", [False, True])
+def test_value_thresholds_keeps_image_size_and_thresholds_every_pixel(lightness_only: bool) -> None:
+    # 13x10: neither side is a multiple of 8. Left half dark, right half light.
+    pixels = numpy.zeros((10, 13, 3), dtype=numpy.uint8)
+    pixels[:, :6] = 40
+    pixels[:, 6:] = 220
+    input_image = Image.fromarray(pixels)
+
+    context = _build_context(input_image)
+    InvokeImageValueThresholdsInvocation(image=ImageField(image_name="in"), lightness_only=lightness_only).invoke(
+        context
+    )
+    saved_image = context.images.save.call_args.args[0]
+
+    assert saved_image.size == (13, 10)
+    saved = numpy.asarray(saved_image.convert("L"))
+    assert (saved[:, :6] == 0).all()
+    assert (saved[:, 6:] == 255).all()

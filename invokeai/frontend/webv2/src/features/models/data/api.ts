@@ -28,6 +28,15 @@ export const listModels = async (signal?: AbortSignal): Promise<ModelConfig[]> =
   return body.models ?? [];
 };
 
+/** Model keys in install order, oldest first. Records carry no timestamp, so this listing's order is the only source. */
+export const listModelKeysByDateAdded = async (signal?: AbortSignal): Promise<string[]> => {
+  const body = await requestJson<{ models?: Pick<ModelConfig, 'key'>[] }>(`${MODELS_BASE}/?order_by=created_at`, {
+    signal,
+  });
+
+  return (body.models ?? []).map((model) => model.key);
+};
+
 /** Models whose database record points at a file that no longer exists. */
 export const listMissingModels = async (signal?: AbortSignal): Promise<ModelConfig[]> => {
   const body = await requestJson<{ models?: ModelConfig[] }>(`${MODELS_BASE}/missing`, { signal });
@@ -48,11 +57,8 @@ export interface Fp8StorageSupportRow {
 }
 
 /**
- * Which kinds of model FP8 Storage actually does something for. Static per backend build.
- *
- * Keyed by the loader key rather than the model type, because the answer differs along all three
- * parts: FLUX main implements the cast, FLUX ControlNet does not, and a GGUF main model must never be
- * re-encoded. A key the backend does not serve is not supported.
+ * The loader keys FP8 Storage does something for, static per backend build; the answer differs along all three parts
+ * (see `fp8StorageSupportStore`). A key the backend does not serve is not supported.
  */
 export const getFp8StorageSupport = (signal?: AbortSignal): Promise<Fp8StorageSupportRow[]> =>
   requestJson<Fp8StorageSupportRow[]>(`${MODELS_BASE}/fp8_storage_support`, { signal });

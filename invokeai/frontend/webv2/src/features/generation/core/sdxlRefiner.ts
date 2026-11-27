@@ -48,8 +48,8 @@ export const getActiveRefiner = (
     : null;
 
 /**
- * The base model's denoise range when a refiner finishes the schedule. An image-to-image start past the hand-over
- * would leave the base model nothing to do, so the start is capped at the hand-over point (legacy parity).
+ * The base model's denoise range when a refiner finishes the schedule. An image-to-image start past the hand-over would
+ * leave the base model nothing to do, so the start is capped at the hand-over point (legacy parity).
  */
 export const getRefinerDenoisingSplit = (
   refinerStart: number,

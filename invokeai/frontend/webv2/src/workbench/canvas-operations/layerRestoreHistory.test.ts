@@ -48,7 +48,7 @@ describe('layer restore through history on an interleaved document', () => {
       [raster('r0'), createInpaintMaskLayer('m1', 'm1'), raster('r1')],
       'r0'
     );
-    const duplicated = await engine.layers.duplicateLayers(['r0']);
+    const duplicated = await engine.layers.duplicateLayers('Duplicate', ['r0']);
     expect(duplicated.status).toBe('duplicated');
 
     const r0 = getDocumentLeaves(document()).find((layer) => layer.id === 'r0')!;
@@ -74,7 +74,7 @@ describe('layer restore through history on an interleaved document', () => {
       [raster('r0'), createInpaintMaskLayer('m1', 'm1'), raster('r1')],
       'r0'
     );
-    const duplicated = await engine.layers.duplicateLayers(['r0']);
+    const duplicated = await engine.layers.duplicateLayers('Duplicate', ['r0']);
     if (duplicated.status !== 'duplicated') {
       throw new Error('expected a duplicate');
     }
@@ -108,7 +108,7 @@ describe('layer restore through history on an interleaved document', () => {
     const outline = () =>
       getDocumentIndex(document()).nodes.map((entry) => `${'  '.repeat(entry.path.length)}${entry.node.id}`);
 
-    const duplicated = await engine.layers.duplicateLayers(['g', 'r2']);
+    const duplicated = await engine.layers.duplicateLayers('Duplicate', ['g', 'r2']);
     if (duplicated.status !== 'duplicated') {
       throw new Error(`expected a duplicate, got ${duplicated.status}`);
     }

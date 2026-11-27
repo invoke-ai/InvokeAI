@@ -17,14 +17,18 @@ from safetensors.torch import save_file
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import view_as
+from invokeai.backend.model_manager.load import load_default
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders import qwen3_5_encoder as loader_module
 from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import (
     Qwen35EncoderCheckpointLoader,
     load_qwen3_5_text_encoder,
 )
-from invokeai.backend.model_manager.taxonomy import Qwen35VariantType, SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, Qwen35VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder, qwen3_5_text_config_from_config_json
+from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 
 _LAST = 3
@@ -85,6 +89,7 @@ def loader(monkeypatch: pytest.MonkeyPatch) -> Qwen35EncoderCheckpointLoader:
     loader = object.__new__(Qwen35EncoderCheckpointLoader)
     loader._ram_cache = MagicMock()
     loader._logger = logging.getLogger(__name__)
+    loader._torch_device = torch.device("cpu")
     return loader
 
 
@@ -214,6 +219,74 @@ def test_the_variant_decides_whether_a_single_file_loads_the_final_norm(
 
     assert isinstance(model, Qwen35Encoder)
     assert ("norm.weight" in model.state_dict()) is loads_the_norm
+
+
+def test_a_text_llm_record_viewed_as_the_encoder_loads_the_same_language_model_as_an_encoder_record(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("invokeai.backend.qwen3_5.qwen3_5_encoder.qwen3_5_text_config", lambda _variant: _config())
+    loader._keep_fp8_weights = lambda _config, _submodel: False
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    weights = _reference(final_norm=True).state_dict()
+    path = tmp_path / "whole.safetensors"
+    save_file({f"{_PREFIX}{k}": v for k, v in weights.items()} | _random({"lm_head.weight": [64, 32]}), path)
+    record = text_llm_file("llm").model_copy(update={"path": str(path)})
+    native = Qwen35Encoder_Checkpoint_Config.model_construct(
+        path=str(path), name="encoder", variant=Qwen35VariantType.Qwen35_9B
+    )
+
+    from_view = loader._load_model(view_as(record, ModelType.Qwen35Encoder), SubModelType.TextEncoder)
+    from_native = loader._load_model(native, SubModelType.TextEncoder)
+
+    _assert_loaded(from_view, weights)
+    _assert_loaded(from_native, weights)
+
+
+def test_a_role_view_caches_each_storage_variant_under_its_record(
+    tmp_path: Path, loader: Qwen35EncoderCheckpointLoader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("invokeai.backend.qwen3_5.qwen3_5_encoder.qwen3_5_text_config", lambda _variant: _config())
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.type == "cuda")
+    monkeypatch.setattr(
+        loader_module.TorchDevice,
+        "choose_bfloat16_safe_dtype",
+        staticmethod(lambda device: torch.bfloat16 if device.type == "cuda" else torch.float32),
+    )
+    projection = "layers.0.mlp.gate_proj.weight"
+    weights = _reference(final_norm=True).state_dict()
+    weights[projection] = weights[projection].to(torch.float8_e4m3fn)
+    path = tmp_path / "whole.safetensors"
+    save_file({f"{_PREFIX}{key}": tensor for key, tensor in weights.items()}, path)
+    key = "aaaaaaaa-1111-2222-3333-444444444444"
+    record = text_llm_file(key).model_copy(update={"path": str(path)})
+    encoder = view_as(record, ModelType.Qwen35Encoder)
+    loader._app_config = MagicMock(log_memory_usage=False, models_path=tmp_path)
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=loader._logger,
+    )
+    loader._ram_cache = cache
+    try:
+        folded = loader.load_model(encoder, SubModelType.TextEncoder)
+        # Only the capability decision uses the simulated device. Model buffers stay on CPU.
+        loader._torch_device = torch.device("cuda:0")
+        packed = loader.load_model(encoder, SubModelType.TextEncoder)
+
+        with folded.model_in_ram() as model:
+            assert model.state_dict()[projection].dtype is torch.float32
+        with packed.model_in_ram() as model:
+            assert model.state_dict()[projection].dtype is torch.float8_e4m3fn
+            assert model.state_dict()["embed_tokens.weight"].dtype is torch.bfloat16
+        assert folded._cache_record.key == f"{key}:text_encoder:as_qwen3_5_encoder:storage=full-float32"
+        assert packed._cache_record.key == f"{key}:text_encoder:as_qwen3_5_encoder:storage=fp8-bfloat16"
+        assert cache.cached_model_keys() == {key}
+        assert cache.drop_model(key) == 2
+    finally:
+        cache.shutdown()
 
 
 # -- ComfyUI's int8_tensorwise build: the whole vision-language model, of which the encoder reads the language model. --
@@ -348,3 +421,46 @@ def test_a_scaled_fp8_layer_is_refused_before_room_is_reserved(tmp_path: Path, l
     with pytest.raises(ValueError, match="quantization side channel"):
         load_qwen3_5_text_encoder(loader, [path], _config(), final_norm=True, keep_fp8=False, what="test")
     loader._ram_cache.make_room.assert_not_called()
+
+
+def test_a_shard_with_float8_weights_is_read_into_owned_storage_and_a_plain_shard_stays_mapped(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Anima-3.8B's encoder ships raw fp8: a view kept through the widening would pin its whole shard."""
+    weights = _reference(final_norm=False).state_dict()
+    fp8_keys = {key for key in weights if key.startswith("layers.0.") and key.endswith("proj.weight")}
+    assert fp8_keys
+    keys = sorted(weights)
+    first, second = keys[: len(keys) // 2], keys[len(keys) // 2 :]
+    fp8_shard, plain_shard = (
+        tmp_path / "model-00001-of-00002.safetensors",
+        tmp_path / "model-00002-of-00002.safetensors",
+    )
+    save_file({k: weights[k].to(torch.float8_e4m3fn) if k in fp8_keys else weights[k] for k in first}, fp8_shard)
+    save_file({k: weights[k] for k in second if k not in fp8_keys}, plain_shard)
+    assert fp8_keys <= set(first)
+
+    backends: dict[Path, str] = {}
+    real_safe_open = loader_module.safe_open
+
+    def recording_safe_open(path, **kwargs):
+        if "backend" in kwargs:
+            backends[Path(path)] = kwargs["backend"]
+        return real_safe_open(path, **kwargs)
+
+    monkeypatch.setattr(loader_module, "safe_open", recording_safe_open)
+
+    load_qwen3_5_text_encoder(
+        loader, [fp8_shard, plain_shard], _config(), final_norm=False, keep_fp8=False, what="test"
+    )
+
+    assert backends == {fp8_shard: "pread", plain_shard: "mmap"}
+
+
+def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(tmp_path: Path, loader) -> None:
+    path = tmp_path / "encoder.safetensors"
+    save_file(_random({"language_model.embed_tokens.weight": [64, 32]}), path)
+    config = Qwen35Encoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
+
+    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == 0
+    assert loader.get_size_fs(config, path, SubModelType.TextEncoder) == path.stat().st_size

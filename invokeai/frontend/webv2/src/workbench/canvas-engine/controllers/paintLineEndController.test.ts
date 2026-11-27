@@ -36,7 +36,6 @@ describe('PaintLineEndController', () => {
     const h = createHarness(paint(100, 0));
     h.ends.set('paint', { x: 60, y: 10 });
 
-    // Cropped: the pixels stay where they were, now at an identity transform.
     h.change(paint(0, 100));
 
     expect(h.ends.get('paint')).toEqual({ x: 160, y: 10 });

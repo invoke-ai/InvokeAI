@@ -1,20 +1,17 @@
-/** Cover every builder against backend-validated node/field/literal fixtures; tests own snapshot formatting. */
-
 import type { BackendGraphContract } from '@features/generation/core/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';
 import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './types';
 
 import {
+  addReferenceImages,
   getComponentSectionPolicy,
   getGenerationValidationReasons,
   isLoraSupported,
-  isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
@@ -24,7 +21,6 @@ import {
   generateGraphCases,
   type ModelShape,
   satisfiedSettingsFor,
-  SHAPE_OVERRIDES,
   tunedSettingsFor,
 } from './graphCoverage.testing';
 import { COMPEL_NODE_TYPES, supportsPromptAttentionSyntax } from './prompt/compel';
@@ -46,25 +42,23 @@ const compileForShape = (
         ...satisfiedSettingsFor(base, shape),
         projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
       };
-  // One enabled reference image wherever the model takes one, so reference nodes and their fields enter the contract.
-  const settings = isReferenceImageSupported(model, satisfied)
-    ? {
-        ...satisfied,
-        referenceImages: withAddedReferenceImages(
-          model,
-          [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
-          [],
-          [
-            {
-              id: 'coverage-reference',
-              image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
-            },
-          ]
-        ),
-      }
-    : satisfied;
+  const settings = {
+    ...satisfied,
+    referenceImages: addReferenceImages({
+      additions: [
+        {
+          id: 'coverage-reference',
+          image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
+        },
+      ],
+      components: satisfied,
+      mode: 'strict',
+      model,
+      models: [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
+      referenceImages: satisfied.referenceImages,
+    }).referenceImages,
+  };
 
-  // Assert every requirement before compilation for complete diagnostics.
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
 
   return { filled, graph: compileGenerateGraph(settings, model, 'gallery', projectSettings).backendGraph };
@@ -79,7 +73,6 @@ const SDXL_REFINER_MODEL: MainModelConfig = {
   type: 'main',
 };
 
-// The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
 const refinerCase = () => {
   const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
   const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
@@ -98,7 +91,6 @@ const refinerCase = () => {
   };
 };
 
-/** The same shape with one concept applied, for bases that load LoRAs; `null` for the rest. */
 const compileWithLoraForShape = (
   base: SupportedGenerateBase,
   shape: ModelShape
@@ -122,7 +114,6 @@ const compileWithLoraForShape = (
   };
 };
 
-// Canvas owns image encoding; both toggle values must reach the backend-validated literal contract.
 const sdxlCanvasCase = (colorCompensation: boolean) => {
   const shape: ModelShape = {
     label: `canvas-img2img-${colorCompensation ? 'compensated' : 'uncompensated'}`,
@@ -154,16 +145,45 @@ const sdxlCanvasCase = (colorCompensation: boolean) => {
   return { base: 'sdxl' as const, filled, graph, shape };
 };
 
-// Edit references replace the style reference the tuned Krea-2 recipe carries, so they need their own case.
+const fluxFillCanvasCase = () => {
+  const shape: ModelShape = {
+    label: 'canvas-fill-outpaint-masked',
+    overrides: { format: 'checkpoint', variant: 'dev_fill' },
+  };
+  const { filled, model, settings } = satisfiedSettingsFor('flux', shape);
+  const { backendGraph: graph } = compileCanvasGraph({
+    bbox: { height: 1024, width: 1024, x: 0, y: 0 },
+    compositeImageName: 'canvas-input.png',
+    compositing: {
+      coherenceEdgeSize: 16,
+      coherenceMinDenoise: 0,
+      coherenceMode: 'Gaussian Blur',
+      infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+      infillMethod: 'lama',
+      infillPatchmatchDownscaleSize: 1,
+      infillTileSize: 32,
+      maskBlur: 16,
+      outputOnlyMaskedRegions: false,
+    },
+    destination: 'canvas',
+    maskImageName: 'canvas-mask.png',
+    mode: 'outpaint',
+    model,
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+    settings,
+    strength: 1,
+  });
+
+  return { base: 'flux' as const, filled, graph, shape };
+};
+
 const krea2EditCase = () => {
   const { filled, model, settings } = satisfiedSettingsFor('krea-2', KREA2_EDIT_SHAPE);
   const image = { original: { image: { height: 1024, image_name: 'edit-reference.png', width: 1024 } } };
   const withEditReferences = {
     ...settings,
-    // CFG builds the negative prompt, which reads the references too.
     cfgScale: 4.5,
     krea2ReferenceKvCache: true,
-    // The K/V cache switch is sent only while a LoRA reads the references.
     loras: [
       {
         isEnabled: true,
@@ -198,13 +218,6 @@ describe('generate graph coverage', () => {
     expect(Object.keys(GRAPH_BUILDERS).sort()).toEqual([...SUPPORTED_GENERATE_BASES].sort());
   });
 
-  it('declares shape overrides only for bases that exist', () => {
-    expect(Object.keys(SHAPE_OVERRIDES).filter((base) => !SUPPORTED_GENERATE_BASES.includes(base as never))).toEqual(
-      []
-    );
-  });
-
-  // The prompt editor highlights and weights attention syntax by this capability; only Compel reads it.
   it.each(generateGraphCases)(
     'encodes $label prompts with Compel exactly when attention syntax is offered',
     ({ base, shape }) => {
@@ -215,7 +228,6 @@ describe('generate graph coverage', () => {
     }
   );
 
-  // SDXL attention syntax carries through the refiner stage, which re-encodes the prompts with its own encoders.
   it('conditions the SDXL refiner denoise with Compel encoders', () => {
     const { graph } = refinerCase();
     const conditioningSource = (field: string) => {
@@ -257,7 +269,6 @@ describe('generate graph coverage', () => {
   });
 
   it('sends every VAE the picker offers into the graph wherever a VAE is required', () => {
-    // Enumerate accepted VAE families at runtime after fixture seeding.
     const checked: string[] = [];
 
     for (const { base, shape } of generateGraphCases) {
@@ -284,7 +295,6 @@ describe('generate graph coverage', () => {
           useNsfwChecker: false,
           useWatermark: false,
         });
-        // Metadata records the selection whether or not the builder used it, so it does not count.
         const sent = Object.values(backendGraph.nodes).some(
           (node) => node.type !== 'core_metadata' && JSON.stringify(node).includes(`"${vae.key}"`)
         );
@@ -294,7 +304,6 @@ describe('generate graph coverage', () => {
       }
     }
 
-    // Require nonempty cross-base coverage after runtime seeding.
     expect(checked).toEqual(
       expect.arrayContaining([
         'anima/qwen3:qwen-image/undefined',
@@ -302,14 +311,12 @@ describe('generate graph coverage', () => {
         'anima/qwen35:qwen-image/undefined',
         'krea-2/standalone-components:anima/undefined',
         'qwen-image/standalone-components:anima/undefined',
-        // A GGUF SD3 transformer brings no VAE, so the selected one has to reach the loader.
         'sd-3/standalone-components:sd-3/undefined',
         'z-image/standalone-components:flux/undefined',
       ])
     );
   });
 
-  // An image's metadata is what recall restores, so it must name exactly the LoRAs that reached inference.
   it.each(generateGraphCases)('$label loads concepts as policy says, and records only those', ({ base, shape }) => {
     const { model, settings } = satisfiedSettingsFor(base, shape);
     const lora = (key: string) => ({ base, key, name: key, type: 'lora' as const });
@@ -335,7 +342,6 @@ describe('generate graph coverage', () => {
       weight: number;
     }[];
 
-    // The concept picker trusts this policy, so a builder that gains or loses a LoRA loader must update it.
     expect(loaded.length > 0, `${base}/${shape.label} LoRA support disagrees with isLoraSupported`).toBe(
       isLoraSupported(model)
     );
@@ -352,8 +358,6 @@ describe('generate graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
-    // Bases that load LoRAs compile it once more with a concept, whose loader nodes the backend has to provide as well.
     const compilations = [
       ...generateGraphCases.flatMap(({ base, shape }) => {
         const withLora = compileWithLoraForShape(base, shape);
@@ -366,6 +370,7 @@ describe('generate graph coverage', () => {
       refinerCase(),
       sdxlCanvasCase(false),
       sdxlCanvasCase(true),
+      fluxFillCanvasCase(),
       krea2EditCase(),
     ];
 
@@ -381,7 +386,6 @@ describe('generate graph coverage', () => {
         const { literals } = fieldsFor(node.type);
 
         for (const [field, value] of Object.entries(node)) {
-          // Node identity and undefined values are excluded from serialized input contracts.
           if (field === 'id' || field === 'type' || value === undefined) {
             continue;
           }
@@ -389,7 +393,6 @@ describe('generate graph coverage', () => {
           const values = literals.get(field) ?? new Map<string, unknown>();
           literals.set(field, values);
 
-          // Check scalar values, not only object names, for synthetic unhashed model fixtures.
           if (value === null || typeof value !== 'object') {
             values.set(JSON.stringify(value), value);
           }

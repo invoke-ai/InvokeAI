@@ -73,7 +73,6 @@ const render = async (selectedModel: GenerateModelConfig) => {
       </ChakraProvider>
     )
   );
-  // The settings under the row hold the mode, the model picker and active steps.
   await act(() =>
     host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.referenceImageSettings"]')?.click()
   );
@@ -101,7 +100,6 @@ describe('Anima IP-Adapter reference row', () => {
     expect(text).toContain('widgets.generate.activeStepsShort');
     expect(text).toContain('IP-Adapter picker');
 
-    // The row's own control, ahead of the step range under it.
     const strength = card.querySelector('[role="slider"]');
     expect(strength?.getAttribute('aria-valuenow')).toBe('1.5');
     expect(strength?.getAttribute('aria-valuemin')).toBe('0');

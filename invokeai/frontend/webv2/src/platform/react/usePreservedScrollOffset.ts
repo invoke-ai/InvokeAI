@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 /**
- * Track offsets during scrolling: hidden-subtree cleanup sees zero after display:none. Restore before paint on
- * reveal; real unmount discards the instance's offsets.
+ * Track offsets during scrolling: hidden-subtree cleanup sees zero after display:none. Restore before paint on reveal;
+ * real unmount discards the instance's offsets.
  */
 export const usePreservedScrollOffset = (ref: RefObject<HTMLElement | null>): void => {
   const offsetRef = useRef({ left: 0, top: 0 });

@@ -4,11 +4,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Raising a window changes how the layer stacks it. It must not change where the window sits in the DOM: moving
- * a node drops keyboard focus from it, and focus arriving in a window is exactly what raises it.
- */
-
 const layerMocks = vi.hoisted(() => ({
   project: { floatingWidgets: {} as Record<string, FloatingWidgetState>, id: 'project-1' },
 }));
@@ -87,7 +82,6 @@ describe('FloatingWidgetLayer', () => {
 
     const queue = host!.querySelector<HTMLElement>('[data-window="queue"]')!;
     queue.focus();
-    // Focus arriving in the lower window raises it.
     await render({ gallery: windowState(1), queue: windowState(2) });
 
     expect(windows()).toEqual([
@@ -102,8 +96,6 @@ describe('FloatingWidgetLayer', () => {
     await render({ gallery: windowState(1) });
     const first = host!.querySelector('[data-window="gallery"]');
 
-    // Instance ids repeat across projects; nothing of the old window — a gesture, its widget's state — may carry
-    // over.
     layerMocks.project = { ...layerMocks.project, id: 'project-2' };
     await render({ gallery: windowState(1) });
 

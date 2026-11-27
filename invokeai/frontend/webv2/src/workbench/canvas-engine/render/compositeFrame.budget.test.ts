@@ -30,7 +30,6 @@ const adjusted = (id: string, x = 0): CanvasLayerContract =>
     transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
   } as Partial<CanvasLayerContract>);
 
-// Two base caches fit by default; their derived and group artifacts are steady overage.
 const scene = (budgetBytes = SURFACE_BYTES * 2) => {
   const backend = createTestStubRasterBackend();
   const diagnostics = createCanvasDiagnostics(true);
@@ -56,6 +55,7 @@ const scene = (budgetBytes = SURFACE_BYTES * 2) => {
     getControlView: () => null,
     getGroupSurface: (scope, members, matrices, content) => raster.groups.get(scope, members, matrices, content),
     getMaskPatternTile: () => null,
+    maskScratch: { getMaskScratch: backend.createSurface, releaseMaskScratch: () => undefined },
     isEditingStagingHiddenStack: () => false,
     layerCache: raster.layers,
     previews: new PreviewStateController(),
@@ -127,6 +127,7 @@ describe('frame description over 2,000 nodes', () => {
       getControlView: () => null,
       getGroupSurface: () => null,
       getMaskPatternTile: () => null,
+      maskScratch: { getMaskScratch: backend.createSurface, releaseMaskScratch: () => undefined },
       isEditingStagingHiddenStack: () => false,
       layerCache: raster.layers,
       previews: new PreviewStateController(),

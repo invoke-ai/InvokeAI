@@ -56,14 +56,10 @@ describe('getFieldsForModel', () => {
   });
 
   it('gives a ControlLoRA the preprocessor only', () => {
-    // Not decided here any more: the backend's table has no `supported` row for a control LoRA, since
-    // it is patched into a base model and the casting hooks would never fire.
     expect(fieldKeys(model('sdxl', 'control_lora'), false)).toEqual(['preprocessor']);
   });
 
   it('leaves the row out entirely when the backend says FP8 Storage does nothing for this model', () => {
-    // The whole point of the change: a FLUX ControlNet, a GGUF main model or a model whose loader never
-    // casts must not be offered a control that silently does nothing.
     expect(fieldKeys(model('flux', 'controlnet'), false)).toEqual(['preprocessor']);
     expect(fieldKeys(model('flux', 'main'), false)).not.toContain('fp8_storage');
   });

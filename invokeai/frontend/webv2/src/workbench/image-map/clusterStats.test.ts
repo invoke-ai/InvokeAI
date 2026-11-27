@@ -48,8 +48,7 @@ describe('summarizeClusters', () => {
   });
 
   it('does not assume cluster ids are dense or start at zero', () => {
-    // DBSCAN renumbers between runs and the map serves only the points the
-    // user can still see, so served ids can skip values entirely.
+    // DBSCAN renumbers between runs and the map serves only points still visible, so served ids can skip values.
     expect(summarizeClusters(points(7, 7, 42))).toEqual({
       clusterCount: 2,
       largestCluster: 2,

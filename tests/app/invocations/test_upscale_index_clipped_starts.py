@@ -4,9 +4,9 @@
 and `qwen_image_denoise` clip it by step index on a shifted schedule, so the same number enters them far
 noisier. The widget therefore does not send them FLUX's start: `getIndexClippedDenoisingStart`
 (`features/upscale/core/graph.ts`) picks the step whose sigma is nearest the one FLUX would enter at,
-from its own copy of each node's schedule and clipping rule (`indexClipping` in `settings.ts`). Krea-2's
-shift depends on the variant, which each case records; Qwen Image's schedule is also stretched to end at
-its scheduler's terminal sigma.
+from Generation's copy of each node's schedule and clipping rule (`getDenoisingStartClipping` in
+`features/generation/core/baseGenerationPolicies.ts`). Krea-2's shift depends on the variant, which
+each case records; Qwen Image's schedule is also stretched to end at its scheduler's terminal sigma.
 
 `upscaleIndexClippedStarts.json`, written by `indexClippedStarts.test.ts` (regenerate with `vitest -u`),
 records what the widget sends. Each case here drives the real `_run_diffusion` -- the real shift, the

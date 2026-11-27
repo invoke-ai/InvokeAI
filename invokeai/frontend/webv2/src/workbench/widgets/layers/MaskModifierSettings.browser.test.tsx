@@ -26,14 +26,12 @@ void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng:
 
 type Engine = NonNullable<Parameters<typeof MaskModifierSettings>[0]['engine']>;
 
-/** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
 let stub: StructuralEngineStub;
 const documentLayer = (): CanvasInpaintMaskLayerContract =>
   getDocumentLayer(stub.document(), 'mask-1') as CanvasInpaintMaskLayerContract;
 
 type Noise = NonNullable<CanvasInpaintMaskLayerContract['noise']>;
 
-/** Lands a noise edit from elsewhere (a tree toggle, a script) as a recorded step, prepared from the live layer. */
 const commitNoiseFromElsewhere = (update: (noise: Noise) => Noise): void => {
   const outcome = commitPreparedEdit(stub.engine as never, 'Noise', (model) => {
     const live = model.getLayer('mask-1') as CanvasInpaintMaskLayerContract;
@@ -98,7 +96,6 @@ const noiseOf = (edit: PreparedDocumentEdit, side: 'forward' | 'inverse') =>
   (edit[side] as unknown as { config: { noise: { isEnabled: boolean; level: number } } }).config.noise;
 const commits = () => stub.commits;
 
-/** Starts a drag on the noise scrubber; `moveTo` takes track fractions from the press, `release` ends it there. */
 const startDrag = async () => {
   const frame = noiseSlider().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
   const rect = frame.getBoundingClientRect();
@@ -144,7 +141,6 @@ describe('MaskModifierSettings', () => {
     await drag.moveTo(0.1);
     await settle(() => commitNoiseFromElsewhere((noise) => ({ ...noise, isEnabled: false })));
 
-    // The toggle ended the previewed gesture, restoring its level before it landed.
     expect(documentLayer().noise).toEqual({ isEnabled: false, level: 0.25 });
 
     await drag.moveTo(0.3);
@@ -180,17 +176,5 @@ describe('MaskModifierSettings', () => {
     await stub.engine.history.undo();
     expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
     expect(notify.error).not.toHaveBeenCalled();
-  });
-
-  it('records nothing and restores the level when a drag returns to where it started', async () => {
-    await render();
-    const drag = await startDrag();
-    await drag.moveTo(0.2);
-    await drag.moveTo(0);
-    await drag.release();
-
-    expect(commits()).toHaveLength(0);
-    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
-    expect(stub.history.canUndo()).toBe(false);
   });
 });

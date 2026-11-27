@@ -45,10 +45,7 @@ const subtreeEnds = (rows: readonly LayerTreeRow[]): Int32Array => {
   return ends;
 };
 
-/**
- * Project vertical gaps and horizontal depth after removing the dragged block. Reject self/invalid/depth-exceeding
- * targets; model validation owns locks and other refusals. Linear in row count.
- */
+/** Projects gaps and depth with the dragged block removed; the model owns locks and other refusals. */
 export const projectLayerDrop = (input: LayerDropInput): LayerDropTarget | null => {
   const { rows } = input;
   if (rows.length === 0) {
@@ -102,9 +99,8 @@ export const projectLayerDrop = (input: LayerDropInput): LayerDropTarget | null 
       return null;
     }
     const next = remaining[overIndex + 1];
-    // Top of the group: the first rendered child, or — for a collapsed group,
-    // whose children render nothing — its first model child, so the landing
-    // matches the indicator instead of quietly falling to the bottom.
+    // Top of the group: the first rendered child, or — for a collapsed group, whose children render nothing — its first
+    // model child, so the landing matches the indicator instead of quietly falling to the bottom.
     const firstModelChildId = isGroupNode(over.vm.node) ? (over.vm.node.children[0]?.id ?? null) : null;
     const beforeId = next && next.vm.parentId === over.id ? next.id : over.expanded ? null : firstModelChildId;
     return {

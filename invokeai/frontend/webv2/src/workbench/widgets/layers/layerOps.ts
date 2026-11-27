@@ -22,6 +22,8 @@ import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
 import {
   createControlLayer,
+  DEFAULT_INPAINT_MASK_FILL,
+  DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
   getSourceContentRect,
   isIdentityAdjustments,
   isMergeableRasterLayer,
@@ -39,10 +41,7 @@ type RegionalGuidanceConfigPatch = {
   autoNegative?: boolean;
   referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
 };
-/**
- * Re-export the engine's canonical mergeability predicate so UI and engine exclude unsafe mask merges
- * consistently.
- */
+/** Re-export the engine's canonical mergeability predicate so UI and engine exclude unsafe mask merges consistently. */
 export { isMergeableRasterLayer };
 
 /** All 16 document blend modes, in the contract's declared order. */
@@ -65,6 +64,17 @@ export const CANVAS_BLEND_MODES: readonly CanvasBlendMode[] = [
   'luminosity',
 ];
 
+/** Fill styles in the order every mask and region menu lists them. */
+export const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
+  'solid',
+  'grid',
+  'crosshatch',
+  'diagonal_left',
+  'diagonal',
+  'horizontal',
+  'vertical',
+];
+
 /** Mints a fresh layer id (matches the engine's `createLayerId` shape). */
 export const createLayerId = (): string => createItemId('layer');
 
@@ -82,7 +92,7 @@ export const createEmptyPaintLayer = (name: string, id: string = createLayerId()
 });
 
 /** Use the legacy diagonal inpaint hatch and first fill color; multiple masks are allowed. */
-export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
+export { DEFAULT_INPAINT_MASK_FILL };
 
 /** The next free "Inpaint Mask N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextInpaintMaskName = (existingNames: readonly string[]): string => {
@@ -141,43 +151,26 @@ export const nextControlTypeLayerName = (typeLabel: string, existingNames: reado
   return `${typeLabel} ${n}`;
 };
 
-/**
- * Whether a control layer still has a name the app gave it ("Control Layer N", or "<Type> N" from a type change), so
- * choosing a type may rename it; a name the user typed is kept.
- */
+/** Whether a control layer still has an app-given name, so a type change may rename it; typed names stay. */
 export const isAutoControlLayerName = (name: string, typeLabels: readonly string[]): boolean =>
   ['Control Layer', ...typeLabels].some((prefix) => numberedSuffix(prefix, name) !== null);
 
 /** Builds an empty inpaint mask layer with the legacy-default fill (no bitmap yet). */
-export const createInpaintMaskLayer = (name: string, id: string = createLayerId()): CanvasInpaintMaskLayerContract => ({
+export const createInpaintMaskLayer = (
+  name: string,
+  id: string = createLayerId(),
+  color: string = DEFAULT_INPAINT_MASK_FILL.color
+): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',
   id,
   isEnabled: true,
   isLocked: false,
-  mask: { bitmap: null, fill: { ...DEFAULT_INPAINT_MASK_FILL } },
+  mask: { bitmap: null, fill: { ...DEFAULT_INPAINT_MASK_FILL, color } },
   name,
   opacity: 1,
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'inpaint_mask',
 });
-
-/** Cycle legacy regional fill colors to distinguish overlaps. */
-export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
-  '#799ddb',
-  '#83d683',
-  '#fae150',
-  '#dc9065',
-  '#e07575',
-  '#d58bca',
-  '#a178d6',
-];
-
-/**
- * Derive colors from document region count with legacy pre-increment ordering: the first region uses palette index
- * 1. Avoid session-global cross-project state.
- */
-export const nextRegionalGuidanceFillColor = (existingRegionalGuidanceCount: number): string =>
-  REGIONAL_GUIDANCE_FILL_COLORS[(existingRegionalGuidanceCount + 1) % REGIONAL_GUIDANCE_FILL_COLORS.length];
 
 /** The next free "Regional Guidance N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextRegionalGuidanceName = (existingNames: readonly string[]): string => {
@@ -200,7 +193,7 @@ export const nextRegionalGuidanceName = (existingNames: readonly string[]): stri
 
 export const createRegionalGuidanceLayer = (
   name: string,
-  existingRegionalGuidanceCount: number,
+  color: string | undefined,
   id: string = createLayerId()
 ): CanvasRegionalGuidanceLayerContract => ({
   autoNegative: false,
@@ -210,7 +203,7 @@ export const createRegionalGuidanceLayer = (
   isLocked: false,
   mask: {
     bitmap: null,
-    fill: { color: nextRegionalGuidanceFillColor(existingRegionalGuidanceCount), style: 'solid' },
+    fill: { color: color ?? DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR, style: 'solid' },
   },
   name,
   negativePrompt: null,
@@ -241,7 +234,7 @@ export const createInpaintMaskFromImage = (input: CreateMaskLayerFromImageInput)
 export const createRegionalGuidanceFromImage = (
   input: CreateMaskLayerFromImageInput
 ): CanvasRegionalGuidanceLayerContract => ({
-  ...createRegionalGuidanceLayer(input.name, 0, input.id),
+  ...createRegionalGuidanceLayer(input.name, undefined, input.id),
   mask: {
     bitmap: { ...input.image },
     fill: { ...input.fill },
@@ -249,16 +242,11 @@ export const createRegionalGuidanceFromImage = (
   },
 });
 
-/** Mints a fresh regional-guidance reference-image id. */
 export const createReferenceImageId = (): string => createItemId('rgref');
 
-/** Mints a fresh raster adjustment-entry id. */
 export const createAdjustmentId = (): string => createItemId('adj');
 
-/**
- * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower
- * values suit subtle grain or dither; the slider covers both.
- */
+/** A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. */
 export const DEFAULT_NOISE_AMOUNT = 0.1;
 
 /** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
@@ -271,10 +259,7 @@ export const DEFAULT_TEXTURE_SIZE = 8;
 /** A fresh uint32 pattern seed for a noise entry. */
 export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
 
-/**
- * A fresh adjustment entry of `type`. Parametric types start at identity so adding one changes nothing until edited;
- * invert has no parameters and noise starts at a visible grain with a fresh seed, so both apply at once.
- */
+/** Parametric types start at identity; invert and noise (fresh seed, visible grain) apply at once. */
 export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
   const id = createAdjustmentId();
   switch (type) {
@@ -314,13 +299,9 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
   }
 };
 
-/** A new regional IP-Adapter reference's weight. */
 export const DEFAULT_REGIONAL_REFERENCE_WEIGHT = 1;
 
-/**
- * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and
- * assign images via drop/upload.
- */
+/** Regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. */
 export const createRegionalReferenceImage = (
   base: string | null,
   id: string = createReferenceImageId()
@@ -353,11 +334,11 @@ export const canAddRegionalReferenceImage = (base: string | null): boolean =>
 
 export const createRegionalGuidanceLayerWithRefImage = (
   name: string,
-  existingRegionalGuidanceCount: number,
+  color: string | undefined,
   base: string | null,
   id: string = createLayerId()
 ): CanvasRegionalGuidanceLayerContract => ({
-  ...createRegionalGuidanceLayer(name, existingRegionalGuidanceCount, id),
+  ...createRegionalGuidanceLayer(name, color, id),
   referenceImages: [createRegionalReferenceImage(base)],
 });
 
@@ -421,11 +402,7 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
 
 type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
 
-/**
- * Whether a raster layer's adjustments change its pixels. Control layers carry no adjustments, so such a layer reaches
- * the control stack only with its pixels baked by the engine (`copyLayerToControl`, `convertLayerToControl`); its
- * alpha, all a mask conversion reads, no adjustment changes.
- */
+/** Whether adjustments change the pixels, so moving to the control stack must bake them. */
 export const needsBakedControlPixels = (layer: CanvasLayerContract): boolean =>
   layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 
@@ -445,17 +422,17 @@ const clonePixelSource = (layer: PixelLayer): CanvasPixelSourceContract | null =
   return null;
 };
 
-const pixelLayerToMask = (layer: PixelLayer): CanvasMaskContract | null => {
+const pixelLayerToMask = (layer: PixelLayer, color: string): CanvasMaskContract | null => {
   const source = clonePixelSource(layer);
   if (!source) {
     return null;
   }
   if (source.type === 'image') {
-    return { bitmap: source.image, fill: { ...DEFAULT_INPAINT_MASK_FILL } };
+    return { bitmap: source.image, fill: { ...DEFAULT_INPAINT_MASK_FILL, color } };
   }
   return {
     bitmap: source.bitmap,
-    fill: { ...DEFAULT_INPAINT_MASK_FILL },
+    fill: { ...DEFAULT_INPAINT_MASK_FILL, color },
     offset: source.offset,
   };
 };
@@ -477,10 +454,7 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
-/**
- * An untyped, model-less control layer over the same pixels; generation resolves its model. Null for a layer
- * {@link needsBakedControlPixels}, which no clone represents.
- */
+/** An untyped, model-less control layer over the same pixels; generation resolves its model. */
 const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
@@ -498,18 +472,20 @@ const pixelLayerToControl = (
 const pixelLayerToInpaintMask = (
   layer: PixelLayer,
   id: string,
-  isCopy: boolean
+  isCopy: boolean,
+  color: string
 ): CanvasInpaintMaskLayerContract | null => {
-  const mask = pixelLayerToMask(layer);
+  const mask = pixelLayerToMask(layer, color);
   return mask ? { ...destinationBase(layer, id, isCopy), mask, type: 'inpaint_mask' } : null;
 };
 
 const pixelLayerToRegionalGuidance = (
   layer: PixelLayer,
   id: string,
-  isCopy: boolean
+  isCopy: boolean,
+  color: string
 ): CanvasRegionalGuidanceLayerContract | null => {
-  const mask = pixelLayerToMask(layer);
+  const mask = pixelLayerToMask(layer, color);
   return mask
     ? {
         ...destinationBase(layer, id, isCopy),
@@ -529,27 +505,33 @@ export const copyRasterToControl = (
   base?: string | null
 ): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base);
 
+// Pixel layers carry no mask color; callers pass the destination palette's next color.
 export const copyRasterToInpaintMask = (
   layer: CanvasRasterLayerContractV2,
-  id: string
-): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+  id: string,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true, color);
 
 export const copyRasterToRegionalGuidance = (
   layer: CanvasRasterLayerContractV2,
-  id: string
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+  id: string,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true, color);
 
 export const convertRasterToControl = (
   layer: CanvasRasterLayerContractV2,
   base?: string | null
 ): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base);
 
-export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
-  pixelLayerToInpaintMask(layer, layer.id, false);
+export const convertRasterToInpaintMask = (
+  layer: CanvasRasterLayerContractV2,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, layer.id, false, color);
 
 export const convertRasterToRegionalGuidance = (
-  layer: CanvasRasterLayerContractV2
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, layer.id, false);
+  layer: CanvasRasterLayerContractV2,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, layer.id, false, color);
 
 export const copyControlToRaster = (
   layer: CanvasControlLayerContract,
@@ -561,13 +543,15 @@ export const copyControlToRaster = (
 
 export const copyControlToInpaintMask = (
   layer: CanvasControlLayerContract,
-  id: string
-): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+  id: string,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true, color);
 
 export const copyControlToRegionalGuidance = (
   layer: CanvasControlLayerContract,
-  id: string
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+  id: string,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true, color);
 
 export const copyMaskToRegionalGuidance = (
   layer: CanvasInpaintMaskLayerContract,
@@ -591,10 +575,7 @@ export const copyRegionalGuidanceToInpaintMask = (
   type: 'inpaint_mask',
 });
 
-/**
- * Convert raster/control types while preserving source, identity, transform, and base properties; reject
- * unsupported or unchanged targets.
- */
+/** Converts raster/control types keeping source, identity, transform and base; rejects unsupported targets. */
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,
   targetType: 'raster' | 'control',
