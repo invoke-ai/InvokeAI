@@ -728,22 +728,24 @@ def test_on_windows_a_reserve_still_short_after_refused_offload_trims_ends_in_th
 
 
 @pytest.mark.parametrize("models", [{"idle": 4 * GB}, {}], ids=["weights-to-offload", "nothing-to-offload"])
-def test_on_windows_a_lock_that_spent_its_trim_past_a_busy_peer_forces_no_second_one_for_the_reserve(
+def test_on_windows_the_reserve_release_forces_its_own_trim_after_the_lock_spent_its_allowance(
     monkeypatch: pytest.MonkeyPatch, models: dict[str, int]
 ):
-    """The reserve release is the last thing a lock does, and runs with the lock's own ledger: a paced lock whose
-    earlier pass trimmed past the peer is not owed another stall here, whether the release would offload weights or
-    trim the pool."""
+    """A reserve left short hangs the node on Windows, which a second stall of the peer does not: the release at the
+    end of a lock gets a trim of its own whatever the lock's passes spent, once, and never offloads weights that no
+    trim follows."""
     monkeypatch.setattr(sys, "platform", "win32")
     pool = _Pool(
         monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB, busy="peer"
     )
     cache = _pool_cache()
-    _resident_models(monkeypatch, cache, pool, models)
+    resident = _resident_models(monkeypatch, cache, pool, models)
 
     cache._release_allocator_blocks_for_reserve(5 * GB, model_cache_module.OffloadLedger(peer_trim_left=False))
 
-    assert True not in pool.trims
+    assert pool.trims.count(True) == 1
+    assert pool.driver_free >= 5 * GB or not models
+    assert all(model.on_device == 0 for model in resident.values())
 
 
 def test_on_windows_a_reserve_trim_the_backend_refuses_raises_for_a_lock_whose_ledger_does_not_say_so(
@@ -1141,6 +1143,32 @@ def test_a_trim_the_backend_refuses_does_not_wipe_the_credit_of_earlier_deferred
     cache._offload_unlocked_models(7 * GB, pretrim=False)
 
     assert [model.on_device for model in models.values()] == [0, 0, 4 * GB]
+
+
+def test_a_release_that_runs_while_a_model_moves_out_settles_the_credit_for_its_bytes(monkeypatch: pytest.MonkeyPatch):
+    """A step-boundary flush returns the pool while `a` is moving to RAM, then the session is busy again and `a`'s own
+    trim is deferred. The flush may have returned `a`'s bytes, so they are not the pool's pending credit: 1 GB
+    available for 4 GB needed still costs `b`."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=22 * GB, fragmented=0, busy="own")
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"a": 4 * GB, "b": 4 * GB})
+    move_to_ram = cache._move_model_to_ram
+    busy = GENERATION_DEVICE_POOL._device_locks["cuda:0"]
+
+    def flush_during_the_move(entry, *args, **kwargs):
+        if entry.key == "a":
+            busy.release()
+            TorchDevice.flush_deferred_empty_cache()
+            TorchDevice.empty_cache()
+            busy.acquire()
+        return move_to_ram(entry, *args, **kwargs)
+
+    monkeypatch.setattr(cache, "_move_model_to_ram", flush_during_the_move)
+
+    cache._offload_unlocked_models(4 * GB, pretrim=False)
+
+    assert [model.on_device for model in models.values()] == [0, 0]
 
 
 @pytest.mark.parametrize("entry_point", ["lock", "make_room_in_vram"])

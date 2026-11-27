@@ -503,6 +503,7 @@ class OffloadLedger:
     reserve release. Nothing outlives the request.
 
     `peer_trim_left`: whether the request may still run its one trim past a busy peer device (`ModelCache._force_trim`).
+    A lock's passes share one; its reserve release on Windows renews it, since a reserve left short hangs there.
     `raise_on_failure`: that trim raises a backend failure instead of logging it (the reserve release on Windows).
     `deferred_bytes`: bytes the pool still holds for the request because a busy device deferred their trim: weights it
     offloaded, or the pool's unused bytes the reserve release counts on. The driver does not see them and an async pool
@@ -2354,8 +2355,8 @@ class ModelCache:
         failure of the forced release raises: the node cannot run as if it had returned anything. Elsewhere an
         allocation that does not fit fails instead of hanging, so the deferral (and the convoy it avoids, see
         `TorchDevice.empty_cache`) stays. A cudaMallocAsync pool has rules of its own:
-        `_release_async_pool_for_reserve`, which spends the lock's own `ledger` (the last thing a lock does), so a lock
-        never runs more than one trim past a busy peer.
+        `_release_async_pool_for_reserve`, which is the one exception to a lock's one trim past a busy peer: on
+        Windows it has a trim of its own (see there).
         """
         if self._execution_device.type != "cuda":
             return
@@ -2389,9 +2390,10 @@ class ModelCache:
         When the reserve is still short after the trim, the unlocked models' weights are the only memory left to give
         back, so they are offloaded, measured against the driver's free memory rather than the cache's cap.
 
-        On Windows the release runs past a busy device (a short reserve hangs there) if the lock's `ledger` has its one
-        trim past a busy peer left, and that trim raises a backend failure, since the node cannot run as if it had
-        returned anything. A lock whose earlier passes spent the ledger's trim gets no second one here. A caller that
+        On Windows the release runs past a busy device (a short reserve hangs there), and that trim raises a backend
+        failure, since the node cannot run as if it had returned anything. It is the one exception to a lock's one trim
+        past a busy peer: the release gets a trim of its own even when the lock's passes spent theirs, because a second
+        stall of the peer beats a hang. It shares the lock's `ledger` for the credit of trims its passes deferred. A caller that
         does not run a session on this cache's device (`TorchDevice.runs_session_on`: a sessionless thread, an off-queue
         borrow) gets just that trim, on the pool, and no offload. A session's caller first tries an unforced trim. When
         a busy device defers it and unlocked weights are on the device, they are offloaded for the reserve's shortfall
@@ -2409,9 +2411,11 @@ class ModelCache:
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
             return
         on_windows = self._trim_past_busy_peer()
+        # The one exception to a lock's one trim past a busy peer: on Windows the reserve release gets a trim of its own,
+        # whatever the lock's passes spent, because a reserve left short there hangs the node, which a second stall of
+        # the peer does not. Off Windows nothing is forced. The rest of the ledger (credit, raising) stays the lock's.
         ledger.raise_on_failure = True
-        if not on_windows:
-            ledger.peer_trim_left = False
+        ledger.peer_trim_left = on_windows
         if on_windows and not TorchDevice.runs_session_on(self._execution_device):
             TorchDevice.empty_cache(force=True)
             self._log_reserve_release(driver_free, releasable, reserve)
@@ -3005,13 +3009,14 @@ class ModelCache:
             vram_bytes_to_free = vram_bytes_shortfall
             follow_ups = 0
             while True:
+                # Before the move: a release that runs from here on may have returned these bytes.
+                epoch = TorchDevice.release_epoch()
                 cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
                 if cache_entry_bytes_freed > 0:
                     self._logger.debug(
                         f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
                     )
                     if empty_cache_per_offload:
-                        epoch = TorchDevice.release_epoch()
                         outcome = TorchDevice.empty_cache()
                         if outcome is EmptyCacheOutcome.RAN:
                             released()

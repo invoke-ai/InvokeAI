@@ -166,6 +166,7 @@ class TorchDevice:
     # count it saw at the deferral: unchanged means the release is still pending, changed means a release since has
     # settled it. Unlike `_empty_cache_deferred` it cannot be set again by another device's later deferral.
     _release_epoch = 0
+    _release_epoch_lock = threading.Lock()
 
     @classmethod
     def set_session_device(cls, device: Union[str, torch.device]) -> None:
@@ -532,7 +533,7 @@ class TorchDevice:
             if _xpu_is_available():
                 torch.xpu.empty_cache()
             released = True
-            cls._release_epoch += 1
+            cls._note_release()
         except RuntimeError as e:
             if force:
                 if was_pending:
@@ -566,6 +567,11 @@ class TorchDevice:
         if not cls._empty_cache_deferred.is_set():
             return
         cls.empty_cache()
+
+    @classmethod
+    def _note_release(cls) -> None:
+        with cls._release_epoch_lock:
+            cls._release_epoch += 1
 
     @classmethod
     def release_epoch(cls) -> int:
@@ -842,7 +848,7 @@ def install_peer_aware_empty_cache() -> None:
             return
         TorchDevice._empty_cache_deferred.clear()
         original_empty_cache()
-        TorchDevice._release_epoch += 1
+        TorchDevice._note_release()
 
     setattr(peer_aware_empty_cache, _PEER_AWARE_SENTINEL, True)
     torch.cuda.empty_cache = peer_aware_empty_cache

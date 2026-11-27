@@ -1244,7 +1244,7 @@ def test_after_an_unlock_a_lock_another_thread_holds_still_voids_the_next_window
         with vae.model_on_device(working_memory=_estimate()):
             pass
         thread.start()
-        holding.wait()
+        assert holding.wait(timeout=30), "the other thread's lock never settled"
         try:
             with vae.model_on_device(working_memory=_estimate()):
                 pass
