@@ -12,6 +12,7 @@ from invokeai.app.invocations.vae.ernie_image_vae_decode import ErnieImageVaeDec
 from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.invocations.vae.sd3_image_to_latents import SD3ImageToLatentsInvocation
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 
 @pytest.fixture
@@ -130,14 +131,10 @@ def test_encode_estimate_uses_the_vae_compute_device(
     assert torch.isfinite(latents).all()
 
 
-def test_ernie_decode_uses_the_cpu_vae_in_an_accelerator_session(cpu_vae_with_accelerator_session):
-    vae = AutoencoderKLFlux2(
-        block_out_channels=(32, 32, 32, 32), latent_channels=32, layers_per_block=1, norm_num_groups=32
-    ).eval()
-    vae_info = cpu_vae_with_accelerator_session(vae, "decode")
+def _decode_ernie(vae_info, packed_latents: torch.Tensor):
     context = SimpleNamespace(
         models=SimpleNamespace(load=lambda _: vae_info),
-        tensors=SimpleNamespace(load=lambda _: torch.zeros(1, 128, 2, 2, dtype=torch.float64)),
+        tensors=SimpleNamespace(load=lambda _: packed_latents),
         images=SimpleNamespace(
             save=lambda image: SimpleNamespace(image_name="decoded.png", width=image.width, height=image.height)
         ),
@@ -145,7 +142,35 @@ def test_ernie_decode_uses_the_cpu_vae_in_an_accelerator_session(cpu_vae_with_ac
     invocation = ErnieImageVaeDecodeInvocation.model_construct(
         latents=LatentsField(latents_name="latents"), vae=SimpleNamespace(vae=None)
     )
+    return invocation.invoke(context)
 
-    result = invocation.invoke(context)
+
+def _ernie_vae() -> AutoencoderKLFlux2:
+    return AutoencoderKLFlux2(
+        block_out_channels=(32, 32, 32, 32), latent_channels=32, layers_per_block=1, norm_num_groups=32
+    ).eval()
+
+
+def test_ernie_decode_uses_the_cpu_vae_in_an_accelerator_session(cpu_vae_with_accelerator_session):
+    vae_info = cpu_vae_with_accelerator_session(_ernie_vae(), "decode")
+
+    result = _decode_ernie(vae_info, torch.zeros(1, 128, 2, 2, dtype=torch.float64))
 
     assert (result.width, result.height) == (32, 32)
+
+
+def test_ernie_decode_reserves_working_memory_for_the_unpatchified_latent(cpu_vae_with_accelerator_session):
+    """Without an estimate the cache keeps only the default working memory free and the transformer stays resident
+    next to a multi-GB decode. The estimate has to price the decoder's [B, 32, H, W] input, not the packed latent."""
+    vae = _ernie_vae()
+    vae_info = cpu_vae_with_accelerator_session(vae, "decode")
+    on_device = Mock(wraps=vae_info.model_on_device)
+    vae_info.model_on_device = on_device
+
+    _decode_ernie(vae_info, torch.zeros(2, 128, 2, 3))
+
+    # Batch 2 and a non-square size: pricing the packed latent or a single sample gives a different estimate.
+    expected = estimate_vae_working_memory_flux2(
+        operation="decode", image_tensor=torch.zeros(2, 32, 4, 6), vae=vae, device=torch.device("cpu")
+    )
+    on_device.assert_called_once_with(working_memory=expected)
