@@ -15,8 +15,9 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory, _denoiser_stores_float8_weights
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import ModelType
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
@@ -108,23 +109,68 @@ def test_an_nvfp4_file_that_also_stores_float8_weights_gets_it(tmp_path: Path) -
     assert config.default_settings.fp8_storage is True
 
 
-def test_an_mxfp8_file_is_left_to_the_user(tmp_path: Path) -> None:
-    """The loaders unpack MXFP8 layers to bf16, and FP8 Storage would re-encode them as fp8 without the block scale,
-    flushing blocks with a small scale to zero. The weights are float8 and the file also has a per-tensor fp8 layer,
-    so only the block-scale layout keeps it off. Switching it on stays possible."""
+def _mxfp8_img_in(scale_suffix: str = "weight_scale") -> dict[str, torch.Tensor]:
     mx, _ = mxfp8_tensors("img_in", torch.full((128, 4), 127.0))
-    path = _qwen_image_checkpoint(
-        tmp_path / "qwen_image_mxfp8.safetensors",
-        torch.float8_e4m3fn,
-        **mx,
-        **{"img_in.comfy_quant": comfy_quant_marker(mxfp8_marker()), "txt_in.weight_scale": torch.ones(1)},
-    )
+    tensors = {key: value for key, value in mx.items() if not key.startswith("img_in.weight_scale")}
+    tensors[f"img_in.{scale_suffix}"] = mx["img_in.weight_scale"]
+    tensors["img_in.comfy_quant"] = comfy_quant_marker(mxfp8_marker())
+    return tensors
+
+
+def _mxfp8_only_checkpoint(path: Path, scale_suffix: str = "weight_scale") -> Path:
+    """Every fp8 weight is an MXFP8 layer; `txt_in` stays bf16."""
+    return _qwen_image_checkpoint(path, torch.bfloat16, **_mxfp8_img_in(scale_suffix))
+
+
+@pytest.mark.parametrize("scale_suffix", ["weight_scale", "scale_weight"])
+def test_a_file_whose_fp8_weights_are_all_mxfp8_is_left_to_the_user(tmp_path: Path, scale_suffix: str) -> None:
+    """The loaders unpack MXFP8 layers to bf16, and with nothing else fp8 in the file FP8 Storage would re-encode them
+    as fp8 without the block scale, flushing blocks with a small scale to zero. Switching it on stays possible."""
+    path = _mxfp8_only_checkpoint(tmp_path / "qwen_image_mxfp8.safetensors", scale_suffix)
 
     config = _identify(path)
     forced = _identify(path, {"default_settings": {"fp8_storage": True}})
 
     assert config.default_settings is None or config.default_settings.fp8_storage is None
     assert forced.default_settings is not None and forced.default_settings.fp8_storage is True
+
+
+def test_wan_keeps_fp8_storage_on_for_an_mxfp8_file(tmp_path: Path) -> None:
+    """Wan's loader leaves every layer it unpacked with its scale at the compute dtype, so FP8 Storage re-encodes none
+    of the MX layers there and the default stays on."""
+    mod = ModelOnDisk(_mxfp8_only_checkpoint(tmp_path / "wan_mxfp8.safetensors"))
+
+    assert _denoiser_stores_float8_weights(mod) is False
+    assert _denoiser_stores_float8_weights(mod, mxfp8_is_lossy=False) is True
+
+
+def test_a_file_mixing_mxfp8_and_scaled_fp8_layers_keeps_fp8_storage_on(tmp_path: Path) -> None:
+    """The scaled fp8 layer stays packed with its scale, so the model holds fp8 weights and the layerwise cast is
+    skipped: the MX layers are not re-encoded and the setting only saves the scaled layer's VRAM."""
+    path = _qwen_image_checkpoint(
+        tmp_path / "qwen_image_mixed.safetensors",
+        torch.float8_e4m3fn,
+        **_mxfp8_img_in(),
+        **{"txt_in.weight_scale": torch.ones(1)},
+    )
+
+    config = _identify(path)
+
+    assert config.default_settings is not None
+    assert config.default_settings.fp8_storage is True
+
+
+def test_a_file_with_an_unscaled_fp8_weight_beside_mxfp8_layers_keeps_fp8_storage_on(tmp_path: Path) -> None:
+    path = _qwen_image_checkpoint(
+        tmp_path / "qwen_image_mixed_unscaled.safetensors",
+        torch.float8_e4m3fn,
+        **_mxfp8_img_in(),
+    )
+
+    config = _identify(path)
+
+    assert config.default_settings is not None
+    assert config.default_settings.fp8_storage is True
 
 
 def test_a_full_precision_file_named_fp8_is_left_alone(tmp_path: Path) -> None:

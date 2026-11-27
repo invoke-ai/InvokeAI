@@ -252,7 +252,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
-from invokeai.backend.quantization.fp8_scaled import header_has_mx_block_scales
+from invokeai.backend.quantization.fp8_scaled import header_is_mxfp8
 from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_gguf_convrot_markers
 
 logger = logging.getLogger(__name__)
@@ -268,7 +268,7 @@ _DENOISER_SUBFOLDERS = frozenset({"transformer", "unet"})
 SettingsT = TypeVar("SettingsT", bound=BaseModel)
 
 
-def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
+def _denoiser_stores_float8_weights(mod: ModelOnDisk, *, mxfp8_is_lossy: bool = True) -> bool:
     """Whether the denoiser's weights are stored in a float8 the storage cast can reproduce, judged by the safetensors
     headers and never by a file name.
 
@@ -286,9 +286,12 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
     it is left to the user instead of switched on. An nvfp4 file that also stores scaled fp8 weights (Qwen-Image's
     nvfp4 build) still counts.
 
-    An MXFP8 file does not count either (`header_has_mx_block_scales`). The loaders unpack its block-scaled layers to
-    bf16, and FP8 Storage would cast them back to fp8 without the block scale: blocks whose scale is far below 1 flush
-    to zero. Like bf16, it is left to the user, who can still switch it on knowingly.
+    A file whose fp8 weights all carry an MX block-scale grid (MXFP8, `header_is_mxfp8`) does not count either. The
+    loaders unpack its block-scaled layers to bf16, and FP8 Storage would cast them back to fp8 without the block
+    scale: blocks whose scale is far below 1 flush to zero. Like bf16, it is left to the user, who can still switch it
+    on knowingly. A file that mixes MX layers with scaled fp8 layers still counts: its scaled layers stay packed, the
+    model then holds fp8 weights and the cast is skipped, so the MX layers are never re-encoded. `mxfp8_is_lossy` is
+    False for Wan, whose loader never re-encodes a layer it unpacked with its scale.
     """
     if mod.path.is_file():
         candidates = [mod.path]
@@ -300,7 +303,7 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
         ]
 
     stores_float8 = False
-    stores_mxfp8 = False
+    denoiser_header: dict[str, Any] = {}
     for path in candidates:
         if path.suffix != ".safetensors":
             continue
@@ -310,13 +313,13 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
             logger.debug(f"Could not read the safetensors header of {path} to look for float8 weights: {e}")
             continue
         denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
-        stores_mxfp8 = stores_mxfp8 or header_has_mx_block_scales(denoiser)
+        denoiser_header.update(denoiser)
         stores_float8 = stores_float8 or any(
             isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES
             for key, info in denoiser.items()
             if not key.endswith("_scale")
         )
-    return stores_float8 and not stores_mxfp8
+    return stores_float8 and not (mxfp8_is_lossy and header_is_mxfp8(denoiser_header))
 
 
 def _identified_default_settings(
@@ -355,7 +358,9 @@ def _identified_default_settings(
 
     if not fp8_storage_verdict(config.base, config.type, config.format).supported:
         update.pop("fp8_storage", None)
-    elif "fp8_storage" not in update and _denoiser_stores_float8_weights(mod):
+    elif "fp8_storage" not in update and _denoiser_stores_float8_weights(
+        mod, mxfp8_is_lossy=config.base != BaseModelType.Wan
+    ):
         logger.info(f"{mod.name}: denoiser weights are stored in float8, enabling FP8 Storage by default")
         update["fp8_storage"] = True
 

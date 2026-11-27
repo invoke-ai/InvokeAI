@@ -484,30 +484,40 @@ _MX_SCALE_HEADER_DTYPES = frozenset({"U8", "F8_E8M0"})
 _FP8_HEADER_DTYPES = frozenset({"F8_E4M3", "F8_E5M2"})
 
 
-def header_has_mx_block_scales(header: Mapping[str, Any]) -> bool:
-    """Whether a safetensors header (``read_safetensors_header``) holds an MXFP8 layer, judged by layout alone.
+def header_is_mxfp8(header: Mapping[str, Any]) -> bool:
+    """Whether every fp8 weight in a safetensors header (``read_safetensors_header``) carries an MX scale grid.
 
-    An fp8 ``<layer>.weight`` beside an exponent-grid ``<layer>.weight_scale``: a 2-D ``uint8`` (or E8M0) tensor with
-    one row per weight row and one entry per :data:`MXFP8_BLOCK_SIZE` columns, the shape :func:`decode_mx_block_scales`
-    requires. The ``comfy_quant`` marker that names the format is tensor data, which a header read cannot see. A
-    producer that writes this layout without naming it does not load at all, so the layout is enough to go on here.
+    An MX layer is an fp8 ``<layer>.weight`` beside an exponent-grid weight scale (``.weight_scale`` or
+    ``.scale_weight``): a 2-D ``uint8`` (or E8M0) tensor with one row per weight row and one entry per
+    :data:`MXFP8_BLOCK_SIZE` columns, the shape :func:`decode_mx_block_scales` requires. The ``comfy_quant`` marker that
+    names the format is tensor data, which a header read cannot see. A producer that writes this layout without naming
+    it does not load at all, so the layout is enough to go on here.
+
+    A file that also holds an fp8 weight with a per-tensor or per-row scale, or none, is not MXFP8 in this sense: the
+    loaders keep such a layer packed with its scale, which makes the model hold fp8 weights and skips the layerwise
+    cast, so the MX layers are never re-encoded either. False when the header has no fp8 weight.
     """
-    for key, info in header.items():
-        if not key.endswith(".weight") or not isinstance(info, dict) or info.get("dtype") not in _FP8_HEADER_DTYPES:
-            continue
-        scale = header.get(f"{key[: -len('.weight')]}.weight_scale")
-        if not isinstance(scale, dict) or scale.get("dtype") not in _MX_SCALE_HEADER_DTYPES:
-            continue
-        weight_shape, scale_shape = info.get("shape"), scale.get("shape")
-        if (
-            isinstance(weight_shape, list)
-            and isinstance(scale_shape, list)
-            and len(weight_shape) == len(scale_shape) == 2
-            and scale_shape[0] == weight_shape[0]
-            and scale_shape[1] * MXFP8_BLOCK_SIZE == weight_shape[1]
-        ):
-            return True
-    return False
+    scales = dict(iter_weight_scale_pairs(header))
+    fp8_weights = [
+        key
+        for key, info in header.items()
+        if key.endswith(".weight") and isinstance(info, dict) and info.get("dtype") in _FP8_HEADER_DTYPES
+    ]
+    return bool(fp8_weights) and all(_has_mx_scale_grid(header, key, scales.get(key)) for key in fp8_weights)
+
+
+def _has_mx_scale_grid(header: Mapping[str, Any], weight_key: str, scale_key: str | None) -> bool:
+    scale = header.get(scale_key) if scale_key is not None else None
+    if not isinstance(scale, dict) or scale.get("dtype") not in _MX_SCALE_HEADER_DTYPES:
+        return False
+    weight_shape, scale_shape = header[weight_key].get("shape"), scale.get("shape")
+    return (
+        isinstance(weight_shape, list)
+        and isinstance(scale_shape, list)
+        and len(weight_shape) == len(scale_shape) == 2
+        and scale_shape[0] == weight_shape[0]
+        and scale_shape[1] * MXFP8_BLOCK_SIZE == weight_shape[1]
+    )
 
 
 def unparsed_fp8_scale_keys(sd: Mapping[str, Any]) -> list[str]:
