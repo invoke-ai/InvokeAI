@@ -1,6 +1,6 @@
 ---
 title: MiniMax H3
-lastUpdated: 2026-09-29
+lastUpdated: 2026-11-24
 alsoListedIn:
   - users-guide/models/local-models
 sidebar:
@@ -85,6 +85,21 @@ When you use reference images and videos in a Ref2VA generation, you
 may refer to them within the prompt as &lt;Picture 1&gt;, &lt;Video
 1&gt; and so forth. These labels appear adjacent to the reference
 image or video.
+
+#### Expand a text prompt with H3 Context-IR
+
+In the workflow editor, **MiniMax H3 Context-IR (API)** turns a scene description into a structured prompt for H3. Running the node sends your text, target duration and aspect ratio to MiniMax. MiniMax bills the configured account for prompt processing.
+
+On the Invoke server, add the key for your MiniMax region to `api_keys.yaml` alongside `invokeai.yaml`, then restart Invoke. The international endpoint defaults to `https://api.minimax.io`. For a mainland China key, use the settings below.
+
+```yaml
+external_minimax_api_key: "your-mainland-china-api-key"
+external_minimax_base_url: "https://api.minimax.cn"
+```
+
+Add **MiniMax H3 Context-IR (API)** to a workflow, enter your scene description, and set the intended clip duration (4–15 seconds) and aspect ratio. Connect its **Value** output to the **Prompt** input on **Prompt - MiniMax H3** to condition a local video generation. To edit the result before generating, run Context-IR in a text-only workflow, then copy **Value** from **Node Inspector → Outputs** into the local H3 prompt.
+
+![MiniMax H3 Context-IR workflow node with a scene prompt, 5-second duration, 16:9 aspect ratio and a Value output.](../assets/minimax-h3-context-ir.png)
 
 #### License
 

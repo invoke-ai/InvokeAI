@@ -501,13 +501,21 @@ def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatc
     InvokeAIArgs.did_parse = True
     monkeypatch.setenv("INVOKEAI_ROOT", str(tmp_path))
     (tmp_path / "invokeai.yaml").write_text("schema_version: 4.0.2\n")
-    (tmp_path / "api_keys.yaml").write_text("external_openai_api_key: openai-key\n")
+    monkeypatch.delenv("INVOKEAI_EXTERNAL_MINIMAX_API_KEY", raising=False)
+    monkeypatch.delenv("INVOKEAI_EXTERNAL_MINIMAX_BASE_URL", raising=False)
+    (tmp_path / "api_keys.yaml").write_text(
+        "external_openai_api_key: openai-key\n"
+        "external_minimax_api_key: minimax-key\n"
+        "external_minimax_base_url: https://api.minimax.cn\n"
+    )
 
     get_config.cache_clear()
     config = get_config()
     get_config.cache_clear()
 
     assert config.external_openai_api_key == "openai-key"
+    assert config.external_minimax_api_key == "minimax-key"
+    assert config.external_minimax_base_url == "https://api.minimax.cn"
 
     InvokeAIArgs.did_parse = False
 
