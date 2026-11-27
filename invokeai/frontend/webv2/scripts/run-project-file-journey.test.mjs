@@ -187,3 +187,33 @@ test('import waives only a missing archived video probe body cancellation after 
   page.emit('requestfailed', request(`${url}/full`, 'net::ERR_ABORTED'));
   assert.equal(errors.length, 4, 'Another request, transport failure and media-content cancellation remain critical');
 });
+
+test('unload recovery waives only an unanswered media-hold PUT cancelled by leaving the page', async () => {
+  const errors = [];
+  const observe = async (phase) => {
+    const page = new EventEmitter();
+    await observeBrowserErrors(page, phase, errors);
+    return page;
+  };
+  const hold = 'http://localhost/api/v1/intermediates/holds/lease';
+  const request = (target, method, errorText) => ({
+    url: () => target,
+    method: () => method,
+    failure: () => ({ errorText }),
+  });
+  const page = await observe('unload recovery');
+  page.emit('requestfailed', request(hold, 'PUT', 'net::ERR_ABORTED'));
+  assert.equal(errors.length, 0);
+  const answered = request(hold, 'PUT', 'net::ERR_ABORTED');
+  page.emit('response', { url: () => hold, status: () => 500, request: () => answered });
+  page.emit('requestfailed', answered);
+  page.emit('requestfailed', request(hold, 'PUT', 'net::ERR_CONNECTION_REFUSED'));
+  page.emit('requestfailed', request(hold, 'DELETE', 'net::ERR_ABORTED'));
+  page.emit('requestfailed', request('http://localhost/api/v1/projects/p', 'PUT', 'net::ERR_ABORTED'));
+  (await observe('export')).emit('requestfailed', request(hold, 'PUT', 'net::ERR_ABORTED'));
+  assert.equal(
+    errors.length,
+    6,
+    'A failed response, transport failure, release, other write or other phase stay critical'
+  );
+});

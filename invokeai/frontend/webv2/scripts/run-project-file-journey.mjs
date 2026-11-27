@@ -84,6 +84,18 @@ export const observeBrowserErrors = async (page, phase, errors) => {
   await observeBrowserDiagnostics(page, {
     onError: (event) => errors.push(new Error(`${phase}: ${JSON.stringify(event)}`)),
     expected: (event) => {
+      // Leaving the page can cancel the media-hold lease's PUT, and the abort can be reported after the navigation
+      // window closes. The lease resends on the next load and the server expires a stale one.
+      if (
+        phase === 'unload recovery' &&
+        event.kind === 'requestfailed' &&
+        event.method === 'PUT' &&
+        event.responseStatus === undefined &&
+        event.message === 'net::ERR_ABORTED' &&
+        new URL(event.url).pathname.startsWith('/api/v1/intermediates/holds/')
+      ) {
+        return true;
+      }
       // Import probes an archived video DTO before restoring its binary under a new identity.
       return (
         phase.endsWith('import') &&
