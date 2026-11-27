@@ -4,12 +4,8 @@ import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { ALL_READABLE_BOARDS_ID, toGalleryItemKey } from '@features/gallery/core/items';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { getGallerySettings } from '@features/gallery/core/settings';
-import {
-  createGalleryBoard,
-  deleteGalleryBoard,
-  downloadGalleryArchive,
-  updateGalleryBoard,
-} from '@features/gallery/data/backend';
+import { downloadGalleryArchive } from '@features/gallery/data/archives';
+import { createGalleryBoard, deleteGalleryBoard, updateGalleryBoard } from '@features/gallery/data/backend';
 import { addGalleryBoardToCaches, invalidateGallery, patchGalleryBoardCaches } from '@features/gallery/data/queryCache';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {

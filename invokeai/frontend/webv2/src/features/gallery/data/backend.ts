@@ -38,14 +38,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import {
-  absolutizeApiUrl,
-  ApiError,
-  apiFetchJson,
-  apiFetchRaw,
-  HttpRequestIdentityExpiredError,
-  sleep,
-} from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError, apiFetchJson, HttpRequestIdentityExpiredError } from '@platform/transport/http';
 
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
@@ -1546,64 +1539,6 @@ export const moveGalleryVideoItemsToBoard = async (
   }
 
   return { affectedBoardIds, succeededNames };
-};
-
-const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
-const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
-
-export const downloadGalleryArchive = async ({
-  boardId,
-  imageNames,
-  signal,
-}: {
-  boardId?: string;
-  imageNames?: string[];
-  signal?: AbortSignal;
-}): Promise<{ blob: Blob; fileName: string }> => {
-  const owner = captureAccountScope();
-  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-  const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
-    '/api/v1/images/download',
-    {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
-      method: 'POST',
-      signal: requestSignal,
-    }
-  );
-
-  assertAccountScopeCurrent(owner);
-  requestSignal.throwIfAborted();
-  if (!fileName) {
-    throw new Error('The bulk download failed to start.');
-  }
-
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
-    const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
-      signal: requestSignal,
-    });
-
-    assertAccountScopeCurrent(owner);
-    requestSignal.throwIfAborted();
-    if (response.ok) {
-      const blob = await response.blob();
-
-      assertAccountScopeCurrent(owner);
-      requestSignal.throwIfAborted();
-      return { blob, fileName };
-    }
-
-    if (response.status !== 404) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
-    assertAccountScopeCurrent(owner);
-    requestSignal.throwIfAborted();
-  }
-
-  throw new Error('Timed out preparing the download archive.');
 };
 
 export const uploadGalleryImage = async (

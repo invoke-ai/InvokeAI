@@ -2643,6 +2643,39 @@ class TestBulkDownloadAccessControl:
         )
         assert r.status_code == status.HTTP_202_ACCEPTED
 
+    def test_orphaned_downloads_are_claimed_only_by_their_owner(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        user1_token: str,
+        user2_token: str,
+        admin_token: str,
+    ):
+        from invokeai.app.services.bulk_download.bulk_download_default import ORPHAN_AFTER_SECONDS
+
+        now = [1000.0]
+        monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.monotonic", lambda: now[0])
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-orphan-dl", user1.user_id)
+        r = client.post(
+            "/api/v1/images/download", json={"image_names": ["user1-orphan-dl"]}, headers=_auth(user1_token)
+        )
+        item_name = r.json()["bulk_download_item_name"]
+        r = client.get(f"/api/v1/images/download/{item_name}", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_404_NOT_FOUND
+        now[0] += ORPHAN_AFTER_SECONDS + 1
+
+        for other_token in (user2_token, admin_token):
+            r = client.post("/api/v1/images/download/claim", headers=_auth(other_token))
+            assert r.json() == {"bulk_download_item_names": []}
+        r = client.get(f"/api/v1/images/download/{item_name}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        r = client.post("/api/v1/images/download/claim", headers=_auth(user1_token))
+        assert r.json() == {"bulk_download_item_names": [item_name]}
+
     @staticmethod
     def _download_zip_names(
         client: TestClient, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path, token: str, board_id: str

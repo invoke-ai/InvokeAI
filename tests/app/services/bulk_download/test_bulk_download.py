@@ -12,7 +12,11 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
 )
 from invokeai.app.services.bulk_download.bulk_download_common import BulkDownloadTargetException
-from invokeai.app.services.bulk_download.bulk_download_default import MAX_BOARD_NAME_BYTES, BulkDownloadService
+from invokeai.app.services.bulk_download.bulk_download_default import (
+    MAX_BOARD_NAME_BYTES,
+    ORPHAN_AFTER_SECONDS,
+    BulkDownloadService,
+)
 from invokeai.app.services.events.events_common import (
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
@@ -474,10 +478,14 @@ def test_handler_on_generic_exception(
         raise exception
 
     monkeypatch.setattr(mock_invoker.services.images, "get_dto", mock_get_board_name)
+    bulk_download_service = BulkDownloadService()
+    bulk_download_service.start(mock_invoker)
+    bulk_download_service.register("failed.zip", "system")
 
-    with pytest.raises(Exception):  # noqa: B017
-        execute_handler_test_on_error(tmp_path, monkeypatch, mock_image_dto, mock_invoker, exception)
+    with pytest.raises(Exception, match="Generic exception"):
+        bulk_download_service.handler([mock_image_dto.image_name], None, "failed")
 
+    assert bulk_download_service.get_owner("failed.zip") is None
     event_bus: TestEventService = mock_invoker.services.events
 
     assert len(event_bus.events) == 2
@@ -491,7 +499,10 @@ def execute_handler_test_on_error(
 ):
     bulk_download_service = BulkDownloadService()
     bulk_download_service.start(mock_invoker)
-    bulk_download_service.handler([mock_image_dto.image_name], None, None)
+    bulk_download_service.register("failed.zip", "system")
+    bulk_download_service.handler([mock_image_dto.image_name], None, "failed")
+    # A failed job is forgotten, so its poller is told it is gone instead of waiting for it.
+    assert bulk_download_service.get_owner("failed.zip") is None
 
     event_bus: TestEventService = mock_invoker.services.events
 
@@ -529,3 +540,75 @@ def test_stop(tmp_path: Path):
     bulk_download_service.stop()
 
     assert not (tmp_path / "bulk_downloads").exists()
+
+
+class FakeClock:
+    def __init__(self, monkeypatch: Any) -> None:
+        self.now = 1000.0
+        monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.monotonic", lambda: self.now)
+
+
+def test_handler_keeps_the_registered_owner_and_lease(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    clock = FakeClock(monkeypatch)
+    prepare_handler_test(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+    service.register("test.zip", "user-a")
+    service.take_ready("test.zip")
+
+    clock.now += ORPHAN_AFTER_SECONDS + 1
+    service.handler([mock_image_dto.image_name], None, "test", user_id="user-a")
+
+    assert service.get_owner("test.zip") == "user-a"
+    assert service.claim_orphaned("user-a") == ["test.zip"]
+
+
+def test_claim_orphaned_takes_only_the_callers_idle_downloads_once(monkeypatch: Any):
+    clock = FakeClock(monkeypatch)
+    service = BulkDownloadService()
+    for name, owner in (("a-idle.zip", "user-a"), ("a-polled.zip", "user-a"), ("b-idle.zip", "user-b")):
+        service.register(name, owner)
+        service.take_ready(name)
+    # Its client waits for the completion event instead of polling, so it is never an orphan.
+    service.register("a-never-polled.zip", "user-a")
+
+    clock.now += ORPHAN_AFTER_SECONDS - 1
+    service.take_ready("a-polled.zip")
+    clock.now += 2
+
+    assert service.claim_orphaned("user-a") == ["a-idle.zip"]
+    # The claim renewed the lease, so a second client signing in at the same time does not take it too.
+    assert service.claim_orphaned("user-a") == []
+
+    clock.now += ORPHAN_AFTER_SECONDS + 1
+    assert sorted(service.claim_orphaned("user-a")) == ["a-idle.zip", "a-polled.zip"]
+
+
+def test_delete_forgets_the_download(tmp_path: Path, monkeypatch: Any):
+    clock = FakeClock(monkeypatch)
+    service = BulkDownloadService()
+    service.register("test.zip", "user-a")
+    service.take_ready("test.zip")
+    (tmp_path / "bulk_downloads" / "test.zip").write_text("contents")
+
+    service.delete("test.zip")
+
+    clock.now += ORPHAN_AFTER_SECONDS + 1
+    assert service.get_owner("test.zip") is None
+    assert service.claim_orphaned("user-a") == []
+
+
+def test_a_ready_download_is_taken_once(tmp_path: Path):
+    service = BulkDownloadService()
+    service.register("test.zip", "user-a")
+    assert service.take_ready("test.zip") is None  # not ready yet, still known
+    assert service.get_owner("test.zip") == "user-a"
+    zip_path = tmp_path / "bulk_downloads" / "test.zip"
+    zip_path.write_text("contents")
+
+    assert service.take_ready("test.zip") == str(zip_path)
+
+    assert service.take_ready("test.zip") is None
+    assert service.get_owner("test.zip") is None  # the route answers 410

@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 828036,
+        "brotliBytes": 830633,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 826764,
+        "gzipBytes": 829454,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2144774,
+        "initialRawBytes": 2151060,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 117308,
+        "ownedRawBytes": 119381,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -128,6 +128,7 @@
           "source:src/app/SocketHubRuntime.tsx",
           "source:src/app/ThemeController.tsx",
           "source:src/app/accountLifecycle.ts",
+          "source:src/app/archiveRecovery.ts",
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
           "source:src/app/router.tsx",
@@ -137,6 +138,8 @@
           "source:src/features/fonts/launchpad.tsx",
           "source:src/features/fonts/react.tsx",
           "source:src/features/fonts/runtime.ts",
+          "source:src/features/gallery/archiveRecovery.ts",
+          "source:src/features/gallery/data/archives.ts",
           "source:src/features/gallery/data/imageRecovery.ts",
           "source:src/features/gallery/ui/useGalleryImageRecovery.ts",
           "source:src/features/identity/capabilities.ts",
@@ -364,15 +367,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1305696,
+        "brotliBytes": 1311134,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1297890,
+        "gzipBytes": 1303711,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3620562,
+        "initialRawBytes": 3635367,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 177610,
+        "ownedRawBytes": 178889,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -510,6 +513,7 @@
           "source:src/app/WorkflowCommandShortcut.tsx",
           "source:src/app/WorkflowUiAdapter.tsx",
           "source:src/app/accountLifecycle.ts",
+          "source:src/app/archiveRecovery.ts",
           "source:src/app/galleryItemMenu.tsx",
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
@@ -522,6 +526,7 @@
           "source:src/features/fonts/launchpad.tsx",
           "source:src/features/fonts/react.tsx",
           "source:src/features/fonts/runtime.ts",
+          "source:src/features/gallery/archiveRecovery.ts",
           "source:src/features/gallery/core/boardAccess.ts",
           "source:src/features/gallery/core/boardLabels.ts",
           "source:src/features/gallery/core/image.ts",
@@ -533,6 +538,7 @@
           "source:src/features/gallery/core/semanticImageQuery.ts",
           "source:src/features/gallery/core/settings.ts",
           "source:src/features/gallery/core/videoPaths.ts",
+          "source:src/features/gallery/data/archives.ts",
           "source:src/features/gallery/data/backend.ts",
           "source:src/features/gallery/data/imageRecovery.ts",
           "source:src/features/gallery/data/imageUrls.ts",
@@ -1193,7 +1199,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-11-20",
+  "capturedAt": "2026-11-26",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

@@ -2939,6 +2939,11 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(201, image);
       }
 
+      // Bulk downloads are not modeled, so no account has archives to resume.
+      if (method === 'POST' && path === '/api/v1/images/download/claim') {
+        return json(200, { bulk_download_item_names: [] });
+      }
+
       if (method === 'POST' && (path === '/api/v1/images/star' || path === '/api/v1/images/unstar')) {
         const body = await readJsonBody(request);
         const names = Array.isArray(body.image_names) ? [...new Set(body.image_names)] : [];

@@ -14,6 +14,7 @@ from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.auth.token_service import TokenData
+from invokeai.app.services.bulk_download.bulk_download_default import ORPHAN_AFTER_SECONDS
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
@@ -190,6 +191,7 @@ def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker:
     mock_file.write_text("contents")
 
     monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda x: str(mock_file))
+    mock_invoker.services.bulk_download.register("test.zip", "system")
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
@@ -205,19 +207,44 @@ def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker:
     assert response.content == b"contents"
 
 
-def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
-    mock_deps = MockApiDependencies(mock_invoker)
-    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
-    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+def test_get_unknown_bulk_download_is_gone(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_download_images_test(monkeypatch, mock_invoker)
 
-    def mock_add_task(*args, **kwargs):
-        return None
+    response = client.get("/api/v1/images/download/test.zip")
 
-    monkeypatch.setattr(BackgroundTasks, "add_task", mock_add_task)
+    assert response.status_code == 410
+
+
+def test_bulk_download_polled_right_after_request_is_not_ready(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    # The job never runs here, as when the client polls before the background task starts.
+    prepare_download_images_test(monkeypatch, mock_invoker)
+    client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
 
     response = client.get("/api/v1/images/download/test.zip")
 
     assert response.status_code == 404
+
+
+def test_polling_a_bulk_download_keeps_it_from_being_claimed(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    now = [1000.0]
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.monotonic", lambda: now[0])
+    prepare_download_images_test(monkeypatch, mock_invoker)
+    client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
+
+    claim = "/api/v1/images/download/claim"
+
+    now[0] += ORPHAN_AFTER_SECONDS + 1
+    assert client.post(claim).json() == {"bulk_download_item_names": []}  # never polled
+    assert client.get("/api/v1/images/download/test.zip").status_code == 404
+    assert client.post(claim).json() == {"bulk_download_item_names": []}
+
+    now[0] += ORPHAN_AFTER_SECONDS + 1
+    assert client.post(claim).json() == {"bulk_download_item_names": ["test.zip"]}
+    assert client.post(claim).json() == {"bulk_download_item_names": []}
 
 
 def prepare_created_range_test(monkeypatch: Any, mock_invoker: Invoker) -> tuple[MagicMock, MagicMock]:
@@ -337,6 +364,7 @@ def test_get_bulk_download_image_image_deleted_after_response(
     mock_file.write_text("contents")
 
     monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda x: str(mock_file))
+    mock_invoker.services.bulk_download.register("test.zip", "system")
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
@@ -344,6 +372,25 @@ def test_get_bulk_download_image_image_deleted_after_response(
     client.get("/api/v1/images/download/test.zip")
 
     assert not (tmp_path / "test.zip").exists()
+
+
+def test_bulk_download_being_served_is_gone_and_unclaimable(
+    tmp_path: Path, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    now = [1000.0]
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.monotonic", lambda: now[0])
+    mock_file: Path = tmp_path / "test.zip"
+    mock_file.write_text("contents")
+    prepare_download_images_test(monkeypatch, mock_invoker)  # also holds back the delete-after-serve task
+    monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda x: str(mock_file))
+    mock_invoker.services.bulk_download.register("test.zip", "system")
+
+    assert client.get("/api/v1/images/download/test.zip").status_code == 200
+
+    # The transfer may still be streaming past the lease: nobody may claim or fetch it again.
+    now[0] += ORPHAN_AFTER_SECONDS + 1
+    assert client.post("/api/v1/images/download/claim").json() == {"bulk_download_item_names": []}
+    assert client.get("/api/v1/images/download/test.zip").status_code == 410
 
 
 # ── Transactional single-image deletion (DELETE /api/v1/images/i/{image_name}) ──

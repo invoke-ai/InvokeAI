@@ -62,6 +62,7 @@ import { useTranslation } from 'react-i18next';
 
 import type * as DefaultsRulesModule from './modelDefaultsRulesReader';
 
+import { startArchiveRecovery } from './archiveRecovery';
 import { RouterErrorScreen } from './RouterErrorScreen';
 import { SocketHubRuntime } from './SocketHubRuntime';
 import { createStartupRedirects } from './startupRedirect';
@@ -493,6 +494,9 @@ const unsubscribeAccountSwitchLanding = subscribeAuthSession(() => {
 });
 // A hot update of this module subscribes again; the replaced module's listener must go with it.
 import.meta.hot?.dispose(unsubscribeAccountSwitchLanding);
+
+const stopArchiveRecovery = startArchiveRecovery();
+import.meta.hot?.dispose(stopArchiveRecovery);
 
 declare module '@tanstack/react-router' {
   interface Register {

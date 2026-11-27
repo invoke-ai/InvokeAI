@@ -931,10 +931,13 @@ def download_images_from_list(
 
     assert_image_move_maintenance_inactive()
 
-    bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
+    bulk_download = ApiDependencies.invoker.services.bulk_download
+    bulk_download_item_id: str = bulk_download.generate_item_id(board_id)
+    # Known before the response, so a client polling at once sees "not ready" rather than "gone".
+    bulk_download.register(bulk_download_item_id + ".zip", current_user.user_id)
 
     background_tasks.add_task(
-        ApiDependencies.invoker.services.bulk_download.handler,
+        bulk_download.handler,
         image_names,
         board_id,
         bulk_download_item_id,
@@ -942,6 +945,22 @@ def download_images_from_list(
         uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
+
+
+class OrphanedBulkDownloads(BaseModel):
+    bulk_download_item_names: list[str] = Field(description="The caller's bulk download items now claimed for fetching")
+
+
+@images_router.post(
+    "/download/claim", operation_id="claim_orphaned_bulk_downloads", response_model=OrphanedBulkDownloads
+)
+def claim_orphaned_bulk_downloads(current_user: CurrentUserOrDefault) -> OrphanedBulkDownloads:
+    """Claims the caller's own bulk downloads whose polling client went away, such as ones prepared across a sign-in.
+
+    Each claimed item must be fetched soon; a second call returns it again only after its lease lapses.
+    """
+    names = ApiDependencies.invoker.services.bulk_download.claim_orphaned(current_user.user_id)
+    return OrphanedBulkDownloads(bulk_download_item_names=names)
 
 
 @images_router.api_route(
@@ -954,7 +973,8 @@ def download_images_from_list(
             "description": "Return the complete bulk download item",
             "content": {"application/zip": {}},
         },
-        404: {"description": "Image not found"},
+        404: {"description": "The bulk download item is not ready yet"},
+        410: {"description": "The bulk download item does not exist, failed, or was already fetched"},
     },
 )
 def get_bulk_download_item(
@@ -968,12 +988,15 @@ def get_bulk_download_item(
     download (tracked by the bulk download service) or an admin.
     """
     try:
-        # Verify the caller owns this download (or is an admin)
-        owner = ApiDependencies.invoker.services.bulk_download.get_owner(bulk_download_item_name)
-        if owner is not None and owner != current_user.user_id and not current_user.is_admin:
+        bulk_download = ApiDependencies.invoker.services.bulk_download
+        owner = bulk_download.get_owner(bulk_download_item_name)
+        if owner is None:
+            raise HTTPException(status_code=410, detail="This download is no longer available")
+        if owner != current_user.user_id and not current_user.is_admin:
             raise HTTPException(status_code=403, detail="Not authorized to access this download")
-
-        path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
+        path = bulk_download.take_ready(bulk_download_item_name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="This download is not ready yet")
 
         response = FileResponse(
             path,
@@ -982,7 +1005,7 @@ def get_bulk_download_item(
             content_disposition_type="inline",
         )
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
+        background_tasks.add_task(bulk_download.delete, bulk_download_item_name)
         return response
     except HTTPException:
         raise

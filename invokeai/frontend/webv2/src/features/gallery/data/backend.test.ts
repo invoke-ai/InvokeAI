@@ -5,8 +5,6 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
-  apiFetchRaw: vi.fn(),
-  sleep: vi.fn(),
 }));
 
 vi.mock('@platform/transport/http', async (importOriginal) => ({
@@ -14,8 +12,6 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
-  apiFetchRaw: mocks.apiFetchRaw,
-  sleep: mocks.sleep,
 }));
 
 import { ApiError } from '@platform/transport/http';
@@ -26,7 +22,6 @@ import {
   galleryBoardExists,
   deleteGalleryBoard,
   deleteGalleryImages,
-  downloadGalleryArchive,
   getGalleryImageByName,
   getGalleryImagesByNames,
   getGalleryItemLocation,
@@ -110,46 +105,6 @@ describe('image mutation outcomes', () => {
 
     await expect(addImagesToGalleryBoard('board-1', ['moved.png', 'locked.png'])).resolves.toEqual(['moved.png']);
     await expect(removeImagesFromGalleryBoard(['removed.png', 'locked.png'])).resolves.toEqual(['removed.png']);
-  });
-});
-
-describe('downloadGalleryArchive', () => {
-  beforeEach(() => {
-    accountLifecycle.activate('user-a');
-    mocks.apiFetchJson.mockReset();
-    mocks.apiFetchRaw.mockReset();
-    mocks.sleep.mockReset();
-  });
-
-  it('aborts polling before another account can request the prior account archive', async () => {
-    let resumeSleep: (() => void) | undefined;
-    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'user-a.zip' });
-    mocks.apiFetchRaw.mockResolvedValue(new Response(null, { status: 404 }));
-    mocks.sleep.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          resumeSleep = resolve;
-        })
-    );
-
-    const download = downloadGalleryArchive({ imageNames: ['user-a.png'] });
-
-    await vi.waitFor(() => {
-      expect(mocks.sleep).toHaveBeenCalledOnce();
-    });
-    const postSignal = (mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
-    const pollSignal = (mocks.apiFetchRaw.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
-    const sleepSignal = mocks.sleep.mock.calls[0]?.[1] as AbortSignal;
-
-    accountLifecycle.invalidate();
-    accountLifecycle.activate('user-b');
-    resumeSleep?.();
-
-    await expect(download).rejects.toThrow('no longer active');
-    expect(postSignal?.aborted).toBe(true);
-    expect(pollSignal?.aborted).toBe(true);
-    expect(sleepSignal.aborted).toBe(true);
-    expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
   });
 });
 

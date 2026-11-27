@@ -1,6 +1,9 @@
 import os
+import threading
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import monotonic
 from typing import Optional, Union
 from zipfile import ZipFile
 
@@ -22,6 +25,16 @@ from invokeai.app.util.misc import uuid_string
 # uuid keeps truncated names unique.
 MAX_BOARD_NAME_BYTES = 100
 
+# A live poller renews its download's lease every ~2s, so one idle this long has lost its client.
+ORPHAN_AFTER_SECONDS = 10
+
+
+@dataclass
+class _DownloadRecord:
+    owner: str
+    # None until a client first polls: clients that wait for the completion event never poll, so are not orphans.
+    last_seen: Optional[float] = None
+
 
 class BulkDownloadService(BulkDownloadBase):
     def start(self, invoker: Invoker) -> None:
@@ -31,8 +44,9 @@ class BulkDownloadService(BulkDownloadBase):
         self._temp_directory = TemporaryDirectory()
         self._bulk_downloads_folder = Path(self._temp_directory.name) / "bulk_downloads"
         self._bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
-        # Track which user owns each download so the fetch endpoint can enforce ownership
-        self._download_owners: dict[str, str] = {}
+        # Owner and lease per download. The handler and the route handlers run concurrently in the threadpool.
+        self._downloads: dict[str, _DownloadRecord] = {}
+        self._lock = threading.Lock()
 
     def handler(
         self,
@@ -46,8 +60,8 @@ class BulkDownloadService(BulkDownloadBase):
         bulk_download_item_id = bulk_download_item_id or uuid_string()
         bulk_download_item_name = bulk_download_item_id + ".zip"
 
-        # Record ownership so the fetch endpoint can verify the caller
-        self._download_owners[bulk_download_item_name] = user_id
+        # The route registers before scheduling; direct callers rely on this.
+        self.register(bulk_download_item_name, user_id)
 
         self._signal_job_started(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
 
@@ -69,8 +83,10 @@ class BulkDownloadService(BulkDownloadBase):
             BulkDownloadException,
             BulkDownloadParametersException,
         ) as e:
+            self._forget(bulk_download_item_name)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
         except Exception as e:
+            self._forget(bulk_download_item_name)
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e, user_id)
             self._invoker.services.logger.error("Problem bulk downloading images.")
             raise e
@@ -180,13 +196,51 @@ class BulkDownloadService(BulkDownloadBase):
     def stop(self, *args, **kwargs):
         self._temp_directory.cleanup()
 
+    def register(self, bulk_download_item_name: str, user_id: str) -> None:
+        with self._lock:
+            self._downloads.setdefault(bulk_download_item_name, _DownloadRecord(owner=user_id))
+
     def get_owner(self, bulk_download_item_name: str) -> Optional[str]:
-        return self._download_owners.get(bulk_download_item_name)
+        with self._lock:
+            record = self._downloads.get(bulk_download_item_name)
+            return record.owner if record else None
+
+    def take_ready(self, bulk_download_item_name: str) -> Optional[str]:
+        with self._lock:
+            record = self._downloads.get(bulk_download_item_name)
+            if record is None:
+                return None
+            record.last_seen = monotonic()
+            try:
+                path = self.get_path(bulk_download_item_name)
+            except BulkDownloadTargetException:
+                return None
+            # Served from here on: one taker only, and a transfer outlasting the lease cannot be claimed.
+            del self._downloads[bulk_download_item_name]
+            return path
+
+    def claim_orphaned(self, user_id: str) -> list[str]:
+        with self._lock:
+            now = monotonic()
+            claimed = [
+                name
+                for name, record in self._downloads.items()
+                if record.owner == user_id
+                and record.last_seen is not None
+                and now - record.last_seen > ORPHAN_AFTER_SECONDS
+            ]
+            for name in claimed:
+                self._downloads[name].last_seen = now
+            return claimed
+
+    def _forget(self, bulk_download_item_name: str) -> None:
+        with self._lock:
+            self._downloads.pop(bulk_download_item_name, None)
 
     def delete(self, bulk_download_item_name: str) -> None:
         path = self.get_path(bulk_download_item_name)
+        self._forget(bulk_download_item_name)
         Path(path).unlink()
-        self._download_owners.pop(bulk_download_item_name, None)
 
     def get_path(self, bulk_download_item_name: str) -> str:
         path = str(self._bulk_downloads_folder / bulk_download_item_name)

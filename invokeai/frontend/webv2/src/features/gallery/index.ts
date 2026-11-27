@@ -37,13 +37,13 @@ import {
   type GalleryItemMutationResult as ItemMutationResult,
   type GalleryItemRef as ItemRef,
 } from './core/items';
+import { downloadGalleryArchive } from './data/archives';
 import {
   addGalleryImageItemsToBoard,
   addImagesToGalleryBoard,
   deleteGalleryImageItems,
   deleteGalleryImages,
   deleteGalleryVideoItems,
-  downloadGalleryArchive,
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
