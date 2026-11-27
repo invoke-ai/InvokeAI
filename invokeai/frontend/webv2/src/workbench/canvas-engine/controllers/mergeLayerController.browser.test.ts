@@ -1,5 +1,3 @@
-/** Real-canvas checks that Merge Down bakes each layer's own adjustment stack as the canvas displayed it. */
-
 import type {
   CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
@@ -40,7 +38,6 @@ const NOISE: CanvasAdjustmentsContract = [
 const IDENTITY = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 const UPPER_RECT: Rect = { height: 18, width: 24, x: -3, y: 2 };
 const LOWER_RECT: Rect = { height: 20, width: 20, x: 6, y: -2 };
-/** Document region covering both layers before and after the merge. */
 const VIEW: Rect = { height: 48, width: 48, x: -8, y: -8 };
 
 const layer = (
@@ -100,7 +97,6 @@ const mergeScene = (scene: Scene, displayed: boolean, service?: SpatialAdjustmen
     lower: getDocumentLayer(h.document(), 'lower')!,
     upper: getDocumentLayer(h.document(), 'upper')!,
   };
-  /** What the canvas shows over {@link VIEW}: each layer's display copy (adjusted when it has a stack) through its transform. */
   const canvasPixels = (): number[] => {
     const surface = backend.createSurface(VIEW.width, VIEW.height);
     for (const contract of [...getDocumentLeaves(h.document())].reverse()) {
@@ -131,7 +127,6 @@ const mergeScene = (scene: Scene, displayed: boolean, service?: SpatialAdjustmen
     publishSelectedLayerIds: () => undefined,
     runSpatial: service ? (request) => service.run(request) : undefined,
   });
-  /** Shows the canvas until every spatial result has landed, as frames would. */
   const settle = () =>
     vi.waitFor(
       () => {
@@ -169,7 +164,6 @@ describe('Merge Down with adjustment stacks', () => {
 
       expect(await h.controller.mergeDown('upper')).toBe('merged');
 
-      // The merged layer has no stack: its baked pixels show what both layers showed.
       expect(getDocumentLayer(h.document(), 'lower')).not.toHaveProperty('adjustments');
       expect(h.canvasPixels()).toEqual(shown);
 
@@ -224,7 +218,6 @@ describe('Merge Down with spatial stacks', () => {
   });
 });
 
-/** Coverage alpha of a mask's baked pixels, filled uniformly over `rect`. */
 const coverage = (rect: Rect, alpha: number): RasterSurface => {
   const surface = createDomRasterBackend().createSurface(rect.width, rect.height);
   surface.ctx.fillStyle = `rgba(255, 255, 255, ${alpha / 255})`;
@@ -234,7 +227,6 @@ const coverage = (rect: Rect, alpha: number): RasterSurface => {
 
 describe('MergeLayerController in Chromium: merge masks', () => {
   it('unions coverage source-over, ignoring each mask’s display opacity', async () => {
-    // The top mask is half-covered at full opacity; the one below is fully covered but shown at 40 % opacity.
     const sources: Record<string, { alpha: number; opacity: number; rect: Rect }> = {
       below: { alpha: 255, opacity: 0.4, rect: { height: 10, width: 10, x: 5, y: 0 } },
       top: { alpha: 128, opacity: 1, rect: { height: 10, width: 10, x: 0, y: 0 } },
@@ -254,7 +246,6 @@ describe('MergeLayerController in Chromium: merge masks', () => {
     };
     const h = createLayerOperationHarness(document);
     const dom = createDomRasterBackend();
-    // Real raw caches, which undo snapshots copy.
     for (const [layerId, { alpha, rect }] of Object.entries(sources)) {
       h.layers.installReplacement({ layerId, rect, surface: coverage(rect, alpha) });
     }
@@ -289,8 +280,6 @@ describe('MergeLayerController in Chromium: merge masks', () => {
 
     const merged = created.find((surface) => surface.width === 15 && surface.height === 10)!;
     const alphaAt = (x: number): number => merged.ctx.getImageData(x, 5, 1, 1).data[3]!;
-    // Top only: its own partial coverage. Below only: full coverage, which generation reads as masked (alpha > 127)
-    // however faintly the mask was shown. Both: full coverage under the top's.
     expect(alphaAt(2)).toBeCloseTo(128, -0.5);
     expect(alphaAt(12)).toBe(255);
     expect(alphaAt(7)).toBe(255);

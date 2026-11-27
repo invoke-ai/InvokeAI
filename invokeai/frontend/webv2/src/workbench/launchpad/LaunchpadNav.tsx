@@ -16,10 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { HelpMenu } from './HelpMenu';
 import { OpenProjectsNavSection } from './OpenProjectsControl';
 
-/**
- * Below the theme's md breakpoint the rail keeps its place beside the page but shows icons only, each named by a
- * tooltip: stacked above the page it took most of a short or zoomed window and left the page no height.
- */
+/** Below md the rail stays beside the page as icons with tooltips; stacked above, it left the page no height. */
 const COMPACT_QUERY = system.breakpoints.down('md').replace(/^@media\s+/, '');
 const subscribeCompact = (onChange: () => void): (() => void) => {
   const query = globalThis.matchMedia(COMPACT_QUERY);
@@ -29,11 +26,7 @@ const subscribeCompact = (onChange: () => void): (() => void) => {
 const getCompact = (): boolean => globalThis.matchMedia(COMPACT_QUERY).matches;
 const TOOLTIP_PLACEMENT = 'right';
 
-/**
- * Sections are routes, so the rail is route links in visual order: Workspace, the open projects, Manage, then the
- * footer (Preferences, then the What's New and Help actions, then the signed-in account in multi-user mode). Tab and
- * reading order follow what the rail shows.
- */
+/** Route links in visual order, so Tab and reading order follow what the rail shows. */
 
 export type LaunchpadNavGroupId = 'workspace' | 'manage' | 'footer';
 
@@ -61,12 +54,7 @@ const GROUP_LABEL_SX: SystemStyleObject = {
   px: '2',
   textTransform: 'uppercase',
 };
-/**
- * The rail's groups stack in the scroll content, which fills the viewport so the footer's auto margin pins it to the
- * bottom. Open projects shrink to their floor before the content outgrows the viewport and the rail scrolls. The
- * padding lives inside the viewport so edge focus rings stay visible; scroll padding does the same for an entry that
- * focus scrolls to an edge.
- */
+/** The scroll content fills the viewport so the footer's auto margin pins it to the bottom. */
 const NAV_CONTENT_BASE = { display: 'flex', flexDirection: 'column', minH: 'full' } as const;
 /** Space between rail groups; headings carry no top padding of their own. */
 const NAV_CONTENT_PROPS = { ...NAV_CONTENT_BASE, css: { '& > section ~ section': { pt: '2' } }, p: '2' } as const;

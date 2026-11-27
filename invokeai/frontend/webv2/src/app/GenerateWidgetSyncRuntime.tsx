@@ -1,11 +1,10 @@
+import { createGenerateWidgetSyncRuntime, type GenerateWidgetSyncProjectSnapshot } from '@features/generation/runtime';
+import { ensureModelsLoaded, getModelsSnapshot, subscribeModels } from '@features/models';
 import {
-  createGenerateWidgetSyncRuntime,
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
-  type GenerateWidgetSyncProjectSnapshot,
-} from '@features/generation/runtime';
-import { ensureModelsLoaded, getModelsSnapshot, subscribeModels } from '@features/models';
+} from '@features/models/architecturesStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { useQueryClient } from '@tanstack/react-query';

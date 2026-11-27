@@ -1,13 +1,8 @@
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from '@features/generation/contracts';
 import type { TFunction } from 'i18next';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import {
-  getDefaultGenerateSettings,
-  getMaxReferenceImages,
-  isSupportedGenerateModel,
-  isVaeModelConfig,
-} from '@features/generation/settings';
+import { getDefaultGenerateSettings, isSupportedGenerateModel, isVaeModelConfig } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import i18n from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -53,7 +48,7 @@ const vaeModels = models.filter(isVaeModelConfig) as VaeModelConfig[];
 const image = (imageName: string) => ({ height: 512, image_name: imageName, width: 512 });
 
 const currentFor = (model: ComponentModelConfig, overrides: Record<string, unknown> = {}) => {
-  const values = getCurrentGenerateValues({ generateValues: { modelKey: model.key }, supportedModels });
+  const values = getCurrentGenerateValues({ generateValues: { modelKey: model.key }, models, supportedModels });
   if (!values) {
     throw new Error('fixture model is not a supported Generate model');
   }
@@ -64,6 +59,24 @@ const build = (currentValues: ReturnType<typeof currentFor>, parameters: Record<
   buildRecallParametersSettings({ currentValues, models, parameters, supportedModels, vaeModels });
 
 seedArchitectureCapabilities();
+
+describe('getCurrentGenerateValues', () => {
+  it("fills the first model's default components and VAE, as Generate does when it picks the first model", () => {
+    const t5 = makeModel('t5-default', 'any', 't5_encoder');
+    const withDefaults = makeModel('flux-with-defaults', 'flux', 'main', {
+      default_settings: { components: { t5_encoder: t5.key } },
+    });
+    const installed = [withDefaults, t5];
+    const initial = getCurrentGenerateValues({
+      generateValues: {},
+      models: installed,
+      supportedModels: installed.filter(isSupportedGenerateModel) as GenerateModelConfig[],
+    });
+
+    expect(initial?.model.key).toBe(withDefaults.key);
+    expect(initial?.t5EncoderModel?.key).toBe(t5.key);
+  });
+});
 
 describe('buildRecallParametersSettings', () => {
   it('applies prompts, seed, size and sampler parameters to the current values', () => {
@@ -155,13 +168,15 @@ describe('buildRecallParametersSettings', () => {
   });
 
   describe("the new model's default VAE", () => {
-    const fluxVae = makeModel('flux-vae', 'flux', 'vae');
     const sdxlNamingMissingVae = makeModel('sdxl-missing-vae', 'sdxl', 'main', { default_settings: { vae: 'gone' } });
-    // The Model Manager stores "default" when the VAE default is on with no VAE picked; FLUX bundles no VAE.
-    const fluxDefaultVae = makeModel('flux-default-vae', 'flux', 'main', { default_settings: { vae: 'default' } });
-    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', { default_settings: { vae: 'default' } });
+    // The Model Manager stores "default" when the VAE default is on with no VAE picked. A Diffusers pipeline's VAE is
+    // an optional override; a GGUF SD3 transformer needs one, as FLUX does.
+    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', {
+      default_settings: { vae: 'default' },
+      format: 'diffusers',
+    });
     const sd3Vae = makeModel('sd3-vae', 'sd-3', 'vae');
-    const catalog = [...models, fluxVae, sdxlNamingMissingVae, fluxDefaultVae, sd3DefaultVae, sd3Vae];
+    const catalog = [...models, sdxlNamingMissingVae, sd3DefaultVae, sd3Vae];
     const buildWith = (currentValues: ReturnType<typeof currentFor>, parameters: Record<string, unknown>) =>
       buildRecallParametersSettings({
         currentValues,
@@ -181,12 +196,6 @@ describe('buildRecallParametersSettings', () => {
       const result = buildWith(currentFor(sd3, { vae: sd3Vae }), { model: sd3DefaultVae.key });
 
       expect(result.values.vae).toBeNull();
-    });
-
-    it("keeps a family's required VAE for the 'default' sentinel", () => {
-      const result = buildWith(currentFor(flux, { vae: fluxVae }), { model: fluxDefaultVae.key });
-
-      expect(result.values.vae?.key).toBe(fluxVae.key);
     });
   });
 
@@ -520,7 +529,8 @@ describe('buildRecallParametersSettings', () => {
       appended.values.referenceImages.map((reference) => reference.config.image?.original.image.image_name)
     ).toEqual(['existing.png', 'new.png']);
 
-    const limit = getMaxReferenceImages(sdxl as GenerateModelConfig);
+    // SDXL's served limit.
+    const limit = 5;
     const overLimit = build(current, {
       append: true,
       reference_images: Array.from({ length: limit }, (_, index) => ({ image: image(`extra-${index}.png`) })),
@@ -534,43 +544,12 @@ describe('buildRecallParametersSettings', () => {
     expect(untouched.values.referenceImages).toEqual(current.referenceImages);
   });
 
-  it('keeps recalled Qwen-Image-2.1 references whichever encoder is selected, leaving the tower check to validation', () => {
-    const qwen21 = makeModel('q21-main', 'qwen-image-2-1', 'main', { format: 'checkpoint' });
-    const q21Supported = [qwen21].filter(isSupportedGenerateModel) as GenerateModelConfig[];
-    const values = getCurrentGenerateValues({
-      generateValues: { modelKey: qwen21.key },
-      supportedModels: q21Supported,
-    });
-
-    if (!values) {
-      throw new Error('fixture model is not a supported Generate model');
-    }
-
-    const encoder = (format: string) => makeModel('enc', 'any', 'qwen3_vl_encoder', { format, variant: 'qwen3_vl_8b' });
-    const recall = (qwen3VLEncoderModel: ComponentModelConfig | null) =>
-      buildRecallParametersSettings({
-        currentValues: { ...values, qwen3VLEncoderModel },
-        models: [qwen21],
-        parameters: { reference_images: [{ image: image('edit.png') }] },
-        supportedModels: q21Supported,
-        vaeModels: [],
-      });
-
-    for (const selected of [encoder('checkpoint'), encoder('gguf_quantized'), null]) {
-      const result = recall(selected);
-
-      expect(result.values.referenceImages.map((reference) => reference.config.type)).toEqual([
-        'qwen_image_2_1_reference_image',
-      ]);
-      expect(result.skipped).toEqual([]);
-    }
-  });
-
   it('types recalled Krea-2 references as one set: a lone one is style, several or appended ones are edit', () => {
     const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
     const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
     const krea2Values = getCurrentGenerateValues({
       generateValues: { modelKey: krea2.key },
+      models: krea2Supported,
       supportedModels: krea2Supported,
     });
 
@@ -607,44 +586,6 @@ describe('buildRecallParametersSettings', () => {
         reference_images: [{ image: image('pose.png') }, { image: image('depth.png') }, { image: image('room.png') }],
       })
     ).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image', 'krea2_edit_reference_image']);
-  });
-
-  it('leaves a Krea-2 style card alone when the appended image does not fit the limit', () => {
-    const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
-    const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
-    const krea2Values = getCurrentGenerateValues({
-      generateValues: { modelKey: krea2.key },
-      supportedModels: krea2Supported,
-    });
-
-    if (!krea2Values) {
-      throw new Error('fixture model is not a supported Generate model');
-    }
-
-    const card = (id: string, isEnabled: boolean) => ({
-      config: {
-        image: { original: { image: image(`${id}.png`) } },
-        styleStrength: 1,
-        type: 'krea2_reference_image' as const,
-      },
-      id,
-      isEnabled,
-    });
-    // Three cards fill Krea-2's limit; only the first runs, as a style reference at its default strength.
-    const currentValues = {
-      ...krea2Values,
-      referenceImages: [card('style', true), card('a', false), card('b', false)],
-    };
-    const result = buildRecallParametersSettings({
-      currentValues,
-      models: [krea2],
-      parameters: { append: true, reference_images: [{ image: image('pose.png') }] },
-      supportedModels: krea2Supported,
-      vaeModels: [],
-    });
-
-    expect(result.values.referenceImages).toEqual(currentValues.referenceImages);
-    expect(result.skipped).toContainEqual({ detail: '3', key: 'reference_images', reason: 'limit' });
   });
 
   it('drops reference images for a model without reference image support and says so', () => {

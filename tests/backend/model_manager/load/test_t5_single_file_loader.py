@@ -16,8 +16,8 @@ import torch
 from safetensors.torch import save_file
 from transformers import T5Config, T5EncoderModel
 
-import invokeai.backend.model_manager.load.model_loaders.flux as loader_module
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.load.model_loaders.flux import T5EncoderSing
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.safetensors_files import record_reads
 
 FP8 = torch.float8_e4m3fn
 LINEAR_SUFFIXES = (
@@ -120,8 +121,8 @@ def loader() -> T5EncoderSingleFileLoader:
 
 
 def _keep_fp8(monkeypatch: pytest.MonkeyPatch, keep: bool) -> None:
-    monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda _device: keep)
-    monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda _device, _logger=None: keep)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: keep)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda _device, _logger=None: keep)
 
 
 def _load_encoder(loader: T5EncoderSingleFileLoader, path: Path) -> T5EncoderModel:
@@ -253,8 +254,8 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
     monkeypatch.setattr(TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
-    monkeypatch.setattr(loader_module, "should_keep_fp8_weights", lambda device: device.type == "cuda")
-    monkeypatch.setattr(loader_module, "_device_supports_fp8_storage", lambda device, _logger=None: False)
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.type == "cuda")
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda device, _logger=None: False)
     path = tmp_path / "t5xxl.safetensors"
     _write_scaled_fp8(_tiny_reference(), path)
     config = T5Encoder_Checkpoint_Config.model_construct(
@@ -350,3 +351,26 @@ def test_device_caches_do_not_share_folded_weights_of_different_dtypes(
         dtypes[name] = weight_dtype(device)
 
     assert dtypes == {"cpu": torch.float32, "cuda": torch.float16}
+
+
+def test_the_duplicate_embedding_of_a_comfyui_file_is_never_read(
+    loader: T5EncoderSingleFileLoader, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`shared` and `encoder.embed_tokens` are one tied parameter. Read through ``pread``, the second copy would cost
+    the embedding's size in process memory only to be dropped; a file with only the encoder's copy still reads it."""
+    _keep_fp8(monkeypatch, False)
+    reference = _tiny_reference()
+    both = tmp_path / "both.safetensors"
+    only_encoder = tmp_path / "only_encoder.safetensors"
+    _write_raw_fp8(reference, both)
+    _write_fp16_embed_tokens_only(reference, only_encoder)
+    log = record_reads(monkeypatch)
+
+    _load_encoder(loader, both)
+    read_from_both = set(log.tensors)
+    log.tensors.clear()
+    _load_encoder(loader, only_encoder)
+
+    assert "shared.weight" in read_from_both
+    assert not {key for key in read_from_both if key.startswith("encoder.embed_tokens.")}
+    assert "encoder.embed_tokens.weight" in log.tensors

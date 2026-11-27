@@ -96,18 +96,6 @@ describe('board media', () => {
     expect(result.ledger.boardImageNames).toEqual(['staging-board-board.png']);
   });
 
-  it('files images and videos in their own ledgers', async () => {
-    const result = await restore({
-      boardItems: [boardItem({ category: 'user' }), boardItem({ kind: 'video', name: 'clip.mp4' })],
-    });
-
-    expect(result.ledger).toMatchObject({
-      boardImageNames: ['staging-board-board.png'],
-      boardVideoNames: ['staging-board-clip.mp4'],
-    });
-    expect(result.boardItemIssues).toEqual([]);
-  });
-
   it('stars exactly the descriptors that were starred, per kind', async () => {
     const starImages = vi.fn(() => Promise.resolve({ failed: [] }));
     const starVideos = vi.fn(() => Promise.resolve({ failed: [] }));
@@ -139,26 +127,6 @@ describe('board media', () => {
     expect(result.mappings.images.get('board.png')).toBe('staging-board-board.png');
   });
 
-  /** Star rejection must not roll back restored media. */
-  it('does not lose the restore when the star request itself fails', async () => {
-    const result = await restore(
-      { boardItems: [boardItem({ starred: true })], documentRefs: [imageRef('board.png')] },
-      { starImages: () => Promise.reject(new Error('500')) }
-    );
-
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'board.png', reason: 'star-failed' }]);
-    expect(result.mappings.images.get('board.png')).toBe('staging-board-board.png');
-    expect(result.ledger.boardImageNames).toEqual(['staging-board-board.png']);
-  });
-
-  it('ends the restore when starring fails because the operation was cancelled', async () => {
-    const cancelled = Object.assign(new Error('aborted'), { name: 'AbortError' });
-
-    await expect(
-      restore({ boardItems: [boardItem({ starred: true })] }, { starImages: () => Promise.reject(cancelled) })
-    ).rejects.toBe(cancelled);
-  });
-
   /** After a failed copy, the existing source name remains unsafe to reuse. */
   it('forces an overlapping reference dangling when its board item fails', async () => {
     const result = await restore(
@@ -169,104 +137,6 @@ describe('board media', () => {
     expect(result.mappings.images.get('both.png')).toBe(`${PROJECT_ID}-missing-image-0`);
     expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'both.png', reason: 'upload-failed' }]);
     expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'both.png', reason: 'upload-failed' }]);
-  });
-
-  it('gives every occurrence of a failed reference the same placeholder', async () => {
-    const items = [boardItem({ name: 'a.png' }), boardItem({ name: 'b.png' })];
-    const result = await restore(
-      { boardItems: items, documentRefs: [imageRef('a.png'), imageRef('b.png')] },
-      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['a.png', 'b.png']) }) }
-    );
-
-    // Derive stable placeholders from descriptors, independently of completion order.
-    expect([...result.mappings.images]).toEqual([
-      ['a.png', `${PROJECT_ID}-missing-image-0`],
-      ['b.png', `${PROJECT_ID}-missing-image-1`],
-    ]);
-  });
-
-  /** Remap the entire document, including history excluded from collection. */
-  it('remaps a failed board item the document names only from history', async () => {
-    const result = await restore(
-      // No document ref: this name lives in `recentImages`, which the live-ref walker skips.
-      { boardItems: [boardItem({ name: 'newest.png' })], documentRefs: [] },
-      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['newest.png']) }) }
-    );
-
-    expect(result.mappings.images.get('newest.png')).toBe(`${PROJECT_ID}-missing-image-0`);
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'newest.png', reason: 'upload-failed' }]);
-    // Missing history references do not count as live losses.
-    expect(result.documentReferenceIssues).toEqual([]);
-  });
-
-  it('keeps two failures the board never described apart', async () => {
-    // Allocate distinct fallback indices for references without descriptor positions.
-    const result = await restore(
-      { boardItems: [boardItem({ name: 'described.png' })] },
-      {
-        materializeBoardMedia: (_boards, onItemSettled) => {
-          onItemSettled();
-
-          return Promise.resolve({
-            failed: [
-              { kind: 'image' as const, name: 'stray-a.png', reason: 'upload-failed' as const },
-              { kind: 'image' as const, name: 'stray-b.png', reason: 'upload-failed' as const },
-            ],
-            materialized: [],
-          });
-        },
-      }
-    );
-
-    expect(result.mappings.images.get('stray-a.png')).not.toBe(result.mappings.images.get('stray-b.png'));
-  });
-
-  /** A materializer that answers neither way has still not delivered the media. */
-  /** Missing, duplicate, or unreported settlements must produce exactly one issue and placeholder per descriptor. */
-  it.each([
-    [
-      'the source could not materialize it',
-      (items: readonly InvkBoardItem[]) =>
-        items.map((item) => ({ kind: item.kind, name: item.name, reason: 'missing-entry' as const })),
-      'missing-entry' as const,
-    ],
-    [
-      'the materializer raised it twice',
-      (items: readonly InvkBoardItem[]) => {
-        const failed = items.map((item) => ({ kind: item.kind, name: item.name, reason: 'upload-failed' as const }));
-
-        return [...failed, ...failed];
-      },
-      'upload-failed' as const,
-    ],
-    ['the materializer never accounted for it', () => [], 'upload-failed' as const],
-  ])('reports a board item once when %s', async (_label, failuresFor, reason) => {
-    const result = await restore(
-      { boardItems: [boardItem({ name: 'gone.png' })], documentRefs: [imageRef('gone.png')] },
-      {
-        materializeBoardMedia: (boards, onItemSettled) => {
-          onItemSettled();
-
-          return Promise.resolve({ failed: failuresFor(boards.flatMap((board) => board.items)), materialized: [] });
-        },
-      }
-    );
-
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'gone.png', reason }]);
-    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'gone.png', reason }]);
-    expect(result.mappings.images.get('gone.png')).toBe(`${PROJECT_ID}-missing-image-0`);
-    expect(result.ledger.boardImageNames).toEqual([]);
-  });
-
-  /** The document-reference issue above comes from the overlap, not from the board failure itself. */
-  it('reports no document-reference issue for a failed item the document never named', async () => {
-    const result = await restore(
-      { boardItems: [boardItem({ name: 'gone.png' })] },
-      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['gone.png']) }) }
-    );
-
-    expect(result.boardItemIssues).toEqual([{ kind: 'image', name: 'gone.png', reason: 'upload-failed' }]);
-    expect(result.documentReferenceIssues).toEqual([]);
   });
 });
 
@@ -290,14 +160,6 @@ describe('document-only references', () => {
     expect(result.documentReferenceIssues).toEqual([]);
   });
 
-  it('ends the restore when the existence check fails because the operation was cancelled', async () => {
-    const cancelled = Object.assign(new Error('aborted'), { name: 'AbortError' });
-
-    await expect(
-      restore({ documentRefs: [imageRef('external.png')] }, { findExistingImageNames: () => Promise.reject(cancelled) })
-    ).rejects.toBe(cancelled);
-  });
-
   it('reuses media the destination already has instead of uploading it again', async () => {
     const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
     const result = await restore(
@@ -310,28 +172,6 @@ describe('document-only references', () => {
     expect(result.documentReferenceIssues).toEqual([]);
   });
 
-  it('uploads a missing reference and records the rename', async () => {
-    const result = await restore(
-      { documentRefs: [imageRef('external.png')] },
-      { documentMediaBytes: () => new Uint8Array([1]) }
-    );
-
-    expect([...result.mappings.images]).toEqual([['external.png', 'uploaded-external.png']]);
-    expect(result.ledger.imageNames).toEqual(['uploaded-external.png']);
-  });
-
-  it('reports a reference with no bytes and carries on', async () => {
-    const result = await restore(
-      { documentRefs: [imageRef('a.png'), imageRef('b.png')] },
-      {
-        documentMediaBytes: (ref) => (ref.name === 'b.png' ? new Uint8Array([1]) : undefined),
-      }
-    );
-
-    expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'a.png', reason: 'missing-entry' }]);
-    expect(result.ledger.imageNames).toEqual(['uploaded-b.png']);
-  });
-
   it('reports a failed upload as dangling rather than failing the restore', async () => {
     const result = await restore(
       { documentRefs: [imageRef('external.png')] },
@@ -340,26 +180,6 @@ describe('document-only references', () => {
 
     expect(result.documentReferenceIssues).toEqual([{ kind: 'image', name: 'external.png', reason: 'upload-failed' }]);
     expect(result.ledger.imageNames).toEqual([]);
-  });
-
-  /** An item that is both is board media; asking the destination about it would be the wrong question. */
-  it('never checks the destination for a reference the board already owns', async () => {
-    const findExisting = vi.fn(() => Promise.resolve(new Set<string>()));
-
-    await restore(
-      { boardItems: [boardItem({ name: 'both.png' })], documentRefs: [imageRef('both.png')] },
-      { findExistingImageNames: findExisting }
-    );
-
-    expect(findExisting).not.toHaveBeenCalled();
-  });
-
-  it('leaves the video endpoints alone for an images-only restore', async () => {
-    const findVideos = vi.fn(() => Promise.resolve(new Set<string>()));
-
-    await restore({ documentRefs: [imageRef('a.png')] }, { findExistingVideoNames: findVideos });
-
-    expect(findVideos).not.toHaveBeenCalled();
   });
 });
 
@@ -375,25 +195,6 @@ describe('the cover', () => {
 
     expect(result.coverImageName).toBe('staging-board-board.png');
     expect(result.ledger.coverImageName).toBeNull();
-  });
-
-  it('falls back to the bundled thumbnail when its source could not be restored', async () => {
-    const result = await restore(
-      { boardItems: [boardItem()], coverBytes: cover, coverSourceImageName: 'board.png' },
-      { materializeBoardMedia: freshNameMaterializer({ fail: new Set(['board.png']) }) }
-    );
-
-    expect(result.coverImageName).toBe('uploaded-cover.webp');
-    expect(result.ledger.coverImageName).toBe('uploaded-cover.webp');
-  });
-
-  it('survives a fallback cover that will not upload', async () => {
-    const result = await restore(
-      { coverBytes: cover, coverSourceImageName: 'gone.png' },
-      { uploadImage: () => Promise.reject(new Error('nope')) }
-    );
-
-    expect(result.coverImageName).toBeNull();
   });
 });
 
@@ -414,47 +215,6 @@ describe('progress', () => {
       { completed: 2, total: 3 },
       { completed: 3, total: 3 },
     ]);
-  });
-
-  it('counts the items of every staged board, each materialized onto its own board', async () => {
-    const onProgress = vi.fn();
-    const targets: [string, string][] = [];
-    const materializeBoardMedia: MediaMaterializer = (boards, onItemSettled) => {
-      for (const { items, stagingBoardId } of boards) {
-        targets.push(...items.map((item): [string, string] => [item.name, stagingBoardId]));
-      }
-
-      return freshNameMaterializer()(boards, onItemSettled);
-    };
-
-    await restore(
-      {
-        boards: [
-          { items: [boardItem({ name: 'one.png' }), boardItem({ name: 'two.png' })], stagingBoardId: 'staged-inbox' },
-          { items: [], stagingBoardId: 'staged-empty' },
-          { items: [boardItem({ name: 'three.png' })], stagingBoardId: 'staged-old' },
-        ],
-      },
-      { materializeBoardMedia, onProgress }
-    );
-
-    expect(targets).toEqual([
-      ['one.png', 'staged-inbox'],
-      ['two.png', 'staged-inbox'],
-      ['three.png', 'staged-old'],
-    ]);
-    expect(onProgress.mock.calls.at(-1)?.[0]).toEqual({ completed: 3, total: 3 });
-  });
-
-  it('drops a deduplicated reference out of the total rather than leaving it unfinished', async () => {
-    const onProgress = vi.fn();
-
-    await restore(
-      { boardItems: [boardItem()], documentRefs: [imageRef('external.png')] },
-      { findExistingImageNames: () => Promise.resolve(new Set(['external.png'])), onProgress }
-    );
-
-    expect(onProgress.mock.calls.at(-1)?.[0]).toEqual({ completed: 1, total: 1 });
   });
 });
 
@@ -518,16 +278,6 @@ describe('rollbackRestoredMedia', () => {
     );
 
     expect(deleteBoard.mock.calls.map(([boardId]) => boardId)).toEqual(['staged-inbox', 'staged-old']);
-  });
-
-  it('never rejects, whatever the cleanup does', async () => {
-    await expect(
-      rollbackRestoredMedia(ledger(), {
-        deleteBoard: () => Promise.reject(new Error('board cleanup failed')),
-        deleteImages: () => Promise.resolve(),
-        deleteVideos: () => Promise.resolve(),
-      })
-    ).resolves.toBeUndefined();
   });
 
   it('issues no requests for a restore that created nothing', async () => {

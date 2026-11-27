@@ -33,7 +33,7 @@ const wanModel: ModelConfig = {
 const submitVideo = () => {
   let state = createInitialWorkbenchState();
 
-  // Video is no longer placed by the non-video defaults; add it first.
+  // The non-video defaults do not place Video; add it first.
   state = workbenchReducer(state, { region: 'left', type: 'toggleRegionWidget', widgetId: 'video' });
   state = workbenchReducer(state, {
     type: 'patchWidgetValues',
@@ -68,8 +68,8 @@ describe('getLocalQueueItemSource', () => {
   it('reports null — not a source — for an item this client did not submit', () => {
     const state = submitVideo();
 
-    // A foreign item carries no decodable origin, so the caller has to fall back
-    // to the Generate-shaped default rather than guessing at video.
+    // A foreign item carries no decodable origin, so the caller has to fall back to the Generate-shaped default rather
+    // than guessing at video.
     expect(getLocalQueueItemSource(state.projects, 'some-other-client')).toBeNull();
     expect(getLocalQueueItemSource(state.projects, null)).toBeNull();
     expect(getLocalQueueItemSource(state.projects, undefined)).toBeNull();

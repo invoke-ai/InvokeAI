@@ -24,6 +24,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.backend.architectures import accepts_vae
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    ClipVariantType,
     Flux2VariantType,
     FluxVariantType,
     MistralVariantType,
@@ -180,11 +181,14 @@ def _value(field: object) -> str:
 def ships_its_vae(model: ModelConfig) -> bool:
     """Whether a main model decodes with its own VAE while Generate's `vae` slot is empty, as its model loader node
     takes it: a Z-Image Diffusers or self-contained SDNQ pipeline (`is_self_contained_sdnq_pipeline`), a FLUX.2 one its
-    own loader takes components from (`_is_flux2_source`), or a self-contained FLUX.1 SDNQ pipeline
-    (`is_self_contained_sdnq_flux1_pipeline`, which also needs the T5 pair). A FLUX.1 Diffusers pipeline does not:
-    Generate requires a standalone VAE for it."""
+    own loader takes components from (`_is_flux2_source`), a self-contained FLUX.1 SDNQ pipeline
+    (`is_self_contained_sdnq_flux1_pipeline`, which also needs the T5 pair), or an SD3 Diffusers pipeline. A FLUX.1
+    Diffusers pipeline does not: Generate requires a standalone VAE for it, as for an SD3 GGUF, which holds the
+    transformer alone."""
     if not _is_main(model):
         return False
+    if model.base == BaseModelType.StableDiffusion3:
+        return _is_diffusers(model)
     if model.base == BaseModelType.Flux:
         return is_self_contained_sdnq_flux1_pipeline(model)
     if model.base == BaseModelType.Flux2:
@@ -267,6 +271,15 @@ def _flux2_sources(main: ModelConfig, models: Sequence[ModelConfig]) -> list[Mod
     return [model for model in models if _is_flux2_source(main, model)]
 
 
+def _qwen3_encoder_variant(model: ModelConfig) -> Optional[str]:
+    """The variant a model serves the Qwen3 encoder in, as filed or by a role (a Qwen3 folder installed as a Text LLM);
+    None when it does not serve it or names no variant. `roles` is read leniently: the configs here are duck-typed."""
+    if model.type == ModelType.Qwen3Encoder:
+        return _variant(model)
+    role = next((r for r in getattr(model, "roles", ()) if r.type == ModelType.Qwen3Encoder), None)
+    return None if role is None or role.variant is None else _value(role.variant)
+
+
 def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
     """Whether a standalone text encoder Generate can fill in for a FLUX.2 main model is installed: a Mistral encoder
     other than the Ministral 3B for [dev] (`isFlux2MistralEncoder`), else a Qwen3 encoder other than the 0.6B, of the
@@ -277,11 +290,12 @@ def _has_standalone_encoder(main: ModelConfig, models: Sequence[ModelConfig]) ->
             for model in models
         )
     required = _KLEIN_QWEN3.get(_variant(main) or "")
+    qwen3_variants = (_qwen3_encoder_variant(model) for model in models)
     return any(
-        model.type == ModelType.Qwen3Encoder
-        and _variant(model) != Qwen3VariantType.Qwen3_06B.value
-        and (required is None or _variant(model) == required)
-        for model in models
+        variant is not None
+        and variant != Qwen3VariantType.Qwen3_06B.value
+        and (required is None or variant == required)
+        for variant in qwen3_variants
     )
 
 
@@ -292,7 +306,7 @@ def _standalone_encoder_name(main: ModelConfig) -> str:
     return _QWEN3_NAMES.get(_KLEIN_QWEN3.get(_variant(main) or "", ""), "Qwen3")
 
 
-def _lacks_text_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
+def _lacks_flux2_text_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
     """Whether Generate cannot compile a FLUX.2 main model's graph for want of a text encoder: its loader takes none
     from the model itself, no installed component source fits it, and no standalone encoder for it is installed. A
     source that does not fit gives only its VAE: Generate keeps it only beside a standalone encoder, and the model
@@ -304,17 +318,87 @@ def _lacks_text_encoder(main: ModelConfig, models: Sequence[ModelConfig]) -> boo
     return not _has_standalone_encoder(main, models)
 
 
+_FLUX1_ENCODERS: Final[tuple[tuple[str, Callable[[ModelConfig], bool]], ...]] = (
+    ("T5", lambda model: model.type == ModelType.T5Encoder),
+    ("CLIP-L", lambda model: model.type == ModelType.CLIPEmbed and _variant(model) == ClipVariantType.L.value),
+)
+_SD3_ENCODERS: Final = (
+    *_FLUX1_ENCODERS,
+    ("CLIP-G", lambda model: model.type == ModelType.CLIPEmbed and _variant(model) == ClipVariantType.G.value),
+)
+
+
+def _main_model_blocker(main: ModelConfig, models: Sequence[ModelConfig]) -> Optional[str]:
+    """Why a main model cannot compile or run a calibration graph."""
+    if main.base == BaseModelType.Flux and _is_diffusers(main):
+        # The graph can compile, but FluxModelLoaderInvocation rejects a plain Diffusers FLUX.1 config.
+        return (
+            f"{main.name} is a FLUX.1 Diffusers model, which the FLUX.1 model loader cannot run. "
+            "Select a FLUX.1 checkpoint, GGUF, or SDNQ model for calibration."
+        )
+    if main.base in (BaseModelType.Flux, BaseModelType.StableDiffusion3) and not ships_its_vae(main):
+        slots = _FLUX1_ENCODERS if main.base == BaseModelType.Flux else _SD3_ENCODERS
+        missing = [f"a {name} encoder" for name, fits in slots if not any(fits(model) for model in models)]
+        if not missing:
+            return None
+        install = missing[0] if len(missing) == 1 else f"{', '.join(missing[:-1])} and {missing[-1]}"
+        if main.base == BaseModelType.Flux:
+            return f"Generate cannot compile a calibration case for {main.name} (FLUX.1). Install {install}."
+        return (
+            f"{main.name} holds only the SD3 transformer, so no case compiles without standalone text encoders: "
+            "Generate needs a T5, a CLIP-L and a CLIP-G encoder for it, and only an SD3 Diffusers pipeline brings its "
+            f"own. Install {install}."
+        )
+    if main.base == BaseModelType.ZImage:
+        # Generate fills required encoder slots from the catalog, but only picks a Z-Image source by default settings.
+        if ships_its_vae(main) or default_component_source(main, models) is not None:
+            return None
+        if any(_qwen3_encoder_variant(model) == Qwen3VariantType.Qwen3_4B.value for model in models):
+            return None
+        return (
+            "Install a Qwen3 4B encoder or set a bundled Z-Image pipeline as the default component source "
+            f"for {main.name}."
+        )
+    if not _lacks_flux2_text_encoder(main, models):
+        return None
+    encoder = _standalone_encoder_name(main)
+    pipeline = "a Diffusers FLUX.2 [dev] pipeline" if _is_dev(main) else "a fitting FLUX.2 pipeline"
+    return (
+        f"{main.name} has no text encoder Generate can use, so no case compiles: Generate takes it from a FLUX.2 "
+        f"pipeline whose encoder fits the model or from a standalone {encoder} encoder, and a pipeline that does "
+        f"not fit gives only its VAE. Install a {encoder} encoder or {pipeline}."
+    )
+
+
+def default_component_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The Z-Image pipeline a main model's default components name as its `component_source`, which Generate fills the
+    slot with when the model is selected (`getModelDefaultComponents`): an installed pipeline that brings its own VAE
+    (`ships_its_vae`). A self-contained pipeline is offered the slot too, and the model loader node takes a source's
+    VAE over its own. FLUX.2 picks its source on its own (`vae_source`), so a stored one is not read."""
+    if not _is_main(model) or model.base != BaseModelType.ZImage:
+        return None
+    key = getattr(getattr(model, "default_settings", None), "components", None)
+    key = key.get("component_source") if isinstance(key, Mapping) else None
+    if not key:
+        return None
+    return next(
+        (source for source in models if source.key == key and source.base == model.base and ships_its_vae(source)), None
+    )
+
+
 def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
     """The pipeline whose own VAE decodes a main model's generations while its `vae` slot is empty: the model itself
-    (`ships_its_vae`), or for another FLUX.2 model the component source Generate then picks on its own and its graph
+    (`ships_its_vae`), the Z-Image pipeline its default components name (`default_component_source`), or for another
+    FLUX.2 model the component source Generate then picks on its own and its graph
     keeps, whose VAE the FLUX.2 model loader node takes: among the installed pipelines that loader takes components
     from (`_flux2_sources`), the first fitting one, else the first one (`getAutoFlux2ComponentSourceModel`), which the
     graph keeps only beside a standalone text encoder. Generate lists the models in the order the server does, which is
-    `models`' order. None: a standalone VAE decodes, the model's default one included (`default_vae`), or, for a FLUX.2
-    model without an encoder, no graph compiles (`_lacks_text_encoder`); without a VAE either, none compiles
-    (`_needs_gpu_vae`)."""
+    `models`' order. None: a standalone VAE decodes, the model's default one included (`default_vae`), or, for a model
+    with missing prerequisites, no case can run (`_main_model_blocker`, `_needs_gpu_vae`)."""
     if default_vae(model, models) is not None:
         return None
+    if (source := default_component_source(model, models)) is not None:
+        return source
     if ships_its_vae(model):
         return model
     if not _is_main(model) or model.base != BaseModelType.Flux2:
@@ -327,7 +411,8 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
 
 
 def own_vae_dtype(pipeline: ModelConfig, vae: VaeDtypes) -> str:
-    """The dtype a pipeline's own VAE loads in (`vae_source`), as its loader yields it."""
+    """The dtype a pipeline's own VAE loads in (`vae_source`), as its loader yields it. Never asked for an SD3
+    pipeline: its decode runs in the `precision` setting's dtype (`decode_dtypes`) whichever VAE decodes."""
     if _is_diffusers(pipeline):
         return vae.z_image_pipeline if pipeline.base == BaseModelType.ZImage else FLUX2_PIPELINE_VAE_DTYPE
     if pipeline.base == BaseModelType.Flux and vae.sdnq_quantized_vae(pipeline):
@@ -497,7 +582,9 @@ def shared_with(
     return sorted(shared, key=lambda model: (model.name, model.key))
 
 
-_STANDALONE_VAE_BASES: Final = frozenset({BaseModelType.Flux, BaseModelType.Flux2, BaseModelType.ZImage})
+_STANDALONE_VAE_BASES: Final = frozenset(
+    {BaseModelType.Flux, BaseModelType.Flux2, BaseModelType.StableDiffusion3, BaseModelType.ZImage}
+)
 """Bases whose Generate requires a `vae` pick, and fills one, unless a pipeline's own VAE decodes (`vae_source`)."""
 
 
@@ -628,12 +715,12 @@ def build_plan(
                 device_class,
                 estimators,
             )
-        # One whose graph compiles and decodes on the GPU, where there is one; otherwise the first says what it lacks.
+        # Prefer a runnable graph that decodes on the GPU. Otherwise the first candidate supplies the reason.
         main = next(
             (
                 model
                 for model in candidates
-                if not _lacks_text_encoder(model, models) and _decodes_on_the_gpu(model, models)
+                if _main_model_blocker(model, models) is None and _decodes_on_the_gpu(model, models)
             ),
             candidates[0],
         )
@@ -664,17 +751,8 @@ def build_plan(
             device_class,
             estimators,
         )
-    if _lacks_text_encoder(main, models):
-        encoder = _standalone_encoder_name(main)
-        pipeline = "a Diffusers FLUX.2 [dev] pipeline" if _is_dev(main) else "a fitting FLUX.2 pipeline"
-        return _unsupported(
-            target,
-            f"{main.name} has no text encoder Generate can use, so no case compiles: Generate takes it from a FLUX.2 "
-            f"pipeline whose encoder fits the model or from a standalone {encoder} encoder, and a pipeline that does "
-            f"not fit gives only its VAE. Install a {encoder} encoder or {pipeline}.",
-            device_class,
-            estimators,
-        )
+    if (reason := _main_model_blocker(main, models)) is not None:
+        return _unsupported(target, reason, device_class, estimators)
     if not _decodes_on_the_gpu(main, models):
         cpu_vae = _cpu_default_vae(main, models)
         assert cpu_vae is not None

@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
 import type { CanvasGallerySaveRegion, CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -90,7 +91,7 @@ const selectModelBase = (project: Project): string | null => {
 };
 
 /** The project's clamped compositing mask blur, which fit-to-masks clears so the feathered edge stays in frame. */
-const selectMaskBlur = (values: Record<string, unknown>): number => readCanvasCompositingSettings(values).maskBlur;
+const selectMaskBlur = (values: ResolvedValues): number => readCanvasCompositingSettings(values).maskBlur;
 
 const selectModelVariant = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { variant?: unknown } } | undefined;
@@ -245,8 +246,8 @@ const CanvasHeaderActionsInner = ({
     [clearCanvas, editingLocked, inFlightCount, stopGenerations]
   );
 
-  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses
-  // the button's confirmation flow.
+  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses the
+  // button's confirmation flow.
   const executeHeaderCommand = useEffectEvent((commandId: string) =>
     executeCanvasHeaderCommand(commandId, commandContext())
   );
@@ -473,10 +474,7 @@ const describeSave = (
   return board ?? undefined;
 };
 
-/**
- * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is
- * open, so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
- */
+/** Mounted only while the menu is open, so the content bounds are planned then, not on every edit. */
 const SaveMenuItems = ({
   board,
   document,

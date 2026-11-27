@@ -1,8 +1,8 @@
 /**
- * The image recall contract. Every key an image graph records, and every key the backend declares for
- * `core_metadata`, has an entry here; the gates hold each entry to what recall does with records compiled from
- * settings tuned off every default. A key a builder starts to write fails G1 until it has an entry, and a key the
- * backend starts to declare fails `tsc` until it has one.
+ * The image recall contract. Every key an image graph records, and every key the backend declares for `core_metadata`,
+ * has an entry here; the gates hold each entry to what recall does with records compiled from settings tuned off every
+ * default. A key a builder starts to write fails G1 until it has an entry, and a key the backend starts to declare
+ * fails `tsc` until it has one.
  */
 
 import type { components } from '@api/schema';
@@ -17,7 +17,6 @@ import type {
 import type { CanvasCompileMode } from '@features/generation/core/canvas/types';
 import type { SpandrelModelConfig } from '@features/upscale/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { canvasModesFor, compile as compileCanvas } from '@features/generation/core/canvas/compileCanvasGraph.testing';
 import {
   externalRecallCases,
@@ -32,11 +31,15 @@ import { compileGenerateGraph } from '@features/generation/graph';
 import {
   deriveAspectRatioId,
   getDefaultGenerateSettings,
+  getEffectivePrompts,
   getExternalResolutionPresets,
   getGenerationUiPolicy,
   isSupportedGenerateModel,
   isVaeModelConfig,
+  normalizeReferenceImages,
+  takesReferenceImages,
 } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, INSTALLED, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
@@ -107,7 +110,7 @@ const IMAGE_RECALL_CONTRACT = {
   },
   negative_prompt: {
     kinds: ['all', 'remix', 'prompts'],
-    restores: ['negativePrompt', 'promptTemplate', 'promptTemplateViewMode'],
+    restores: ['negativePrompt', 'negativePromptEnabled', 'promptTemplate', 'promptTemplateViewMode'],
   },
   seed: { kinds: ['all', 'seed'], restores: ['seed', 'seedMode'] },
   // An upscale records the size of the frame it enlarged, which only exists once the graph runs.
@@ -120,10 +123,17 @@ const IMAGE_RECALL_CONTRACT = {
     when: (_model, written) => typeof written.height === 'number',
   },
 
-  // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults
-  // where the panel hides them.
-  steps: { restores: ['steps'] },
-  cfg_scale: { restores: ['cfgScale'] },
+  // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults where
+  // the panel hides them.
+  // Ideogram records effective sampling in these shared fields and keeps its overrides in separate fields below.
+  steps: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { steps: Number(written.steps) } : {}),
+    restores: ['steps'],
+  },
+  cfg_scale: {
+    expected: (written, tuned) => (tuned.model?.base === 'ideogram-4' ? { cfgScale: Number(written.cfg_scale) } : {}),
+    restores: ['cfgScale'],
+  },
   guidance: { restores: ['cfgScale'], when: (model) => getGenerationUiPolicy(model).guidanceLabel === 'Guidance' },
   cfg_rescale_multiplier: {
     restores: ['cfgRescaleMultiplier'],
@@ -409,8 +419,20 @@ const baselineValues = (): GenerateWidgetValues => ({
   ],
   model: BASELINE_MODEL,
   positivePrompt: 'the baseline prompt',
+  negativePromptEnabled: false,
   promptTemplate: { id: 'template', name: 'Template', negativePrompt: 'lowres', positivePrompt: '{prompt}, detailed' },
   promptTemplateViewMode: true,
+  referenceImages: normalizeReferenceImages([
+    {
+      config: {
+        image: { height: 512, image_name: 'baseline-reference.png', width: 512 },
+        model: { base: 'sdxl', key: 'baseline-adapter', name: 'Baseline adapter', type: 'ip_adapter' },
+        type: 'ip_adapter',
+      },
+      id: 'baseline-reference',
+      isEnabled: true,
+    },
+  ]),
   seed: 123,
   seedMode: 'random',
 });
@@ -840,7 +862,7 @@ describe('image recall contract', () => {
         [
           'prompts',
           recall(testCase, 'prompts')?.values ?? null,
-          { ...baseline, ...pick(all, settingsUnder(testCase, 'prompts')) },
+          { ...baseline, ...getEffectivePrompts(baseline), ...pick(all, settingsUnder(testCase, 'prompts')) },
         ],
         [
           'seed',
@@ -948,6 +970,16 @@ describe('image recall contract', () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it('records the reference list on every generation record of a family that takes references', () => {
+    // Recall reads a missing list as "none", so a builder that forgets to record its references would clear them.
+    const missing = getCases()
+      .filter(({ model, record }) => typeof record.generation_mode === 'string' && takesReferenceImages(model))
+      .filter(({ record }) => !Array.isArray(record.ref_images))
+      .map(({ label }) => label);
+
+    expect(missing).toEqual([]);
   });
 
   it('G8: restores the default a generation record implies for each key it lacks', () => {

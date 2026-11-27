@@ -1,6 +1,5 @@
 /**
- * Keep contracts implementation-free so persistence and presentation consumers do not load Queue runtime or
- * widgets.
+ * Keep contracts implementation-free so persistence and presentation consumers do not load Queue runtime or widgets.
  */
 export type {
   QueueHistoryItemStatus,
@@ -58,6 +57,7 @@ export {
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
+export { isSameSubmissionRetry, restoreSubmissionRetry, withoutSubmissionRetry } from './core/submissionRetry';
 export {
   extractGenerationMeta,
   extractNamedGenerationMeta,

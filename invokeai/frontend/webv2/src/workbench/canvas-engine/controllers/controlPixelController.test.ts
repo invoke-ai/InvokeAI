@@ -29,7 +29,6 @@ const image = layerContract('image', 'raster', {
   source: { image: { height: 1, imageName: 'image', width: 1 }, type: 'image' },
 } as Partial<CanvasLayerContract>);
 
-/** The controller over a real reducer, mutation context and history. */
 const createHarness = (
   layer: CanvasLayerContract,
   options: {

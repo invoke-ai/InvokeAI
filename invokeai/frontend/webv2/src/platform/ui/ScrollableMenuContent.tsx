@@ -10,10 +10,7 @@ import { Scrollable } from './Scrollable';
  * highlight is skipped (the item under the pointer is already in view), as Zag does, so hovering an edge row does not
  * nudge the list.
  */
-const followHighlightedItem = (viewport: HTMLDivElement | null) => {
-  if (!viewport) {
-    return;
-  }
+const followHighlightedItem = (viewport: HTMLDivElement) => {
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       const item = record.target;
@@ -26,9 +23,34 @@ const followHighlightedItem = (viewport: HTMLDivElement | null) => {
   return () => observer.disconnect();
 };
 
+/**
+ * Keeps the viewport out of the tab order: the menu owns keyboard navigation, and a menu may not contain a focusable
+ * element, even at tabindex -1. Zag sets tabindex 0 until it first measures its scrollbars (and whenever both axes
+ * overflow), and an undefined prop cannot override it, so the attribute is removed on attach, before first paint, and
+ * whenever Zag sets it again.
+ */
+const keepOutOfTabOrder = (viewport: HTMLDivElement) => {
+  viewport.removeAttribute('tabindex');
+  const observer = new MutationObserver(() => viewport.removeAttribute('tabindex'));
+  observer.observe(viewport, { attributeFilter: ['tabindex'] });
+  return () => observer.disconnect();
+};
+
+const attachMenuViewport = (viewport: HTMLDivElement | null) => {
+  if (!viewport) {
+    return;
+  }
+  const stopKeepingOutOfTabOrder = keepOutOfTabOrder(viewport);
+  const stopFollowingHighlight = followHighlightedItem(viewport);
+  return () => {
+    stopKeepingOutOfTabOrder();
+    stopFollowingHighlight();
+  };
+};
+
 /** A menu's scrolling list, in content laid out with `SCROLLABLE_MENU_CONTENT_PROPS`, above any rows that stay in view. */
 export const ScrollableMenuList = ({ children }: { children: ReactNode }) => (
-  <Scrollable minH="0" viewportRef={followHighlightedItem}>
+  <Scrollable minH="0" viewportRef={attachMenuViewport}>
     {children}
   </Scrollable>
 );

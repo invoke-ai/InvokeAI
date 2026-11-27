@@ -24,6 +24,7 @@ import { MaskModifierSettings } from '@workbench/widgets/layers/MaskModifierSett
 import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerFilterSection';
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
+import { VectorLayerSettings } from '@workbench/widgets/layers/VectorLayerSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,17 +37,12 @@ type LayerSectionEngine = Pick<
   'document' | 'exports' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'tools'
 >;
 
-// Reference equality is exact: the document index hands back the same node
-// object until the node itself changes, and the section renders the whole
-// node, so a narrower comparison would serve stale views of it.
+// Reference equality is exact: the document index hands back the same node object until the node itself changes, and
+// the section renders the whole node, so a narrower comparison would serve stale views of it.
 const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 
-/**
- * Render selected-layer editors here; blend/opacity remain in LayerBlendRow and all edits retain their document
- * seams.
- */
 export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -60,6 +56,7 @@ export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   return (
     <PropertiesSection
       disabled={disabled}
+      sectionId="layer"
       subtitle={child ? child.subtitle : (node?.name ?? t('widgets.transform.noSelection'))}
       title={t('widgets.properties.sections.layer')}
     >
@@ -148,7 +145,6 @@ const ChildEditor = ({
   return null;
 };
 
-/** Dispatches to the correct per-type settings block for the layer. */
 const LayerTypeSettings = ({
   documentRevision,
   engine,
@@ -159,6 +155,8 @@ const LayerTypeSettings = ({
   layer: CanvasLayerContract;
 }) => {
   switch (layer.type) {
+    case 'vector':
+      return <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'inpaint_mask':
       return <InpaintMaskSettings key={layer.id} engine={engine} layer={layer} />;
     case 'regional_guidance':

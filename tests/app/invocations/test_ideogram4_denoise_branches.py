@@ -108,9 +108,13 @@ class _LoadedModel:
         finally:
             self._released.append(self._key)
 
-    def unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
-        self.unloaded.append((vram_bytes_to_free, keep_required_weights_in_vram))
-        return vram_bytes_to_free
+    def hold_resident_bytes(self, max_resident_bytes: int) -> int:
+        # The cache's trim: required weights stay behind. Its reserve for streaming is the cache's to test.
+        excess = self.resident_weight_bytes - max_resident_bytes
+        if excess <= 0:
+            return 0
+        self.unloaded.append((excess, True))
+        return excess
 
 
 def _context(

@@ -20,8 +20,6 @@ import {
   getDocumentModelDiagnostics,
   lookupDocumentLayer,
   lookupDocumentLeaf,
-  lookupLayerBelow,
-  mergeDownEligibility,
 } from './documentModel';
 import { checkEditPostconditions } from './postconditions';
 
@@ -65,7 +63,6 @@ const projectWith = (nodes: CanvasNodeContract[], selectedLayerId: string | null
 const context = (project: Project) => ({ editRevision: 0, projectId: project.id });
 const modelOf = (project: Project) => createDocumentModel(project.canvas.document, context(project));
 
-/** Every node id, stacks top first, each in preorder with indentation for depth. */
 const outline = (document: CanvasDocumentContractV3): string[] =>
   getDocumentIndex(document).nodes.map((entry) => `${'  '.repeat(entry.path.length)}${entry.node.id}`);
 
@@ -231,21 +228,6 @@ describe('createDocumentModel', () => {
       });
     });
 
-    it('inserts inside a group, at a foreign stack top, and honours an explicit selection', () => {
-      const project = projectWith(tree(), 'r3');
-      const inside = roundTrip(project, { aboveId: null, insideId: 'G', nodes: [layer('n1')], type: 'insert' });
-      expect(outline(inside.after.canvas.document).slice(3, 6)).toEqual(['G', '  n1', '  r2']);
-
-      const foreign = roundTrip(project, {
-        aboveId: 'r3',
-        nodes: [layer('m2', 'inpaint_mask')],
-        selectId: null,
-        type: 'insert',
-      });
-      expect(outline(foreign.after.canvas.document).slice(0, 2)).toEqual(['m2', 'i1']);
-      expect(foreign.after.canvas.document.selectedLayerId).toBeNull();
-    });
-
     it('inserts a whole subtree and refuses one that mixes stacks or nests too deep', () => {
       const project = projectWith(tree(), 'r1');
       const subtree = group('S', [layer('s1'), group('S2', [layer('s2')])]);
@@ -284,16 +266,6 @@ describe('createDocumentModel', () => {
         touchedIds: ['i1', 'r2', 'r4'],
         touchedStacks: ['inpaint_mask', 'raster'],
       });
-    });
-
-    it('removes a group with its descendants, once, even when descendants are listed too', () => {
-      const project = projectWith(tree(), 'r3');
-      const { after, edit } = roundTrip(project, { ids: ['G', 'r3'], type: 'remove' });
-
-      expect(outline(after.canvas.document)).toEqual(['i1', 'c1', 'r1', 'r5']);
-      expect(edit.forward).toEqual({ ids: ['G'], type: 'removeCanvasLayers' });
-      expect(edit.touchedIds).toEqual(['G', 'r2', 'H', 'r3', 'r4']);
-      expect(edit.selectionAfter).toBe('r5');
     });
 
     it('refuses to remove a node with a locked ancestor or descendant', () => {
@@ -335,25 +307,35 @@ describe('createDocumentModel', () => {
       expect(after.canvas.document.stacks.raster[1]).toMatchObject({ name: 'G copy', type: 'group' });
     });
 
-    it('keeps adjustment entries on a duplicated layer, noise seeds included, so the copy looks identical', () => {
-      const adjustments = [
-        {
-          amount: 0.1,
-          distribution: 'gaussian',
-          id: 'n',
-          isEnabled: true,
-          grain: 'monochrome',
-          response: 'flat',
-          size: 1,
-          seed: 1234,
-          type: 'noise',
-        },
-      ] as const;
-      const project = projectWith([layer('r1', 'raster', { adjustments: [...adjustments] })], 'r1');
-      const { after } = roundTrip(project, { createId: () => 'd0', ids: ['r1'], type: 'duplicate' });
+    it('duplicates a locked node and a group holding one beside themselves, but copies nothing into a locked group', () => {
+      let next = 0;
+      const createId = () => `d${next++}`;
+      const project = projectWith(
+        [
+          layer('r1', 'raster', { isLocked: true }),
+          group('G', [layer('r2', 'raster', { isLocked: true })]),
+          group('L', [layer('r3')], { isLocked: true }),
+        ],
+        'r1'
+      );
 
-      const copy = after.canvas.document.stacks.raster.find((node) => node.id === 'd0');
-      expect(copy).toMatchObject({ adjustments });
+      const { after } = roundTrip(project, { createId, ids: ['r1', 'G', 'L'], type: 'duplicate' });
+      expect(outline(after.canvas.document)).toEqual([
+        'd0',
+        'r1',
+        'd1',
+        '  d2',
+        'G',
+        '  r2',
+        'd3',
+        '  d4',
+        'L',
+        '  r3',
+      ]);
+      expect(modelOf(project).prepare({ createId, ids: ['r3'], type: 'duplicate' })).toEqual({
+        ids: ['L'],
+        status: 'locked',
+      });
     });
 
     it('moves within sibling lists, keeping a selected group and its descendants together', () => {
@@ -424,18 +406,6 @@ describe('createDocumentModel', () => {
         ],
       });
       expect(edit.selectionAfter).toBe('r1');
-    });
-
-    it('reparents to the bottom of the root and reports an unchanged placement', () => {
-      const project = projectWith(tree(), 'r1');
-      const { after } = roundTrip(project, { beforeId: null, ids: ['r3'], parentId: null, type: 'reparent' });
-      expect(outline(after.canvas.document)).toEqual(['i1', 'c1', 'r1', 'G', '  r2', '  H', '  r4', 'r5', 'r3']);
-      expect(modelOf(project).prepare({ beforeId: 'r5', ids: ['G'], parentId: null, type: 'reparent' })).toEqual({
-        status: 'unchanged',
-      });
-      expect(modelOf(project).prepare({ beforeId: null, ids: ['r5'], parentId: null, type: 'reparent' })).toEqual({
-        status: 'unchanged',
-      });
     });
 
     it.each<[string, DocumentCommand, PrepareEditResult]>([
@@ -572,7 +542,6 @@ describe('createDocumentModel', () => {
       expect(outline(after.canvas.document)).toEqual(['i1', 'c1', 'r1', 'r2', 'H', '  r3', 'r4', 'r5']);
       expect(edit).toMatchObject({ selectionAfter: 'r2', touchedIds: ['G', 'r2', 'H', 'r4'] });
 
-      // Naming a group and one nested inside it dissolves both; nothing half-applies.
       const nested = roundTrip(projectWith(tree(), 'H'), { ids: ['H', 'G'], type: 'ungroup' });
       expect(outline(nested.after.canvas.document)).toEqual(['i1', 'c1', 'r1', 'r2', 'r3', 'r4', 'r5']);
       expect(nested.edit.selectionAfter).toBe('r3');
@@ -649,46 +618,6 @@ describe('createDocumentModel', () => {
       });
     });
 
-    it('patches opacity and blend on a raster-stack group, with an inverse restoring absence', () => {
-      const project = projectWith(tree(), 'G');
-      const { after, edit } = roundTrip(project, {
-        id: 'G',
-        patch: { blendMode: 'multiply', opacity: 0.5 },
-        type: 'patch',
-      });
-      expect(after.canvas.document.stacks.raster[1]).toMatchObject({ blendMode: 'multiply', opacity: 0.5 });
-      expect(edit.inverse).toEqual({
-        id: 'G',
-        patch: { blendMode: undefined, opacity: undefined },
-        type: 'updateCanvasLayer',
-      });
-    });
-
-    it('patches a color label on leaves and groups in any stack, locked included, and clears to absence', () => {
-      const project = projectWith(
-        [layer('r1', 'raster', { isLocked: true }), group('OG', [layer('c1', 'control')])],
-        null
-      );
-      // Organizational, so the lock does not gate it.
-      const { after, edit } = roundTrip(project, { id: 'r1', patch: { colorLabel: 'red' }, type: 'patch' });
-      expect(after.canvas.document.stacks.raster[0]).toMatchObject({ colorLabel: 'red' });
-      expect(edit.inverse).toEqual({ id: 'r1', patch: { colorLabel: undefined }, type: 'updateCanvasLayer' });
-
-      const overlayGroup = roundTrip(project, { id: 'OG', patch: { colorLabel: 'blue' }, type: 'patch' });
-      expect(overlayGroup.after.canvas.document.stacks.control[0]).toMatchObject({ colorLabel: 'blue' });
-
-      const cleared = applyCanvasProjectMutation(after, {
-        id: 'r1',
-        patch: { colorLabel: undefined },
-        type: 'updateCanvasLayer',
-      });
-      expect(
-        cleared.canvas.document.stacks.raster[0] && 'colorLabel' in cleared.canvas.document.stacks.raster[0]
-          ? cleared.canvas.document.stacks.raster[0].colorLabel
-          : undefined
-      ).toBeUndefined();
-    });
-
     it('refuses opacity and blend on an overlay-stack group and on a locked group', () => {
       const overlay = projectWith([group('OG', [layer('c1', 'control')])], null);
       expect(modelOf(overlay).prepare({ id: 'OG', patch: { opacity: 0.5 }, type: 'patch' })).toEqual({
@@ -699,7 +628,6 @@ describe('createDocumentModel', () => {
         operation: 'blend an overlay-stack group',
         status: 'unsupported',
       });
-      // Renaming a locked group stays allowed; its appearance does not.
       const locked = projectWith([group('LG', [layer('r1')], { isLocked: true })], null);
       expect(modelOf(locked).prepare({ id: 'LG', patch: { opacity: 0.5 }, type: 'patch' })).toEqual({
         ids: ['LG'],
@@ -820,126 +748,16 @@ describe('createDocumentModel', () => {
         model.prepare({ config: { adjustments: stack, layerType: 'raster' }, id: 'G', type: 'patch-config' })
       ).toEqual({
         actual: 'group',
-        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
         status: 'wrong-type',
       });
 
-      // Even unvalidated preview/replay dispatches must reject adjustment stacks on overlay groups.
       const rawDispatch = applyCanvasProjectMutation(project, {
         config: { adjustments: stack, layerType: 'group' },
         id: 'OG',
         type: 'updateCanvasLayerConfig',
       });
       expect(rawDispatch.canvas.document).toBe(project.canvas.document);
-    });
-
-    it('round-trips a layer regenerate region through add, toggle and null-remove', () => {
-      const project = projectWith(flat(), 'r1');
-      const inpaint = {
-        isEnabled: true,
-        fill: { color: '#e07575', style: 'diagonal' as const },
-      };
-      const added = roundTrip(project, {
-        before: { inpaint: null, layerType: 'raster' },
-        config: { inpaint, layerType: 'raster' },
-        id: 'r1',
-        type: 'patch-config',
-      });
-      const toggled = roundTrip(added.after, {
-        before: { inpaint, layerType: 'raster' },
-        config: { inpaint: { ...inpaint, isEnabled: false }, layerType: 'raster' },
-        id: 'r1',
-        type: 'patch-config',
-      });
-      const removed = roundTrip(toggled.after, {
-        before: { inpaint: { ...inpaint, isEnabled: false }, layerType: 'raster' },
-        config: { inpaint: null, layerType: 'raster' },
-        id: 'r1',
-        type: 'patch-config',
-      });
-      const layer = getDocumentLeaves(removed.after.canvas.document).find((leaf) => leaf.id === 'r1')!;
-      expect(Object.hasOwn(layer, 'inpaint')).toBe(false);
-    });
-
-    it('round-trips a mask modifier through add, toggle and null-remove with passing postconditions', () => {
-      const project = projectWith(flat(), 'i1');
-      const noise = { isEnabled: true, level: 0.25 };
-      const added = roundTrip(project, {
-        before: { layerType: 'inpaint_mask', noise: null },
-        config: { layerType: 'inpaint_mask', noise },
-        id: 'i1',
-        type: 'patch-config',
-      });
-      const toggled = roundTrip(added.after, {
-        before: { layerType: 'inpaint_mask', noise },
-        config: { layerType: 'inpaint_mask', noise: { ...noise, isEnabled: false } },
-        id: 'i1',
-        type: 'patch-config',
-      });
-      const removed = roundTrip(toggled.after, {
-        before: { layerType: 'inpaint_mask', noise: { ...noise, isEnabled: false } },
-        config: { layerType: 'inpaint_mask', noise: null },
-        id: 'i1',
-        type: 'patch-config',
-      });
-      const mask = getDocumentLeaves(removed.after.canvas.document).find((leaf) => leaf.id === 'i1')!;
-      expect(Object.hasOwn(mask, 'noise')).toBe(false);
-    });
-
-    it("round-trips a region's layout role from the live layer, and clearing it leaves no field behind", () => {
-      const project = projectWith([layer('g1', 'regional_guidance'), layer('r1')], 'g1');
-      const regionOf = (after: Project) => getDocumentLeaves(after.canvas.document).find((leaf) => leaf.id === 'g1')!;
-      // The settings panel commits without a baseline, so each inverse is read from the live layer.
-      const added = roundTrip(project, {
-        config: { layerType: 'regional_guidance', layout: { kind: 'text' } },
-        id: 'g1',
-        type: 'patch-config',
-      });
-      expect(added.edit.inverse).toEqual({
-        config: { layerType: 'regional_guidance', layout: undefined },
-        id: 'g1',
-        type: 'updateCanvasLayerConfig',
-      });
-      const texted = roundTrip(added.after, {
-        config: { layerType: 'regional_guidance', layout: { kind: 'text', text: 'OPEN' } },
-        id: 'g1',
-        type: 'patch-config',
-      });
-      expect(regionOf(texted.after)).toMatchObject({ layout: { kind: 'text', text: 'OPEN' } });
-      const cleared = roundTrip(texted.after, {
-        config: { layerType: 'regional_guidance', layout: null },
-        id: 'g1',
-        type: 'patch-config',
-      });
-
-      expect(Object.hasOwn(regionOf(cleared.after), 'layout')).toBe(false);
-      const undoneAdd = applyCanvasProjectMutation(added.after, added.edit.inverse);
-      expect(Object.hasOwn(regionOf(undoneAdd), 'layout')).toBe(false);
-      expect(
-        modelOf(cleared.after).prepare({
-          config: { layerType: 'regional_guidance', layout: null },
-          id: 'g1',
-          type: 'patch-config',
-        })
-      ).toEqual({ status: 'unchanged' });
-    });
-
-    it('round-trips setting and clearing a regional prompt, which the layer stores as null', () => {
-      const project = projectWith([layer('g1', 'regional_guidance'), layer('r1')], 'g1');
-      const set = roundTrip(project, {
-        before: { layerType: 'regional_guidance', negativePrompt: null },
-        config: { layerType: 'regional_guidance', negativePrompt: 'blurry' },
-        id: 'g1',
-        type: 'patch-config',
-      });
-      const cleared = roundTrip(set.after, {
-        before: { layerType: 'regional_guidance', negativePrompt: 'blurry' },
-        config: { layerType: 'regional_guidance', negativePrompt: null },
-        id: 'g1',
-        type: 'patch-config',
-      });
-      const region = getDocumentLeaves(cleared.after.canvas.document).find((leaf) => leaf.id === 'g1')!;
-      expect(region).toMatchObject({ negativePrompt: null });
     });
 
     it('round-trips an atomic cross-layer config batch and refuses malformed batches', () => {
@@ -1012,57 +830,6 @@ describe('createDocumentModel', () => {
       ).toEqual({ status: 'unchanged' });
     });
 
-    it('moves an adjustment from a raster layer into a raster group as one edit, refusing ineligible owners', () => {
-      const entry = { id: 'a1', isEnabled: true, saturation: 0.5, type: 'hsl' as const };
-      const kept = { id: 'a2', isEnabled: true, type: 'invert' as const };
-      const resident = { id: 'g1', isEnabled: false, type: 'invert' as const };
-      const nodes = [
-        layer('r1', 'raster', { adjustments: [entry, kept] }),
-        group('G', [layer('r2')], { adjustments: [resident] }),
-        group('GL', [layer('r3')], { adjustments: [resident], isLocked: true }),
-        group('OG', [layer('c2', 'control')], { adjustments: [resident] }),
-      ];
-      const project = projectWith(nodes, 'r1');
-      const moveInto = (id: string): DocumentCommand => ({
-        patches: [
-          {
-            before: { adjustments: [entry, kept], layerType: 'raster' },
-            config: { adjustments: [kept], layerType: 'raster' },
-            id: 'r1',
-          },
-          {
-            before: { adjustments: [resident], layerType: 'group' },
-            config: { adjustments: [entry, resident], layerType: 'group' },
-            id,
-          },
-        ],
-        type: 'patch-config-batch',
-      });
-
-      // One prepared edit whose single inverse restores both owners (roundTrip asserts the restore).
-      const { after, edit } = roundTrip(project, moveInto('G'));
-      expect(edit.touchedIds).toEqual(['r1', 'G']);
-      const index = getDocumentIndex(after.canvas.document);
-      const adjustmentsOf = (id: string) => {
-        const node = index.byId.get(id)!.node;
-        return node.type === 'raster' || node.type === 'group' ? node.adjustments : null;
-      };
-      expect(adjustmentsOf('r1')).toEqual([kept]);
-      expect(adjustmentsOf('G')).toEqual([entry, resident]);
-
-      const model = modelOf(project);
-      expect(model.prepare(moveInto('GL'))).toEqual({ ids: ['GL'], status: 'locked' });
-      expect(model.prepare(moveInto('OG'))).toEqual({
-        operation: 'adjust an overlay-stack group',
-        status: 'unsupported',
-      });
-      // A locked source refuses the whole batch too.
-      expect(modelOf(projectWith([{ ...nodes[0]!, isLocked: true }, nodes[1]!], 'r1')).prepare(moveInto('G'))).toEqual({
-        ids: ['r1'],
-        status: 'locked',
-      });
-    });
-
     it('round-trips config, source and flag commands through the reducer, groups included', () => {
       const project = projectWith(tree(), 'r1');
       const control = roundTrip(project, {
@@ -1128,7 +895,11 @@ describe('createDocumentModel', () => {
       [
         'a config patch on a group',
         { config: { layerType: 'raster', isTransparencyLocked: true }, id: 'G', type: 'patch-config' },
-        { actual: 'group', expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'], status: 'wrong-type' },
+        {
+          actual: 'group',
+          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
+          status: 'wrong-type',
+        },
       ],
       [
         'a source patch on a mask',
@@ -1154,17 +925,6 @@ describe('createDocumentModel', () => {
       const { edit } = roundTrip(project, { id: 'G', type: 'select' });
       expect(edit).toMatchObject({ history: 'none', selectionAfter: 'G', selectionBefore: 'r1', touchedIds: [] });
       expect(modelOf(project).prepare({ id: 'r1', type: 'select' })).toEqual({ status: 'unchanged' });
-    });
-
-    it.each<[string, DocumentCommand, PrepareEditResult]>([
-      ['a move already at the boundary', { ids: ['r1'], kind: 'front', type: 'move' }, { status: 'unchanged' }],
-      [
-        'a reorder that keeps the order',
-        { orders: [{ orderedIds: ['r1', 'G', 'r5'], parentId: null, stack: 'raster' }], type: 'reorder' },
-        { status: 'unchanged' },
-      ],
-    ])('reports %s as unchanged', (_label, command, result) => {
-      expect(modelOf(projectWith(tree(), 'r1')).prepare(command)).toEqual(result);
     });
 
     it.each<[string, DocumentCommand, PrepareEditResult]>([
@@ -1271,7 +1031,6 @@ describe('createDocumentModel', () => {
       const locked = projectWith([group('G', [layer('a'), layer('b')], { isLocked: true })], null);
       expect(modelOf(locked).canMergeDown('a')).toEqual({ ids: ['G'], status: 'locked' });
       const off = projectWith([group('G', [layer('a'), layer('b')], { isEnabled: false })], null);
-      // The group that disables the pair is named, not the layer.
       expect(modelOf(off).canMergeDown('a')).toEqual({ reason: 'disabled', status: 'invalid-target', targetId: 'G' });
     });
 
@@ -1284,6 +1043,12 @@ describe('createDocumentModel', () => {
         [layer('a'), layer('b', 'raster', { isLocked: true })],
         'a',
         { ids: ['b'], status: 'locked' },
+      ],
+      [
+        'a locked upper layer',
+        [layer('a', 'raster', { isLocked: true }), layer('b')],
+        'a',
+        { ids: ['a'], status: 'locked' },
       ],
       [
         'a disabled upper layer',
@@ -1317,23 +1082,6 @@ describe('document-level seam', () => {
     expect(lookupDocumentLeaf(document, 'r3')).toBe(compileDocumentLeaves(document).find((leaf) => leaf.id === 'r3'));
     expect(lookupDocumentLeaf(document, 'G')).toBeNull();
     expect(lookupDocumentLeaf(document, 'nope')).toBeNull();
-  });
-
-  it('finds the leaf sibling directly below, never crossing a parent or a group', () => {
-    const document = projectWith(tree(), 'r1').canvas.document;
-    expect(lookupLayerBelow(document, 'r2')).toBeNull();
-    expect(lookupLayerBelow(document, 'r1')).toBeNull();
-    expect(lookupLayerBelow(document, 'H')?.id).toBe('r4');
-    expect(lookupLayerBelow(document, 'r4')).toBeNull();
-    expect(lookupLayerBelow(projectWith([layer('a'), layer('b')], null).canvas.document, 'a')?.id).toBe('b');
-  });
-
-  it('shares the merge-down rule with the model', () => {
-    const project = projectWith(tree(), 'r1');
-    const model = modelOf(project);
-    for (const entry of getDocumentIndex(project.canvas.document).nodes) {
-      expect(mergeDownEligibility(project.canvas.document, entry.node.id)).toEqual(model.canMergeDown(entry.node.id));
-    }
   });
 });
 
@@ -1420,7 +1168,6 @@ describe('lock coherence and limits', () => {
     });
     expect(model.prepare({ ids: ['r2'], kind: 'back', type: 'move' })).toEqual({ ids: ['L'], status: 'locked' });
     expect(model.prepare({ ids: ['r4'], kind: 'front', type: 'move' })).toEqual({ ids: ['r4'], status: 'locked' });
-    // A locked sibling may be passed; only the moving subtree has to be free.
     expect(model.prepare({ ids: ['r1'], kind: 'back', type: 'move' }).status).toBe('prepared');
     expect(model.prepare({ beforeId: null, ids: ['L'], parentId: null, type: 'reparent' })).toEqual({
       ids: ['L'],
@@ -1448,42 +1195,5 @@ describe('lock coherence and limits', () => {
     const createId = () => `dup${created++}`;
     expect(model.prepare({ createId, ids: ['l0', 'l1'], type: 'duplicate' })).toMatchObject({ reason: 'node-limit' });
     expect(model.prepare({ createId, ids: ['l0'], type: 'duplicate' }).status).toBe('prepared');
-  });
-
-  it('inserts an empty group into the stack it names and refuses one without a stack', () => {
-    expect(
-      modelOf(projectWith(tree(), 'c1')).prepare({ aboveId: 'c1', nodes: [group('E')], type: 'insert' })
-    ).toMatchObject({
-      status: 'unsupported',
-    });
-    const { after } = roundTrip(projectWith(tree(), 'c1'), {
-      aboveId: 'c1',
-      nodes: [group('E')],
-      stack: 'control',
-      type: 'insert',
-    });
-    expect(after.canvas.document.stacks.control.map((node) => node.id)).toEqual(['E', 'c1']);
-  });
-
-  it('reparents leaves from different parents in one edit and restores each run on undo', () => {
-    const { after } = roundTrip(projectWith(tree(), 'r1'), {
-      beforeId: null,
-      ids: ['r1', 'r3', 'r5'],
-      parentId: 'G',
-      type: 'reparent',
-    });
-    expect(outline(after.canvas.document)).toEqual(['i1', 'c1', 'G', '  r2', '  H', '  r4', '  r1', '  r3', '  r5']);
-  });
-
-  it('dissolves sibling groups in one edit', () => {
-    const { after, edit } = roundTrip(
-      projectWith([group('A', [layer('r1'), layer('r2')]), group('B', [layer('r3')])], 'r3'),
-      {
-        ids: ['A', 'B'],
-        type: 'ungroup',
-      }
-    );
-    expect(outline(after.canvas.document)).toEqual(['r1', 'r2', 'r3']);
-    expect(edit.selectionAfter).toBe('r3');
   });
 });

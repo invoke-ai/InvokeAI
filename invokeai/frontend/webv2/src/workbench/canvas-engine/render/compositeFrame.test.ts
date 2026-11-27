@@ -58,7 +58,6 @@ interface Harness {
   rasterizeLayer: ReturnType<typeof vi.fn>;
   beginFrame: ReturnType<typeof vi.fn>;
   enforce: ReturnType<typeof vi.fn>;
-  /** What the engine reports for a gesture editing a mask or region. */
   editingHiddenStack: boolean;
 }
 
@@ -89,6 +88,7 @@ const makeHarness = (): Harness => {
       getCheckerboardTile: () => surface(8, 8),
       getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
+      maskScratch: { getMaskScratch: () => surface(8, 8), releaseMaskScratch: vi.fn() },
       isEditingStagingHiddenStack: () => harness.editingHiddenStack,
       layerCache: {
         byteSize: () => 0,
@@ -102,7 +102,7 @@ const makeHarness = (): Harness => {
       stores,
       transformOverrides: overrides,
       viewport: {
-        getDpr: () => 1,
+        getDpr: () => 2,
         getViewportSize: () => ({ height: 64, width: 64 }),
         getZoom: () => 1,
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
@@ -125,12 +125,19 @@ const draw = (
   sam: SamPreviewState | null = null
 ) => createCompositeFrame(harness.deps).draw(surface(), doc, VIEW, floatFrame, sam);
 
-/** The options object the compositor was handed on the most recent draw. */
 const lastCompositeOptions = () => composite.mock.calls.at(-1)?.[4] as Record<string, unknown>;
 
 beforeEach(() => {
   harness = makeHarness();
   composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => undefined);
+});
+
+it('passes the viewport DPR and its mask scratch to the screen compositor', () => {
+  draw();
+  expect(lastCompositeOptions().screenMask).toEqual({
+    dpr: 2,
+    getScratch: expect.any(Function),
+  });
 });
 
 describe('cache preparation', () => {
@@ -228,8 +235,6 @@ describe('filter previews', () => {
     const snapshot = vi.spyOn(harness.previews, 'filterSnapshot');
     draw();
     expect(lastCompositeOptions().layerPreviews).toBeNull();
-    // This runs every composite frame; snapshotting unconditionally would
-    // allocate a map per frame for the overwhelmingly common case of none.
     expect(snapshot).not.toHaveBeenCalled();
   });
 
@@ -336,6 +341,21 @@ describe('the surface budget', () => {
     draw();
     expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
   });
+
+  it('releases mask scratch after a full repaint without patterns and retains it across bounded damage', () => {
+    const doc = documentOf([layer('a')]);
+    const frame = createCompositeFrame(harness.deps);
+    const screen = surface();
+    const release = harness.deps.maskScratch.releaseMaskScratch;
+    composite.mockImplementationOnce((...[, , , , options]: Parameters<typeof compositor.compositeDocument>) => {
+      options.screenMask!.getScratch(8, 8);
+    });
+    frame.draw(screen, doc, VIEW, null, null);
+    frame.draw(screen, doc, VIEW, null, null, { kind: 'regions', regions: [{ layerId: 'a', rect: entryFor().rect }] });
+    expect(release).not.toHaveBeenCalled();
+    frame.draw(screen, doc, VIEW, null, null);
+    expect(release).toHaveBeenCalledOnce();
+  });
 });
 
 describe('overlay stacks while a result is staged', () => {
@@ -384,7 +404,6 @@ describe('overlay stacks while a result is staged', () => {
     drawFrame();
     expect(description()).toBe(hidden);
 
-    // Accepting or discarding ends the preview and shows them again.
     harness.previews.clearStaged();
     drawFrame();
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
@@ -405,13 +424,11 @@ describe('overlay stacks while a result is staged', () => {
     hiddenWhileComparing();
     expect(lastCompositeOptions().stagedPreview).not.toBeNull();
 
-    // The eye shows the canvas under the result exactly as the shown result left it: no masks, no tint.
     harness.previews.hideStaged();
     drawFrame();
     hiddenWhileComparing();
     expect(lastCompositeOptions().stagedPreview).toBeNull();
 
-    // A mask gesture reveals them as it would over the shown result, and the frame keeps the selected mask ready.
     harness.entries.set('m', entryFor(undefined, true));
     drawFrame({ ...doc, selectedLayerId: 'm' });
     expect(harness.rasterizeLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'm' }), expect.anything());
@@ -422,7 +439,6 @@ describe('overlay stacks while a result is staged', () => {
     harness.editingHiddenStack = false;
     harness.entries.set('m', entryFor());
 
-    // Showing it again and hiding it again never brings them back.
     publishPreview();
     drawFrame();
     hiddenWhileComparing();
@@ -430,7 +446,6 @@ describe('overlay stacks while a result is staged', () => {
     drawFrame();
     hiddenWhileComparing();
 
-    // Accepting or discarding while it is toggled off ends the comparison.
     harness.previews.clearStaged();
     drawFrame();
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
@@ -441,7 +456,6 @@ describe('overlay stacks while a result is staged', () => {
   it('shows them over the preview only while a gesture edits a control layer, mask or region, whatever is selected', () => {
     const frame = createCompositeFrame(harness.deps);
     publishPreview();
-    // Selecting a mask alone keeps the result unmasked.
     frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(drawnIds()).toEqual(['a']);
 
@@ -467,7 +481,6 @@ describe('overlay stacks while a result is staged', () => {
       return harness.rasterizeLayer.mock.calls.map(([layer]) => (layer as CanvasLayerContract).id);
     };
 
-    // A stale cache starts loading, and the frame protects the leaf from eviction though it draws none.
     harness.entries.set('c', entryFor(undefined, true));
     harness.entries.set('m', entryFor(undefined, true));
     harness.entries.set('r', entryFor(undefined, true));
@@ -479,7 +492,6 @@ describe('overlay stacks while a result is staged', () => {
     expect(drawSelected('c')).toEqual(['c']);
     expect(demandedIds()).toEqual(['a', 'c']);
 
-    // A disabled mask draws nowhere, and a selected group's brush or shape paints a new layer instead.
     const disabled = documentOf([layer('a'), control('c'), { ...mask('m'), isEnabled: false }, region('r')]);
     expect(drawSelected('m', disabled)).toEqual([]);
     expect(demandedIds()).toEqual(['a']);
@@ -487,7 +499,6 @@ describe('overlay stacks while a result is staged', () => {
     expect(drawSelected('g', grouped)).toEqual([]);
     expect(demandedIds()).toEqual(['a']);
 
-    // Off screen it is left on demand, as a drawn leaf would be.
     const offscreen = documentOf([
       layer('a'),
       control('c'),
@@ -497,7 +508,6 @@ describe('overlay stacks while a result is staged', () => {
     expect(drawSelected('m', offscreen)).toEqual([]);
     expect(demandedIds()).toEqual(['a']);
 
-    // Without a shown preview the stacks draw, so their leaves are demanded as usual.
     harness.previews.clearStaged();
     frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);

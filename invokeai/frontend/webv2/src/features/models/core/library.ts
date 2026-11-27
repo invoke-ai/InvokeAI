@@ -3,7 +3,7 @@ import type { ModelConfig, ModelTaxonomyType } from './types';
 import { getModelBaseLabel, KNOWN_MODEL_BASES } from './baseIdentity';
 import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
 
-export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format' | 'type' | 'path';
+export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'added' | 'format' | 'type' | 'path';
 
 export interface ModelLibraryFilters {
   searchTerm: string;
@@ -11,7 +11,6 @@ export interface ModelLibraryFilters {
   typeFilter: ModelTaxonomyType | null;
   /** null = all bases. */
   baseFilter: string | null;
-  /** Only models whose files are missing on disk. */
   missingOnly: boolean;
   sortField: ModelSortField;
   sortDirection: 'asc' | 'desc';
@@ -26,11 +25,23 @@ export const DEFAULT_LIBRARY_FILTERS: ModelLibraryFilters = {
   typeFilter: null,
 };
 
+/** A model listed in a type group; `viaType` is the role type when the group is a role type of a model listed there as well as under its primary type. */
+export interface ModelGroupEntry {
+  model: ModelConfig;
+  viaType: ModelTaxonomyType | null;
+}
+
 export interface ModelGroup {
   type: ModelTaxonomyType;
   label: string;
-  models: ModelConfig[];
+  entries: ModelGroupEntry[];
 }
+
+type WithRoles = { type: ModelTaxonomyType; roles?: readonly { type: ModelTaxonomyType }[] };
+
+/** A model serves a type as its primary type or through a role. */
+export const modelServesType = (model: WithRoles, type: ModelTaxonomyType): boolean =>
+  model.type === type || (model.roles ?? []).some((role) => role.type === type);
 
 export interface ModelPickerOptions {
   /** Multi-select base filter; empty/undefined = all bases. */
@@ -65,27 +76,38 @@ const matchesSearchTerms = (model: ModelConfig, terms: readonly string[]): boole
   }
 
   const haystack =
-    `${model.name} ${model.description ?? ''} ${model.base} ${model.type} ${model.format} ${(model.trigger_phrases ?? []).join(' ')}`.toLowerCase();
+    `${model.name} ${model.description ?? ''} ${model.base} ${model.type} ${(model.roles ?? []).map((role) => role.type).join(' ')} ${model.format} ${(model.trigger_phrases ?? []).join(' ')}`.toLowerCase();
 
   return terms.every((term) => haystack.includes(term));
 };
 
-const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortField): number => {
+const compareByName = (a: ModelConfig, b: ModelConfig): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
+const compareBySortField = (
+  a: ModelConfig,
+  b: ModelConfig,
+  field: ModelSortField,
+  dateAddedRanks: ReadonlyMap<string, number> | null
+): number => {
   switch (field) {
     case 'name':
     case 'default':
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return compareByName(a, b);
     case 'base':
       return getModelBaseLabel(a.base).localeCompare(getModelBaseLabel(b.base));
     case 'size':
       return a.file_size - b.file_size;
+    case 'added': {
+      // An unlisted model was installed after the order was read, so it is the newest.
+      const newest = dateAddedRanks?.size ?? 0;
+
+      return (dateAddedRanks?.get(a.key) ?? newest) - (dateAddedRanks?.get(b.key) ?? newest) || compareByName(a, b);
+    }
     case 'format':
       return String(a.format).localeCompare(String(b.format));
     case 'type':
-      return (
-        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-      );
+      return getModelCategoryRank(a.type) - getModelCategoryRank(b.type) || compareByName(a, b);
     case 'path':
       return a.path.localeCompare(b.path);
   }
@@ -94,41 +116,70 @@ const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortFiel
 export const filterModels = (
   models: ModelConfig[],
   filters: ModelLibraryFilters,
-  missingModelKeys: ReadonlySet<string>
+  missingModelKeys: ReadonlySet<string>,
+  /** Install-order ranks for the `added` sort, oldest first; until they load that sort lists by name, ascending. */
+  dateAddedRanks: ReadonlyMap<string, number> | null = null
 ): ModelConfig[] => {
   // Split once per pass, not once per model.
   const terms = filters.searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const directionFactor = filters.sortDirection === 'desc' ? -1 : 1;
+  // The direction waits for the install order: applied to the name fallback, it would flip the list and then
+  // reorder it again when the ranks land.
+  const isDescending = filters.sortDirection === 'desc' && (filters.sortField !== 'added' || dateAddedRanks !== null);
+  const directionFactor = isDescending ? -1 : 1;
 
   return models
     .filter(
       (model) =>
         (!filters.missingOnly || missingModelKeys.has(model.key)) &&
-        (filters.typeFilter === null || model.type === filters.typeFilter) &&
+        (filters.typeFilter === null || modelServesType(model, filters.typeFilter)) &&
         (filters.baseFilter === null || model.base === filters.baseFilter) &&
         matchesSearchTerms(model, terms)
     )
-    .sort((a, b) => compareBySortField(a, b, filters.sortField) * directionFactor);
+    .sort((a, b) => compareBySortField(a, b, filters.sortField, dateAddedRanks) * directionFactor);
 };
 
-/** Group filtered models by category in canonical category order. */
-export const groupModelsByType = (models: ModelConfig[]): ModelGroup[] => {
-  const groupsByType = new Map<ModelTaxonomyType, ModelConfig[]>();
-
-  for (const model of models) {
-    const group = groupsByType.get(model.type);
+/**
+ * Group filtered models by category in canonical category order. A model also sits in each of its role types'
+ * groups; under a type filter it sits in the filtered type's group only, as a plain entry.
+ */
+export const groupModelsByType = (models: ModelConfig[], typeFilter: ModelTaxonomyType | null = null): ModelGroup[] => {
+  const groupsByType = new Map<ModelTaxonomyType, ModelGroupEntry[]>();
+  const add = (type: ModelTaxonomyType, entry: ModelGroupEntry) => {
+    const group = groupsByType.get(type);
 
     if (group) {
-      group.push(model);
+      group.push(entry);
     } else {
-      groupsByType.set(model.type, [model]);
+      groupsByType.set(type, [entry]);
+    }
+  };
+
+  for (const model of models) {
+    if (typeFilter !== null) {
+      // Listed once, so it is the model's only row: no section-qualified identity needed.
+      add(typeFilter, { model, viaType: null });
+      continue;
+    }
+
+    add(model.type, { model, viaType: null });
+
+    for (const roleType of new Set((model.roles ?? []).map((role) => role.type))) {
+      if (roleType !== model.type) {
+        add(roleType, { model, viaType: roleType });
+      }
     }
   }
 
   return [...groupsByType.entries()]
     .sort(([a], [b]) => getModelCategoryRank(a) - getModelCategoryRank(b))
-    .map(([type, groupModels]) => ({ label: getModelTypePluralLabel(type), models: groupModels, type }));
+    .map(([type, entries]) => ({ entries, label: getModelTypePluralLabel(type), type }));
 };
+
+/** The type a candidate qualifies as in a picker: its primary type if asked for, else its first asked-for role type. */
+export const getQualifyingType = (model: WithRoles, allowedTypes: readonly string[]): ModelTaxonomyType =>
+  allowedTypes.includes(model.type)
+    ? model.type
+    : ((model.roles ?? []).find((role) => allowedTypes.includes(role.type))?.type ?? model.type);
 
 /** Candidate, sort, and grouping rules shared by every model picker instance. */
 const isModelPickerCandidate = (
@@ -136,7 +187,7 @@ const isModelPickerCandidate = (
   allowedTypes: ReadonlySet<string>,
   options: Pick<ModelPickerOptions, 'excludeKeys' | 'filter'>
 ): boolean =>
-  allowedTypes.has(model.type) &&
+  (allowedTypes.has(model.type) || (model.roles ?? []).some((role) => allowedTypes.has(role.type))) &&
   !options.excludeKeys?.has(model.key) &&
   (options.filter ? options.filter(model) : true);
 
@@ -153,21 +204,25 @@ export const hasModelPickerCandidates = (
 export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
   const allowedTypes = new Set(options.modelTypes);
   const candidates = models.filter((model) => isModelPickerCandidate(model, allowedTypes, options));
-  // Chips are derived from candidates — before the base filter — so the chip
-  // row stays stable while the user toggles chips.
+  // Chips are derived from candidates — before the base filter — so the chip row stays stable while the user toggles
+  // chips.
   const availableBases = collectBasesForDisplay(candidates);
-  // A remembered base that this picker does not offer (uninstalled, or a
-  // sibling picker's choice) must not filter everything out behind a hidden chip.
+  // A remembered base that this picker does not offer (uninstalled, or a sibling picker's choice) must not filter
+  // everything out behind a hidden chip.
   const baseFilter = new Set(availableBases.filter((base) => options.baseFilter?.has(base)));
   const { relatedKeys } = options;
+  const qualifyingTypes = new Map(candidates.map((model) => [model, getQualifyingType(model, options.modelTypes)]));
+  const isNative = (model: ModelConfig) => qualifyingTypes.get(model) === model.type;
   const visibleModels = candidates
     .filter((model) => baseFilter.size === 0 || baseFilter.has(String(model.base)))
     .sort(
       (a, b) =>
         getBaseDisplayRank(String(a.base)) - getBaseDisplayRank(String(b.base)) ||
         String(a.base).localeCompare(String(b.base)) ||
+        // Models of the asked type lead; those that only serve as it follow.
+        Number(isNative(b)) - Number(isNative(a)) ||
         Number(relatedKeys?.has(b.key) ?? false) - Number(relatedKeys?.has(a.key) ?? false) ||
-        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
+        getModelCategoryRank(qualifyingTypes.get(a)!) - getModelCategoryRank(qualifyingTypes.get(b)!) ||
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
     );
 
@@ -199,7 +254,6 @@ export const collectBases = (models: Pick<ModelConfig, 'base'>[]): string[] =>
 /** Bases that exist but carry no architecture meaning, sorted after the rest. */
 const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'unknown']);
 
-/** Order known bases by registry, then unfamiliar bases, with any/external/unknown last. */
 const KNOWN_BASE_RANKS = new Map<string, number>(KNOWN_MODEL_BASES.map((base, index) => [base, index]));
 
 /** Display rank for a base: registry order, unknown bases next, meaningless bases last. */
@@ -218,5 +272,7 @@ export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): str
 };
 
 /** Distinct types present in a model list, in canonical order. */
-export const collectTypes = (models: Pick<ModelConfig, 'type'>[]): ModelTaxonomyType[] =>
-  [...new Set(models.map((model) => model.type))].sort((a, b) => getModelCategoryRank(a) - getModelCategoryRank(b));
+export const collectTypes = (models: WithRoles[]): ModelTaxonomyType[] =>
+  [...new Set(models.flatMap((model) => [model.type, ...(model.roles ?? []).map((role) => role.type)]))].sort(
+    (a, b) => getModelCategoryRank(a) - getModelCategoryRank(b)
+  );

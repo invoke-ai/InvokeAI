@@ -73,8 +73,7 @@ describe('GalleryViewTabs', () => {
     const count = counts[shownIndex]!;
     const style = getComputedStyle(count);
 
-    // The shown fill is translucent, so measure against what it composites to
-    // over the surface beneath.
+    // The shown fill is translucent, so measure against what it composites to over the surface beneath.
     const effectiveTabBg = compositeColors(
       getComputedStyle(tabs[shownIndex]!).backgroundColor,
       getComputedStyle(document.body).backgroundColor

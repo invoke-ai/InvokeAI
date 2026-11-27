@@ -4,8 +4,8 @@ import { commands } from 'vitest/browser';
 
 /**
  * Reviewed Chromium PNG goldens include raster/browser metadata. Flatten onto opaque backgrounds before channel
- * comparison to avoid premultiplied-alpha rounding. Update only via the golden command; normal failures write
- * ignored expected/actual/diff artifacts.
+ * comparison to avoid premultiplied-alpha rounding. Update only via the golden command; normal failures write ignored
+ * expected/actual/diff artifacts.
  */
 export interface GoldenTolerance {
   /** Largest per-channel difference a pixel may show before it counts as differing. */
@@ -29,8 +29,8 @@ export const INTERPOLATED: GoldenTolerance = { maxChannelDelta: 16, maxDiffering
 
 const GOLDEN_DIR = 'src/workbench/canvas-engine/render/golden/__golden__';
 
-// A string define such as "false" is truthy and would silently turn every run
-// into a baseline rewrite (Vitest 5 browser mode injects strings verbatim).
+// A string define such as "false" is truthy and would silently turn every run into a baseline rewrite (Vitest 5 browser
+// mode injects strings verbatim).
 if (typeof __CANVAS_GOLDEN_UPDATE__ !== 'boolean') {
   throw new TypeError(`__CANVAS_GOLDEN_UPDATE__ must be a boolean define, got ${typeof __CANVAS_GOLDEN_UPDATE__}.`);
 }

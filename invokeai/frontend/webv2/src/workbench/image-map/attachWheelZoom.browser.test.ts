@@ -38,9 +38,8 @@ const attach = (element: HTMLElement, ranges: AxisRanges): { applied: number; cu
 };
 
 /**
- * Zooms are coalesced into the next animation frame, so nothing is applied
- * until one passes. Two frames, because the first only guarantees the
- * callback has been scheduled by the dispatch above.
+ * Zooms are coalesced into the next animation frame, so nothing is applied until one passes. Two frames, because the
+ * first only guarantees the callback has been scheduled by the dispatch above.
  */
 const settleFrames = (): Promise<void> =>
   new Promise((resolve) => {
@@ -79,8 +78,7 @@ describe('attachWheelZoom pinch bookkeeping', () => {
     ]);
     dispatchTouch(element, 'touchmove', [touchAt(element, 1, 10), touchAt(element, 2, 390), touchAt(element, 3, 300)]);
 
-    // Back to two fingers, now far apart. Measuring against the stale 100px
-    // baseline would scale the view by ~1/3.8 in a single frame.
+    // Back to two fingers, now far apart: against the stale 100px baseline the view would scale by ~1/3.8 in one frame.
     dispatchTouch(element, 'touchend', [touchAt(element, 1, 10), touchAt(element, 2, 390)]);
     await settleFrames();
     const spanBefore = spanOf(state.current);
@@ -90,8 +88,8 @@ describe('attachWheelZoom pinch bookkeeping', () => {
     dispatchTouch(element, 'touchmove', [touchAt(element, 1, 10), touchAt(element, 2, 390)]);
     await settleFrames();
 
-    // "Nothing moved" has to mean the gesture ran and correctly produced no
-    // movement — a zoom that never applied would satisfy the span check too.
+    // "Nothing moved" has to mean the gesture ran and correctly produced no movement — a zoom that never applied would
+    // satisfy the span check too.
     expect(state.applied).toBe(appliedBefore);
     expect(spanOf(state.current)).toBeCloseTo(spanBefore, 6);
   });
@@ -126,9 +124,8 @@ describe('attachWheelZoom wheel deltas', () => {
   });
 
   it('applies one zoom per frame however fast the wheel emits', async () => {
-    // A wheel outruns a frame by an order of magnitude, and each applied zoom
-    // is a plotly relayout over the whole scene: one per event queued
-    // relayouts behind the cursor on a large map.
+    // A wheel outruns a frame by an order of magnitude, and each applied zoom is a plotly relayout over the whole
+    // scene: one per event queued relayouts behind the cursor on a large map.
     const element = mountHost();
     const state = attach(element, { x: [0, 100], y: [0, 100] });
 
@@ -143,14 +140,12 @@ describe('attachWheelZoom wheel deltas', () => {
     await settleFrames();
 
     expect(state.applied).toBe(1);
-    // Coalesced, not dropped: twelve zoom-ins compose into one much larger
-    // step rather than collapsing to a single event's worth.
+    // Coalesced, not dropped: twelve zoom-ins compose into one much larger step, not a single event's worth.
     expect(spanOf(state.current)).toBeLessThan(50);
   });
 
   it('drops a queued zoom when the map goes away before the frame runs', async () => {
-    // The owning effect detaches and then purges the plotly div; a frame
-    // that survived the detach would relayout a purged container.
+    // The owning effect detaches, then purges the plotly div; a frame outliving the detach would relayout a purged div.
     const element = mountHost();
     const state = attach(element, { x: [0, 100], y: [0, 100] });
 
@@ -180,8 +175,7 @@ describe('attachWheelZoom wheel deltas', () => {
     );
     await settleFrames();
 
-    // An unapplied zoom would also satisfy the bound below, so check the
-    // gesture actually landed before reading it.
+    // An unapplied zoom would also satisfy the bound below, so check the gesture actually landed before reading it.
     expect(state.applied).toBe(1);
     // The trackpad-pinch gain on a mouse-sized delta would be ~2.7x.
     expect(spanOf(state.current)).toBeLessThan(125);

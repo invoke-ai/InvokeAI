@@ -11,10 +11,7 @@ import { ClipboardCopyIcon, FolderOpenIcon } from 'lucide-react';
 import { useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Persist typed source and derive busy state from shared install activity so tab remounts preserve work; validate
- * before POST.
- */
+/** Typed source and busy state outlive tab remounts (shared install activity); the source is validated before POST. */
 export const AddNodesView = () => {
   const { t } = useTranslation();
   const notify = useNotify();

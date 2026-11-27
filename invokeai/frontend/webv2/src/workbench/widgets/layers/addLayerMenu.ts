@@ -1,14 +1,10 @@
-/**
- * Share React-free add-layer grouping/gating; headers use {@link ADD_LAYER_MENU}, stack buttons use {@link
- * stackAddItemId}.
- */
-
 import type { LayerStackKind } from '@workbench/canvas-engine/api';
 
 import { canAddRegionalReferenceImage } from './layerOps';
 
 /** The distinct "add a layer" actions offered across the panel's add surfaces. */
 export type AddLayerItemId =
+  | 'vector'
   | 'inpaint_mask'
   | 'regional_guidance'
   | 'regional_reference_image'
@@ -22,7 +18,6 @@ export interface AddLayerMenuItem {
   labelKey: string;
 }
 
-/** A titled group of add-layer menu entries. */
 export interface AddLayerMenuGroup {
   titleKey: string;
   items: AddLayerMenuItem[];
@@ -41,13 +36,13 @@ export const ADD_LAYER_MENU: readonly AddLayerMenuGroup[] = [
     items: [
       { id: 'control', labelKey: 'widgets.layers.actions.addControlLayer' },
       { id: 'raster', labelKey: 'widgets.layers.actions.addRasterLayer' },
+      { id: 'vector', labelKey: 'widgets.layers.actions.addVectorLayer' },
       { id: 'group', labelKey: 'widgets.layers.actions.newGroup' },
     ],
     titleKey: 'widgets.layers.menuGroups.layers',
   },
 ];
 
-/** Whether an add action is supported by the selected model base. */
 export const isAddLayerItemAvailable = (id: AddLayerItemId, base: string | null): boolean =>
   id !== 'regional_reference_image' || canAddRegionalReferenceImage(base);
 

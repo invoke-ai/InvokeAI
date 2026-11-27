@@ -3,7 +3,7 @@ import type { SpatialAdjustmentStep } from '@workbench/canvas-engine/render/spat
 
 const LUT_SIZE = 256;
 
-/** ITU-R BT.601 luma weights, matching legacy grayscale/lightness math. */
+/** Matches legacy grayscale and lightness math. */
 const LUMA_R = 0.299;
 const LUMA_G = 0.587;
 const LUMA_B = 0.114;
@@ -12,12 +12,10 @@ const clamp255 = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
 
 type CurvePoints = readonly (readonly [number, number])[];
 
-/** True when a channel's curve points describe the identity mapping (absent, or exactly 0→0 / 255→255). */
 const isIdentityCurve = (points: CurvePoints | undefined): boolean => {
   if (!points || points.length === 0) {
     return true;
   }
-  // Any 2-point curve that is exactly the diagonal is identity.
   if (points.length === 2) {
     const sorted = [...points].sort((a, b) => a[0] - b[0]);
     const [p0, p1] = sorted;
@@ -26,10 +24,7 @@ const isIdentityCurve = (points: CurvePoints | undefined): boolean => {
   return false;
 };
 
-/**
- * Builds a 256-entry monotone-cubic Fritsch–Carlson LUT without overshoot. Fewer than two points gives identity;
- * outside endpoints uses flat extension.
- */
+/** Monotone Fritsch–Carlson, no overshoot; flat outside the endpoints, identity under two points. */
 export const buildCurveLut = (points: CurvePoints | undefined): Uint8ClampedArray => {
   const lut = new Uint8ClampedArray(LUT_SIZE);
   if (isIdentityCurve(points)) {
@@ -39,7 +34,7 @@ export const buildCurveLut = (points: CurvePoints | undefined): Uint8ClampedArra
     return lut;
   }
 
-  // Clean + sort + dedupe by x (keep the last y for a duplicated x).
+  // Keep the last y for a duplicated x.
   const byX = new Map<number, number>();
   for (const [x, y] of points as CurvePoints) {
     byX.set(clamp255(Math.round(x)), clamp255(y));
@@ -54,13 +49,11 @@ export const buildCurveLut = (points: CurvePoints | undefined): Uint8ClampedArra
   const ys = xs.map((x) => byX.get(x) as number);
 
   const n = xs.length;
-  // Secant slopes between consecutive points.
   const delta: number[] = [];
   for (let i = 0; i < n - 1; i++) {
     const dx = xs[i + 1] - xs[i];
     delta.push(dx === 0 ? 0 : (ys[i + 1] - ys[i]) / dx);
   }
-  // Fritsch–Carlson tangents (m) enforcing monotonicity.
   const m: number[] = Array.from({ length: n }, () => 0);
   m[0] = delta[0];
   m[n - 1] = delta[n - 2];
@@ -116,7 +109,7 @@ export const buildCurveLut = (points: CurvePoints | undefined): Uint8ClampedArra
   return lut;
 };
 
-/** True when `entry` cannot change a pixel, regardless of enablement. */
+/** Regardless of enablement. */
 export const isIdentityAdjustmentEntry = (entry: CanvasAdjustmentEntry): boolean => {
   switch (entry.type) {
     case 'brightness-contrast':
@@ -149,36 +142,26 @@ export const isIdentityAdjustmentEntry = (entry: CanvasAdjustmentEntry): boolean
 
 const contributes = (entry: CanvasAdjustmentEntry): boolean => entry.isEnabled && !isIdentityAdjustmentEntry(entry);
 
-/** True when the stack is a no-op: empty, or only disabled/identity entries. */
 export const isIdentityAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
   !adjustments || adjustments.every((entry) => !contributes(entry));
 
-/**
- * True when the stack's output depends on pixel position (contributing noise). Such a layer stack must be applied to
- * layer-local pixels before resampling on every path, so resampling shapes its grain exactly as the display does.
- */
+/** Position-dependent stacks apply to layer-local pixels before any resampling, matching the display's grain. */
 export const isPositionDependentAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
   adjustments?.some((entry) => entry.type === 'noise' && contributes(entry)) ?? false;
 
 type SpatialAdjustmentEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
 
-/**
- * Spatial entries read a neighborhood across the owner's whole surface (its alpha bounds), so they are neither
- * region independent nor resample-commuting. `compileAdjustments` and `applyAdjustments` skip them: they run in the
- * spatial worker on the owner's full source.
- */
+/** Neither region independent nor resample-commuting; they run in the spatial worker on the full source. */
 export const isSpatialAdjustmentEntry = (entry: CanvasAdjustmentEntry): entry is SpatialAdjustmentEntry =>
   entry.type === 'clarity' || entry.type === 'texture' || entry.type === 'dehaze';
 
-/** True when any contributing entry is spatial. */
 export const hasSpatialAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
   adjustments?.some((entry) => isSpatialAdjustmentEntry(entry) && contributes(entry)) ?? false;
 
-/** The stack without its spatial entries: what `applyAdjustments` evaluates, and the display's interim. */
+/** What `applyAdjustments` evaluates, and the display's interim. */
 export const perPixelAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): CanvasAdjustmentsContract =>
   (adjustments ?? []).filter((entry) => !isSpatialAdjustmentEntry(entry));
 
-/** One run of a {@link toSpatialPlan}: per-pixel entries for `applyAdjustments`, or steps for one spatial job. */
 export type SpatialPlanRun =
   | { readonly kind: 'per-pixel'; readonly adjustments: CanvasAdjustmentsContract }
   | { readonly kind: 'spatial'; readonly steps: readonly SpatialAdjustmentStep[] };
@@ -188,10 +171,7 @@ const spatialStep = (entry: SpatialAdjustmentEntry): SpatialAdjustmentStep =>
     ? { amount: entry.amount, kind: 'dehaze' }
     : { amount: entry.amount, kind: entry.type, size: entry.size };
 
-/**
- * Splits the contributing entries into ordered alternating runs, so evaluating them in turn equals the stack in list
- * order. Consecutive spatial entries share one run (one worker job); empty means identity.
- */
+/** Alternating runs that equal the stack in list order; consecutive spatial entries share one worker job. */
 export const toSpatialPlan = (adjustments: CanvasAdjustmentsContract | undefined): SpatialPlanRun[] => {
   const runs: SpatialPlanRun[] = [];
   for (const entry of adjustments ?? []) {
@@ -214,12 +194,7 @@ export const toSpatialPlan = (adjustments: CanvasAdjustmentsContract | undefined
   return runs;
 };
 
-/**
- * One step of the compiled pixel pass. Per-channel entries fold into LUT
- * segments (adjacent ones compose into ONE lut); saturation and hue are
- * cross-channel and stand alone. Noise depends on pixel position, so it is its
- * own pass and LUTs never fold across it.
- */
+/** Adjacent per-channel entries fold into one LUT; noise is position-dependent, so LUTs never fold across it. */
 export type CompiledAdjustmentSegment =
   | {
       readonly kind: 'lut';
@@ -233,25 +208,24 @@ export type CompiledAdjustmentSegment =
       readonly kind: 'noise';
       readonly grain: NoiseEntry['grain'];
       readonly midtones: boolean;
-      /** Each of the table's equiprobable quantiles scaled to the entry's σ: channel units, or OKLab a/b for chroma. */
+      /** Equiprobable quantiles scaled to σ: channel units, or OKLab a/b for chroma. */
       readonly samples: Float64Array;
-      /** The grain kernel's taps 0…R (see `grainKernel`); null at size 1, where every pixel is its own sample. */
+      /** Null at size 1, where every pixel is its own sample. */
       readonly kernel: Float64Array | null;
       readonly seed: number;
     };
 
 type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
 
-/** Standard deviation at `amount` 1, in 0–255 channel units (see the noise entry's contract). */
+/** 0–255 channel units. */
 export const NOISE_FULL_SCALE_SIGMA = 128;
-/** Chroma grain's OKLab a and b standard deviation at `amount` 1 (see the noise entry's contract). */
 export const NOISE_CHROMA_FULL_SCALE_SIGMA = 0.32;
 
 const NOISE_TABLE_BITS = 10;
 const NOISE_TABLE_SIZE = 1 << NOISE_TABLE_BITS;
 const NOISE_TABLE_MASK = NOISE_TABLE_SIZE - 1;
 
-/** Acklam's approximation of the standard normal inverse CDF for `p` in (0, 0.5] (relative error < 1.2e-9). */
+/** Acklam, for `p` in (0, 0.5]; relative error < 1.2e-9. */
 const inverseNormalCdf = (p: number): number => {
   const c0 = -7.784894002430293e-3;
   const c1 = -3.223964580411365e-1;
@@ -283,11 +257,7 @@ const inverseNormalCdf = (p: number): number => {
   return numerator / denominator;
 };
 
-/**
- * `NOISE_TABLE_SIZE` equiprobable quantiles of a zero-mean, unit-variance distribution. A uniform table index then
- * samples the distribution with no per-pixel `log`/`sqrt`. Mirrored so the mean is exactly zero, and rescaled so
- * the discrete variance is exactly one; uniform spans ±√3 to match gaussian's standard deviation.
- */
+/** Mirrored for zero mean and rescaled to unit variance; uniform spans ±√3 to match gaussian σ. */
 const buildUnitNoiseTable = (quantile: (p: number) => number): Float64Array => {
   const table = new Float64Array(NOISE_TABLE_SIZE);
   let sumSquares = 0;
@@ -311,16 +281,10 @@ const unitNoiseTable = (distribution: 'gaussian' | 'uniform'): Float64Array =>
     distribution === 'gaussian' ? inverseNormalCdf : (p) => Math.sqrt(3) * (2 * p - 1)
   ));
 
-/** Below this, a kernel's outer taps change no 8-bit pixel visibly, so it runs as white noise at a third of the cost. */
+/** Below this, outer taps change no 8-bit pixel, so the kernel runs as white noise. */
 const GRAIN_MIN_OUTER_TAP = 1e-3;
 
-/**
- * Taps 0…R of the symmetric, separable grain kernel for `size`: a Gaussian of σ `√(size² − 1) / 2` pixels truncated
- * at 3σ, scaled so the full kernel's squared taps sum to one. Blurring unit-variance white noise along both axes then
- * keeps unit variance exactly, so size never changes strength. The σ makes a grain about `size` pixels across: a
- * pixel itself spans one, and blurring adds 4σ² to its squared width. Null at size 1 and wherever the first outer tap
- * would stay under `GRAIN_MIN_OUTER_TAP` (sizes under about 1.14, within one 0.1 slider step of 1).
- */
+/** Gaussian σ = √(size² − 1) / 2 truncated at 3σ, squared taps summing to one so size never changes strength. */
 const grainKernel = (size: number): Float64Array | null => {
   if (size <= 1) {
     return null;
@@ -342,10 +306,7 @@ const grainKernel = (size: number): Float64Array | null => {
   return taps;
 };
 
-/**
- * The grain's linear span in pixels, `(Σ taps)²` of its normalized kernel (1 at size 1). Box-averaging the grain over
- * B×B pixels, with B much larger than the grain, leaves its standard deviation multiplied by `span / B`.
- */
+/** `(Σ taps)²`; box-averaging over B×B pixels scales the grain's σ by `span / B`. */
 export const noiseGrainSpan = (size: number): number => {
   const kernel = grainKernel(size);
   if (!kernel) {
@@ -408,7 +369,7 @@ const invertLut = (): Uint8ClampedArray => {
 const srgbToLinear = (v: number): number => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
 const linearToSrgb = (v: number): number => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
 
-/** True exposure: 2^stops in linear light, not a gamma-space brightness multiply. */
+/** 2^stops in linear light, not a gamma-space multiply. */
 const exposureLut = (stops: number): Uint8ClampedArray => {
   const factor = Math.pow(2, stops);
   const lut = new Uint8ClampedArray(LUT_SIZE);
@@ -426,7 +387,7 @@ const identityLut = (): Uint8ClampedArray => {
   return lut;
 };
 
-/** The SVG feColorMatrix `hueRotate` matrix: luminance-preserving rotation around the gray axis. */
+/** SVG feColorMatrix `hueRotate`. */
 const hueRotateMatrix = (degrees: number): number[] => {
   const radians = (degrees * Math.PI) / 180;
   const cos = Math.cos(radians);
@@ -444,7 +405,6 @@ const hueRotateMatrix = (degrees: number): number[] => {
   ];
 };
 
-/** `outer` applied after `inner`, folded into one table. */
 const composeLut = (inner: Uint8ClampedArray, outer: Uint8ClampedArray): Uint8ClampedArray => {
   const lut = new Uint8ClampedArray(LUT_SIZE);
   for (let i = 0; i < LUT_SIZE; i++) {
@@ -480,10 +440,7 @@ const entryLuts = (
   return { b: lut, g: lut, r: lut };
 };
 
-/**
- * Compiles enabled nonidentity per-pixel entries in order (spatial entries are skipped), folding adjacent per-channel
- * operations into LUT trios. Empty means identity.
- */
+/** Skips spatial entries; empty means identity. */
 export const compileAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): CompiledAdjustmentSegment[] => {
   const segments: CompiledAdjustmentSegment[] = [];
   for (const entry of adjustments ?? []) {
@@ -518,7 +475,7 @@ export const compileAdjustments = (adjustments: CanvasAdjustmentsContract | unde
   return segments;
 };
 
-/** A deterministic cache key fully identifying the stack's pixel effect; entry ids do not affect it. */
+/** Entry ids do not affect it. */
 export const adjustmentsKey = (adjustments: CanvasAdjustmentsContract | undefined): string => {
   const active = (adjustments ?? []).filter(contributes);
   if (active.length === 0) {
@@ -557,13 +514,12 @@ export const adjustmentsKey = (adjustments: CanvasAdjustmentsContract | undefine
     .join('||');
 };
 
-/** Integer pixel coordinate of an ImageData's top-left pixel in its adjustment stack's reference space. */
+/** In the adjustment stack's reference space. */
 export interface AdjustmentOrigin {
   readonly x: number;
   readonly y: number;
 }
 
-/** One pixel-major pass over consecutive position-independent segments. */
 const applyColorSegments = (data: Uint8ClampedArray, segments: readonly CompiledAdjustmentSegment[]): void => {
   for (let i = 0; i + 3 < data.length; i += 4) {
     let r = data[i];
@@ -595,7 +551,7 @@ const applyColorSegments = (data: Uint8ClampedArray, segments: readonly Compiled
   }
 };
 
-/** Chris Wellons' `lowbias32`: a bijective, well-avalanched 32-bit integer finalizer. */
+/** Chris Wellons' `lowbias32` finalizer. */
 const hash32 = (value: number): number => {
   let h = value ^ (value >>> 16);
   h = Math.imul(h, 0x7feb352d);
@@ -607,17 +563,11 @@ const hash32 = (value: number): number => {
 const NOISE_ROW_STRIDE = 0x9e3779b9;
 const NOISE_STEP_SALT = 0x632be5ab;
 
-/**
- * Row `y`'s Weyl sequence: a start hashed from its coordinate and an odd step hashed from the start. A per-row step
- * keeps rows from being shifted copies of each other; pixel `x` hashes `start + x × step`.
- */
+/** A per-row Weyl step keeps rows from being shifted copies of each other. */
 const noiseRowStart = (seedKey: number, y: number): number => hash32((seedKey + Math.imul(y, NOISE_ROW_STRIDE)) | 0);
 const noiseRowStep = (rowStart: number): number => hash32(rowStart ^ NOISE_STEP_SALT) | 1;
 
-/**
- * Fills `out` with white table samples keyed by `(seed, x, y)` for `count` pixels of row `y` from column `x0`. One
- * hash feeds every channel from disjoint 10-bit fields.
- */
+/** One hash feeds every channel from disjoint 10-bit fields. */
 const fillWhiteRow = (
   out: readonly Float64Array[],
   samples: Float64Array,
@@ -650,13 +600,7 @@ const fillWhiteRow = (
   }
 };
 
-/**
- * Streams the region's noise rows top to bottom, `emit(row, noise)` receiving each row's per-channel values. At size 1
- * they are the white samples; above it, the separable kernel blurs the white field, horizontally into a ring of 2R + 1
- * rows and then vertically. White samples past the region's edges come from the same hash, never from pixels, and
- * every output sums the same samples in the same order wherever the region starts, so the field stays a pure
- * function of the coordinate. Memory is O(R × width), never a padded copy of the region.
- */
+/** Edge samples come from the hash, not pixels, so the field is a pure function of the coordinate; O(R × width). */
 const streamNoiseRows = (
   width: number,
   height: number,
@@ -700,7 +644,6 @@ const streamNoiseRows = (
     if (row < 2 * radius) {
       continue;
     }
-    // The ring now holds the 2R + 1 filtered rows around output row `row − 2R`.
     const middle = ((row - radius) % span) * width;
     for (let c = 0; c < channels; c++) {
       const source = ring[c];
@@ -721,25 +664,22 @@ const streamNoiseRows = (
   }
 };
 
-/** 255 × 10000: Rec. 709 luma weights in ten-thousandths summed over 0–255 channels, so white sums exactly to it. */
+/** Rec. 709 weights in ten-thousandths over 0–255, so white sums exactly to it. */
 const LUMA_SCALE = 2_550_000;
 const MIDTONE_NORM = 4 / (LUMA_SCALE * LUMA_SCALE);
 
-/** 4·Y′·(1 − Y′) of a pixel's Rec. 709 luma Y′: 1 at mid-grey, exactly 0 at black and white (integer luma sum). */
+/** 1 at mid-grey, exactly 0 at black and white. */
 const midtoneWeight = (r: number, g: number, b: number): number => {
   const luma = 2126 * r + 7152 * g + 722 * b;
   return luma * (LUMA_SCALE - luma) * MIDTONE_NORM;
 };
 
-/** Linear-light encoding table resolution: dark codes sit about five entries apart, so rounding stays exact or ±1. */
+/** Dark codes sit about five entries apart, so rounding stays exact or ±1. */
 const LINEAR_TABLE_MAX = 16383;
 
 interface ChromaTables {
-  /** sRGB code → linear light. */
   readonly toLinear: Float64Array;
-  /** Linear light × `LINEAR_TABLE_MAX`, rounded → sRGB code. */
   readonly toSrgb: Uint8Array;
-  /** One float32 and its bits, the cube root's scratch. */
   readonly bits: Float32Array;
   readonly word: Uint32Array;
 }
@@ -765,10 +705,7 @@ const getChromaTables = (): ChromaTables => {
 const encodeSrgb = (toSrgb: Uint8Array, linear: number): number =>
   linear <= 0 ? 0 : linear >= 1 ? 255 : toSrgb[(linear * LINEAR_TABLE_MAX + 0.5) | 0];
 
-/**
- * Cube root of a non-negative value: the float32 exponent-divide guess (within ~4%) and one Halley step, relative
- * error < 3·10⁻⁵ (far below one 8-bit code) at about a third of `Math.cbrt`'s cost.
- */
+/** Exponent-divide guess plus one Halley step: relative error < 3·10⁻⁵ at a third of `Math.cbrt`'s cost. */
 const fastCbrt = (value: number, bits: Float32Array, word: Uint32Array): number => {
   bits[0] = value;
   word[0] = ((word[0] / 3) | 0) + 709_921_077;
@@ -777,10 +714,7 @@ const fastCbrt = (value: number, bits: Float32Array, word: Uint32Array): number 
   return (guess * (cube + 2 * value)) / (2 * cube + value);
 };
 
-/**
- * Adds OKLab a/b noise to one row, keeping OKLab L. Adding (0, δa, δb) in OKLab adds M₂⁻¹·(0, δa, δb) to the
- * cube-rooted LMS, so L, a and b are never materialized. Out-of-gamut results clamp in linear light.
- */
+/** Adds M₂⁻¹·(0, δa, δb) to cube-rooted LMS, keeping OKLab L; out-of-gamut results clamp in linear light. */
 const applyChromaRow = (
   data: Uint8ClampedArray,
   start: number,
@@ -828,7 +762,6 @@ const applyChromaRow = (
   }
 };
 
-/** Adds monochrome or color noise to one row; fractional values round in the clamped store. */
 const applyRgbRow = (
   data: Uint8ClampedArray,
   start: number,
@@ -852,11 +785,7 @@ const applyRgbRow = (
   }
 };
 
-/**
- * Size 1 monochrome or color grain straight from the hash, the most common case. Flat response adds integer offsets;
- * midtones scales the samples by the pixel's weight and rounds in the clamped store. Monochrome reuses the first
- * 10-bit field for every channel.
- */
+/** Monochrome reuses the first 10-bit field for every channel. */
 const applyPixelRgbNoise = (
   data: Uint8ClampedArray,
   width: number,
@@ -867,7 +796,7 @@ const applyPixelRgbNoise = (
 ): void => {
   const { midtones, samples } = segment;
   const monochrome = segment.grain === 'monochrome';
-  // Pixels are integers, so rounding a flat offset equals rounding the noisy value; midtones never reads these.
+  // Pixels are integers, so rounding a flat offset equals rounding the noisy value.
   const offsets = midtones ? null : Int16Array.from(samples, Math.round);
   const seedKey = hash32(segment.seed);
   for (let row = 0, i = 0; row < height; row++) {
@@ -896,7 +825,6 @@ const applyPixelRgbNoise = (
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        // One luma weight for all channels keeps neutral pixels neutral on average.
         const weight = midtoneWeight(r, g, b);
         const h = hash32(key);
         data[i] = r + samples[h & NOISE_TABLE_MASK] * weight;
@@ -909,7 +837,6 @@ const applyPixelRgbNoise = (
           continue;
         }
         const offset = offsets![hash32(key) & NOISE_TABLE_MASK];
-        // Uint8ClampedArray stores clamp to 0–255.
         data[i] += offset;
         data[i + 1] += offset;
         data[i + 2] += offset;
@@ -928,7 +855,6 @@ const applyPixelRgbNoise = (
   }
 };
 
-/** Adds the segment's grain keyed by `(seed, x, y)` in reference space; alpha and fully transparent pixels stay. */
 const applyNoise = (
   data: Uint8ClampedArray,
   width: number,
@@ -955,19 +881,13 @@ const applyNoise = (
   );
 };
 
-/** Unpremultiplied RGBA8 pixels, row-major: an `ImageData` or a worker result viewed the same way. */
 export interface AdjustablePixels {
   readonly data: Uint8ClampedArray;
   readonly width: number;
   readonly height: number;
 }
 
-/**
- * Applies the compiled stack in place, preserving alpha; identity is a no-op. `origin` places the pixels in the
- * stack's reference space. Spatial entries are skipped (see {@link isSpatialAdjustmentEntry}); every entry applied is
- * region independent: adjusting a sub-rectangle with its matching origin yields exactly the pixels a whole-surface
- * pass would there.
- */
+/** In place, alpha preserved; every applied entry is region independent given its matching `origin`. */
 export const applyAdjustments = (
   imageData: AdjustablePixels,
   adjustments: CanvasAdjustmentsContract | undefined,

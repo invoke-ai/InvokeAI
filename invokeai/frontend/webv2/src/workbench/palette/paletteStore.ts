@@ -2,10 +2,7 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useSyncExternalStore } from 'react';
 
-/**
- * Share palette visibility across topbar, editor command, and Launchpad shortcut; each surface hosts its own
- * subscribed dialog.
- */
+/** Palette visibility shared by topbar, editor command and Launchpad; each hosts its own dialog. */
 
 export const commandPaletteStore = createExternalStoreCore<{ isOpen: boolean }>({ isOpen: false });
 
@@ -26,10 +23,7 @@ registerAccountOwnedResource({
 export const getCommandPaletteReturnFocusElement = (): HTMLElement | null =>
   returnFocusElement?.isConnected ? returnFocusElement : null;
 
-/**
- * Closing focuses `returnFocus`, for a control that is gone by then (a menu item), or else whatever had focus when the
- * palette opened.
- */
+/** Closing focuses `returnFocus` (for a control gone by then), else what had focus at open. */
 export const openCommandPaletteFrom = (returnFocus: HTMLElement | null): void => {
   if (!commandPaletteStore.getSnapshot().isOpen) {
     const target = returnFocus ?? document.activeElement;

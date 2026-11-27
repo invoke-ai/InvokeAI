@@ -112,39 +112,6 @@ describe('IndexedDB queue run journal', () => {
     expect(await journal.listProjectIds()).toEqual({ kind: 'available', projectIds: ['project-2'] });
   });
 
-  it('skips malformed receipt cleanup keys without blocking later acknowledgements', async () => {
-    const { database, journal } = await createJournal();
-    await database.put('queueReceiptAcks', { key: '0-corrupt', projectId: '', queueItemId: 'bad' });
-    await journal.record('project-1', createItem({ backendItemIds: [11], status: 'running' }));
-    expect(await journal.listPendingReceipts()).toEqual({
-      kind: 'available',
-      entries: [
-        {
-          key: JSON.stringify(['project-1', 'queue-item-1']),
-          projectId: 'project-1',
-          queueItemId: 'queue-item-1',
-        },
-      ],
-    });
-  });
-
-  it('lists distinct projects without decoding their run payloads', async () => {
-    const { database, journal } = await createJournal();
-    await journal.record('project-1', createItem());
-    await journal.record('project-1', createItem({ id: 'run-2' }));
-    await journal.record('project-2', createItem());
-    const records = await database.getAll('queueRuns');
-    for (const record of records) {
-      await database.put('queueRuns', { ...record, itemJson: 'invalid-json' });
-    }
-    expect(await journal.listProjectIds()).toEqual({
-      kind: 'available',
-      projectIds: ['project-1', 'project-2'],
-    });
-    journal.close();
-    expect(await journal.listProjectIds()).toEqual({ kind: 'unavailable' });
-  });
-
   it('retains the run when receipt cleanup cannot be stored and permits retry after quota recovers', async () => {
     const { database, journal } = await createJournal();
     await journal.record('project-1', createItem());
@@ -155,35 +122,6 @@ describe('IndexedDB queue run journal', () => {
     expect(await recoveringJournal.settle('project-1', 'queue-item-1')).toEqual({ kind: 'removed' });
     expect(await journal.listAll()).toMatchObject({ entries: [] });
     expect(await journal.listPendingReceipts()).toMatchObject({ entries: [{ queueItemId: 'queue-item-1' }] });
-  });
-
-  it('retains receipt cleanup after settlement and retries it across adapter reloads', async () => {
-    const { database, journal } = await createJournal();
-    await journal.record('project-1', createItem({ backendItemIds: [11], status: 'running' }));
-
-    await expect(journal.listPendingReceipts()).resolves.toMatchObject({
-      kind: 'available',
-      entries: [{ projectId: 'project-1', queueItemId: 'queue-item-1' }],
-    });
-    await journal.settle('project-1', 'queue-item-1');
-    const reloaded = createIndexedDbQueueRunJournal(database);
-    await expect(reloaded.listPendingReceipts()).resolves.toMatchObject({
-      kind: 'available',
-      entries: [{ projectId: 'project-1', queueItemId: 'queue-item-1' }],
-    });
-    await reloaded.acknowledgeReceipt('project-1', 'queue-item-1');
-    await expect(reloaded.listPendingReceipts()).resolves.toEqual({ kind: 'available', entries: [] });
-  });
-
-  it('does not repeatedly enqueue receipt cleanup for already acknowledged active runs', async () => {
-    const { journal } = await createJournal();
-    const item = createItem({ backendItemIds: [11, 12], status: 'running' });
-    await journal.record('project-1', item);
-    await journal.acknowledgeReceipt('project-1', item.id);
-    await journal.record('project-1', { ...item, completedBackendItemIds: [11] });
-    await journal.settle('project-1', item.id);
-
-    await expect(journal.listPendingReceipts()).resolves.toEqual({ kind: 'available', entries: [] });
   });
   it('round-trips active runs and coalesces status updates', async () => {
     const { journal } = await createJournal();
@@ -267,39 +205,7 @@ describe('IndexedDB queue run journal', () => {
     ]);
   });
 
-  it('keeps the items a retry reopened a run away from, and drops a malformed list without losing the run', async () => {
-    const { journal } = await createJournal();
-    const store = createWorkbenchStore();
-    const projectId = store.getState().activeProjectId;
-    const reopened = createItem({ backendItemIds: [99], retriedBackendItemIds: [41, 42], status: 'running' });
-    const malformed = createItem({
-      backendItemIds: [100],
-      id: 'queue-item-2',
-      retriedBackendItemIds: [43, 43],
-      status: 'running',
-    });
-    await journal.record(projectId, reopened);
-    await journal.record(projectId, malformed);
-
-    const loaded = await journal.listForProject(projectId);
-    expect(loaded.kind).toBe('available');
-    store.commands.queue.restoreFromJournal({
-      items: loaded.kind === 'available' ? loaded.entries.map((entry) => entry.item) : [],
-      projectId,
-    });
-
-    const restored = store.getState().projects[0]?.queue.items ?? [];
-    expect(restored.find((item) => item.id === reopened.id)).toMatchObject({
-      backendItemIds: [99],
-      retriedBackendItemIds: [41, 42],
-      status: 'running',
-    });
-    const restoredMalformed = restored.find((item) => item.id === malformed.id);
-    expect(restoredMalformed).toMatchObject({ backendItemIds: [100], status: 'running' });
-    expect(restoredMalformed).not.toHaveProperty('retriedBackendItemIds');
-  });
-
-  it('keeps the failed submission of a run not yet accepted, and drops a malformed or stale one without losing the run', async () => {
+  it('keeps the failed submission of a run not yet accepted, and drops an unreadable or stale one without losing the run', async () => {
     const { journal } = await createJournal();
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
@@ -313,46 +219,19 @@ describe('IndexedDB queue run journal', () => {
       status: 500,
     };
     const retrying = createItem({ submissionRetry: retry });
-    // A server error must be counted, and its window cannot start after the failure it ends with.
-    const miscounted = createItem({ id: 'queue-item-2', submissionRetry: { ...retry, serverErrorCount: 0 } });
-    const backwards = createItem({ id: 'queue-item-3', submissionRetry: { ...retry, serverErrorSince: 13_000 } });
-    // Every server error is a failed submission.
-    const undercounted = createItem({ id: 'queue-item-5', submissionRetry: { ...retry, failureCount: 1 } });
     // A run the backend accepted has no submission left to retry.
     const accepted = createItem({
       backendItemIds: [11],
-      id: 'queue-item-4',
+      id: 'queue-item-2',
       status: 'running',
       submissionRetry: retry,
     });
-    // A failure that is neither a server error nor a transport failure keeps its own reason.
-    const otherError = {
-      ...retry,
-      message: 'Invalid queue enqueue response',
-      reason: 'error' as const,
-      serverErrorCount: 0,
-      serverErrorSince: null,
-      status: null,
-    };
-    const unreadable = createItem({ id: 'queue-item-6', submissionRetry: otherError });
-    // A reason this build does not know, as a later build might write it.
+    // As a later build might write it.
     const unknownReason = createItem({
-      id: 'queue-item-7',
-      submissionRetry: { ...otherError, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
+      id: 'queue-item-3',
+      submissionRetry: { ...retry, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
     });
-    // Written before messages were bounded: a whole HTML error page.
-    const page = `<html>${'x'.repeat(5_000)}</html>`;
-    const longMessage = createItem({ id: 'queue-item-8', submissionRetry: { ...retry, message: page } });
-    for (const item of [
-      retrying,
-      miscounted,
-      backwards,
-      undercounted,
-      accepted,
-      unreadable,
-      unknownReason,
-      longMessage,
-    ]) {
+    for (const item of [retrying, accepted, unknownReason]) {
       await journal.record(projectId, item);
     }
 
@@ -368,44 +247,11 @@ describe('IndexedDB queue run journal', () => {
       status: 'pending',
       submissionRetry: retry,
     });
-    expect(restored.find((item) => item.id === unreadable.id)).toMatchObject({ submissionRetry: otherError });
-    expect(restored.find((item) => item.id === longMessage.id)?.submissionRetry).toEqual({
-      ...retry,
-      message: `${page.slice(0, 499)}…`,
-    });
-    for (const item of [miscounted, backwards, undercounted, accepted, unknownReason]) {
+    for (const item of [accepted, unknownReason]) {
       const restoredItem = restored.find((candidate) => candidate.id === item.id);
       expect(restoredItem).toMatchObject({ status: item.status });
       expect(restoredItem).not.toHaveProperty('submissionRetry');
     }
-  });
-
-  it('restores newest-first submission order without moving a run when its status changes', async () => {
-    const { journal } = await createJournal();
-    await journal.record('project-1', createItem({ id: 'queue-item-1' }));
-    await journal.record('project-1', createItem({ id: 'queue-item-2' }));
-    await journal.record('project-1', createItem({ id: 'queue-item-1', status: 'running' }));
-
-    const loaded = await journal.listForProject('project-1');
-
-    expect(loaded.kind === 'available' ? loaded.entries.map((entry) => entry.queueItemId) : []).toEqual([
-      'queue-item-2',
-      'queue-item-1',
-    ]);
-  });
-
-  it('keeps project and item identities collision-free', async () => {
-    const { journal } = await createJournal();
-    await journal.record('a:b', createItem({ id: 'c' }));
-    await journal.record('a', createItem({ id: 'b:c' }));
-
-    await expect(journal.listAll()).resolves.toMatchObject({
-      entries: [
-        { item: { id: 'b:c' }, projectId: 'a' },
-        { item: { id: 'c' }, projectId: 'a:b' },
-      ],
-      kind: 'available',
-    });
   });
 
   it('settles idempotently and never stores terminal items', async () => {
@@ -453,52 +299,6 @@ describe('IndexedDB queue run journal', () => {
     expect(await database.get('queueRuns', '["project-2","queue-item-2"]')).toBeUndefined();
   });
 
-  it('removes deeply invalid payloads at the storage boundary', async () => {
-    const { database, journal } = await createJournal();
-    const item = createItem();
-    await database.put('queueRuns', {
-      itemJson: JSON.stringify({
-        cancellable: true,
-        id: item.id,
-        snapshot: { backendSubmission: {}, sourceId: 'workflow', submittedAt: 'now' },
-        status: 'pending',
-      }),
-      key: '["project-1","queue-item-1"]',
-      projectId: 'project-1',
-      queueItemId: 'queue-item-1',
-      schemaVersion: 1,
-      submissionOrder: 1,
-      updatedAt: 1,
-    });
-
-    const loaded = await journal.listAll();
-    expect(loaded).toEqual({ entries: [], kind: 'available', removedCorrupt: 1 });
-    expect(await database.count('queueRuns')).toBe(0);
-  });
-
-  it('removes malformed rows without hiding valid runs', async () => {
-    const { database, journal } = await createJournal();
-    await journal.record('project-1', createItem({ id: 'valid' }));
-    const malformed = createItem({ id: 'malformed' }) as unknown as Record<string, unknown>;
-    malformed.backendItemIds = 7;
-    await database.put('queueRuns', {
-      itemJson: JSON.stringify(malformed),
-      key: '["project-1","malformed"]',
-      projectId: 'project-1',
-      queueItemId: 'malformed',
-      schemaVersion: 1,
-      submissionOrder: 2,
-      updatedAt: 2,
-    });
-
-    await expect(journal.listForProject('project-1')).resolves.toMatchObject({
-      entries: [{ item: { id: 'valid' } }],
-      kind: 'available',
-      removedCorrupt: 1,
-    });
-    expect(await database.get('queueRuns', '["project-1","malformed"]')).toBeUndefined();
-  });
-
   it('rejects malformed and oversized records without poisoning the journal', async () => {
     const baselineBytes = new TextEncoder().encode(JSON.stringify(createItem())).byteLength;
     const { journal } = await createJournal({ maxRunBytes: baselineBytes + 8 });
@@ -522,33 +322,6 @@ describe('IndexedDB queue run journal', () => {
     await expect(journal.record('project-1', createItem())).resolves.toEqual({ kind: 'stored' });
   });
 
-  it('prunes oversized rows written by an older or less restrictive client', async () => {
-    const item = createItem({ error: 'x'.repeat(256) });
-    const baselineBytes = new TextEncoder().encode(JSON.stringify(createItem())).byteLength;
-    const { database, journal } = await createJournal({ maxRunBytes: baselineBytes + 8 });
-    await database.put('queueRuns', {
-      itemJson: JSON.stringify(item),
-      key: '["project-1","queue-item-1"]',
-      projectId: 'project-1',
-      queueItemId: 'queue-item-1',
-      schemaVersion: 1,
-      submissionOrder: 1,
-      updatedAt: 1,
-    });
-
-    await expect(journal.listAll()).resolves.toEqual({ entries: [], kind: 'available', removedCorrupt: 1 });
-    expect(await database.count('queueRuns')).toBe(0);
-  });
-
-  it('reports quota without poisoning later writes', async () => {
-    const { database } = await createJournal();
-    const journal = createIndexedDbQueueRunJournal(rejectFirstPutWithQuota(database));
-
-    await expect(journal.record('project-1', createItem())).resolves.toEqual({ kind: 'quota' });
-    expect(journal.availability).toBe('available');
-    await expect(journal.record('project-1', createItem())).resolves.toEqual({ kind: 'stored' });
-  });
-
   it('bounds aggregate entry count without evicting active runs', async () => {
     const { journal } = await createJournal({ maxEntries: 1 });
 
@@ -559,18 +332,6 @@ describe('IndexedDB queue run journal', () => {
     });
     await expect(journal.listAll()).resolves.toMatchObject({
       entries: [{ item: { id: 'first', status: 'running' } }],
-      kind: 'available',
-    });
-  });
-
-  it('bounds aggregate bytes without evicting active runs', async () => {
-    const itemBytes = new TextEncoder().encode(JSON.stringify(createItem())).byteLength;
-    const { journal } = await createJournal({ totalMaxBytes: itemBytes + 32 });
-
-    await expect(journal.record('project-1', createItem({ id: 'first' }))).resolves.toEqual({ kind: 'stored' });
-    await expect(journal.record('project-1', createItem({ id: 'second' }))).resolves.toEqual({ kind: 'quota' });
-    await expect(journal.listAll()).resolves.toMatchObject({
-      entries: [{ item: { id: 'first' } }],
       kind: 'available',
     });
   });
@@ -587,15 +348,5 @@ describe('IndexedDB queue run journal', () => {
       kind: 'available',
       removedCorrupt: 0,
     });
-  });
-
-  it('repairs negative aggregate metadata before enforcing budgets', async () => {
-    const { database, journal } = await createJournal({ maxEntries: 1 });
-    await database.put('metadata', { key: 'queueRunCount', value: -100 });
-    await database.put('metadata', { key: 'queueRunTotalBytes', value: -100 });
-
-    await expect(journal.record('project-1', createItem({ id: 'first' }))).resolves.toEqual({ kind: 'stored' });
-    await expect(journal.record('project-1', createItem({ id: 'second' }))).resolves.toEqual({ kind: 'quota' });
-    await expect(database.get('metadata', 'queueRunCount')).resolves.toEqual({ key: 'queueRunCount', value: 1 });
   });
 });

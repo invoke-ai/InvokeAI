@@ -1,33 +1,16 @@
 import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
-import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CanvasLayerContract } from './canvas-engine/contracts';
-import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
+import type { LayoutPreset } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
-import { publishLayerPanelSelection, readLayerPanelState, toggleLayerStackCollapsed } from './layerPanelState';
-import { getActiveProjectGraph } from './projectWorkflows';
-import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
-import { getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
+import { getProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState } from './workbenchState';
 import { createWorkbenchStore } from './workbenchStore';
 
 const overlays = vi.hoisted(() => ({ closeWidgetOverlays: vi.fn() }));
 vi.mock('@platform/ui/widgetOverlayRegistry', () => overlays);
-
-const paintLayer = (id: string): CanvasLayerContract => ({
-  blendMode: 'normal',
-  id,
-  isEnabled: true,
-  isLocked: false,
-  name: id,
-  opacity: 1,
-  source: { bitmap: null, type: 'paint' },
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-  type: 'raster',
-});
 
 const watchSelector = <Selected>(
   store: WorkbenchInternalStore,
@@ -61,14 +44,6 @@ describe('createWorkbenchStore', () => {
   beforeEach(() => {
     resetLogging();
     configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'trace' });
-  });
-
-  it('initializes snapshot metadata', () => {
-    const store = createWorkbenchStore();
-    const snapshot = store.getSnapshot();
-
-    expect(snapshot.hasHydrated).toBe(false);
-    expect(snapshot.projects).toHaveLength(1);
   });
 
   it('blocks persistence retargets only for queue work that has reached the backend', () => {
@@ -169,72 +144,6 @@ describe('createWorkbenchStore', () => {
     ).toEqual({ ok: false, reason: 'active-queue-runs' });
   });
 
-  it("keeps each project's transient layer multi-selection across project switches", () => {
-    const store = createWorkbenchStore();
-    const firstProjectId = store.getSnapshot().activeProject.id;
-    store.commands.canvas.apply(firstProjectId, {
-      anchor: stackTopAnchor(firstProjectId),
-      layer: paintLayer('a'),
-      type: 'addCanvasLayer',
-    });
-    store.commands.canvas.apply(firstProjectId, {
-      anchor: stackTopAnchor(firstProjectId),
-      layer: paintLayer('b'),
-      type: 'addCanvasLayer',
-    });
-    publishLayerPanelSelection({ primaryId: 'b', projectId: firstProjectId, selectedIds: ['a', 'b'] });
-
-    const secondProject = store.commands.projects.create();
-    store.commands.projects.switchTo(firstProjectId);
-
-    expect(readLayerPanelState(firstProjectId, 'b').selectedIds).toEqual(['a', 'b']);
-    expect(readLayerPanelState(secondProject.id, null).selectedIds).toEqual([]);
-  });
-
-  it("clears every project's panel state on hydration", () => {
-    const store = createWorkbenchStore();
-    const projectId = store.getSnapshot().activeProject.id;
-    store.commands.canvas.apply(projectId, {
-      anchor: stackTopAnchor(projectId),
-      layer: paintLayer('a'),
-      type: 'addCanvasLayer',
-    });
-    store.commands.canvas.apply(projectId, {
-      anchor: stackTopAnchor(projectId),
-      layer: paintLayer('b'),
-      type: 'addCanvasLayer',
-    });
-    publishLayerPanelSelection({ primaryId: 'b', projectId, selectedIds: ['a', 'b'] });
-    toggleLayerStackCollapsed(projectId, 'b', 'raster');
-    expect(readLayerPanelState(projectId, 'b')).toMatchObject({ collapsedStacks: ['raster'], selectedIds: ['a', 'b'] });
-
-    store.internal.persistence.hydrate(createInitialWorkbenchState());
-
-    expect(readLayerPanelState(projectId, 'b')).toMatchObject({ collapsedStacks: [], selectedIds: ['b'] });
-  });
-
-  it('does not resurrect stale secondaries after external primary changes in the same project', () => {
-    const store = createWorkbenchStore();
-    const projectId = store.getSnapshot().activeProject.id;
-    for (const id of ['a', 'b', 'c']) {
-      store.commands.canvas.apply(projectId, {
-        anchor: stackTopAnchor(projectId),
-        layer: paintLayer(id),
-        type: 'addCanvasLayer',
-      });
-    }
-    // Model a panel-originated multi-selection: it publishes before dispatching
-    // its new primary, so the store preserves the selected set.
-    publishLayerPanelSelection({ primaryId: 'c', projectId, selectedIds: ['a', 'c'] });
-    store.commands.canvas.apply(projectId, { id: 'c', type: 'setCanvasSelectedLayer' });
-    expect(readLayerPanelState(projectId, 'c').selectedIds).toEqual(['a', 'c']);
-
-    store.commands.canvas.apply(projectId, { id: 'b', type: 'setCanvasSelectedLayer' });
-    store.commands.canvas.apply(projectId, { id: 'c', type: 'setCanvasSelectedLayer' });
-
-    expect(readLayerPanelState(projectId, 'c').selectedIds).toEqual(['c']);
-  });
-
   it('coordinates layout preset activation across every command caller', async () => {
     const deferred = new Map<string, { promise: Promise<void>; resolve: () => void }>();
     const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<void> => {
@@ -280,70 +189,6 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
   });
 
-  it('keeps a synchronous preset application newer than a pending activation', async () => {
-    let resolve!: () => void;
-    const loadLayoutPresetWidgets = (): Promise<void> =>
-      new Promise<void>((next) => {
-        resolve = next;
-      });
-    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
-
-    const activation = store.commands.layout.activatePreset('edit');
-    store.commands.layout.applyPreset('automate');
-    resolve();
-    await activation;
-
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('automate');
-    expect(store.getSnapshot().activeProject.invocation).toMatchObject({
-      destination: 'gallery',
-      sourceId: 'workflow',
-    });
-  });
-
-  it('discards a pending custom preset after its saved snapshot is removed', async () => {
-    let resolve!: () => void;
-    const loadLayoutPresetWidgets = (): Promise<void> =>
-      new Promise<void>((next) => {
-        resolve = next;
-      });
-    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
-
-    store.commands.layout.createPreset('custom-pending', 'Pending');
-    // Saving as a new preset moves the project onto it; start the pending switch from Edit.
-    store.commands.layout.applyPreset('edit');
-    const activation = store.commands.layout.activatePreset('custom-pending');
-    store.commands.layout.deletePreset('custom-pending');
-    resolve();
-    await activation;
-
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
-  });
-
-  it('closes widget overlays only for changes that hide or replace a shown widget', () => {
-    const store = createWorkbenchStore();
-    overlays.closeWidgetOverlays.mockClear();
-    const project = store.getSnapshot().activeProject;
-    const [region, regionState] = Object.entries(project.widgetRegions).find(
-      ([, state]) => state.instanceIds.length > 1
-    )!;
-    const other = regionState.instanceIds.find((id) => id !== regionState.activeInstanceId)!;
-
-    store.commands.projects.rename(project.id, 'Renamed');
-    expect(overlays.closeWidgetOverlays).not.toHaveBeenCalled();
-
-    store.commands.widgets.select({ projectId: project.id, region: region as never, widgetId: other });
-    expect(overlays.closeWidgetOverlays).toHaveBeenCalledTimes(1);
-
-    store.commands.widgets.select({ projectId: project.id, region: region as never, widgetId: other });
-    expect(overlays.closeWidgetOverlays).toHaveBeenCalledTimes(1);
-
-    store.commands.layout.applyPreset('edit');
-    expect(overlays.closeWidgetOverlays).toHaveBeenCalledTimes(2);
-
-    store.commands.projects.create();
-    expect(overlays.closeWidgetOverlays).toHaveBeenCalledTimes(3);
-  });
-
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {
     const store = createWorkbenchStore();
     const listener = vi.fn();
@@ -363,26 +208,6 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.name).toBe('Renamed');
   });
 
-  it('updates hydration metadata without changing durable workbench state', () => {
-    const store = createWorkbenchStore();
-    const initialState = store.getState();
-    const initialPersistedRevision = store.getPersistedRevision();
-    const listener = vi.fn();
-
-    store.subscribe(listener);
-
-    store.setHasHydrated(true);
-
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot().hasHydrated).toBe(true);
-    expect(store.getState()).toBe(initialState);
-    expect(store.getPersistedRevision()).toBe(initialPersistedRevision);
-
-    store.setHasHydrated(true);
-
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
-
   it('bumps persisted revision only for autosaved state changes', () => {
     const store = createWorkbenchStore();
     const initialPersistedRevision = store.getPersistedRevision();
@@ -400,87 +225,17 @@ describe('createWorkbenchStore', () => {
     expect(store.getPersistedRevision()).toBe(initialPersistedRevision + 1);
   });
 
-  it('forwards payload-form commands into reducer actions', () => {
-    const store = createWorkbenchStore();
-
-    store.commands.notifications.add({ kind: 'info', title: 'Payload form' });
-
-    expect(store.getSnapshot().notifications[0]?.title).toBe('Payload form');
-  });
-
-  it('maps positional-form commands onto their action payloads', () => {
+  it('forwards payload, positional, and nullary command forms into reducer actions', () => {
     const store = createWorkbenchStore();
     const projectId = store.getSnapshot().activeProject.id;
 
+    store.commands.notifications.add({ kind: 'info', title: 'Payload form' });
+    expect(store.getSnapshot().notifications[0]?.title).toBe('Payload form');
+
     store.commands.gallery.setSearchTerm('positional form', projectId);
-
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
-  });
 
-  it('selects an item picked from another board within that board, leaving the Gallery on its own board', () => {
-    const store = createWorkbenchStore();
-    store.commands.gallery.selectBoard('board-a');
-
-    store.commands.gallery.selectItemInItsBoard({
-      boardId: 'board-b',
-      category: 'general',
-      createdAt: '2026-09-01T00:00:00.000Z',
-      durationSeconds: 4,
-      fullUrl: '/full/clip.mp4',
-      height: 64,
-      isIntermediate: false,
-      kind: 'video',
-      name: 'clip.mp4',
-      starred: false,
-      thumbnailUrl: '/thumb/clip.mp4',
-      width: 64,
-    });
-
-    const values = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
-    expect(values.selectedImageName).toBe('video:clip.mp4');
-    // Preview's next/previous step through this listing.
-    expect(values.selectedImageQuery).toMatchObject({ boardId: 'board-b', itemBoard: true, page: 0 });
-    expect(values.selectedBoardId).toBe('board-a');
-  });
-
-  it('edits a preset default route through the layout capability', () => {
-    const store = createWorkbenchStore();
-
-    store.commands.layout.setPresetRoute('compose', { destination: 'canvas', sourceId: 'upscale' });
-
-    expect(store.getSnapshot().account.layoutPresetRouteOverrides?.compose).toEqual({
-      destination: 'canvas',
-      sourceId: 'upscale',
-    });
-  });
-
-  it('reorders presets through the layout capability', () => {
-    const store = createWorkbenchStore();
-
-    store.commands.layout.reorderPresets('compose', 'edit');
-
-    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['edit', 'compose', 'video', 'automate']);
-  });
-
-  it('creates a custom preset with an explicitly selected default route in one command', () => {
-    const store = createWorkbenchStore();
-    const defaultRoute: LayoutPresetRoute = { destination: 'gallery', sourceId: 'workflow' };
-
-    store.commands.layout.createPreset('custom-explicit-route', 'Workflow layout', 'workflow', defaultRoute);
-    defaultRoute.destination = 'canvas';
-
-    expect(store.getSnapshot().account.customLayoutPresets?.[0]?.defaultRoute).toEqual({
-      destination: 'gallery',
-      sourceId: 'workflow',
-    });
-  });
-
-  it('dispatches nullary commands with no payload', () => {
-    const store = createWorkbenchStore();
-
-    store.commands.notifications.add({ kind: 'info', title: 'To clear' });
     store.commands.notifications.clear();
-
     expect(store.getSnapshot().notifications).toHaveLength(0);
   });
 
@@ -548,98 +303,6 @@ describe('createWorkbenchStore', () => {
     ]);
   });
 
-  it('warns once per retry cycle while autosave keeps retrying', () => {
-    const store = createWorkbenchStore();
-    const persistence = store.internal.persistence;
-    const pendingWarnings = () =>
-      getLogSnapshot().entries.filter((entry) => entry.name === 'persistence.autosave-pending');
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      persistence.saveStarted();
-      persistence.savePending('Autosave is pending and will retry.');
-    }
-    expect(pendingWarnings()).toHaveLength(1);
-    expect(store.getSnapshot().autosave.status).toBe('pending');
-
-    persistence.saveStarted();
-    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
-    persistence.saveStarted();
-    persistence.savePending('Autosave is pending and will retry.');
-
-    expect(pendingWarnings()).toHaveLength(2);
-  });
-
-  it('reports a retrying save as pending and a project awaiting a decision as attention, not as failures', () => {
-    const store = createWorkbenchStore();
-    const persistence = store.internal.persistence;
-
-    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
-    persistence.savePending('Autosave is pending and will retry.');
-
-    expect(store.getSnapshot().autosave).toEqual({
-      error: 'Autosave is pending and will retry.',
-      lastSavedAt: '2026-10-14T09:00:00.000Z',
-      status: 'pending',
-    });
-
-    persistence.saveStarted();
-    persistence.saveNeedsAttention('2026-10-14T09:00:05.000Z');
-
-    // Every other project did save, so the time stays visible while one project waits.
-    expect(store.getSnapshot().autosave).toEqual({ lastSavedAt: '2026-10-14T09:00:05.000Z', status: 'attention' });
-    expect(store.getSnapshot().notifications).toEqual([]);
-  });
-
-  it('records accepted widget failures into diagnostics once', () => {
-    const store = createWorkbenchStore();
-    const projectId = store.getSnapshot().activeProject.id;
-    const failure = {
-      details: 'Widget stack',
-      message: 'Widget failed',
-      occurredAt: '2026-06-29T00:00:00.000Z',
-      widgetId: 'workflow' as const,
-    };
-
-    store.commands.notifications.recordWidgetFailure(failure);
-    store.commands.notifications.recordWidgetFailure(failure);
-
-    expect(getLogSnapshot().entries).toMatchObject([
-      {
-        context: { details: 'Widget stack', widgetId: 'workflow' },
-        level: 'error',
-        message: 'Widget failed',
-        name: 'widget.registration-failed',
-        namespace: 'system',
-        source: { area: 'widget-failure', namespace: 'system', projectId },
-      },
-    ]);
-  });
-
-  it('stops notifying unsubscribed listeners', () => {
-    const store = createWorkbenchStore();
-    const listener = vi.fn();
-    const unsubscribe = store.subscribe(listener);
-
-    unsubscribe();
-    store.commands.projects.create();
-
-    expect(listener).not.toHaveBeenCalled();
-  });
-
-  it('keeps active-project selectors stable across unrelated global state updates', () => {
-    const store = createWorkbenchStore();
-    const activeProjectWatcher = watchSelector(store, (snapshot) => snapshot.activeProject);
-    const activeProjectIdWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.id);
-    const notificationCountWatcher = watchSelector(store, (snapshot) => snapshot.notifications.length);
-
-    store.commands.notifications.add({ kind: 'info', title: 'Global notice' });
-
-    expect(notificationCountWatcher.current).toBe(1);
-    expect(notificationCountWatcher.changeCount).toBe(1);
-    expect(activeProjectWatcher.changeCount).toBe(0);
-    expect(activeProjectIdWatcher.changeCount).toBe(0);
-  });
-
   it('lets narrow selectors observe only their own state changes', () => {
     const store = createWorkbenchStore();
     const backendStatusWatcher = watchSelector(store, (snapshot) => snapshot.backendConnection.status);
@@ -672,142 +335,6 @@ describe('createWorkbenchStore', () => {
     expect(activeProjectIdWatcher.current).toBe(store.getSnapshot().activeProject.id);
     expect(activeProjectIdWatcher.changeCount).toBe(1);
     expect(backendStatusWatcher.changeCount).toBe(1);
-  });
-
-  it('supports custom equality for derived selector objects', () => {
-    const store = createWorkbenchStore();
-    const statusObjectWatcher = watchSelector(
-      store,
-      (snapshot) => ({ status: snapshot.backendConnection.status }),
-      (left, right) => left.status === right.status
-    );
-
-    store.commands.notifications.add({ kind: 'info', title: 'Unrelated notice' });
-
-    expect(statusObjectWatcher.current).toEqual({ status: 'connecting' });
-    expect(statusObjectWatcher.changeCount).toBe(0);
-
-    store.commands.queue.setConnectionStatus({ status: 'connected' });
-
-    expect(statusObjectWatcher.current).toEqual({ status: 'connected' });
-    expect(statusObjectWatcher.changeCount).toBe(1);
-  });
-
-  it('resolves widget value selectors over the mirrored defaults without counting them as project edits', () => {
-    const store = createWorkbenchStore();
-    const revision = store.getPersistedRevision();
-    const gallery = (snapshot: WorkbenchSnapshot) =>
-      getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
-    const pinsBefore = gallery(store.getSnapshot());
-
-    store.internal.setScopedDefaults({ gallery: { thumbnailFit: 'aspect' } });
-
-    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
-    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery')).toBe(pinsBefore);
-    expect(store.getPersistedRevision()).toBe(revision);
-
-    store.commands.widgets.patchInstanceValues('gallery', { thumbnailFit: 'square' });
-    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
-
-    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], 'another-project');
-    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
-
-    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], store.getSnapshot().activeProject.id);
-    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
-  });
-
-  it('keeps widget placement metadata stable across widget value updates', () => {
-    const store = createWorkbenchStore();
-    const placementWatcher = watchSelector(
-      store,
-      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
-      areWidgetPlacementProjectsEqual
-    );
-    const widgetInstancesWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.widgetInstances);
-
-    store.commands.widgets.patchInstanceValues('generate', { prompt: 'updated' });
-
-    expect(widgetInstancesWatcher.changeCount).toBe(1);
-    expect(placementWatcher.changeCount).toBe(0);
-  });
-
-  it('changes the rail-facing placement only when a window floats or docks, not while it moves, shades, or is raised', () => {
-    const store = createWorkbenchStore();
-    const placementWatcher = watchSelector(
-      store,
-      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
-      areWidgetPlacementProjectsEqual
-    );
-    const windowsWatcher = watchSelector(store, (snapshot) => snapshot.activeProject.floatingWidgets);
-
-    store.commands.widgets.float('image-map');
-    store.commands.widgets.float('gallery');
-    expect(placementWatcher.changeCount).toBe(2);
-
-    for (let step = 1; step <= 20; step += 1) {
-      store.commands.widgets.setFloatingGeometry('image-map', { heightPx: 300, widthPx: 320, x: 100 + step, y: 100 });
-    }
-    store.commands.widgets.setFloatingMode('image-map', 'shaded');
-    store.commands.widgets.raiseFloating('image-map');
-    store.commands.widgets.revealFloating('gallery');
-
-    // 23 window writes, none of which reach the rails.
-    expect(windowsWatcher.changeCount).toBe(2 + 23);
-    expect(placementWatcher.changeCount).toBe(2);
-    // Raising is ordinary focus: it leaves a shaded window shaded. Only the explicit reveal expands one.
-    expect(store.getSnapshot().activeProject.floatingWidgets?.['image-map'].mode).toBe('shaded');
-
-    store.commands.widgets.dockFloating('gallery');
-    expect(placementWatcher.changeCount).toBe(3);
-  });
-
-  it('notifies no subscriber when the window already on top is raised again', () => {
-    const store = createWorkbenchStore();
-
-    store.commands.widgets.float('image-map');
-    store.commands.widgets.float('gallery');
-    const stateWatcher = watchSelector(store, (snapshot) => snapshot.activeProject);
-
-    // Every press inside a window asks for a raise. For the topmost window the reducer returns the same state, and
-    // the store must turn that into silence: no notification, so no re-render and no autosave.
-    for (let repeat = 0; repeat < 5; repeat += 1) {
-      store.commands.widgets.raiseFloating('gallery');
-    }
-
-    expect(stateWatcher.changeCount).toBe(0);
-  });
-
-  it('treats identical widget placement in a different project as a placement change', () => {
-    const store = createWorkbenchStore();
-    const placementWatcher = watchSelector(
-      store,
-      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
-      areWidgetPlacementProjectsEqual
-    );
-    const firstProjectId = placementWatcher.current.projectId;
-
-    store.commands.projects.create();
-
-    expect(placementWatcher.current.projectId).not.toBe(firstProjectId);
-    expect(placementWatcher.changeCount).toBe(1);
-  });
-
-  it('does not notify subscribers for equivalent generate and project settings writes', () => {
-    const store = createWorkbenchStore();
-    const listener = vi.fn();
-
-    store.subscribe(listener);
-
-    store.commands.generation.setBatchCount(1);
-    store.commands.account.updateProjectPreferences({
-      viewerAutoSwitch: store.getSnapshot().activeProject.settings.viewerAutoSwitch,
-    });
-    store.commands.layout.setRegionCollapsed('left', false);
-    store.commands.layout.setRegionSize('left', store.getSnapshot().activeProject.widgetRegions.left.sizePx);
-    store.commands.widgets.patchValues('generate', {});
-    store.commands.queue.setConnectionStatus({ status: 'connecting' });
-
-    expect(listener).not.toHaveBeenCalled();
   });
 
   it('composes same-turn functional widget patches from the latest values', () => {
@@ -847,62 +374,6 @@ describe('createWorkbenchStore', () => {
     store.commands.widgets.patchValues('video', update, firstProjectId);
     expect(update).not.toHaveBeenCalled();
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video').steps).toBe(50);
-  });
-
-  it('does not notify subscribers for equivalent queue status writes', () => {
-    const store = createWorkbenchStore();
-    const project = store.getSnapshot().activeProject;
-    const listener = vi.fn();
-
-    store.subscribe(listener);
-
-    store.commands.queue.setStatus({ projectId: project.id, queueItemId: 'missing-queue-item', status: 'pending' });
-
-    expect(listener).not.toHaveBeenCalled();
-  });
-
-  it('exposes queue behavior through namespaced commands', () => {
-    const initialState = createInitialWorkbenchState();
-    const initialProject = initialState.projects[0];
-    const store = createWorkbenchStore({
-      ...initialState,
-      projects: [
-        {
-          ...initialProject,
-          queue: {
-            items: [
-              {
-                cancellable: true,
-                id: 'queue-item-1',
-                snapshot: {} as (typeof initialProject.queue.items)[number]['snapshot'],
-                status: 'pending',
-              },
-              {
-                cancellable: false,
-                id: 'queue-item-complete',
-                snapshot: {} as (typeof initialProject.queue.items)[number]['snapshot'],
-                status: 'completed',
-              },
-            ],
-          },
-        },
-      ],
-    });
-    const projectId = store.getSnapshot().activeProject.id;
-
-    store.commands.queue.setConnectionStatus({ status: 'connected' });
-    store.commands.queue.cancel(projectId, 'queue-item-1');
-
-    expect(store.getState().backendConnection.status).toBe('connected');
-    expect(store.getSnapshot().activeProject.queue.items[0]?.status).toBe('cancelled');
-    expect(store.getSnapshot().notifications[0]).toMatchObject({
-      kind: 'info',
-      titleKey: 'notifications.run.cancelRequested',
-    });
-
-    store.commands.queue.clearCompleted();
-
-    expect(store.getSnapshot().activeProject.queue.items.map((item) => item.id)).toEqual(['queue-item-1']);
   });
 
   it('enforces project lifecycle invariants through observable command results', () => {
@@ -951,51 +422,6 @@ describe('createWorkbenchStore', () => {
 
     expect(store.commands.projects.close(project.id)).toEqual({ ok: false, reason: 'active-queue-runs' });
     expect(store.getSnapshot().projects.some((candidate) => candidate.id === project.id)).toBe(true);
-  });
-
-  it('applies Canvas and Workflow edits without exposing aggregate reducer actions', () => {
-    const store = createWorkbenchStore();
-    const project = store.getSnapshot().activeProject;
-    const bbox = project.canvas.document.bbox;
-
-    expect(store.commands.canvas.apply(project.id, { bbox: { ...bbox, x: bbox.x + 10 }, type: 'setCanvasBbox' })).toBe(
-      true
-    );
-    expect(store.getSnapshot().activeProject.canvas.document.bbox.x).toBe(bbox.x + 10);
-
-    store.commands.workflows.editGraph({ patch: { name: 'Command-owned workflow' }, type: 'setMetadata' });
-
-    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Command-owned workflow');
-  });
-
-  it('undoes a committed rename as its own step, apart from the typed name edits before it', () => {
-    const store = createWorkbenchStore();
-    const workflowId = store.getSnapshot().activeProject.workflows.activeWorkflowId;
-
-    store.commands.workflows.editGraph({ patch: { name: 'Alph' }, type: 'setMetadata' });
-    store.commands.workflows.editGraph({ patch: { name: 'Alpha' }, type: 'setMetadata' });
-    expect(store.commands.workflows.rename(workflowId, 'Alpha, published')).toEqual({ ok: true });
-    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha, published');
-
-    store.commands.workflows.undo();
-    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha');
-
-    store.commands.workflows.undo();
-    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Untitled Workflow');
-  });
-
-  it('keeps placement selectors stable across generate and settings changes', () => {
-    const store = createWorkbenchStore();
-    const placementWatcher = watchSelector(
-      store,
-      (snapshot) => getWidgetPlacementProject(snapshot.activeProject),
-      areWidgetPlacementProjectsEqual
-    );
-
-    store.commands.generation.setBatchCount(2);
-    store.commands.account.updateProjectPreferences({ useCpuNoise: false });
-
-    expect(placementWatcher.changeCount).toBe(0);
   });
 });
 

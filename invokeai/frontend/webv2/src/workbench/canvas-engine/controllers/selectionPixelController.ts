@@ -23,8 +23,8 @@ import { MASK_PAINT_COLOR } from '@workbench/canvas-engine/tools/paintConstants'
 import type { CanvasMutationContext, EditTransaction } from './mutationContext';
 
 /**
- * A paint layer or mask is edited in its own local space, the selection mapped into it. A control layer or raster
- * image edits through a pixel-edit transaction, which bakes its transform first, so the document is its space.
+ * A paint layer or mask is edited in its own local space, the selection mapped into it. A control layer or raster image
+ * edits through a pixel-edit transaction, which bakes its transform first, so the document is its space.
  */
 type PixelTarget =
   | { kind: 'direct'; color: string | null; toLocal: Mat2d; transparencyLocked: boolean; txn: EditTransaction }
@@ -193,8 +193,8 @@ export class SelectionPixelController {
   }
 
   /**
-   * Fills or erases the selection on one target. Only the touched region is captured: it is admitted before any
-   * pixel changes, and a refused or failed publication restores it and the cache's original extent.
+   * Fills or erases the selection on one target. Only the touched region is captured: it is admitted before any pixel
+   * changes, and a refused or failed publication restores it and the cache's original extent.
    */
   private edit(
     kind: 'fill' | 'erase',

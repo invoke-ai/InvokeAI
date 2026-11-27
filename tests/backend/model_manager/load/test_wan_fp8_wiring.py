@@ -9,11 +9,12 @@ Three behaviours are pinned here, and each of them is a decision this loader mak
 machinery it inherits:
 
 - a plain checkpoint reaches the cast;
-- a Comfy `fp8_scaled` checkpoint does *not*, and says why. Its per-tensor scales were folded into the
-  weights and dropped, so re-encoding the result as unscaled fp8 would flush the low end of every
-  tensor to zero -- 3.4% of the weights on `flux-2-klein-4b-fp8`. Identification switches FP8 Storage
-  on by itself for a float8 denoiser, so this is the default path for such a file, not a road less
-  travelled;
+- a Comfy `fp8_scaled` checkpoint with FP8 Storage on does *not* take that cast. Its scaled layers stay
+  fp8 with the file's own scale, and the cast the rest of the model gets skips them: the layerwise cast
+  would upcast them without the scale, and re-encoding a folded weight as unscaled fp8 flushes the low
+  end of every tensor to zero -- 3.4% of the weights on `flux-2-klein-4b-fp8`. Identification switches
+  FP8 Storage on by itself for a float8 denoiser, so this is the default path for such a file. (With the
+  setting off the file is folded; `TestEndToEnd` covers that);
 - the state dict is released first, or the bf16 originals stay reachable beside their fp8 copies while
   the reservation covers only one of the two.
 """
@@ -22,12 +23,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders.wan import WanCheckpointModel, WanDiffusersModel
-from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType, WanVariantType
 
 # Same tiny-but-faithful transformer the sibling loader tests use; `attention_head_dim` must stay 128,
 # because the loader derives `num_attention_heads` from it.
@@ -43,18 +44,23 @@ TINY_MODEL_KWARGS = {
 }
 
 
+SCALE = 4.0
+
+
 def _tiny_state_dict() -> dict[str, torch.Tensor]:
     from diffusers import WanTransformer3DModel
 
+    torch.manual_seed(0)
     return WanTransformer3DModel(**TINY_MODEL_KWARGS).state_dict()
 
 
 def _checkpoint(path: Path, scaled: bool) -> Path:
     sd = _tiny_state_dict()
     if scaled:
-        # What Comfy's `fp8_scaled` repack looks like: a per-tensor scale beside the weight, and the
-        # marker tensor that names the convention.
-        sd["blocks.0.attn1.to_q.scale_weight"] = torch.tensor([4.0])
+        # What Comfy's `fp8_scaled` repack looks like: an fp8 weight with a per-tensor scale beside it, and
+        # the marker tensor that names the convention.
+        sd["blocks.0.attn1.to_q.weight"] = (sd["blocks.0.attn1.to_q.weight"] / SCALE).to(torch.float8_e4m3fn)
+        sd["blocks.0.attn1.to_q.scale_weight"] = torch.tensor([SCALE])
         sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
     save_file(sd, path)
     return path
@@ -63,9 +69,10 @@ def _checkpoint(path: Path, scaled: bool) -> Path:
 def _loader(cast_calls: list, *, asks_for_fp8: bool = True) -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
-    # The branch under test consults the gate to decide whether the decline is worth reporting; the
-    # gate itself has its own cells in `test_load_default_fp8.py`.
-    loader._should_use_fp8 = lambda *_args, **_kwargs: asks_for_fp8
+    loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
+    loader._test_fp8_storage = asks_for_fp8
     loader._apply_fp8_layerwise_casting = lambda model, config, submodel: (
         cast_calls.append((config, submodel)),
         model,
@@ -77,9 +84,13 @@ def _load(loader: WanCheckpointModel, path: Path):
     config = MagicMock()
     config.path = str(path)
     config.variant = WanVariantType.T2V_A14B
+    config.base, config.type, config.format = BaseModelType.Wan, ModelType.Main, ModelFormat.Checkpoint
+    config.default_settings.fp8_storage = getattr(loader, "_test_fp8_storage", False)
 
     with (
         patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
+        patch("invokeai.backend.model_manager.load.load_default.should_keep_fp8_weights", return_value=False),
+        patch("invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage", return_value=True),
         patch(
             "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
             return_value=torch.bfloat16,
@@ -99,35 +110,23 @@ class TestTheCheckpointLoader:
         assert len(cast_calls) == 1
         assert cast_calls[0][1] is SubModelType.Transformer
 
-    def test_a_scaled_checkpoint_is_declined_and_the_reason_is_logged(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_a_scaled_checkpoint_keeps_its_layers_packed_and_skips_the_unscaled_cast(self, tmp_path: Path) -> None:
         """The case identification turns on by itself, and the one where the cast would cost quality.
 
-        Folding happened before this point and the scales are gone, so the cast could only re-encode
-        the result unscaled. Declining leaves the model where it already is -- correct, at bf16 size.
+        The scaled layer stays fp8 with its checkpoint scale; the rest of the model is cast in the same
+        pass, so the loader's trailing cast, which would see the scaled layer too, is not reached.
         """
         cast_calls: list = []
         loader = _loader(cast_calls)
 
-        with caplog.at_level("INFO"):
-            model = _load(loader, _checkpoint(tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors", scaled=True))
+        model = _load(loader, _checkpoint(tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors", scaled=True))
 
         assert cast_calls == []
-        assert model is not None
-        assert "FP8 Storage not applied" in caplog.text
-        assert "unscaled fp8" in caplog.text
-
-    def test_the_decline_is_silent_when_nobody_asked(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Most loads of a scaled file have the setting off, and they have nothing to be told."""
-        cast_calls: list = []
-        loader = _loader(cast_calls, asks_for_fp8=False)
-
-        with caplog.at_level("INFO"):
-            _load(loader, _checkpoint(tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors", scaled=True))
-
-        assert cast_calls == []
-        assert "FP8 Storage" not in caplog.text
+        scaled = model.get_submodule("blocks.0.attn1.to_q")
+        assert scaled.weight.dtype is torch.float8_e4m3fn
+        assert scaled.weight_scale.item() == SCALE
+        assert model.get_submodule("blocks.0.ffn.net.2").weight.dtype is torch.float8_e4m3fn
+        assert getattr(model.get_submodule("blocks.0.ffn.net.2"), "weight_scale", None) is None
 
     def test_the_state_dict_is_released_before_the_cast(self, tmp_path: Path) -> None:
         """Peak RAM must not overshoot the `make_room()` reservation.
@@ -140,6 +139,8 @@ class TestTheCheckpointLoader:
         observed: list[int] = []
         loader = object.__new__(WanCheckpointModel)
         loader._ram_cache = MagicMock()
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
         loader._should_use_fp8 = lambda *_args, **_kwargs: True
 
         captured: dict[str, dict] = {}
@@ -162,6 +163,32 @@ class TestTheCheckpointLoader:
         assert observed == [0], "the loader still held every bf16 tensor while the cast allocated fp8 copies"
 
 
+def test_checkpoint_cache_key_and_scaled_weights_share_one_device_decision(monkeypatch, tmp_path: Path) -> None:
+    path = _checkpoint(tmp_path / "wan_fp8_scaled.safetensors", scaled=True)
+    config = MagicMock()
+    config.path, config.key, config.variant = str(path), "wan", WanVariantType.T2V_A14B
+    config.base, config.type, config.format = BaseModelType.Wan, ModelType.Main, ModelFormat.Checkpoint
+    config.default_settings.fp8_storage = False
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.index == 0)
+    monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: False)
+    monkeypatch.setattr(load_default.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+    capable, incapable = _loader([]), _loader([])
+    capable._torch_device, incapable._torch_device = torch.device("cuda:0"), torch.device("cuda:1")
+
+    capable_key = capable._get_cache_key(config, SubModelType.Transformer)
+    incapable_key = incapable._get_cache_key(config, SubModelType.Transformer)
+    assert capable_key != incapable_key
+    # Probe changes after lookup cannot change the weights constructed under either key.
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda device: device.index == 1)
+    packed = capable._load_from_singlefile(config).get_submodule("blocks.0.attn1.to_q")
+    folded = incapable._load_from_singlefile(config).get_submodule("blocks.0.attn1.to_q")
+
+    assert packed.weight.dtype is torch.float8_e4m3fn
+    assert packed.weight_scale.item() == SCALE
+    assert folded.weight.dtype is torch.float32
+    torch.testing.assert_close(folded.weight, packed.weight.float() * SCALE)
+
+
 class TestTheDiffusersLoader:
     def test_a_diffusers_folder_reaches_the_cast(self, tmp_path: Path) -> None:
         """`WanDiffusersModel` overrides `_load_model` to force bfloat16, and in doing so replaced the
@@ -170,6 +197,8 @@ class TestTheDiffusersLoader:
         there to be found in the parent's source."""
         cast_calls: list = []
         loader = object.__new__(WanDiffusersModel)
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
         loader._apply_fp8_layerwise_casting = lambda model, config, submodel: (
             cast_calls.append((config, submodel)),
             model,

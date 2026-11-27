@@ -1,8 +1,15 @@
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
+
 import type { GenerationIssue } from './generationIssues';
 import type { GenerateModelConfig, GenerateReferenceImage, GenerateSettings, MainModelConfig } from './types';
 
-import { resetArchitectureCapabilities, setArchitectureCapabilities } from './architectureCapabilities';
-import { architectureCapabilitiesFixture, seedArchitectureCapabilities } from './architectureCapabilities.testing';
 import {
   getDefaultGenerateSettings,
   getGenerationModelAvailabilityIssues,
@@ -24,7 +31,6 @@ const settingsFor = (main: GenerateModelConfig, overrides: Partial<GenerateSetti
   ...overrides,
 });
 const image = { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } };
-/** Set while collecting named scenarios: every reference then carries `Name of <id>`. */
 let nameReferences = false;
 const reference = (id: string, config: Record<string, unknown>): GenerateReferenceImage => ({
   config: { image, ...config } as GenerateReferenceImage['config'],
@@ -50,9 +56,8 @@ const ipAdapterReference = (id: string, overrides: Record<string, unknown> = {})
   });
 
 /**
- * Scenarios that together raise every translated Generate issue, for tests that check each against the locale and
- * its renderer. `namedReferences` gives every reference image a name. Needs the capability table seeded; leaves it
- * seeded.
+ * Scenarios that together raise every translated Generate issue, for tests that check each against the locale and its
+ * renderer. `namedReferences` gives every reference image a name. Needs the capability table seeded; leaves it seeded.
  */
 export const collectGenerationIssueScenarios = ({ namedReferences = false } = {}): GenerationIssue[] => {
   nameReferences = namedReferences;

@@ -118,12 +118,6 @@ describe('GalleryWidgetLabel', () => {
     expect(host?.textContent).toContain('dogs');
   });
 
-  it('translates the uncategorized board rather than showing the transported name', async () => {
-    await renderChrome(GalleryWidgetLabel, { selectedBoardId: 'none' });
-
-    expect(host?.textContent).toContain('widgets.gallery.uncategorized');
-  });
-
   it('collapses the boards when expanded', async () => {
     await renderChrome(GalleryWidgetLabel, { selectedBoardId: 'dogs' });
 

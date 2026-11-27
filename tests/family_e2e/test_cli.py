@@ -256,7 +256,9 @@ def startable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         s.bind(("127.0.0.1", 0))
         free = s.getsockname()[1]
     (tmp_path / "template").mkdir()
-    (tmp_path / "template" / "invokeai.yaml").write_text(yaml.safe_dump({"schema_version": "4.0.3", "port": free}))
+    (tmp_path / "template" / "invokeai.yaml").write_text(
+        yaml.safe_dump({"schema_version": "4.0.3", "multiuser": False, "port": free})
+    )
     (tmp_path / "code" / "scripts").mkdir(parents=True)
     (tmp_path / "code" / "scripts" / "invokeai-web.py").write_text("")
     manifest = tmp_path / "manifest.yaml"

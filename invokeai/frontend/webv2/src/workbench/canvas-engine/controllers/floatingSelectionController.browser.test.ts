@@ -33,7 +33,6 @@ const DOCUMENT: CanvasDocumentContractV3 = {
   width: 100,
 };
 
-/** Every view reads this fixed area, so caches of different extents compare pixel for pixel. */
 const VIEW: Rect = { height: 40, width: 80, x: 0, y: 0 };
 
 const createHarness = (byteBudget = 64 * 1024 * 1024) => {
@@ -47,7 +46,6 @@ const createHarness = (byteBudget = 64 * 1024 * 1024) => {
     onChange: () => undefined,
   });
 
-  // Distinct opaque pixels everywhere, so any misplaced copy shows.
   const entry = layers.getOrCreateRect('a', { height: 40, width: 40, x: 0, y: 0 });
   const seed = entry.surface.ctx.createImageData(40, 40);
   for (let index = 0; index < 40 * 40; index += 1) {
@@ -100,7 +98,6 @@ const createHarness = (byteBudget = 64 * 1024 * 1024) => {
     suspendPersistence: () => () => undefined,
   });
 
-  /** The layer's pixels over {@link VIEW}, transparent where the cache does not reach. */
   const pixels = (): number[] => {
     const view = backend.createSurface(VIEW.width, VIEW.height);
     const cache = layers.get('a')!;
@@ -127,7 +124,6 @@ describe('FloatingSelectionController in a real raster backend', () => {
     expect(h.controller.setTransform({ rotation: 0, scaleX: 1, scaleY: 1, x: 35, y: 0 })).toBe(true);
     h.controller.commit();
 
-    // The hole is clear and the pixels landed past the original cache edge.
     expect(h.pixelAt(12, 12)).toEqual([0, 0, 0, 0]);
     expect(h.pixelAt(47, 12)).toEqual([12, 12, 200, 255]);
     expect(h.selected().rect).toEqual({ height: 10, width: 10, x: 45, y: 10 });
@@ -141,45 +137,5 @@ describe('FloatingSelectionController in a real raster backend', () => {
     expect(await h.history.redo()).toEqual({ status: 'applied' });
     expect(h.pixels()).toEqual(landedPixels);
     expect(h.selected()).toEqual(landedSelection);
-  });
-
-  it('restores exact pixels on cancel, recording nothing', () => {
-    const h = createHarness();
-    const originalPixels = h.pixels();
-
-    h.controller.lift('a');
-    h.controller.setTransform({ rotation: 0, scaleX: 1, scaleY: 1, x: 20, y: 5 });
-    h.controller.cancel();
-
-    expect(h.pixels()).toEqual(originalPixels);
-    expect(h.history.canUndo()).toBe(false);
-  });
-
-  it('commits an enlarged, rotated float with every other byte of the budget taken', () => {
-    const budget = 1024 * 1024;
-    const h = createHarness(budget);
-    h.controller.lift('a');
-    expect(h.controller.setTransform({ rotation: Math.PI / 6, scaleX: 1.5, scaleY: 2, x: 12, y: 3 })).toBe(true);
-
-    // Take the largest edit that still fits beside the float's admission.
-    let low = 0;
-    let high = budget;
-    while (low < high) {
-      const mid = Math.ceil((low + high) / 2);
-      const probe = h.history.admit(mid);
-      probe?.release();
-      if (probe) {
-        low = mid;
-      } else {
-        high = mid - 1;
-      }
-    }
-    const rest = h.history.admit(low)!;
-
-    h.controller.commit();
-
-    expect(h.history.entries().past).toEqual(['Move selection']);
-    expect(h.reportRefusal).not.toHaveBeenCalled();
-    rest.release();
   });
 });

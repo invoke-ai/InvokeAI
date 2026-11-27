@@ -2,13 +2,7 @@ import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 
 import { IS_MAC_OS } from './keys';
 
-/**
- * Every binding the app ships, so Hotkeys settings list each under its widget whether or not that widget is mounted.
- * A widget registers the same ids with the same defaults while it is mounted (parity tests hold them together); only
- * registered handlers intercept chords. App chords are global, other chords require widget focus, and editable fields
- * are excluded unless explicitly allowed. Overrides include print/search/settings, undo/redo, selection/clipboard, and
- * Canvas merge/deselect/invert; browser-reserved chords work only when delivered to the page.
- */
+/** Every shipped binding, listed in settings whether or not its widget is mounted; widgets register the same ids. */
 
 const categoryScopes = {
   app: { kind: 'global' },
@@ -19,24 +13,18 @@ const categoryScopes = {
   workflows: { kind: 'widget', typeIds: ['workflow'] },
 } as const satisfies Record<HotkeyCategory, HotkeyScope>;
 
-/**
- * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
- * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
- */
+/** Recall and workflow loading act on the gallery selection, so they answer in both Gallery and Preview. */
 const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
-/**
- * Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow
- * submission.
- */
+/** Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow submission. */
 const editableAppHotkeys = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
   'app.invokeToOtherDestination',
   'app.openProjectSwitcher',
-  // Settings is a global destination with no meaning inside a text field, so
-  // the caret's location should not decide whether it opens.
+  // Settings is a global destination with no meaning inside a text field, so the caret's location should not decide
+  // whether it opens.
   'app.openSettings',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
@@ -79,8 +67,8 @@ const hotkey = (
   };
 };
 
-// The palette must open while typing and toggle closed above its own modal
-// layer, so it opts into both editable and modal contexts.
+// The palette must open while typing and toggle closed above its own modal layer, so it opts into both editable and
+// modal contexts.
 export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   allowInEditable: true,
   allowInModal: true,
@@ -93,27 +81,15 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   title: 'Open Command Palette',
 };
 
-/**
- * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
- * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
- */
+/** Set by `PromptTextarea` only while the model reads attention syntax; elsewhere Ctrl+Up/Down edits text. */
 const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
 
-/**
- * The Queue marks a row this way while it offers recall, so its A key works where the Gallery's does and keeps its
- * meaning everywhere else in the queue.
- */
+/** The Queue marks a row this way while it offers recall, so its A key works there as in the Gallery. */
 const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue-recall-item] *';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
-/**
- * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
- * except on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph,
- * Control+Arrow and Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow
- * is VoiceOver's navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no
- * stock macOS, browser, text-field or VoiceOver binding that we know of.
- */
+/** Reachable from text fields, so no text field may bind it; macOS reserves most other modified arrows. */
 export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
   `${isMacOs ? 'mod+ctrl' : 'alt+shift'}+arrow${direction}`;
 
@@ -161,6 +137,10 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectCanvasTab', ['2'], { title: 'Open Canvas' }),
   hotkey('app', 'selectUpscalingTab', ['3'], { title: 'Open Upscale' }),
   hotkey('app', 'selectWorkflowsTab', ['4'], { title: 'Open Workflow editor' }),
+  hotkey('app', 'switchWorkflowView', ['shift+z'], {
+    scope: categoryScopes.workflows,
+    title: 'Switch workflow view',
+  }),
   hotkey('app', 'selectModelsTab', ['5'], { title: 'Open Model Manager' }),
   hotkey('app', 'selectQueueTab', ['6'], { title: 'Open Queue' }),
   hotkey('app', 'openWidgets', [], { title: 'Show widgets' }),
@@ -190,6 +170,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'tool.lasso', ['l'], { title: 'Select Lasso Tool' }),
   hotkey('canvas', 'tool.marquee', ['m'], { title: 'Select Marquee Tool' }),
   hotkey('canvas', 'tool.shape', ['u'], { title: 'Select Shape Tool' }),
+  hotkey('canvas', 'tool.spline', ['s'], { title: 'Select Spline Edit Tool' }),
   hotkey('canvas', 'tool.text', ['t'], { title: 'Select Text Tool' }),
   hotkey('canvas', 'tool.gradient', ['g'], { title: 'Select Gradient Tool' }),
   hotkey('canvas', 'tool.colorPicker', ['i'], { title: 'Select Color Picker' }),
@@ -219,6 +200,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'nudgeRightLarge', ['shift+arrowright']),
   hotkey('canvas', 'nudgeUpLarge', ['shift+arrowup']),
   hotkey('canvas', 'nudgeDownLarge', ['shift+arrowdown']),
+  hotkey('canvas', 'newRasterLayer', [], { ignoreRepeat: true }),
   hotkey('canvas', 'duplicateLayer', ['mod+j']),
   hotkey('canvas', 'groupLayers', ['mod+g']),
   hotkey('canvas', 'ungroupLayers', ['mod+shift+g']),
@@ -228,6 +210,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'layerToFront', ['mod+shift+]']),
   hotkey('canvas', 'layerToBack', ['mod+shift+[']),
   hotkey('canvas', 'cropAllLayersToFrame', []),
+  hotkey('canvas', 'flipHorizontal', []),
+  hotkey('canvas', 'flipVertical', []),
   hotkey('canvas', 'fitBboxToLayers', ['shift+n'], { title: 'Fit Frame To Layers' }),
   hotkey('canvas', 'fitBboxToMasks', ['shift+b'], { title: 'Fit Frame To Masks' }),
   // The gallery saves have no default keys; they are assignable through the hotkeys settings.
@@ -267,8 +251,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'zoomToActual', ['1'], { title: 'Zoom to Actual Size' }),
   hotkey('viewer', 'zoomToFit', ['f'], { title: 'Zoom to Fit' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
-  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button
-  // deselects. Users can still assign one.
+  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button deselects.
   hotkey('gallery', 'clearSelection', []),
   hotkey('gallery', 'galleryNavUp', ['up']),
   hotkey('gallery', 'galleryNavRight', ['right']),
@@ -278,9 +261,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
   hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
   hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
-  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
-  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
-  // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone.
   hotkey('gallery', 'extendSelectionUp', ['shift+up']),
   hotkey('gallery', 'extendSelectionRight', ['shift+right']),
   hotkey('gallery', 'extendSelectionDown', ['shift+down']),

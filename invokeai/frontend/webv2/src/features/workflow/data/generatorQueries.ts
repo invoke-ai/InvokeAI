@@ -46,8 +46,8 @@ const fromBoardImages = (page: { items: readonly { kind: string; name: string }[
 });
 
 /**
- * The query behind an async generator: dynamic prompts or a board's images. The preview widget and the submit
- * path share the underlying queries so a preview that already loaded needs no second round trip.
+ * The query behind an async generator: dynamic prompts or a board's images. The preview widget and the submit path
+ * share the underlying queries so a preview that already loaded needs no second round trip.
  */
 export const getWorkflowGeneratorQueryOptions = (request: WorkflowAsyncGeneratorRequest) =>
   request.kind === 'dynamicPrompts'

@@ -21,8 +21,8 @@ const getPackageOwner = (moduleId) => {
 };
 
 /**
- * Keep first-party paths; collapse dependencies to package IDs to ignore pnpm layout changes. Exclude ownerless
- * virtual modules; byte budgets still cover them.
+ * Keep first-party paths; collapse dependencies to package IDs to ignore pnpm layout changes. Exclude ownerless virtual
+ * modules; byte budgets still cover them.
  */
 export const getModuleSourceOwner = (moduleId, projectRoot) => {
   if (typeof moduleId !== 'string' || moduleId.length === 0 || moduleId.startsWith(VIRTUAL_MODULE_PREFIX)) {

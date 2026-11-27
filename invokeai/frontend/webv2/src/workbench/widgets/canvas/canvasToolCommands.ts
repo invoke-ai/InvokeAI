@@ -7,6 +7,7 @@ import type {
   LayerUnreadable,
   ShapeToolKind,
 } from '@workbench/canvas-engine/api';
+import type { WidgetHotkeyContribution } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 import type { ElementType } from 'react';
 
@@ -14,14 +15,9 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createActionToast } from '@platform/ui/toaster';
 import { getDocumentNode, mergeDownEligibility } from '@workbench/canvas-engine/api';
 import { reportLayerOperation, type LayerOperationRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
-import { CircleIcon, PenLineIcon, PentagonIcon, SquareIcon, StarIcon, TriangleIcon } from 'lucide-react';
+import { CircleIcon, PenLineIcon, VectorPolygonIcon, SquareIcon, StarIcon, TriangleIcon } from 'lucide-react';
 
-/**
- * A command refusal the user can fix, shown the way the Canvas shows its edit refusals: an info toast only, never
- * recorded in Notifications, and one per `key`, so pressing the key again (or holding it) replaces the toast rather
- * than stacking another. It lives here, beside the commands that raise it, because the Canvas and its companion
- * widgets already load this module; a module of its own would cost Canvas activation a request.
- */
+/** A fixable command refusal: an info toast only, one per `key`; here because Canvas companions load this module. */
 export const showCanvasRefusalNotice = (key: string, title: string, message: string): void => {
   createActionToast({
     actions: [],
@@ -33,19 +29,19 @@ export const showCanvasRefusalNotice = (key: string, title: string, message: str
   });
 };
 
-/** Shows a refusal notice under `key`; see {@link showCanvasRefusalNotice}. */
 export type CanvasRefusalNotice = typeof showCanvasRefusalNotice;
 
-/** One hotkey row: its command id, title key and default keys. */
-export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKeys: readonly string[]];
+export type HotkeyTableEntry = readonly [
+  id: string,
+  titleKey: string,
+  defaultKeys: readonly string[],
+  options?: Pick<WidgetHotkeyContribution, 'ignoreRepeat'>,
+];
 
 /** The same layer operation is available from the Canvas and the Layers widget. */
 export const CANVAS_MERGE_DOWN_HOTKEY = ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']] as const;
 
-/**
- * Merges the selected layer into the one below it. A layer that cannot merge is explained through `reportIneligible`
- * (nothing selected stays silent); a merge the engine refuses or that fails goes to `report`.
- */
+/** Merges down; ineligibility goes to `reportIneligible`, engine refusals and failures to `report`. */
 export const mergeSelectedLayerDown = (
   engine: Pick<CanvasEngine, 'layers'> | null,
   document: CanvasDocumentContractV3,
@@ -82,10 +78,7 @@ const MERGE_DOWN_TARGET_KEYS: Partial<
   'not-mergeable': 'widgets.layers.actions.mergeDownNotMergeable',
 };
 
-/**
- * Says why the selected layer cannot merge down, naming the layer or group in the way, as one notice per layer and
- * reason. The engine decides the reason; this only words it.
- */
+/** Words the engine's reason the selected layer cannot merge down, one notice per layer and reason. */
 export const reportMergeDownRefusal = (
   document: CanvasDocumentContractV3,
   refusal: DocumentRefusal,
@@ -129,11 +122,7 @@ export const reportMergeDownRefusal = (
   }
 };
 
-/**
- * Canvas keys that also act while a companion widget (Layers, with its Color pane) holds focus: tools, the
- * transform session, brush size and the color pair. The Canvas and the companion both register from this table;
- * companions import this module alone, without the Canvas's full dispatcher (`canvasHotkeyCommands.ts`).
- */
+/** Canvas keys that also act from companions; they import this module alone, not `canvasHotkeyCommands.ts`. */
 export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.view', 'widgets.canvas.commands.selectViewTool', ['h']],
   ['canvas.tool.move', 'widgets.canvas.commands.selectMoveTool', ['v']],
@@ -146,6 +135,7 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
   ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
+  ['canvas.tool.spline', 'widgets.canvas.commands.selectSplineTool', ['s']],
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
   // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
   ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],
@@ -162,14 +152,11 @@ export const CANVAS_HISTORY_HOTKEYS = [
   ['canvas.redo', 'widgets.canvas.commands.redo', ['mod+shift+z', 'mod+y']],
 ] as const satisfies readonly HotkeyTableEntry[];
 
-/**
- * How each shape kind is shown wherever the next shape's kind is chosen: the tool strip flyout and the Shape
- * options. It lives with the Shape key's command so the Canvas and the Layers pane share it from a chunk both load.
- */
+/** Shape kind display for the flyout and Shape options, here so both share a chunk they already load. */
 export const SHAPE_KIND_PRESENTATION: Record<ShapeToolKind, { icon: ElementType; labelKey: string }> = {
   ellipse: { icon: CircleIcon, labelKey: 'widgets.canvas.toolOptions.shapeEllipse' },
   freehand: { icon: PenLineIcon, labelKey: 'widgets.canvas.toolOptions.shapeFreehand' },
-  polygon: { icon: PentagonIcon, labelKey: 'widgets.canvas.toolOptions.shapePolygon' },
+  polygon: { icon: VectorPolygonIcon, labelKey: 'widgets.canvas.toolOptions.shapePolygon' },
   rect: { icon: SquareIcon, labelKey: 'widgets.canvas.toolOptions.shapeRect' },
   star: { icon: StarIcon, labelKey: 'widgets.canvas.toolOptions.shapeStar' },
   triangle: { icon: TriangleIcon, labelKey: 'widgets.canvas.toolOptions.shapeTriangle' },
@@ -194,10 +181,7 @@ export const isCanvasToolCommand = (commandId: string): commandId is CanvasToolC
 
 export type TransformRefusal = Exclude<BeginTransformResult, 'started'>;
 
-/**
- * Explains a refused `beginTransform` on `layer`. A layer Transform cannot act on is a refusal notice (one per layer,
- * not recorded), not a failure; the other refusals keep the shared layer-operation error.
- */
+/** A layer Transform cannot act on is a refusal notice, not a failure; other refusals use the shared error. */
 export const reportTransformRefusal = (
   refusal: TransformRefusal,
   layer: { id: string; name: string },
@@ -224,7 +208,6 @@ export interface CanvasToolCommandContext {
   readonly swapActiveColors: () => void;
   /** Resets the pair to the black-on-white default. */
   readonly resetActiveColors: () => void;
-  /** Explains a refused Transform of the selected layer `layerId`. */
   readonly reportTransformRefusal: (refusal: TransformRefusal, layerId: string) => void;
 }
 
@@ -250,8 +233,7 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       engine.tools.setTool('move');
       return;
     case 'canvas.transformSelected': {
-      // A selected leaf opens its session at once, even with Transform already active; otherwise only the tool
-      // changes. Apply/Cancel (Enter/Escape) are handled engine-side.
+      // A selected leaf opens its session at once, even with Transform already active; otherwise only the tool changes.
       if (ctx.selectedLayerId === null) {
         engine.tools.setTool('transform');
         return;
@@ -307,6 +289,9 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       return;
     case 'canvas.tool.text':
       engine.tools.setTool('text');
+      return;
+    case 'canvas.tool.spline':
+      engine.tools.setTool('spline');
       return;
     case 'canvas.tool.gradient':
       engine.tools.setTool('gradient');

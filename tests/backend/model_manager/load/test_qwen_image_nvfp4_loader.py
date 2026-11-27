@@ -4,7 +4,8 @@ Both Comfy files mix nvfp4 with scaled fp8, and an fp8 fold multiplies every `.w
 block scales included. So what these tests pin is the order: the nvfp4 layers leave the state dict before any fp8
 handling, come back packed under the paths the model uses (the encoder's legacy `model.X` keys become
 `model.language_model.X`), and one reservation is made before anything is widened. The transformer's scaled fp8 layers
-are folded unless fp8 compute or the model's fp8 storage setting keeps them; the encoder's are always folded. The compute
+are folded unless fp8 compute or the model's fp8 storage setting keeps them; the encoder's are folded unless the
+device can hold or multiply float8 (`test_qwen_image_encoder_fp8.py`). The compute
 dtype is bf16, as in production: the packed global scale must not be cast.
 """
 
@@ -14,7 +15,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-import safetensors.torch
 import torch
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
@@ -31,6 +31,7 @@ from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_convrot
+from tests.fixtures.safetensors_files import served_checkpoint
 
 COMPUTE_DTYPE = torch.bfloat16
 
@@ -56,8 +57,6 @@ ENCODER_SEAM = Seam(
     loader=QwenVLEncoderCheckpointLoader,
     module=qwen_image,
     entry="_load_text_encoder_from_singlefile",
-    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-    load_file_host=safetensors.torch,
     patches_device=True,
     sets_torch_dtype=False,
     casts_fp8_storage=False,
@@ -66,9 +65,11 @@ ENCODER_SEAM = Seam(
 
 def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: dict) -> list[bool]:
     """Patch file access and devices; return a log for `_record_fold`."""
-    import safetensors.torch
 
-    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.qwen_image.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
+    )
     monkeypatch.setattr(qwen_image, "read_safetensors_metadata", lambda _path, _logger: metadata)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: COMPUTE_DTYPE)
@@ -77,7 +78,7 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: d
 
 def _record_fold(monkeypatch: pytest.MonkeyPatch, loader, log: list[bool], *names: str) -> None:
     """At every call of the named `qwen_image` functions, log whether room had been made yet."""
-    for name in names or ("_dequantize_comfyui_fp8",):
+    for name in names or ("dequantize_fp8_scaled",):
         original = getattr(qwen_image, name)
 
         def recording(*args, _original=original, **kwargs):
@@ -143,7 +144,7 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
 
     log = _patch_common(monkeypatch, state_dict, {"_quantization_metadata": json.dumps({"layers": header})})
     monkeypatch.setattr(diffusers, "QwenImageTransformer2DModel", _TinyQwenImageTransformer, raising=False)
-    monkeypatch.setattr(qwen_image, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: mode == "fp8_compute")
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda *_args: True)
     checkpoint = tmp_path / "qwen_image_nvfp4.safetensors"
     checkpoint.touch()
@@ -246,14 +247,15 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         state_dict[f"{legacy}.comfy_quant"] = _marker("nvfp4")
         expected[legacy.replace("model.", "model.language_model.", 1)] = weight
     state_dict["model.layers.0.self_attn.q_proj.bias"] = torch.randn(128)
-    fp8_values = torch.randint(-8, 9, (32, 64)).float()
     fp8_marker = _marker("float8_e4m3fn")
-    # The fp8_scaled encoder's own scale spelling, beside the marker the nvfp4 build adds.
-    state_dict["lm_head.weight"] = fp8_values.to(torch.float8_e4m3fn)
-    state_dict["lm_head.scale_weight"] = torch.tensor(0.5)
-    state_dict["lm_head.scale_input"] = torch.tensor(1.0)
-    state_dict["lm_head.comfy_quant"] = fp8_marker
-    state_dict["visual.proj.weight"] = torch.randn(4, 8)
+    # The fp8_scaled encoder's own scale spelling, beside the marker the nvfp4 build adds. The released nvfp4 file ships
+    # the LM head in scaled fp8; it is not loaded.
+    fp8_values = torch.randint(-8, 9, (4, 8)).float()
+    for legacy, weight in (("visual.proj", fp8_values), ("lm_head", torch.randint(-8, 9, (32, 64)).float())):
+        state_dict[f"{legacy}.weight"] = weight.to(torch.float8_e4m3fn)
+        state_dict[f"{legacy}.scale_weight"] = torch.tensor(0.5)
+        state_dict[f"{legacy}.scale_input"] = torch.tensor(1.0)
+        state_dict[f"{legacy}.comfy_quant"] = fp8_marker
     state_dict["visual.proj.bias"] = torch.randn(4)
 
     log = _patch_common(monkeypatch, state_dict, {})
@@ -267,9 +269,9 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     checkpoint.touch()
     loader = object.__new__(QwenVLEncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
     _record_fold(monkeypatch, loader, log)
     q_bias = state_dict["model.layers.0.self_attn.q_proj.bias"]
-    visual_weight = state_dict["visual.proj.weight"]
 
     model = loader._load_text_encoder_from_singlefile(
         QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint))
@@ -284,15 +286,17 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         x = torch.randn(3, module.in_features, dtype=torch.float32)
         bias = q_bias.to(COMPUTE_DTYPE).float() if module.bias is not None else None
         torch.testing.assert_close(module(x), torch.nn.functional.linear(x, weight, bias))
-    assert torch.equal(model.lm_head.weight, (fp8_values * 0.5).to(COMPUTE_DTYPE))
-    assert torch.equal(model.model.visual.proj.weight, visual_weight.to(COMPUTE_DTYPE))
+    assert list(model.lm_head.parameters()) == []
+    assert torch.equal(model.model.visual.proj.weight, (fp8_values * 0.5).to(COMPUTE_DTYPE))
     assert log == [True]
 
-    # Counted by hand: the packed layers as stored, the q_proj bias, the folded LM head with its two scale scalars and
-    # the vision projection at bf16, and the LM head's 27-byte marker as stored.
+    # Counted by hand: the packed layers as stored, the q_proj bias and the folded vision projection at bf16, and that
+    # projection's recovered scale (the 1.0 `scale_input` is an uncalibrated placeholder, charged nothing). Its marker
+    # is consumed by the extraction before the reservation. The LM head, scales and marker included, costs nothing.
     packed = 2 * _packed_bytes(128, 64)
-    widened = 128 + (32 * 64 + 2) + (4 * 8 + 4)
-    loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + fp8_marker.numel())
+    widened = 128 + (4 * 8 + 4)
+    recovered_scale = torch.tensor(0.5).element_size()
+    loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale)
 
 
 #: The shared encoder seam computes in float32; the int8 cells need bf16, since a blanket cast to it is what would ruin
@@ -369,13 +373,13 @@ def test_the_encoder_keeps_int8_layers_int8_under_their_transformers_paths(monke
         torch.testing.assert_close(layer(x), torch.nn.functional.linear(x, weight, bias), rtol=1e-4, atol=1e-4)
         # The W8A8 activation scale has nothing to attach to.
         assert not hasattr(layer, "input_scale")
-    assert model.lm_head.weight.dtype is COMPUTE_DTYPE
+    assert list(model.lm_head.parameters()) == []
     assert model.model.visual.proj.weight.dtype is COMPUTE_DTYPE
-    # Counted by hand: the int8 weights as stored, their fp32 scales, and the bias, `lm_head` and vision projection at
+    # Counted by hand: the int8 weights as stored, their fp32 scales, and the bias and vision projection at
     # bf16. Markers and activation scales are dropped and cost nothing.
     int8 = 2 * 128 * 64
     scales = (2 * 128 * 4) if rotated else 2 * 4
-    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    dense = 128 + (4 * 8 + 4)
     assert run.reserved == [int8 + scales + dense * COMPUTE_DTYPE.itemsize]
 
 
@@ -448,9 +452,9 @@ def test_an_encoder_file_mixing_int8_and_nvfp4_layers_loads_both_under_one_reser
     assert isinstance(packed, NVFP4Linear)
     x = torch.randn(3, 64)
     torch.testing.assert_close(packed(x), torch.nn.functional.linear(x, nvfp4_weight))
-    # The int8 q_proj with its fp32 scale, the packed layer as stored, and the dense bias, `lm_head` and vision
-    # projection at bf16: one call that covers both schemes.
-    dense = 128 + 32 * 64 + (4 * 8 + 4)
+    # The int8 q_proj with its fp32 scale, the packed layer as stored, and the dense bias and vision projection at
+    # bf16: one call that covers both schemes.
+    dense = 128 + (4 * 8 + 4)
     assert run.reserved == [128 * 64 + 128 * 4 + _packed_bytes(128, 64) + dense * COMPUTE_DTYPE.itemsize]
 
 
@@ -535,7 +539,6 @@ def test_the_transformer_refuses_an_nvfp4_layer_missing_its_global_scale_before_
         loader=QwenImageCheckpointModel,
         module=qwen_image,
         entry="_load_from_singlefile",
-        load_file_host=safetensors.torch,
         compute_dtype=COMPUTE_DTYPE,
         patches_device=True,
         # This entry reads neither: `_torch_dtype` is read nowhere in `qwen_image`, and the fp8

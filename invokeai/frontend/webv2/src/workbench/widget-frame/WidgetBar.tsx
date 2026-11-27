@@ -109,8 +109,8 @@ export const WidgetBar = ({
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
   const handleInstanceClose = useCallback(() => setInstanceMenu(null), []);
   const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
-  // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the
-  // caller has focus to place only for this one.
+  // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the caller
+  // has focus to place only for this one.
   const handleInstanceRemove = useCallback(
     (item: WidgetEnableMenuItem) =>
       (item as WidgetBarItem).isFloating ? onRemoveFloating(item.id) : onToggle(item as WidgetBarItem),
@@ -222,10 +222,7 @@ const RailGroup = ({
   );
 };
 
-/**
- * Use brand color on active icons over neutral fill for cross-theme contrast. Attribute selectors preserve active
- * styling on hover.
- */
+/** Use brand color on active icons over neutral fill for cross-theme contrast. */
 export const WIDGET_ITEM_SX: SystemStyleObject = {
   display: 'flex',
   alignItems: 'center',

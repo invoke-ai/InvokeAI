@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import accelerate
+import torch
 
 from invokeai.backend.anima.checkpoint_layout import (
     ANIMA_KEY_PREFIXES,
@@ -40,6 +41,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
@@ -76,6 +78,13 @@ class AnimaCheckpointModel(ModelLoader):
     the AnimaTransformer model with the correct architecture parameters.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        return TorchDevice.choose_anima_inference_dtype(device)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -96,8 +105,6 @@ class AnimaCheckpointModel(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
-
         from invokeai.backend.anima.anima_transformer import AnimaTransformer
         from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
 
@@ -115,17 +122,17 @@ class AnimaCheckpointModel(ModelLoader):
                 "Use 'Re-identify model' in the Model Manager to load it as a GGUF model."
             )
 
-        # Load the state dict from safetensors
-        sd = load_file(model_path)
+        # Only the transformer's tensors are read: an all-in-one's bundled VAE and text encoder, and the runtime-derived
+        # buffers and exporter metadata that aren't model weights, are dropped by name before any payload is read.
+        sd = load_safetensors_checkpoint(
+            model_path,
+            select=lambda names: filter_non_model_keys(strip_anima_bundle_prefix(names)),
+        )
 
         # Strip the transformer-key prefix (`net.` or bundled `model.diffusion_model.`).
         sd = strip_anima_bundle_prefix(sd)
 
-        # Drop runtime-derived buffers and exporter metadata that aren't model weights.
-        sd = filter_non_model_keys(sd)
-
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         # Two ComfyUI side-channel formats share the `weight` + `weight_scale` layout, and a checkpoint
         # carries one or the other (Anima-2.9B ships an `int8_tensorwise` build beside its bf16 one).
@@ -236,8 +243,8 @@ class AnimaCheckpointModel(ModelLoader):
         # nothing stayed packed, the state dict was cast to a single `model_dtype` above, so the
         # layerwise cast has one unambiguous compute dtype to restore to; when something did stay
         # packed, the cast bails out on its own rather than upcast a scaled weight without applying
-        # its scale. AnimaTransformer is a plain nn.Module, so this takes the hook-based path in
-        # `_apply_fp8_to_nn_module`.
+        # its scale or cast the dense remainder of an int8 build. AnimaTransformer is a plain nn.Module, so this
+        # takes the hook-based path in `_apply_fp8_to_nn_module`.
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
             logger.info(

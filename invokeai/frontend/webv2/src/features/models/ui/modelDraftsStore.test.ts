@@ -34,7 +34,6 @@ describe('model drafts store', () => {
     const server = { description: '', name: 'Server' };
 
     recordModelDraftFields('m', 'identity', { description: '', name: 'Draft' }, server);
-    // The server moved on before the next keystroke; the name keeps its original baseline.
     recordModelDraftFields('m', 'identity', { description: 'Notes', name: 'Draft 2' }, { ...server, name: 'Other' });
 
     expect(getModelDraft('m')?.identity).toEqual({
@@ -43,7 +42,6 @@ describe('model drafts store', () => {
       fields: { description: 'Notes', name: 'Draft 2' },
     });
 
-    // Typing a field back to the server value stops it being an edit.
     recordModelDraftFields('m', 'identity', { description: '', name: 'Draft 2' }, server);
     expect(getModelDraft('m')?.identity?.fields).toEqual({ name: 'Draft 2' });
   });
@@ -69,6 +67,16 @@ describe('model drafts store', () => {
     expect(getModelDraft('m')).toBeUndefined();
   });
 
+  it('compares default components by content, so a map edited back to the saved one is no edit', () => {
+    const saved = { components: { t5_encoder: 'a' } };
+
+    recordModelDraftFields('m', 'defaults', { components: { t5_encoder: 'b' } }, saved);
+    expect(getModelDraft('m')?.defaults).toBeDefined();
+
+    recordModelDraftFields('m', 'defaults', { components: { t5_encoder: 'a' } }, saved);
+    expect(getModelDraft('m')).toBeUndefined();
+  });
+
   it('rebases untouched fields onto the server and flags only edited fields the server changed differently', () => {
     const draft = { baseline: { name: 'Server' }, fields: { name: 'Mine' } };
 
@@ -78,7 +86,6 @@ describe('model drafts store', () => {
     });
     expect(hasModelDraftConflict({ description: 'New', name: 'Server' }, draft)).toBe(false);
     expect(hasModelDraftConflict({ description: '', name: 'Server 2' }, draft)).toBe(true);
-    // The server arriving at the user's own value is agreement, not a conflict.
     expect(hasModelDraftConflict({ description: '', name: 'Mine' }, draft)).toBe(false);
   });
 
@@ -90,7 +97,6 @@ describe('model drafts store', () => {
     recordModelDraftFields('m', 'defaults', { steps: 20 }, { steps: 30 });
     expect(hasUnsavedModelChanges(getModelDraft('m'))).toBe(true);
 
-    // Reverting the only defaults edit leaves the open editor behind.
     recordModelDraftFields('m', 'defaults', { steps: 30 }, { steps: 30 });
     expect(getModelDraft('m')).toEqual({ identity: { baseline: {}, error: null, fields: {} } });
   });
@@ -113,7 +119,6 @@ describe('model drafts store', () => {
       recordModelDraftFields(`m${index}`, 'defaults', { steps: index }, { steps: -1 });
     }
 
-    // Editing the oldest again makes m1 the least recent.
     recordModelDraftFields('m0', 'defaults', { steps: 99 }, { steps: -1 });
     recordModelDraftFields('newest', 'defaults', { steps: 1 }, { steps: -1 });
 
@@ -140,7 +145,6 @@ describe('model drafts store', () => {
       recordModelDraftFields(`m${index}`, 'defaults', { steps: index }, { steps: -1 });
     }
 
-    // Neither opening m0's editor nor a failed save of it makes it recent.
     openModelIdentityDraft('m0');
     beginModelDraftSave('m0', 'defaults', { steps: 0 });
     failModelDraftSave('m0', 'defaults', { steps: -1 }, null);
@@ -162,7 +166,6 @@ describe('model drafts store', () => {
 
     recordModelDraftFields('m', 'identity', { description: 'Old', name: 'Sent' }, server);
     beginModelDraftSave('m', 'identity', { description: 'Old', name: 'Sent' });
-    // After the click: a new description, and the name typed back to its old server value.
     recordModelDraftFields('m', 'identity', { description: 'Later', name: 'Old' }, server);
 
     finishModelDraftSave('m', 'identity', { description: 'Old', name: 'Sent' });

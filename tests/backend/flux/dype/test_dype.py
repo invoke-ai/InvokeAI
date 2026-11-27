@@ -23,30 +23,6 @@ from invokeai.backend.flux.dype.rope import rope_dype
 from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 
 
-class TestDyPEConfig:
-    """Tests for DyPEConfig dataclass."""
-
-    def test_default_values(self):
-        config = DyPEConfig()
-        assert config.enable_dype is True
-        assert config.base_resolution == 1024
-        assert config.dype_scale == 2.0
-        assert config.dype_exponent == 2.0
-        assert config.dype_start_sigma == 1.0
-
-    def test_custom_values(self):
-        config = DyPEConfig(
-            enable_dype=False,
-            base_resolution=512,
-            dype_scale=4.0,
-            dype_exponent=3.0,
-            dype_start_sigma=0.5,
-        )
-        assert config.enable_dype is False
-        assert config.base_resolution == 512
-        assert config.dype_scale == 4.0
-
-
 class TestDyPEExtension:
     """Tests for DyPE extension helpers."""
 

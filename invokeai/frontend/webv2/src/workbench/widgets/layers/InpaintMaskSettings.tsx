@@ -13,29 +13,17 @@ import {
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
+import { MASK_FILL_STYLES } from '@workbench/widgets/layers/layerOps';
 import { PaletteIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-/** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
-const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
-  'solid',
-  'grid',
-  'crosshatch',
-  'diagonal',
-  'horizontal',
-  'vertical',
-];
 
 interface InpaintMaskSettingsProps {
   engine: (CanvasStructuralEngine & CanvasPreparedEngine & ColorSamplerEngine) | null;
   layer: CanvasInpaintMaskLayerContract;
 }
 
-/**
- * Properties owns fill/style and invert; noise/denoise modifiers have tree-child editors. Fill uses undoable
- * config patches, invert uses engine pixels.
- */
+/** Fill uses undoable config patches, invert uses engine pixels; modifiers have tree-child editors. */
 export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps) => {
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);

@@ -1,7 +1,14 @@
+import { layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
 import { describe, expect, it } from 'vitest';
 
-import { createControlLayer, nextControlLayerName } from './layerFactories';
+import {
+  advanceMaskFillColors,
+  createControlLayer,
+  nextControlLayerName,
+  nextMaskFillColor,
+  resetMaskFillColors,
+} from './layerFactories';
 
 describe('createControlLayer', () => {
   it('creates an empty, untyped, model-less layer on the legacy ControlNet defaults with transparency on', () => {
@@ -19,7 +26,6 @@ describe('createControlLayer', () => {
       type: 'control',
       withTransparencyEffect: true,
     });
-    // The defaults' mutable step range is copied, never shared.
     expect(layer.adapter.beginEndStepPct).not.toBe(CONTROL_ADAPTER_DEFAULTS.controlnet.beginEndStepPct);
   });
 
@@ -46,4 +52,64 @@ describe('nextControlLayerName', () => {
     expect(nextControlLayerName(['Control Layer 1', 'Control Layer 3', 'Layer 2'])).toBe('Control Layer 2');
     expect(nextControlLayerName(['Control Layer 1', 'Control Layer 2'])).toBe('Control Layer 3');
   });
+});
+
+it('cycles mask colors independently in palette order and restarts at the session defaults', () => {
+  resetMaskFillColors();
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#83d683');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  expect(Array.from({ length: 10 }, (_, index) => nextMaskFillColor('inpaint_mask', index))).toEqual([
+    '#83d683',
+    '#f59e42',
+    '#f4d35e',
+    '#38c9c5',
+    '#62b5f5',
+    '#637be8',
+    '#ad80e8',
+    '#ed79ba',
+    '#b7d65a',
+    '#e07575',
+  ]);
+  advanceMaskFillColors('inpaint_mask');
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#f59e42');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  advanceMaskFillColors('regional_guidance');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#f59e42');
+  resetMaskFillColors();
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#83d683');
+});
+
+it.each([
+  { label: 'same type and uppercase hex', used: ['#83D683'], other: [], expected: ['#f59e42'] },
+  { label: 'colors used by the other mask type', used: [], other: ['#83d683'], expected: ['#83d683'] },
+  { label: 'an import batch', used: ['#83d683', '#f4d35e'], other: [], expected: ['#f59e42', '#38c9c5', '#62b5f5'] },
+  {
+    label: 'an exhausted palette',
+    used: [
+      '#e07575',
+      '#83d683',
+      '#f59e42',
+      '#f4d35e',
+      '#38c9c5',
+      '#62b5f5',
+      '#637be8',
+      '#ad80e8',
+      '#ed79ba',
+      '#b7d65a',
+    ],
+    other: [],
+    expected: ['#83d683', '#f59e42'],
+  },
+])('chooses palette colors with $label', ({ used, other, expected }) => {
+  resetMaskFillColors();
+  const layers = [
+    ...used.map((color) =>
+      layerContract(color, 'regional_guidance', { mask: { bitmap: null, fill: { color, style: 'solid' } } })
+    ),
+    ...other.map((color) =>
+      layerContract(color, 'inpaint_mask', { mask: { bitmap: null, fill: { color, style: 'solid' } } })
+    ),
+  ];
+  expect(expected.map((_, offset) => nextMaskFillColor('regional_guidance', offset, layers))).toEqual(expected);
 });

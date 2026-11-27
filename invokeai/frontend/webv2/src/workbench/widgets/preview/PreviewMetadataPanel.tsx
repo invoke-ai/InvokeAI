@@ -26,10 +26,7 @@ import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
 
-/**
- * Show parsed details with copy (and per-field recall for images) beside the raw payloads. Key query children by
- * account and qualified identity so closure/identity changes abort supported transports.
- */
+/** Children are keyed by account and identity so closure or identity changes abort supported transports. */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
 const METADATA_NAMESPACES = ['metadata', 'translation'] as const;
@@ -43,16 +40,14 @@ const keepTabKeys = (event: KeyboardEvent<HTMLElement>) => {
   }
 };
 
-/**
- * Offer field recall only where a dedicated verb exists; model/steps/scheduler retain copy and use All/Remix for
- * recall.
- */
+/** Field recall only where a dedicated verb exists; others copy and use All/Remix. */
 const ENTRY_RECALL_KINDS: Partial<
   Record<string, { capability: keyof ImageRecallCapabilities; kind: ImageRecallKind }>
 > = {
   clipSkip: { capability: 'clipSkip', kind: 'clipSkip' },
-  negativePrompt: { capability: 'prompts', kind: 'prompts' },
-  positivePrompt: { capability: 'prompts', kind: 'prompts' },
+  // The shared capability gates the Generate target; parsed rows prove the individual prompt exists.
+  negativePrompt: { capability: 'prompts', kind: 'negativePrompt' },
+  positivePrompt: { capability: 'prompts', kind: 'positivePrompt' },
   seed: { capability: 'seed', kind: 'seed' },
   size: { capability: 'dimensions', kind: 'dimensions' },
 };
@@ -112,10 +107,7 @@ const PreviewDetailsQuery = ({
     </DetailsTabs>
   );
 
-/**
- * Metadata comes from the gallery's shared entry, which the video's menu and recall commands also read; the embedded
- * workflow and graph are Details' own read. Either failing leaves the other's tabs on offer.
- */
+/** Metadata from the gallery's shared entry; workflow and graph are Details' own read, failing separately. */
 const VideoDetailsQuery = ({
   accountEpoch,
   itemKey,
@@ -169,10 +161,7 @@ const VideoDetails = ({ entries }: { entries: readonly PreviewMetadataEntry[] })
   </Scrollable>
 );
 
-/**
- * Metadata comes from the gallery's shared entry, which the image's menus and recall commands also read; the embedded
- * workflow and graph are Details' own read. Either failing leaves the other's tabs on offer.
- */
+/** Metadata from the gallery's shared entry; workflow and graph are Details' own read, failing separately. */
 const ImageDetailsQuery = ({
   accountEpoch,
   actions,

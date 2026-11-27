@@ -2,7 +2,7 @@
 
 import type { BackendGraphContract } from '@features/generation/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { UpscaleWidgetValues } from './types';
@@ -22,9 +22,9 @@ const compileCase = (testCase: (typeof CASES)[number]): BackendGraphContract => 
 };
 
 /**
- * Model only, at a Scale (the widget and the image menu) and at the native scale of an upscaler that never recorded
- * it (the image menu's plain pass). It loads no main model, so it has no base of its own: its node types and fields
- * join the contract without a `byBase` entry.
+ * Model only, at a Scale (the widget and the image menu) and at the native scale of an upscaler that never recorded it
+ * (the image menu's plain pass). It loads no main model, so it has no base of its own: its node types and fields join
+ * the contract without a `byBase` entry.
  */
 const compileModelOnlyGraphs = (): BackendGraphContract[] => {
   const image = { height: 101, image_name: 'input.png', width: 203 };

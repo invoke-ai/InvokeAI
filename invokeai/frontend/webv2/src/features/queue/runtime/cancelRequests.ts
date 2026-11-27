@@ -51,8 +51,8 @@ const covers = (request: QueueCancelRequest, run: QueueCancelRequestRun): boolea
 };
 
 /**
- * Records a request before it is sent, so a cancel event that beats the response is still covered. Returns the way
- * to drop it again when the request fails.
+ * Records a request before it is sent, so a cancel event that beats the response is still covered. Returns the way to
+ * drop it again when the request fails.
  */
 export const noteQueueCancelRequested = (request: QueueCancelRequest): (() => void) => {
   const now = Date.now();
