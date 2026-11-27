@@ -128103,7 +128103,7 @@
           "latent_channels"
         ],
         "title": "VAE_Checkpoint_Wan_Config",
-        "description": "Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).\n\nDistinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,\nWan2.2-VAE) via the input channel count of ``decoder.conv_in.weight``."
+        "description": "Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).\n\nDistinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,\nWan2.2-VAE) via the input channel count of the first decoder convolution, in\neither the diffusers or the original (ComfyUI) layout."
       },
       "VAE_Diffusers_FLUX_Config": {
         "properties": {
