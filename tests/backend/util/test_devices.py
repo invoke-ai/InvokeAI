@@ -845,10 +845,24 @@ def test_a_forced_release_that_fails_leaves_the_pending_request_as_it_was(refusi
         TorchDevice._empty_cache_deferred.set()
     with pytest.raises(torch.OutOfMemoryError):
         TorchDevice.empty_cache(force=True)
-    assert TorchDevice.release_deferred() is pending
+    assert TorchDevice._empty_cache_deferred.is_set() is pending
 
     assert TorchDevice.empty_cache() is EmptyCacheOutcome.REFUSED
-    assert not TorchDevice.release_deferred()
+    assert not TorchDevice._empty_cache_deferred.is_set()
+
+
+def test_the_release_epoch_moves_only_for_a_release_that_returned_the_pool(refusing_backend, monkeypatch):
+    """A caller owed a deferred release reads the epoch before asking: it is settled once the epoch differs. A release
+    the backend refused, ordinary or forced, returned nothing and must not settle it."""
+    epoch = TorchDevice.release_epoch()
+    assert TorchDevice.empty_cache() is EmptyCacheOutcome.REFUSED
+    with pytest.raises(torch.OutOfMemoryError):
+        TorchDevice.empty_cache(force=True)
+    assert TorchDevice.release_epoch() == epoch
+
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
+    assert TorchDevice.empty_cache() is EmptyCacheOutcome.RAN
+    assert TorchDevice.release_epoch() == epoch + 1
 
 
 def test_install_peer_aware_empty_cache_wraps_torch_entry_point(monkeypatch):
@@ -969,8 +983,10 @@ def test_peer_aware_wrapper_defers_and_a_direct_run_clears_the_request(monkeypat
             finally:
                 GENERATION_DEVICE_POOL.release_session(torch.device("cuda:1"))
             # Quiet again: a direct call runs and clears the request, so a later flush is a no-op.
+            epoch = TorchDevice.release_epoch()
             torch_mod.cuda.empty_cache()
             assert calls == ["cuda"]
+            assert TorchDevice.release_epoch() == epoch + 1
             assert not TorchDevice._empty_cache_deferred.is_set(), "a real run left the request pending"
             TorchDevice.flush_deferred_empty_cache()
             assert calls == ["cuda"]

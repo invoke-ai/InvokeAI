@@ -161,6 +161,12 @@ class TorchDevice:
     # end that finds no other generation device mid-session.
     _empty_cache_deferred = threading.Event()
 
+    # Counts the releases that actually returned the pool to the driver, from any thread and for any device
+    # (`torch.cuda.empty_cache` is process-global). A caller that is owed a deferred release compares it with the
+    # count it saw at the deferral: unchanged means the release is still pending, changed means a release since has
+    # settled it. Unlike `_empty_cache_deferred` it cannot be set again by another device's later deferral.
+    _release_epoch = 0
+
     @classmethod
     def set_session_device(cls, device: Union[str, torch.device]) -> None:
         """Pin the calling thread's execution device. Used by multi-GPU session workers."""
@@ -526,6 +532,7 @@ class TorchDevice:
             if _xpu_is_available():
                 torch.xpu.empty_cache()
             released = True
+            cls._release_epoch += 1
         except RuntimeError as e:
             if force:
                 if was_pending:
@@ -561,12 +568,14 @@ class TorchDevice:
         cls.empty_cache()
 
     @classmethod
-    def release_deferred(cls) -> bool:
-        """Whether a release a peer-aware skip deferred is still pending: no release has run since it was skipped.
+    def release_epoch(cls) -> int:
+        """How many releases have returned the pool to the driver so far, in any thread, for any device.
 
-        An ordinary release the backend refused counts as having run (it clears the request; see `empty_cache`).
+        Read it before a call that may be deferred: a release skipped by that call is still pending while the count
+        reads the same, and settled once it differs. A release the backend refused returned nothing, so it does not
+        count, whatever it does to the flush request (see `empty_cache`).
         """
-        return cls._empty_cache_deferred.is_set()
+        return cls._release_epoch
 
     @classmethod
     def runs_session_on(cls, device: torch.device) -> bool:
@@ -833,6 +842,7 @@ def install_peer_aware_empty_cache() -> None:
             return
         TorchDevice._empty_cache_deferred.clear()
         original_empty_cache()
+        TorchDevice._release_epoch += 1
 
     setattr(peer_aware_empty_cache, _PEER_AWARE_SENTINEL, True)
     torch.cuda.empty_cache = peer_aware_empty_cache

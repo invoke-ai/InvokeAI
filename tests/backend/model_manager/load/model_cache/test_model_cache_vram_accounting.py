@@ -449,7 +449,10 @@ class _Pool:
         self.allocated = allocated
         self.fragmented = fragmented
         self.refuse = refuse
-        self.trims: list[bool] = []  # `force` of each empty_cache() that was asked for
+        # `force` of each empty_cache() the thread under test asked for. The cache's deferred-work worker also
+        # releases the pool, process-wide, on its own schedule; those calls are not the lock's trims.
+        self.trims: list[bool] = []
+        thread_under_test = threading.get_ident()
         stats = {} if backend == "cudaMallocAsync" else {"inactive_split_bytes.all.current": fragmented}
         monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
         monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: backend)
@@ -467,7 +470,8 @@ class _Pool:
         empty_cache = TorchDevice.empty_cache
 
         def recorded_empty_cache(cls, force: bool = False) -> EmptyCacheOutcome:
-            self.trims.append(force)
+            if threading.get_ident() == thread_under_test:
+                self.trims.append(force)
             return empty_cache(force=force)
 
         monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(recorded_empty_cache))
@@ -721,6 +725,70 @@ def test_on_windows_a_reserve_still_short_after_refused_offload_trims_ends_in_th
         cache._release_allocator_blocks_for_reserve(5 * GB)
 
     assert pool.trims == [False, False, True]
+
+
+@pytest.mark.parametrize("models", [{"idle": 4 * GB}, {}], ids=["weights-to-offload", "nothing-to-offload"])
+def test_on_windows_a_lock_that_spent_its_trim_past_a_busy_peer_forces_no_second_one_for_the_reserve(
+    monkeypatch: pytest.MonkeyPatch, models: dict[str, int]
+):
+    """The reserve release is the last thing a lock does, and runs with the lock's own ledger: a paced lock whose
+    earlier pass trimmed past the peer is not owed another stall here, whether the release would offload weights or
+    trim the pool."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(
+        monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB, busy="peer"
+    )
+    cache = _pool_cache()
+    _resident_models(monkeypatch, cache, pool, models)
+
+    cache._release_allocator_blocks_for_reserve(5 * GB, model_cache_module.OffloadLedger(peer_trim_left=False))
+
+    assert True not in pool.trims
+
+
+def test_on_windows_a_reserve_trim_the_backend_refuses_raises_for_a_lock_whose_ledger_does_not_say_so(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A lock's ledger is built to log a failed trim; the reserve release it ends in must still raise it."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(
+        monkeypatch,
+        backend="cudaMallocAsync",
+        reserved=22 * GB,
+        allocated=12 * GB,
+        fragmented=9 * GB,
+        busy="peer",
+        refuse=True,
+    )
+    cache = _pool_cache()
+    _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    with pytest.raises(torch.OutOfMemoryError, match="while trimming the pool"):
+        cache._release_allocator_blocks_for_reserve(5 * GB, model_cache_module.OffloadLedger())
+
+
+@pytest.mark.parametrize("models", [{"idle": 4 * GB}, {}], ids=["weights-to-offload", "nothing-to-offload"])
+def test_on_windows_a_reserve_short_by_a_sliver_after_a_deferred_trim_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch, models: dict[str, int]
+):
+    """100 MB short of the reserve is below the least shortfall worth a stall or a re-stream, as it is when the first
+    trim ran: a busy peer's deferral must not turn it into an offload or a trim past the peer."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(
+        monkeypatch,
+        backend="cudaMallocAsync",
+        reserved=24 * GB - (5 * GB - 100 * MB),
+        allocated=12 * GB,
+        fragmented=0,
+        busy="peer",
+    )
+    cache = _pool_cache()
+    resident = _resident_models(monkeypatch, cache, pool, models)
+
+    cache._release_allocator_blocks_for_reserve(5 * GB)
+
+    assert pool.trims == [False]
+    assert [model.on_device for model in resident.values()] == list(models.values())
 
 
 def test_off_windows_a_release_deferred_by_a_busy_peer_changes_nothing(monkeypatch: pytest.MonkeyPatch):
@@ -1050,6 +1118,31 @@ def test_a_trim_the_backend_refuses_is_credited_but_forces_nothing(monkeypatch: 
     assert pool.trims == [False]
 
 
+def test_a_trim_the_backend_refuses_does_not_wipe_the_credit_of_earlier_deferred_trims(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """1 GB available for 7 GB needed, three 4 GB models. `a`'s trim is deferred by the busy peer and credited. By
+    `b`'s the peer is idle and the context refuses: that refusal returned nothing, so `a`'s bytes are still the pool's
+    and still credited, with `b`'s own refused credit on top: 9 GB, and `c` stays."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=22 * GB, fragmented=0, busy="peer")
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"a": 4 * GB, "b": 4 * GB, "c": 4 * GB})
+    move_to_ram = cache._move_model_to_ram
+
+    def peer_idles_and_the_context_breaks(entry, *args, **kwargs):
+        if entry.key == "b":
+            GENERATION_DEVICE_POOL._device_locks["cuda:1"].release()
+            pool.refuse = True
+        return move_to_ram(entry, *args, **kwargs)
+
+    monkeypatch.setattr(cache, "_move_model_to_ram", peer_idles_and_the_context_breaks)
+
+    cache._offload_unlocked_models(7 * GB, pretrim=False)
+
+    assert [model.on_device for model in models.values()] == [0, 0, 4 * GB]
+
+
 @pytest.mark.parametrize("entry_point", ["lock", "make_room_in_vram"])
 def test_a_trim_past_a_busy_peer_that_the_backend_refuses_does_not_fail_the_offload(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, entry_point: str
@@ -1120,14 +1213,15 @@ def test_a_paced_lock_offloads_for_its_shortfall_once_while_the_release_stays_de
         cache.shutdown()
 
 
-@pytest.mark.parametrize("returned_by", ["a-flush", "the-load"])
+@pytest.mark.parametrize("returned_by", ["a-flush", "a-flush-and-another-devices-deferral", "the-load"])
 def test_deferred_weights_count_only_while_the_pool_still_holds_them_for_the_request(
     monkeypatch: pytest.MonkeyPatch, returned_by: str
 ):
-    """A lock offloads `a` while the session on the GPU defers its trim. Then either a step-boundary flush returns it,
-    and the session frees 4 GB of activations into the pool, or the lock's own load takes those 4 GB from the pool.
-    Either way the pool no longer holds `a`'s weights for the lock: counting them again would leave the next pass
-    4 GB short with `b` still on the device."""
+    """A lock offloads `a` while the session on the GPU defers its trim. Then either a step-boundary flush returns it
+    (and another device's session defers a release of its own, which arms the process-wide request again), and the
+    session frees 4 GB of activations into the pool, or the lock's own load takes those 4 GB from the pool. Either way
+    the pool no longer holds `a`'s weights for the lock: counting them again would leave the next pass 4 GB short with
+    `b` still on the device."""
     monkeypatch.setattr(sys, "platform", "linux")
     pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=22 * GB, fragmented=0, busy="own")
     cache = _pool_cache()
@@ -1137,10 +1231,12 @@ def test_deferred_weights_count_only_while_the_pool_still_holds_them_for_the_req
     cache._offload_unlocked_models(4 * GB, ledger=ledger)  # 1 GB available: `a` goes, its trim defers
     assert [model.on_device for model in models.values()] == [0, 4 * GB]
 
-    if returned_by == "a-flush":
+    if returned_by != "the-load":
         GENERATION_DEVICE_POOL._device_locks["cuda:0"].release()  # the session reaches a step boundary
         TorchDevice.flush_deferred_empty_cache()
         pool.reserved += 4 * GB  # the session's activations, freed into the pool
+        if returned_by == "a-flush-and-another-devices-deferral":
+            TorchDevice._empty_cache_deferred.set()
     else:
         pool.allocated += 4 * GB  # the load's weights, allocated from the pool's unused bytes
 

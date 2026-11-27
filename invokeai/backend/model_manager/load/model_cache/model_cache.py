@@ -507,13 +507,25 @@ class OffloadLedger:
     `deferred_bytes`: bytes the pool still holds for the request because a busy device deferred their trim: weights it
     offloaded, or the pool's unused bytes the reserve release counts on. The driver does not see them and an async pool
     or expandable segments credit none of a pool's unused bytes, so without them each paced pass would offload the same
-    shortfall again from the next models. They count until a release runs (`TorchDevice.release_deferred`), and never
-    for more than the pool's unused bytes, which the load's own allocations reuse first.
+    shortfall again from the next models. They count until a release runs (`TorchDevice.release_epoch` moves past
+    `deferred_epoch`, the count when the first of them was deferred), and never for more than the pool's unused bytes,
+    which the load's own allocations reuse first. Only the request's own deferrals and the releases that ran count:
+    another device's later deferral or a refused release neither settles nor revives them.
     """
 
     peer_trim_left: bool = True
     raise_on_failure: bool = False
     deferred_bytes: int = 0
+    deferred_epoch: int = 0
+
+    def defer(self, nbytes: int, epoch: int) -> None:
+        """Credit bytes whose trim a busy device deferred. `epoch` is `TorchDevice.release_epoch()` read before that
+        trim was asked for: a release that ran since an earlier deferral has returned those bytes, and one that ran
+        in between may have returned these, so neither stays credited."""
+        if epoch != self.deferred_epoch:
+            self.deferred_bytes = 0
+            self.deferred_epoch = epoch
+        self.deferred_bytes += nbytes
 
 
 def _is_integrated_xpu(device: torch.device) -> bool:
@@ -2188,6 +2200,8 @@ class ModelCache:
         allows); False when `max_move_bytes` truncated the pass and another pass is needed.
         """
         start_time = stream_started_at if stream_started_at is not None else time.time()
+        if offload_ledger is None:
+            offload_ledger = OffloadLedger()
 
         # Calculate model_vram_needed, the amount of additional VRAM that will be used if we fully load the model into
         # VRAM.
@@ -2306,7 +2320,10 @@ class ModelCache:
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
         self._release_allocator_blocks_for_reserve(
-            self._working_mem_reserve(working_mem_bytes) + streaming_reserve if streaming_reserve else working_mem_bytes
+            self._working_mem_reserve(working_mem_bytes) + streaming_reserve
+            if streaming_reserve
+            else working_mem_bytes,
+            offload_ledger,
         )
         return True
 
@@ -2315,7 +2332,9 @@ class ModelCache:
         default = int(self._execution_device_working_mem_gb * GB)
         return max(working_mem_bytes or default, default)
 
-    def _release_allocator_blocks_for_reserve(self, working_mem_bytes: Optional[int]) -> None:
+    def _release_allocator_blocks_for_reserve(
+        self, working_mem_bytes: Optional[int], ledger: Optional["OffloadLedger"] = None
+    ) -> None:
         """Return torch's unused blocks to the driver when the working-memory reserve is not free there.
 
         `_get_vram_available` counts the blocks torch's caching allocator holds but does not use as available, and
@@ -2335,7 +2354,8 @@ class ModelCache:
         failure of the forced release raises: the node cannot run as if it had returned anything. Elsewhere an
         allocation that does not fit fails instead of hanging, so the deferral (and the convoy it avoids, see
         `TorchDevice.empty_cache`) stays. A cudaMallocAsync pool has rules of its own:
-        `_release_async_pool_for_reserve`.
+        `_release_async_pool_for_reserve`, which spends the lock's own `ledger` (the last thing a lock does), so a lock
+        never runs more than one trim past a busy peer.
         """
         if self._execution_device.type != "cuda":
             return
@@ -2344,7 +2364,9 @@ class ModelCache:
         if driver_free >= reserve:
             return
         if self._uses_cuda_async_pool():
-            self._release_async_pool_for_reserve(reserve, driver_free, working_mem_bytes)
+            self._release_async_pool_for_reserve(
+                reserve, driver_free, working_mem_bytes, ledger if ledger is not None else OffloadLedger()
+            )
             return
         if expandable_segments_enabled():
             # Freed pages inside a segment are not counted as reclaimable there, but empty_cache() unmaps them.
@@ -2358,31 +2380,38 @@ class ModelCache:
         if TorchDevice.empty_cache(force=self._trim_past_busy_peer()) is EmptyCacheOutcome.RAN:
             self._log_reserve_release(driver_free, releasable, reserve)
 
-    def _release_async_pool_for_reserve(self, reserve: int, driver_free: int, working_mem_bytes: Optional[int]) -> None:
+    def _release_async_pool_for_reserve(
+        self, reserve: int, driver_free: int, working_mem_bytes: Optional[int], ledger: "OffloadLedger"
+    ) -> None:
         """`_release_allocator_blocks_for_reserve` for a cudaMallocAsync pool, whose trim (`cudaMemPoolTrimTo`) returns
         only the chunks without a live allocation: the pool's unused bytes are what it may return, not what it will.
 
         When the reserve is still short after the trim, the unlocked models' weights are the only memory left to give
         back, so they are offloaded, measured against the driver's free memory rather than the cache's cap.
 
-        On Windows the release runs past a busy device once (a short reserve hangs there), and the forced trim raises a
-        backend failure, since the node cannot run as if it had returned anything. A caller that does not run a session
-        on this cache's device (`TorchDevice.runs_session_on`: a sessionless thread, an off-queue borrow) gets just that
-        trim, on the pool, and no offload. A session's caller first tries an unforced trim. When a busy device defers
-        it and unlocked weights are on the device, they are offloaded for the reserve's shortfall first, their own
-        trims deferred and credited (`OffloadLedger`), and the one forced trim then returns them together with the
-        pool's free chunks; the driver's figure after it decides any follow-up. The pool's unused bytes are not
-        counted as pending, since fragmentation can keep most of them back, so the offload may take weights the pool
-        alone would have covered: that costs a re-stream, a short reserve a hang. Without weights to offload the
-        forced trim goes to the pool. A first trim the backend refuses is retried forced, and raises; nothing was
-        deferring it, so the retry stalls no peer. A reserve still short after the offload (its trims refused, or
-        returning too little) ends in the one forced trim too. Off Windows nothing is forced: a deferred trim ends the
-        release.
+        On Windows the release runs past a busy device (a short reserve hangs there) if the lock's `ledger` has its one
+        trim past a busy peer left, and that trim raises a backend failure, since the node cannot run as if it had
+        returned anything. A lock whose earlier passes spent the ledger's trim gets no second one here. A caller that
+        does not run a session on this cache's device (`TorchDevice.runs_session_on`: a sessionless thread, an off-queue
+        borrow) gets just that trim, on the pool, and no offload. A session's caller first tries an unforced trim. When
+        a busy device defers it and unlocked weights are on the device, they are offloaded for the reserve's shortfall
+        first, their own trims deferred and credited (`OffloadLedger`), and the one forced trim then returns them
+        together with the pool's free chunks; the driver's figure after it decides any follow-up. The pool's unused
+        bytes are not counted as pending, since fragmentation can keep most of them back, so the offload may take
+        weights the pool alone would have covered: that costs a re-stream, a short reserve a hang. Without weights to
+        offload the forced trim goes to the pool. A first trim the backend refuses is retried forced, and raises;
+        nothing was deferring it, so the retry stalls no peer and does not spend the ledger's trim. A reserve still
+        short after the offload (its trims refused, or returning too little) ends in the one forced trim too. A reserve
+        short by less than `_MIN_RELEASABLE_FOR_RESERVE` after the first trim ran or was deferred ends the release. Off
+        Windows nothing is forced: a deferred trim ends the release.
         """
         releasable = torch.cuda.memory_reserved(self._execution_device) - self._get_vram_in_use()
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
             return
         on_windows = self._trim_past_busy_peer()
+        ledger.raise_on_failure = True
+        if not on_windows:
+            ledger.peer_trim_left = False
         if on_windows and not TorchDevice.runs_session_on(self._execution_device):
             TorchDevice.empty_cache(force=True)
             self._log_reserve_release(driver_free, releasable, reserve)
@@ -2399,15 +2428,16 @@ class ModelCache:
         if outcome is EmptyCacheOutcome.DEFERRED:
             if not on_windows:
                 return
-            if not self._has_offloadable_vram():
-                TorchDevice.empty_cache(force=True)
-                self._log_reserve_release(driver_free, releasable, reserve)
-                return
         else:
             released_free = self._log_reserve_release(driver_free, releasable, reserve)
-            if reserve - released_free < _MIN_RELEASABLE_FOR_RESERVE:
-                return
-        ledger = OffloadLedger(peer_trim_left=on_windows, raise_on_failure=True)
+        if reserve - released_free < _MIN_RELEASABLE_FOR_RESERVE:
+            return
+        if outcome is EmptyCacheOutcome.DEFERRED and not self._has_offloadable_vram():
+            if ledger.peer_trim_left:
+                ledger.peer_trim_left = False
+                TorchDevice.empty_cache(force=True)
+                self._log_reserve_release(driver_free, releasable, reserve)
+            return
         believed = self._offload_unlocked_models(
             0,
             working_mem_bytes,
@@ -2896,9 +2926,9 @@ class ModelCache:
         vram_bytes_refused = 0
 
         def deferred_credit() -> int:
-            if ledger.deferred_bytes and not TorchDevice.release_deferred():
-                # Another thread's release ran since (a step-boundary flush), or one the backend refused, which also
-                # ends the pending request: either way no release is pending for these bytes any more.
+            if ledger.deferred_bytes and TorchDevice.release_epoch() != ledger.deferred_epoch:
+                # A release ran since the deferral (another thread's step-boundary flush, or another device's
+                # session): the pool is process-global, so it returned these bytes too.
                 ledger.deferred_bytes = 0
             if ledger.deferred_bytes <= 0:
                 return 0
@@ -2913,9 +2943,7 @@ class ModelCache:
             return max(0, min(ledger.deferred_bytes, reserved - self._get_vram_in_use()))
 
         def released() -> None:
-            # A release of this request ran: the driver sees everything it freed. Not left to `deferred_credit`, which
-            # would revive the credit if another thread's deferral re-armed the flag right after, and which does not
-            # hold the refused bytes.
+            # A release of this request ran: the driver sees everything it freed, the refused bytes included.
             nonlocal vram_bytes_refused
             ledger.deferred_bytes = 0
             vram_bytes_refused = 0
@@ -2983,13 +3011,14 @@ class ModelCache:
                         f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
                     )
                     if empty_cache_per_offload:
+                        epoch = TorchDevice.release_epoch()
                         outcome = TorchDevice.empty_cache()
                         if outcome is EmptyCacheOutcome.RAN:
                             released()
                         elif capped:
                             pass
                         elif outcome is EmptyCacheOutcome.DEFERRED:
-                            ledger.deferred_bytes += cache_entry_bytes_freed
+                            ledger.defer(cache_entry_bytes_freed, epoch)
                         else:
                             vram_bytes_refused += cache_entry_bytes_freed
                 vram_bytes_freed += cache_entry_bytes_freed
