@@ -140,6 +140,18 @@ def test_the_lineage_read_tests_the_origin_on_the_listing_index(
     assert "TEMP B-TREE" not in lineage.plan
 
 
+def test_active_id_read_uses_the_status_index_not_full_history(session_queue: SessionQueue, database: Database) -> None:
+    _enqueue(session_queue)
+    reads = _statements(
+        database,
+        lambda: session_queue.get_active_queue_item_ids("default", origin_prefix=ORIGIN_PREFIX),
+    )
+    assert len(reads) == 2
+    for read in reads:
+        assert ANY_STATUS_SEEK.search(read.plan), read
+        assert LISTING_INDEX not in read.plan, read
+
+
 def test_the_unfinished_origins_read_finds_its_rows_by_their_status(
     session_queue: SessionQueue, database: Database
 ) -> None:

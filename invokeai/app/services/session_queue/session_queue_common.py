@@ -236,6 +236,14 @@ class ItemIdsResult(BaseModel):
     )
 
 
+class ActiveItemIdsResult(ItemIdsResult):
+    """Active hydration ids and the distinct roots actually executing in the same read."""
+
+    executing_root_item_ids: list[int] | None = Field(
+        description="Distinct root iteration ids of in-progress items in an origin-scoped read; null for unscoped lists"
+    )
+
+
 NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
 
 

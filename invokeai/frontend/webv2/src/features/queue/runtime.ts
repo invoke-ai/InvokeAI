@@ -827,6 +827,9 @@ export const createQueueRuntime = ({
     reportedCancelFailures.delete(key);
     submissionDueTimes.delete(key);
     invalidateAttempt(projectId, queueItemId);
+    if (isActive()) {
+      coordinator.forgetRunConcurrency(queueItemId);
+    }
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
     if (!journal) {
@@ -1400,6 +1403,10 @@ export const createQueueRuntime = ({
   };
   const coordinator = createQueueCoordinator(
     {
+      isRunOpen: (localQueueItemId) => {
+        const status = getRouteTarget(history, localQueueItemId)?.queueItem?.status;
+        return status === 'pending' || status === 'running';
+      },
       onBackendItemCancelled: (localQueueItemId, backendItemId) => {
         if (!isActive()) {
           return;

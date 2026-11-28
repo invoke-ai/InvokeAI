@@ -7,6 +7,7 @@ An origin prefix matches as SQLite's `LIKE` always has, ignoring case; its `%` a
 """
 
 import functools
+import heapq
 import itertools
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta, timezone
@@ -1023,9 +1024,42 @@ class SessionQueueQueries(QueryModule):
 
     @read
     def in_progress(self, conn: Connection, scope: Scope) -> list[int]:
-        """The ids of the scope's items in progress."""
-        statement = _scoped(*_scope_shape(scope), ("in_progress",), False, conn.dialect.name != "sqlite")
-        return sorted(int(row[0]) for row in conn.execute(statement, scope.parameters()).all())
+        """The ids of the scope's items in progress, in ascending order for cancellation."""
+        # Keep SQLite on the status index rather than ordering by id across the queue's history.
+        statement = _scoped(*_scope_shape(scope), ("in_progress",), False, False)
+        return sorted(int(item_id) for item_id in conn.execute(statement, scope.parameters()).scalars())
+
+    @read
+    def active_ids(self, conn: Connection, scope: Scope) -> tuple[list[int], list[int] | None]:
+        """Hydration ids and distinct executing roots; only actual execution contributes to the latter."""
+        # One SQL statement establishes simultaneous execution. Separate item reads can span a worker hand-off.
+        statement = _scoped(*_scope_shape(scope), ("in_progress",), False, False).with_only_columns(
+            _Q.item_id, func.coalesce(_Q.root_item_id, _Q.item_id)
+        )
+        rows = conn.execute(statement, scope.parameters()).all()
+        executing_ids = sorted((int(row[0]) for row in rows), reverse=True)
+        # Unscoped hydration must not preferentially expose other users' workflow lineage.
+        executing_roots = {int(row[1]) for row in rows} if scope.origin_prefix is not None else set()
+
+        # Retain waiting roots of executing children before filling the bounded waiting-parent allowance.
+        # Read only waiting ids within the same scope, so a root cannot bypass its filters.
+        statement = _scoped(*_scope_shape(scope), ("waiting",), False, False)
+        required_waiting_ids: list[int] = []
+
+        def ordinary_waiting_ids() -> Iterable[int]:
+            for item_id in conn.execute(statement, scope.parameters()).scalars():
+                item_id = int(item_id)
+                if item_id in executing_roots:
+                    required_waiting_ids.append(item_id)
+                else:
+                    yield item_id
+
+        newest_waiting_ids = heapq.nlargest(50, ordinary_waiting_ids())
+        remaining_capacity = max(0, 50 - len(required_waiting_ids))
+        waiting_ids = sorted(required_waiting_ids + newest_waiting_ids[:remaining_capacity], reverse=True)
+
+        # The unscoped queue list includes other users' items, whose workflow lineage must remain private.
+        return executing_ids + waiting_ids, sorted(executing_roots) if scope.origin_prefix is not None else None
 
     @read
     def has_active_work(self, conn: Connection) -> bool:

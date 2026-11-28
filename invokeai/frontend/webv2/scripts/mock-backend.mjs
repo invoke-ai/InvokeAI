@@ -2205,19 +2205,52 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
               )
           );
         }
+        if (action === 'active_ids' && method === 'GET') {
+          // Match the production status-indexed active-id read, within the requested origin scope.
+          const idsForStatus = (status) =>
+            scopedItems
+              .filter((item) => item.status === status)
+              .map((item) => item.item_id)
+              .sort((left, right) => right - left);
+          const isScoped = url.searchParams.has('origin_prefix');
+          const executingRoots = new Set(
+            isScoped
+              ? scopedItems
+                  .filter((item) => item.status === 'in_progress')
+                  .map((item) => item.root_item_id ?? item.item_id)
+              : []
+          );
+          const waitingIds = idsForStatus('waiting');
+          const requiredWaitingIds = waitingIds.filter((id) => executingRoots.has(id));
+          const ordinaryWaitingIds = waitingIds
+            .filter((id) => !executingRoots.has(id))
+            .slice(0, Math.max(0, 50 - requiredWaitingIds.length));
+          const ids = [
+            ...idsForStatus('in_progress'),
+            ...[...requiredWaitingIds, ...ordinaryWaitingIds].sort((left, right) => right - left),
+          ];
+          return json(200, {
+            executing_root_item_ids: isScoped ? [...executingRoots].sort((left, right) => left - right) : null,
+            item_ids: ids,
+            total_count: ids.length,
+          });
+        }
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
-          const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
+          const itemIds = [...scopedItems]
+            .sort(
+              (left, right) =>
+                (descending
+                  ? right.created_at.localeCompare(left.created_at)
+                  : left.created_at.localeCompare(right.created_at)) || left.item_id - right.item_id
+            )
+            .map((item) => item.item_id);
           // Like the backend: a limit returns the head of the order, and total_count is then the number returned.
           const limit = action === 'item_ids' ? url.searchParams.get('limit') : null;
 
           if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 1000)) {
             return json(422, { detail: 'limit must be an integer from 1 to 1000' });
           }
-          if (descending) {
-            itemIds.reverse();
-          }
-
           const returned = limit === null ? itemIds : itemIds.slice(0, Number(limit));
 
           return json(200, { item_ids: returned, total_count: returned.length });

@@ -85,6 +85,7 @@ const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBack
   pauseProcessor: vi.fn(),
   readCurrent: vi.fn(),
   readItemIds: vi.fn(),
+  readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
   readItemsById: vi.fn().mockResolvedValue([]),
   readNext: vi.fn(),
   readStatus: vi.fn(),
@@ -353,6 +354,7 @@ describe('queue runtime', () => {
       pauseProcessor: vi.fn(),
       readCurrent: vi.fn(),
       readItemIds: vi.fn(),
+      readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
       readItemsById: vi.fn().mockResolvedValue([]),
       readNext: vi.fn(),
       readStatus: vi.fn(),
@@ -1623,6 +1625,7 @@ describe('queue runtime video board routing', () => {
       pauseProcessor: vi.fn(),
       readCurrent: vi.fn().mockResolvedValue(null),
       readItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
+      readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
       readItemsById: vi.fn().mockResolvedValue([]),
       readNext: vi.fn().mockResolvedValue(null),
       readStatus: vi.fn().mockResolvedValue({
@@ -1963,6 +1966,38 @@ describe('queue runtime retries', () => {
     timestamp: 0,
     updated_at: '2026-07-17T00:00:00.000Z',
     user_id: 'user',
+  });
+
+  it('retains concurrent presentation through final result delivery and clears it when the run closes', async () => {
+    const queueItem: QueueItem = {
+      ...createPendingQueueItem(),
+      backendBatchId: 'batch',
+      backendItemIds: [41, 42],
+      status: 'running',
+    };
+    const origin = buildQueueItemOrigin(queueItem.id, 'project-1');
+    const { commands, emit, notify, runtime } = createRetryHarness(queueItem, {
+      getItem: vi.fn((id: number) => Promise.resolve({ batchId: 'batch', id, origin, status: 'in_progress' as const })),
+      readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [41, 42], executingRootItemIds: [41, 42] }),
+    });
+    let observedDuringDelivery: boolean | undefined;
+    vi.mocked(commands.routeResults).mockImplementation(() => {
+      observedDuringDelivery = activeProgressTargetStore.hasObservedConcurrency(queueItem.id);
+      queueItem.status = 'completed';
+      notify();
+    });
+
+    try {
+      runtime.start();
+      await vi.waitFor(() => expect(activeProgressTargetStore.hasObservedConcurrency(queueItem.id)).toBe(true));
+      emit('queue_item_status_changed', completedEvent(41, origin, 'canvas'));
+      emit('queue_item_status_changed', completedEvent(42, origin, 'canvas'));
+      await vi.waitFor(() => expect(commands.routeResults).toHaveBeenCalledTimes(1));
+      expect(observedDuringDelivery).toBe(true);
+      await vi.waitFor(() => expect(activeProgressTargetStore.hasObservedConcurrency(queueItem.id)).toBe(false));
+    } finally {
+      await runtime.dispose();
+    }
   });
 
   it('reopens the run that owns a retried item and routes its rerun to the run destination', async () => {

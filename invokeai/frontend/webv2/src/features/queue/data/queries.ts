@@ -50,17 +50,21 @@ export const queueReadModelOptions = (
     return queryOptions({
       queryFn: async ({ signal }): Promise<QueueReadModel> => {
         const requestSignal = AbortSignal.any([signal, owner.signal]);
-        const [status, current, next, idsResult] = await Promise.all([
+        const [status, current, next, idsResult, activeIds] = await Promise.all([
           backend.readStatus(scope, requestSignal),
           backend.readCurrent(scope, requestSignal),
           backend.readNext(scope, requestSignal),
           backend.readItemIds('desc', scope, requestSignal, QUEUE_RECENT_WINDOW),
+          // A second GPU can still run an old job after 50 newer ones enter the queue.
+          backend.readActiveItemIds(scope, requestSignal),
         ]);
 
         assertAccountScopeCurrent(owner);
         requestSignal.throwIfAborted();
-        // A server that predates the id limit answers with every id.
-        const items = await backend.readItemsById(idsResult.itemIds.slice(0, QUEUE_RECENT_WINDOW), requestSignal);
+        // Preserve the server's recent order (including enqueue order within a batch).
+        // Append only active ids outside that window; the endpoint bounds waiting parents separately.
+        const itemIds = [...new Set([...idsResult.itemIds.slice(0, QUEUE_RECENT_WINDOW), ...activeIds.itemIds])];
+        const items = await backend.readItemsById(itemIds, requestSignal);
 
         assertAccountScopeCurrent(owner);
         requestSignal.throwIfAborted();

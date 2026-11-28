@@ -20,6 +20,55 @@ describe('activeProgressTargetStore', () => {
     activeProgressTargetStore.set(target('queue-1', 2));
 
     expect(getActiveProgressTargets()).toEqual([target('queue-1', 1), target('queue-1', 2)]);
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(false);
+  });
+
+  it('does not count a settling slot as concurrent work during sequential hand-off', () => {
+    activeProgressTargetStore.set(target('queue-1', 1));
+    activeProgressTargetStore.settle(target('queue-1', 1));
+    activeProgressTargetStore.set(target('queue-1', 2));
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(false);
+    expect(getActiveProgressTargets()).toEqual([target('queue-1', 2)]);
+    expect(getFollowedProgressTargets()).toHaveLength(2);
+  });
+
+  it('remembers concurrency across gaps until the run ends', () => {
+    activeProgressTargetStore.set(target('queue-1', 1));
+    activeProgressTargetStore.set(target('queue-1', 2));
+    activeProgressTargetStore.observeConcurrency('queue-1');
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(true);
+
+    activeProgressTargetStore.clear(target('queue-1', 1));
+    activeProgressTargetStore.clear(target('queue-1', 2));
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(true);
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-2')).toBe(false);
+
+    activeProgressTargetStore.forgetRun('queue-1');
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(false);
+  });
+
+  it('does not count different runs as concurrent iterations of one run', () => {
+    activeProgressTargetStore.set(target('queue-1', 1));
+    activeProgressTargetStore.set(target('queue-2', 1));
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(false);
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-2')).toBe(false);
+  });
+
+  it('clears remembered concurrency during account cleanup even without active slots', () => {
+    activeProgressTargetStore.set(target('queue-1', 1));
+    activeProgressTargetStore.set(target('queue-1', 2));
+    activeProgressTargetStore.observeConcurrency('queue-1');
+    activeProgressTargetStore.clear(target('queue-1', 1));
+    activeProgressTargetStore.clear(target('queue-1', 2));
+
+    activeProgressTargetStore.clear();
+
+    expect(activeProgressTargetStore.hasObservedConcurrency('queue-1')).toBe(false);
   });
 
   it('keeps array identity when an already-tracked target reports again', () => {

@@ -196,6 +196,43 @@ class TestListings:
         assert newest_first == [*batch, old]
         assert oldest_first == [old, *batch]
 
+    @pytest.mark.parametrize("origin_prefix", [None, "workflows:"])
+    @pytest.mark.parametrize("required_count", [1, 55])
+    def test_active_ids_retain_waiting_roots_only_for_scoped_reads(
+        self, database: Database, service: SessionQueue, origin_prefix: Optional[str], required_count: int
+    ) -> None:
+        parents = [_item(database, status="waiting", origin="workflows:1") for _ in range(60)]
+        roots = parents[:required_count]
+        children = [
+            _item(database, status="in_progress", origin="workflows:1", parent_item_id=parent) for parent in roots
+        ]
+        with database.begin(write=True) as conn:
+            for child, parent in zip(children, roots, strict=True):
+                conn.execute(session_queue.update().where(session_queue.c.item_id == child).values(root_item_id=parent))
+
+        result = service.get_active_queue_item_ids(QUEUE, origin_prefix=origin_prefix)
+
+        if origin_prefix is None:
+            expected_waiting = parents[-50:]
+        else:
+            ordinary = parents[required_count:]
+            expected_waiting = roots + list(reversed(ordinary))[: max(0, 50 - required_count)]
+        assert result.item_ids == [*reversed(children), *sorted(expected_waiting, reverse=True)]
+        assert result.total_count == len(children) + len(expected_waiting)
+        assert result.executing_root_item_ids == (roots if origin_prefix is not None else None)
+
+    @pytest.mark.parametrize("origin_prefix", [None, "workflows:"])
+    def test_active_ids_without_execution_distinguish_unscoped_reads(
+        self, database: Database, service: SessionQueue, origin_prefix: Optional[str]
+    ) -> None:
+        parent = _item(database, status="waiting", origin="workflows:1")
+
+        result = service.get_active_queue_item_ids(QUEUE, origin_prefix=origin_prefix)
+
+        assert result.item_ids == [parent]
+        assert result.total_count == 1
+        assert result.executing_root_item_ids == ([] if origin_prefix is not None else None)
+
     def test_item_ids_by_origin(self, database: Database) -> None:
         wanted = _item(database, origin="workflows:1")
         _item(database, origin="canvas:1")

@@ -119,4 +119,5 @@ export interface QueueAndProcessorStatusDTO {
 
 export interface QueueItemIdsResultDTO {
   item_ids: number[];
+  executing_root_item_ids?: number[] | null;
 }

@@ -4,6 +4,7 @@ import type { QueueItemProgress } from '@features/queue/core/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getFinishedImageCount,
   getProjectQueueIndicatorState,
   getQueueProgressBarState,
   getQueueProgressBarValue,
@@ -39,6 +40,58 @@ const createQueueItem = ({
     submittedAt,
   },
   status,
+});
+
+describe('getFinishedImageCount', () => {
+  const item = {
+    ...createQueueItem({
+      backendItemIds: [1, 2, 3, 4],
+      id: 'batch-1',
+      status: 'running',
+      submittedAt: '2026-06-10T00:00:00Z',
+    }),
+    completedBackendItemIds: [1, 1, 2],
+    cancelledBackendItemIds: [2, 3],
+  };
+
+  it('deduplicates completed and cancelled backend slots', () => {
+    expect(getFinishedImageCount(item)).toBe(3);
+  });
+
+  it('uses the greater live or recorded settled count', () => {
+    expect(
+      getFinishedImageCount(item, {
+        completedItemCount: 1,
+        message: '',
+        percentage: null,
+      })
+    ).toBe(3);
+
+    expect(
+      getFinishedImageCount(item, {
+        completedItemCount: 4,
+        message: '',
+        percentage: null,
+      })
+    ).toBe(4);
+  });
+
+  it('caps the settled count at the expected batch size', () => {
+    expect(
+      getFinishedImageCount(item, {
+        completedItemCount: 6,
+        message: '',
+        percentage: null,
+      })
+    ).toBe(4);
+
+    expect(
+      getFinishedImageCount({
+        ...item,
+        completedBackendItemIds: [1, 2, 3, 4, 5],
+      })
+    ).toBe(4);
+  });
 });
 
 describe('getQueueSummary', () => {
@@ -104,6 +157,184 @@ describe('getQueueSummary', () => {
     );
 
     expect(summary).toEqual({ current: 2, remaining: 7, runningQueueItemId: 'batch-1', total: 8 });
+  });
+
+  it('does not move the queue ordinal backwards as concurrent iterations report out of order', () => {
+    const item = createQueueItem({
+      backendItemIds: [10, 11, 12, 13, 14],
+      batchCount: 5,
+      id: 'batch-concurrent',
+      status: 'running',
+      submittedAt: '2026-06-10T00:00:00.000Z',
+    });
+    const reports = [
+      { activeItemIndex: 4, completedItemCount: 0 },
+      { activeItemIndex: 1, completedItemCount: 0 },
+      { activeItemIndex: 5, completedItemCount: 1 },
+      { activeItemIndex: 2, completedItemCount: 1 },
+      { activeItemIndex: 3, completedItemCount: 2 },
+    ];
+
+    expect(
+      reports.map(
+        ({ activeItemIndex, completedItemCount }) =>
+          getQueueSummary([item], { activeItemIndex, completedItemCount, message: '', percentage: null }, true).current
+      )
+    ).toEqual([1, 1, 2, 2, 3]);
+  });
+
+  it('counts unfinished slots across concurrently running batches', () => {
+    const first = {
+      ...createQueueItem({
+        backendItemIds: [7, 8, 9],
+        id: 'first',
+        status: 'running',
+        submittedAt: '2026-06-10T00:00:00Z',
+      }),
+      completedBackendItemIds: [7],
+    };
+    const second = {
+      ...createQueueItem({
+        backendItemIds: [10, 11, 12],
+        id: 'second',
+        status: 'running',
+        submittedAt: '2026-06-10T00:01:00Z',
+      }),
+      completedBackendItemIds: [10, 11],
+    };
+
+    expect(getQueueSummary([second, first])).toEqual({
+      current: 2,
+      remaining: 3,
+      runningQueueItemId: 'first',
+      total: 6,
+    });
+    // A newer progress reading advances only its owning batch, not both batches.
+    expect(getQueueSummary([second, first], { completedItemCount: 2, message: '', percentage: null }).remaining).toBe(
+      2
+    );
+  });
+
+  it('includes older pending work and excludes cancelled slots in another open batch', () => {
+    const pending = createQueueItem({ batchCount: 2, id: 'pending', submittedAt: '2026-06-10T00:00:00Z' });
+    const first = createQueueItem({
+      backendItemIds: [1, 2],
+      id: 'first',
+      status: 'running',
+      submittedAt: '2026-06-10T00:01:00Z',
+    });
+    const second = {
+      ...createQueueItem({
+        backendItemIds: [3, 4, 5],
+        id: 'second',
+        status: 'running',
+        submittedAt: '2026-06-10T00:02:00Z',
+      }),
+      cancelledBackendItemIds: [4],
+      completedBackendItemIds: [3],
+    };
+
+    expect(getQueueSummary([second, first, pending])).toEqual({
+      current: 3,
+      remaining: 5,
+      runningQueueItemId: 'first',
+      total: 7,
+    });
+  });
+
+  it('counts only unsettled slots when a partially finished batch is pending', () => {
+    const pending = {
+      ...createQueueItem({ backendItemIds: [1, 2, 3], id: 'pending', submittedAt: '2026-06-10T00:00:00Z' }),
+      completedBackendItemIds: [1],
+    };
+    expect(getQueueSummary([pending])).toEqual({ current: 0, remaining: 2, runningQueueItemId: null, total: 3 });
+  });
+
+  it('keeps a single-image run open until result delivery closes it', () => {
+    const item = createQueueItem({
+      backendItemIds: [1],
+      id: 'batch-1',
+      status: 'running',
+      submittedAt: '2026-06-10T00:00:00Z',
+    });
+    const progress: QueueItemProgress = { completedItemCount: 1, message: '', percentage: null };
+    const delivered = { ...item, completedBackendItemIds: [1] };
+
+    // Terminal backend status, transient progress cleanup, then recorded delivery.
+    expect([
+      getQueueSummary([item], progress).remaining,
+      getQueueSummary([item]).remaining,
+      getQueueSummary([delivered]).remaining,
+      getQueueSummary([{ ...delivered, status: 'completed' }]).remaining,
+    ]).toEqual([1, 1, 1, 0]);
+  });
+
+  it('keeps every running batch open while settled results are being delivered', () => {
+    const first = {
+      ...createQueueItem({
+        backendItemIds: [1, 2],
+        id: 'first',
+        status: 'running',
+        submittedAt: '2026-06-10T00:00:00Z',
+      }),
+      completedBackendItemIds: [1, 2],
+    };
+    const second = {
+      ...createQueueItem({ backendItemIds: [3], id: 'second', status: 'running', submittedAt: '2026-06-10T00:01:00Z' }),
+      completedBackendItemIds: [3],
+    };
+    expect(getQueueSummary([first, second]).remaining).toBe(2);
+    expect(getQueueSummary([{ ...first, status: 'completed' }, second]).remaining).toBe(1);
+  });
+
+  it('uses the actual sequential image ordinal after an earlier image fails', () => {
+    const item = {
+      ...createQueueItem({
+        backendItemIds: [1, 2, 3, 4],
+        id: 'batch-1',
+        status: 'running',
+        submittedAt: '2026-06-10T00:00:00Z',
+      }),
+      completedBackendItemIds: [1],
+    };
+    const progress: QueueItemProgress = {
+      activeItemIndex: 3,
+      completedItemCount: 2,
+      message: 'Denoising',
+      percentage: 0.6,
+      totalItemCount: 4,
+    };
+    expect(getQueueSummary([item], progress)).toEqual({
+      current: 3,
+      remaining: 2,
+      runningQueueItemId: 'batch-1',
+      total: 4,
+    });
+  });
+
+  it('does not advance the sequential image ordinal when a later pending image is cancelled', () => {
+    const item = {
+      ...createQueueItem({
+        backendItemIds: [1, 2, 3, 4],
+        id: 'batch-1',
+        status: 'running',
+        submittedAt: '2026-06-10T00:00:00Z',
+      }),
+      cancelledBackendItemIds: [4],
+    };
+    const progress: QueueItemProgress = {
+      activeItemIndex: 1,
+      completedItemCount: 1,
+      message: 'Denoising',
+      percentage: 0.6,
+      totalItemCount: 4,
+    };
+    expect(getQueueSummary([item], progress)).toEqual({
+      current: 1,
+      remaining: 3,
+      runningQueueItemId: 'batch-1',
+      total: 4,
+    });
   });
 
   it('returns zeroes when all batches are terminal', () => {

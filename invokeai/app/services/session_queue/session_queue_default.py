@@ -13,6 +13,7 @@ from invokeai.app.services.session_queue.session_queue_base import SessionQueueB
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
+    ActiveItemIdsResult,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -1062,6 +1063,19 @@ class SessionQueue(SessionQueueBase):
             limit=limit,
         )
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
+
+    def get_active_queue_item_ids(
+        self,
+        queue_id: str,
+        owner_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
+    ) -> ActiveItemIdsResult:
+        item_ids, executing_root_item_ids = self._queries.session_queue.active_ids(
+            Scope(queue_id=queue_id, user_id=owner_id, origin_prefix=origin_prefix)
+        )
+        return ActiveItemIdsResult(
+            item_ids=item_ids, total_count=len(item_ids), executing_root_item_ids=executing_root_item_ids
+        )
 
     def has_active_queue_work(self) -> bool:
         return self._queries.session_queue.has_active_work()

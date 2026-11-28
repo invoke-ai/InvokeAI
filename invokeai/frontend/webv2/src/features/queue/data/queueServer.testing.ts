@@ -7,7 +7,7 @@ export const createQueueItemDTO = (
   overrides: Partial<QueueServerItemDTO> = {}
 ): QueueServerItemDTO => ({
   batch_id: 'batch',
-  created_at: `2026-01-01T00:00:00.${String(itemId).padStart(3, '0')}`,
+  created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, itemId)).toISOString(),
   item_id: itemId,
   session_id: `session-${String(itemId)}`,
   status: 'completed',
@@ -19,10 +19,14 @@ export const createQueueItemDTO = (
  * A `fetch` stand-in for the backend's queue read routes. It answers `item_ids` like the server (every id, newest
  * first, or the first `limit` of them) and records each request as `METHOD route?query` so tests can assert exactly
  * what crossed the transport. `predatesItemIdsLimit` answers like a server without `limit`, with every id.
+ * `predatesActiveIdsEndpoint` simulates a backend without the active-id route (404 or HTML app shell).
  */
 export const createQueueServer = (
   items: readonly QueueServerItemDTO[],
-  { predatesItemIdsLimit = false }: { predatesItemIdsLimit?: boolean } = {}
+  {
+    predatesItemIdsLimit = false,
+    predatesActiveIdsEndpoint = false,
+  }: { predatesItemIdsLimit?: boolean; predatesActiveIdsEndpoint?: boolean | 'html' } = {}
 ) => {
   const requests: string[] = [];
   const hydratedIds: number[][] = [];
@@ -63,8 +67,57 @@ export const createQueueServer = (
 
       return respond(items.find((item) => item.status === status) ?? null);
     }
+    if (route === 'active_ids') {
+      if (predatesActiveIdsEndpoint === 'html') {
+        return Promise.resolve(
+          new Response('<!doctype html><html><body><div id="root"></div></body></html>', {
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+            status: 200,
+          })
+        );
+      }
+      if (predatesActiveIdsEndpoint) {
+        return respond({ detail: 'Not Found' }, 404);
+      }
+      const originPrefix = url.searchParams.get('origin_prefix');
+      const scopedItems = items.filter((item) => originPrefix === null || item.origin?.startsWith(originPrefix));
+      const idsForStatus = (status: QueueServerItemDTO['status']) =>
+        scopedItems
+          .filter((item) => item.status === status)
+          .map((item) => item.item_id)
+          .sort((left, right) => right - left);
+      const executingRoots = new Set(
+        originPrefix !== null
+          ? scopedItems.filter((item) => item.status === 'in_progress').map((item) => item.root_item_id ?? item.item_id)
+          : []
+      );
+      const waitingIds = idsForStatus('waiting');
+      const requiredWaitingIds = waitingIds.filter((id) => executingRoots.has(id));
+      const ordinaryWaitingIds = waitingIds
+        .filter((id) => !executingRoots.has(id))
+        .slice(0, Math.max(0, 50 - requiredWaitingIds.length));
+      const ids = [
+        ...idsForStatus('in_progress'),
+        ...[...requiredWaitingIds, ...ordinaryWaitingIds].sort((left, right) => right - left),
+      ];
+      return respond({
+        executing_root_item_ids: originPrefix !== null ? [...executingRoots].sort((left, right) => left - right) : null,
+        item_ids: ids,
+        total_count: ids.length,
+      });
+    }
     if (route === 'item_ids') {
-      const ids = items.map((item) => item.item_id).sort((left, right) => right - left);
+      const originPrefix = url.searchParams.get('origin_prefix');
+      const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
+      const ids = items
+        .filter((item) => originPrefix === null || item.origin?.startsWith(originPrefix))
+        .sort(
+          (left, right) =>
+            (descending
+              ? right.created_at.localeCompare(left.created_at)
+              : left.created_at.localeCompare(right.created_at)) || left.item_id - right.item_id
+        )
+        .map((item) => item.item_id);
       const limit = predatesItemIdsLimit ? null : url.searchParams.get('limit');
       const returned = limit === null ? ids : ids.slice(0, Number(limit));
 

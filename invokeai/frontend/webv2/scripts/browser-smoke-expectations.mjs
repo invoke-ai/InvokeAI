@@ -4,6 +4,7 @@ const queueReadMethods = new Map([
   ['/api/v1/queue/default/current', 'GET'],
   ['/api/v1/queue/default/next', 'GET'],
   ['/api/v1/queue/default/item_ids', 'GET'],
+  ['/api/v1/queue/default/active_ids', 'GET'],
   ['/api/v1/queue/default/items_by_ids', 'POST'],
 ]);
 export const isQueueReadRequest = (event, origin) => {

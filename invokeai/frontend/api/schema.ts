@@ -3359,6 +3359,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/active_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Active Queue Item Ids
+         * @description Read all executing ids followed by up to 50 waiting parent ids, independently of recent history.
+         *
+         *     Origin-scoped reads retain all waiting roots of executing children, even if this exceeds 50.
+         *     Executing root ids are returned only for origin-scoped reads; otherwise they are null.
+         */
+        get: operations["get_active_queue_item_ids"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/items_by_ids": {
         parameters: {
             query?: never;
@@ -4789,6 +4812,27 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
+        /**
+         * ActiveItemIdsResult
+         * @description Active hydration ids and the distinct roots actually executing in the same read.
+         */
+        ActiveItemIdsResult: {
+            /**
+             * Item Ids
+             * @description Ordered list of item ids
+             */
+            item_ids: number[];
+            /**
+             * Total Count
+             * @description Number of ids in item_ids. Equals the number of matching items only when no limit is given; use the queue status for totals
+             */
+            total_count: number;
+            /**
+             * Executing Root Item Ids
+             * @description Distinct root iteration ids of in-progress items in an origin-scoped read; null for unscoped lists
+             */
+            executing_root_item_ids: number[] | null;
+        };
         /** AddImagesToBoardResult */
         AddImagesToBoardResult: {
             /**
@@ -69174,6 +69218,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemIdsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_active_queue_item_ids: {
+        parameters: {
+            query?: {
+                /** @description Only include active items whose origin starts with this prefix; non-admins see only their own */
+                origin_prefix?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform the operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveItemIdsResult"];
                 };
             };
             /** @description Validation Error */

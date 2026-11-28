@@ -1,5 +1,6 @@
 import type { QueueBackendPort, QueueCounts, QueueItemReadModel, QueueReadModel } from '@features/queue/core/types';
 
+import { getCurrentBatchItems } from '@features/queue/ui/currentBatchItems';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -38,6 +39,7 @@ const createBackend = (): QueueBackendPort => ({
   pauseProcessor: vi.fn(),
   readCurrent: vi.fn().mockResolvedValue(null),
   readItemIds: vi.fn().mockResolvedValue({ itemIds: [2, 1] }),
+  readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
   readItemsById: vi.fn().mockResolvedValue([
     { batchId: 'batch', createdAt: '', id: 2, resultImageNames: [], sessionId: 's2', status: 'pending', updatedAt: '' },
     {
@@ -165,6 +167,7 @@ describe('queue reads at the transport boundary', () => {
       const model = await client.fetchQuery(queueReadModelOptions(queueBackend, {}));
 
       expect([...server.requests].sort()).toEqual([
+        'GET active_ids',
         'GET current',
         'GET item_ids?limit=50&order_dir=DESC',
         'GET next',
@@ -176,6 +179,186 @@ describe('queue reads at the transport boundary', () => {
       expect(model.current?.id).toBe(size);
     }
   );
+
+  it('preserves enqueue order within recent batches and appends older executing items', async () => {
+    accountLifecycle.activate('queue-batch-order');
+    const items = [
+      createQueueItemDTO(1, { status: 'in_progress' }),
+      ...[2, 3, 4].map((id) => createQueueItemDTO(id, { created_at: '2026-01-02T00:00:00Z' })),
+      ...[5, 6, 7].map((id) => createQueueItemDTO(id, { created_at: '2026-01-03T00:00:00Z' })),
+      ...Array.from({ length: 44 }, (_, index) =>
+        createQueueItemDTO(index + 8, { created_at: '2026-01-04T00:00:00Z' })
+      ),
+    ];
+    const server = createQueueServer(items);
+    vi.stubGlobal('fetch', server.fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const model = await client.fetchQuery(queueReadModelOptions(queueBackend, {}));
+    const expected = [...Array.from({ length: 44 }, (_, index) => index + 8), 5, 6, 7, 2, 3, 4, 1];
+    expect(server.hydratedIds).toEqual([expected]);
+    expect(model.items.map((item) => item.id)).toEqual(expected);
+  });
+
+  it('bounds waiting-parent hydration without hiding older executing items', async () => {
+    accountLifecycle.activate('queue-many-waiting');
+    const items = [
+      createQueueItemDTO(1, { status: 'in_progress' }),
+      createQueueItemDTO(2, { status: 'in_progress' }),
+      ...Array.from({ length: 2_500 }, (_, index) => createQueueItemDTO(index + 3, { status: 'waiting' })),
+      ...Array.from({ length: 50 }, (_, index) => createQueueItemDTO(index + 2_503, { status: 'pending' })),
+    ];
+    const server = createQueueServer(items);
+    vi.stubGlobal('fetch', server.fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const model = await client.fetchQuery(queueReadModelOptions(queueBackend, {}));
+    expect(server.hydratedIds).toHaveLength(1);
+    expect(model.items).toHaveLength(102);
+    expect(model.items.filter((item) => item.status === 'in_progress').map((item) => item.id)).toEqual([2, 1]);
+    expect(model.items.filter((item) => item.status === 'waiting')).toHaveLength(50);
+  });
+
+  it.each([1, 55])('retains %s required waiting roots only in scoped active IDs', async (requiredCount) => {
+    accountLifecycle.activate('queue-active-root-retention');
+    const originPrefix = 'webv2:p:project-a:q:';
+    const parents = Array.from({ length: 60 }, (_, index) => index + 1);
+    const roots = parents.slice(0, requiredCount);
+    const children = roots.map((id) => id + 60);
+    const server = createQueueServer([
+      ...parents.map((id) => createQueueItemDTO(id, { origin: `${originPrefix}run`, status: 'waiting' })),
+      ...roots.map((id) =>
+        createQueueItemDTO(id + 60, {
+          origin: `${originPrefix}run`,
+          parent_item_id: id,
+          root_item_id: id,
+          status: 'in_progress',
+        })
+      ),
+    ]);
+    vi.stubGlobal('fetch', server.fetch);
+
+    const scoped = await queueBackend.readActiveItemIds({ originPrefix });
+    const ordinary = parents
+      .slice(requiredCount)
+      .reverse()
+      .slice(0, Math.max(0, 50 - requiredCount));
+    expect(scoped.itemIds).toEqual([
+      ...[...children].reverse(),
+      ...[...roots, ...ordinary].sort((left, right) => right - left),
+    ]);
+    expect(scoped.executingRootItemIds).toEqual(roots);
+
+    const unscoped = await queueBackend.readActiveItemIds({});
+    expect(unscoped.itemIds).toEqual([...children.reverse(), ...parents.slice(-50).reverse()]);
+    expect(unscoped.executingRootItemIds).toBeNull();
+  });
+
+  it('recovers older running GPU jobs and waiting parents outside recent history', async () => {
+    accountLifecycle.activate('queue-active-ids');
+    const projectA = 'webv2:p:project-a:q:';
+    const items = [
+      createQueueItemDTO(1, { batch_id: 'batch-a', origin: `${projectA}run-a`, status: 'in_progress' }),
+      createQueueItemDTO(2, { batch_id: 'batch-b', origin: `${projectA}run-b`, status: 'in_progress' }),
+      createQueueItemDTO(3, { batch_id: 'batch-parent', origin: `${projectA}parent`, status: 'waiting' }),
+      ...Array.from({ length: QUEUE_RECENT_WINDOW }, (_, index) =>
+        createQueueItemDTO(index + 4, { batch_id: 'batch-new', origin: `${projectA}queued`, status: 'pending' })
+      ),
+      createQueueItemDTO(54, { batch_id: 'batch-foreign', origin: 'webv2:p:project-b:q:run', status: 'in_progress' }),
+    ];
+    const server = createQueueServer(items);
+    vi.stubGlobal('fetch', server.fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const scoped = await client.fetchQuery(queueReadModelOptions(queueBackend, { originPrefix: projectA }));
+    const running = getCurrentBatchItems(scoped).filter((item) => item.status === 'in_progress');
+
+    expect(running.map((item) => item.id)).toEqual([1, 2]);
+    expect(scoped.items.find((item) => item.id === 3)?.status).toBe('waiting');
+    expect(scoped.items.some((item) => item.id === 54)).toBe(false);
+    expect(server.requests).toContain(`GET active_ids?origin_prefix=${encodeURIComponent(projectA)}`);
+    const expectedIds = [...Array.from({ length: 50 }, (_, index) => 53 - index), 2, 1, 3];
+    expect(server.hydratedIds).toEqual([expectedIds]);
+    expect(scoped.items.map((item) => item.id)).toEqual(expectedIds);
+  });
+
+  it.each([true, 'html'] as const)(
+    'keeps the 50-item hydration bound when an older backend has no active_ids endpoint (%s)',
+    async (legacyResponse) => {
+      accountLifecycle.activate('queue-legacy-active-ids');
+      const server = createQueueServer(queueOf(1_000), {
+        predatesItemIdsLimit: true,
+        predatesActiveIdsEndpoint: legacyResponse,
+      });
+      vi.stubGlobal('fetch', server.fetch);
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+      const model = await client.fetchQuery(queueReadModelOptions(queueBackend, {}));
+
+      expect(server.requests).toContain('GET active_ids');
+      expect(server.hydratedIds).toHaveLength(1);
+      expect(server.hydratedIds[0]).toHaveLength(QUEUE_RECENT_WINDOW);
+      expect(model.items).toHaveLength(QUEUE_RECENT_WINDOW);
+      expect(model.current?.id).toBe(1_000);
+
+      // Every read may retry the optional endpoint; a transient failure must not disable it.
+      await client.invalidateQueries({ queryKey: queueKeys.all });
+      await client.fetchQuery(queueReadModelOptions(queueBackend, {}));
+
+      const scoped = await queueBackend.readActiveItemIds({ originPrefix: 'webv2:p:another-project:q:' }, undefined);
+      expect(scoped.itemIds).toEqual([]);
+      expect(server.requests.filter((request) => request.startsWith('GET active_ids'))).toHaveLength(3);
+      expect(server.hydratedIds).toHaveLength(2);
+      expect(server.hydratedIds[1]).toHaveLength(QUEUE_RECENT_WINDOW);
+
+      // Fallback must still respect cancellation.
+      const controller = new AbortController();
+      controller.abort();
+      await expect(queueBackend.readActiveItemIds({}, controller.signal)).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+
+      // Recover without requiring a logout or account change.
+      const upgradedServer = createQueueServer(queueOf(1_000));
+      vi.stubGlobal('fetch', upgradedServer.fetch);
+
+      const upgraded = await queueBackend.readActiveItemIds({}, undefined);
+      expect(upgraded.itemIds).toEqual([1_000]);
+      expect(upgradedServer.requests).toContain('GET active_ids');
+    }
+  );
+
+  it.each([403, 500])('does not hide HTTP %s errors from the active IDs endpoint', async (status) => {
+    accountLifecycle.activate('queue-active-ids-error');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response('{"detail":"Request failed"}', {
+            headers: { 'content-type': 'application/json' },
+            status,
+          })
+        )
+      )
+    );
+    await expect(queueBackend.readActiveItemIds({}, undefined)).rejects.toMatchObject({ status });
+    await expect(queueBackend.readActiveItemIds({}, undefined)).rejects.toMatchObject({ status });
+  });
+
+  it('does not treat malformed JSON from the active IDs endpoint as an unsupported route', async () => {
+    accountLifecycle.activate('queue-active-ids-malformed');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response('{', {
+            headers: { 'content-type': 'application/json' },
+            status: 200,
+          })
+        )
+      )
+    );
+    await expect(queueBackend.readActiveItemIds({}, undefined)).rejects.toBeInstanceOf(SyntaxError);
+    await expect(queueBackend.readActiveItemIds({}, undefined)).rejects.toBeInstanceOf(SyntaxError);
+  });
 
   it('reads Home counts with a single status request and no item reads', async () => {
     accountLifecycle.activate('queue-transport-status');

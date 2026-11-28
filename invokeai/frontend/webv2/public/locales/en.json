@@ -597,6 +597,7 @@
       "batchImage": "Batch image {{current}}/{{total}}",
       "currentImageProgress": "Current image progress",
       "idle": "Queue idle",
+      "imagesFinished": "{{current}} of {{total}} images finished",
       "imageProgress": "Image {{current}} of {{total}}",
       "imageProgressPercent": "Image {{current}} of {{total}}, {{percent}} percent",
       "loadingModelsCount_one": "Loading {{count}} model",

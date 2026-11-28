@@ -5,7 +5,7 @@ import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import { Box, HStack, Menu, Portal, ScrollArea, Skeleton, Spinner, Stack, Text } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
-import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { useQueueItemProgressImage, useQueueItemSlotProgress } from '@features/queue/react';
 import { Button, Group, IconButton, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
 import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
@@ -638,8 +638,7 @@ const StagingPlaceholderThumbnail = ({
   slot: Extract<CanvasStagingSlot, { kind: 'placeholder' }>;
 }) => {
   const progressImage = useQueueItemProgressImage(slot.queueItemId, slot.itemIndex);
-  const progress = useQueueItemProgress(slot.queueItemId);
-  const isActive = progress?.activeItemIndex === slot.itemIndex;
+  const progress = useQueueItemSlotProgress(slot.queueItemId, slot.itemIndex);
   const percentage = getDeterminateProgressPercent(progress?.percentage);
 
   return (
@@ -653,7 +652,7 @@ const StagingPlaceholderThumbnail = ({
       >
         <Skeleton h="full" w="full" />
       </StreamingImageFrame>
-      {isActive ? <StagingPlaceholderProgress percentage={percentage} /> : null}
+      {progress ? <StagingPlaceholderProgress percentage={percentage} /> : null}
     </>
   );
 };

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { DOCUMENT_TITLE_BASE, DOCUMENT_TITLE_PRODUCT, formatDocumentTitle } from './documentTitle';
+import {
+  DOCUMENT_TITLE_BASE,
+  DOCUMENT_TITLE_PRODUCT,
+  formatDocumentTitle,
+  getBatchDocumentTitlePercent,
+} from './documentTitle';
 
 const labels = { generating: 'Generating', queued: '3 queued' };
 
@@ -38,5 +43,34 @@ describe('formatDocumentTitle', () => {
     expect(DOCUMENT_TITLE_PRODUCT.length).toBeLessThan(DOCUMENT_TITLE_BASE.length);
     expect(running).not.toContain(DOCUMENT_TITLE_BASE);
     expect(running.endsWith(DOCUMENT_TITLE_PRODUCT)).toBe(true);
+  });
+});
+
+describe('getBatchDocumentTitlePercent', () => {
+  it('has no misleading percent before any iteration finishes', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 0 })).toBeNull();
+  });
+
+  it('uses settled iterations to represent concurrent batch progress', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 2 })).toBe(25);
+  });
+
+  it('does not announce 100 percent before the final iteration settles', () => {
+    const unfinished = getBatchDocumentTitlePercent({
+      batchCount: 200,
+      completedCount: 199,
+    });
+
+    expect(unfinished).toBe(99);
+    expect(formatDocumentTitle({ current: 200, labels, percent: unfinished, total: 200 })).toBe(
+      `99% · 200/200 · ${DOCUMENT_TITLE_PRODUCT}`
+    );
+    expect(getBatchDocumentTitlePercent({ batchCount: 200, completedCount: 200 })).toBe(100);
+  });
+
+  it('advances through completions and caps at 100 percent', () => {
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 3 })).toBe(38);
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 8 })).toBe(100);
+    expect(getBatchDocumentTitlePercent({ batchCount: 8, completedCount: 9 })).toBe(100);
   });
 });

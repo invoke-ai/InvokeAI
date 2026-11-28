@@ -14220,6 +14220,72 @@
         }
       }
     },
+    "/api/v1/queue/{queue_id}/active_ids": {
+      "get": {
+        "tags": ["queue"],
+        "summary": "Get Active Queue Item Ids",
+        "description": "Read all executing ids followed by up to 50 waiting parent ids, independently of recent history.\n\nOrigin-scoped reads retain all waiting roots of executing children, even if this exceeds 50.\nExecuting root ids are returned only for origin-scoped reads; otherwise they are null.",
+        "operationId": "get_active_queue_item_ids",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform the operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform the operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include active items whose origin starts with this prefix; non-admins see only their own",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include active items whose origin starts with this prefix; non-admins see only their own"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveItemIdsResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/{queue_id}/items_by_ids": {
       "post": {
         "tags": ["queue"],
@@ -19119,6 +19185,42 @@
   },
   "components": {
     "schemas": {
+      "ActiveItemIdsResult": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Ordered list of item ids"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Number of ids in item_ids. Equals the number of matching items only when no limit is given; use the queue status for totals"
+          },
+          "executing_root_item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executing Root Item Ids",
+            "description": "Distinct root iteration ids of in-progress items in an origin-scoped read; null for unscoped lists"
+          }
+        },
+        "type": "object",
+        "required": ["item_ids", "total_count", "executing_root_item_ids"],
+        "title": "ActiveItemIdsResult",
+        "description": "Active hydration ids and the distinct roots actually executing in the same read."
+      },
       "AddImagesToBoardResult": {
         "properties": {
           "affected_boards": {

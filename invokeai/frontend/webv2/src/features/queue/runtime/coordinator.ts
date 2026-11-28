@@ -20,6 +20,7 @@ import {
   isTerminalBackendStatus,
   parseQueueItemOrigin,
   parseQueueItemOriginProjectId,
+  QUEUE_ITEM_ORIGIN_PREFIX,
   type InvocationCompleteEvent,
   type InvocationErrorEvent,
   type InvocationProgressEvent,
@@ -36,7 +37,7 @@ import { queueItemProgressStore, type QueueItemProgressSink } from '@features/qu
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { ApiError } from '@platform/transport/http';
+import { ApiError, withRequestDeadline } from '@platform/transport/http';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
@@ -47,6 +48,7 @@ const NODE_EVENT_BUFFER_ITEM_LIMIT = 64;
 const NODE_EVENT_BUFFER_EVENTS_PER_ITEM = 512;
 const PROGRESS_EVENT_BUFFER_ITEM_LIMIT = 64;
 const BACKEND_READ_CONCURRENCY = 16;
+const CONCURRENCY_SNAPSHOT_TIMEOUT_MS = 10_000;
 const FRAME_GATES_PER_WAIT_LIMIT = 64;
 
 /** Injected by App so Queue reports model-load activity without importing Models. */
@@ -89,10 +91,13 @@ export type QueueCoordinatorBackendPort = Pick<
   | 'listItems'
   | 'on'
   | 'onConnectionChange'
+  | 'readActiveItemIds'
   | 'readProgressPreviews'
 >;
 
 export interface QueueCoordinatorCallbacks {
+  /** The runtime owns the run lifetime, including final result delivery. */
+  isRunOpen?(localQueueItemId: string): boolean;
   /** Fired when one backend item in a local batch completes, before the whole local batch necessarily settles. */
   onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void | Promise<void>;
   onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
@@ -164,6 +169,7 @@ export interface QueueCoordinator {
   connect(): void;
   detachRun(localQueueItemId: string): void;
   dispose(): void;
+  forgetRunConcurrency(localQueueItemId: string): void;
   /** Reconcile persisted work with backend items to avoid duplicate submission or orphaned runs after reload. */
   reconcile(items: ReconcileInput[]): Promise<Map<string, ReconcileOutcome>>;
   submitGenerate(localQueueItemId: string, request: QueueEnqueueGenerateRequest): Promise<QueueEnqueueResult>;
@@ -191,8 +197,7 @@ interface RunState {
 interface RunProgressState {
   activeBackendItemId?: number;
   backendItemIds: number[];
-  cancelledBackendItemIds: Set<number>;
-  completedBackendItemIds: Set<number>;
+  settledBackendItemIds: Set<number>;
   message: string;
   percentage: number | null;
 }
@@ -316,6 +321,59 @@ export const createQueueCoordinator = (
   let isSweepRequested = false;
   const isActive = (): boolean => !isDisposed && isAccountScopeCurrent(owner);
 
+  const observeConcurrency = (localQueueItemId: string, run: RunState): void => {
+    if (
+      isActive() &&
+      runs.get(localQueueItemId) === run &&
+      !activeProgressTarget.hasObservedConcurrency(localQueueItemId) &&
+      (callbacks.isRunOpen?.(localQueueItemId) ?? true)
+    ) {
+      activeProgressTarget.observeConcurrency(localQueueItemId);
+      publishRunProgress(localQueueItemId);
+    }
+  };
+
+  // Recovery reads individual queue items at different instants. Their combined statuses cannot prove overlap.
+  // The active-id route reports the distinct executing roots from a single SQL statement instead.
+  let isReadingConcurrency = false;
+  let concurrencyReadRequested = false;
+  const refreshConcurrentRuns = async (): Promise<void> => {
+    if (isReadingConcurrency) {
+      concurrencyReadRequested = true;
+      return;
+    }
+    isReadingConcurrency = true;
+    try {
+      do {
+        concurrencyReadRequested = false;
+        const candidates = [...runs].filter(
+          ([localQueueItemId, run]) =>
+            run.backendItemIds.length > 1 && !activeProgressTarget.hasObservedConcurrency(localQueueItemId)
+        );
+        if (!isActive() || candidates.length === 0) {
+          break;
+        }
+        try {
+          const { executingRootItemIds } = await withRequestDeadline(
+            (signal) => backend.readActiveItemIds({ originPrefix: QUEUE_ITEM_ORIGIN_PREFIX }, signal),
+            CONCURRENCY_SNAPSHOT_TIMEOUT_MS,
+            owner.signal
+          );
+          const executing = new Set(executingRootItemIds ?? []);
+          for (const [localQueueItemId, run] of candidates) {
+            if (run.backendItemIds.filter((id) => executing.has(id)).length > 1) {
+              observeConcurrency(localQueueItemId, run);
+            }
+          }
+        } catch {
+          // Older servers and failed reads cannot establish overlap. Keep the current presentation.
+        }
+      } while (concurrencyReadRequested && isActive());
+    } finally {
+      isReadingConcurrency = false;
+    }
+  };
+
   const scheduleGalleryRefresh = (): void => {
     if (!isActive() || galleryRefreshTimer !== null) {
       return;
@@ -360,7 +418,24 @@ export const createQueueCoordinator = (
       return;
     }
 
-    const terminalBackendItemIds = new Set([...state.completedBackendItemIds, ...state.cancelledBackendItemIds]);
+    const terminalBackendItemIds = state.settledBackendItemIds;
+
+    if (activeProgressTarget.hasObservedConcurrency(localQueueItemId)) {
+      const completedItemCount = terminalBackendItemIds.size;
+      const totalItemCount = state.backendItemIds.length;
+      // Concurrent progress describes settled iterations, not the last GPU to report.
+      const percentage = completedItemCount === 0 ? null : Math.min(0.99, completedItemCount / totalItemCount);
+
+      progress.set(localQueueItemId, {
+        activeItemIndex: undefined,
+        completedItemCount,
+        message: '',
+        percentage,
+        totalItemCount,
+      });
+      return;
+    }
+
     const activeBackendItemId =
       state.activeBackendItemId !== undefined && !terminalBackendItemIds.has(state.activeBackendItemId)
         ? state.activeBackendItemId
@@ -441,7 +516,11 @@ export const createQueueCoordinator = (
         const routedEvent = routeNodeEvent(nodeEvent.event, backendItemId, invocationSourceId);
         const wait = waits.get(backendItemId);
         if (wait) {
-          activeProgressTarget.set(getProgressImageTarget(wait.localQueueItemId, backendItemId));
+          const target = getProgressImageTarget(wait.localQueueItemId, backendItemId);
+          activeProgressTarget.set(target);
+          if (!progressImage.getProgress(target)) {
+            progressImage.setProgress({ message: '', percentage: null }, target);
+          }
         }
         nodeExecution.started(routedEvent);
         return;
@@ -563,6 +642,7 @@ export const createQueueCoordinator = (
     waits.delete(backendItemId);
     settleNodes(backendItemId, outcome);
     const progressTarget = getProgressImageTarget(wait.localQueueItemId, backendItemId);
+    progressImage.setProgress(null, progressTarget);
     const releaseProgressSlot = (): void => {
       if (isActive()) {
         activeProgressTarget.clear(progressTarget);
@@ -577,23 +657,18 @@ export const createQueueCoordinator = (
         state.message = '';
         state.percentage = null;
       }
-      if (outcome.status === 'completed') {
-        state.completedBackendItemIds.add(backendItemId);
-      }
-      if (outcome.status === 'canceled') {
-        state.cancelledBackendItemIds.add(backendItemId);
-      }
+      state.settledBackendItemIds.add(backendItemId);
       publishRunProgress(wait.localQueueItemId);
     }
 
     if (outcome.status === 'completed') {
       // Hold the frame before routing so the decoding result can replace it without blanking.
       progressImage.hold(progressTarget);
+      activeProgressTarget.settle(progressTarget);
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
 
       if (routingPromise) {
         // Keep following until routing lands; terminal events precede finished-image selection by network round trips.
-        activeProgressTarget.settle(progressTarget);
         const routing = Promise.resolve(routingPromise)
           .finally(releaseProgressSlot)
           .catch(() => undefined);
@@ -623,6 +698,7 @@ export const createQueueCoordinator = (
       } else if ((queueItem.status === 'pending' || queueItem.status === 'waiting') && !wait.hasWorkflowCall) {
         wait.hasOwnFrame = false;
         activeProgressTarget.clear(target);
+        progressImage.setProgress(null, target);
       }
     }
     if (isTerminalBackendStatus(queueItem.status)) {
@@ -675,8 +751,7 @@ export const createQueueCoordinator = (
 
     runProgress.set(localQueueItemId, {
       backendItemIds,
-      cancelledBackendItemIds: new Set(),
-      completedBackendItemIds: new Set(),
+      settledBackendItemIds: new Set(),
       message: '',
       percentage: null,
     });
@@ -706,19 +781,37 @@ export const createQueueCoordinator = (
     isSweeping = true;
 
     try {
+      const runningItems: Array<{
+        item: QueueBackendItem;
+        wait: WaitState;
+        sequence: number | undefined;
+      }> = [];
+
+      const isCurrentRead = (itemId: number, wait: WaitState, sequence: number | undefined): boolean =>
+        isActive() && waits.get(itemId) === wait && latestStatusSequences.get(itemId) === sequence;
+
       await mapWithConcurrency([...waits.keys()], BACKEND_READ_CONCURRENCY, async (backendItemId) => {
-        if (!isActive() || !waits.has(backendItemId)) {
+        const wait = waits.get(backendItemId);
+        if (!isActive() || !wait) {
           return;
         }
+
+        const sequence = latestStatusSequences.get(backendItemId);
 
         try {
           const queueItem = await backend.getItem(backendItemId);
 
-          if (isActive()) {
+          if (!isCurrentRead(backendItemId, wait, sequence)) {
+            return;
+          }
+
+          if (queueItem.status === 'in_progress' || (queueItem.status === 'waiting' && wait.hasWorkflowCall)) {
+            runningItems.push({ item: queueItem, wait, sequence });
+          } else {
             settleFromQueueItem(queueItem);
           }
         } catch (error) {
-          if (isActive() && error instanceof ApiError && error.status === 404) {
+          if (isCurrentRead(backendItemId, wait, sequence) && error instanceof ApiError && error.status === 404) {
             settleWait(backendItemId, {
               cause: 'removed',
               error: `Queue item ${backendItemId} is no longer on the backend queue.`,
@@ -727,6 +820,15 @@ export const createQueueCoordinator = (
           }
         }
       });
+
+      // HTTP responses can arrive out of order during a sequential handover.
+      // Remove inactive slots before observing newly running ones.
+      for (const { item, wait, sequence } of runningItems) {
+        if (isCurrentRead(item.id, wait, sequence)) {
+          settleFromQueueItem(item);
+        }
+      }
+      void refreshConcurrentRuns();
     } finally {
       isSweeping = false;
 
@@ -775,6 +877,24 @@ export const createQueueCoordinator = (
       latestStatusSequences.set(event.item_id, sequence);
     }
 
+    if (event.batch_status && event.batch_status.in_progress > 1) {
+      const wait = waits.get(event.item_id);
+      const run = wait && runs.get(wait.localQueueItemId);
+      if (
+        wait &&
+        run &&
+        !wait.hasWorkflowCall &&
+        run.backendBatchId === event.batch_id &&
+        event.batch_status.total === run.backendItemIds.length
+      ) {
+        // A normal, fully tracked batch has one backend item per iteration. Its status count is already atomic.
+        observeConcurrency(wait.localQueueItemId, run);
+      } else if ([...runs.values()].some((candidate) => candidate.backendBatchId === event.batch_id)) {
+        // Children share their parent's batch, and several children may belong to the same iteration.
+        void refreshConcurrentRuns();
+      }
+    }
+
     if (!isTerminalBackendStatus(event.status)) {
       const wait = waits.get(event.item_id);
       if (wait && event.status === 'in_progress') {
@@ -784,7 +904,9 @@ export const createQueueCoordinator = (
       if (event.status === 'pending' || event.status === 'waiting') {
         if (wait && !wait.hasWorkflowCall) {
           wait.hasOwnFrame = false;
-          activeProgressTarget.clear(getProgressImageTarget(wait.localQueueItemId, event.item_id));
+          const target = getProgressImageTarget(wait.localQueueItemId, event.item_id);
+          activeProgressTarget.clear(target);
+          progressImage.setProgress(null, target);
         }
         wait?.frameGates.clear();
       }
@@ -879,6 +1001,7 @@ export const createQueueCoordinator = (
 
     const target = getProgressImageTarget(wait.localQueueItemId, backendItemId);
     activeProgressTarget.set(target);
+    progressImage.setProgress({ message: event.message, percentage: event.percentage }, target);
 
     if (event.image?.dataURL) {
       progressImage.set({ dataUrl: event.image.dataURL, height: event.image.height, width: event.image.width }, target);
@@ -893,10 +1016,12 @@ export const createQueueCoordinator = (
     const state = runProgress.get(wait.localQueueItemId);
 
     if (state) {
-      state.activeBackendItemId = backendItemId;
-      state.message = event.message;
-      state.percentage = event.percentage;
-      publishRunProgress(wait.localQueueItemId);
+      if (!activeProgressTarget.hasObservedConcurrency(wait.localQueueItemId)) {
+        state.activeBackendItemId = backendItemId;
+        state.message = event.message;
+        state.percentage = event.percentage;
+        publishRunProgress(wait.localQueueItemId);
+      }
     } else {
       progress.set(wait.localQueueItemId, { message: event.message, percentage: event.percentage });
     }
@@ -928,6 +1053,16 @@ export const createQueueCoordinator = (
     modelLoads.reset();
 
     if (status === 'connected') {
+      // Concurrent progress is derived from settled iterations, not stale socket events.
+      for (const localQueueItemId of runProgress.keys()) {
+        if (
+          activeProgressTarget.hasObservedConcurrency(localQueueItemId) &&
+          (callbacks.isRunOpen?.(localQueueItemId) ?? true)
+        ) {
+          publishRunProgress(localQueueItemId);
+        }
+      }
+
       scheduleGalleryRefresh();
       void sweep();
     }
@@ -1123,6 +1258,7 @@ export const createQueueCoordinator = (
       );
     }
 
+    void refreshConcurrentRuns();
     void refreshProgressPreviews();
 
     return outcomes;
@@ -1139,6 +1275,8 @@ export const createQueueCoordinator = (
     }
 
     beginRun(localQueueItemId, result.itemIds, result.batchId, context);
+    // Workers can start before the enqueue receipt reaches this tab.
+    void refreshConcurrentRuns();
 
     return result;
   };
@@ -1226,6 +1364,7 @@ export const createQueueCoordinator = (
       runs.delete(localQueueItemId);
       runProgress.delete(localQueueItemId);
       if (isActive()) {
+        // The runtime still owns final delivery; only detach or run settlement forgets concurrency.
         progress.clear(localQueueItemId);
       }
     }
@@ -1250,6 +1389,12 @@ export const createQueueCoordinator = (
     }
   };
 
+  const forgetRunConcurrency = (localQueueItemId: string): void => {
+    if (isActive()) {
+      activeProgressTarget.forgetRun(localQueueItemId);
+    }
+  };
+
   const detachRun = (localQueueItemId: string): void => {
     const run = runs.get(localQueueItemId);
     for (const backendItemId of run?.backendItemIds ?? []) {
@@ -1268,9 +1413,20 @@ export const createQueueCoordinator = (
       activeProgressTarget.clear(target);
       progressImage.clear(target);
     }
+    forgetRunConcurrency(localQueueItemId);
     progressImage.clearHeld(localQueueItemId);
     progress.clear(localQueueItemId);
   };
 
-  return { cancelRun, connect, detachRun, dispose, reconcile, submitGenerate, submitWorkflow, waitForResults };
+  return {
+    cancelRun,
+    connect,
+    detachRun,
+    dispose,
+    forgetRunConcurrency,
+    reconcile,
+    submitGenerate,
+    submitWorkflow,
+    waitForResults,
+  };
 };

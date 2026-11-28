@@ -131,7 +131,7 @@ export const isTerminalBackendStatus = (status: QueueItemStatus): status is Term
   status === 'completed' || status === 'failed' || status === 'canceled';
 
 /** Encode local IDs in origins so reload reconciliation can re-adopt submitted backend items. */
-const QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:';
+export const QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:';
 const PROJECT_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:p:';
 
 /**

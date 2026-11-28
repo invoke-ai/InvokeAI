@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import ImageField, VideoField
 from invokeai.app.services.progress_previews.progress_previews_common import ProgressPreviewDTO
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
+    ActiveItemIdsResult,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -415,6 +416,34 @@ def get_queue_item_ids(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
+
+
+@session_queue_router.get(
+    "/{queue_id}/active_ids",
+    operation_id="get_active_queue_item_ids",
+    responses={200: {"model": ActiveItemIdsResult}},
+)
+def get_active_queue_item_ids(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform the operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None,
+        description="Only include active items whose origin starts with this prefix; non-admins see only their own",
+    ),
+) -> ActiveItemIdsResult:
+    """Read all executing ids followed by up to 50 waiting parent ids, independently of recent history.
+
+    Origin-scoped reads retain all waiting roots of executing children, even if this exceeds 50.
+    Executing root ids are returned only for origin-scoped reads; otherwise they are null.
+    """
+    try:
+        return ApiDependencies.invoker.services.session_queue.get_active_queue_item_ids(
+            queue_id=queue_id,
+            owner_id=origin_owner(current_user, origin_prefix),
+            origin_prefix=origin_prefix,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while listing active queue item ids: {e}")
 
 
 @session_queue_router.post(

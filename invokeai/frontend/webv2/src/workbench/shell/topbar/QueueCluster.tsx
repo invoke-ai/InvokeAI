@@ -5,10 +5,12 @@ import type { QueueItemProgress } from '@features/queue/react';
 import { Badge, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
 import {
   getDeterminateProgressFraction,
+  getFinishedImageCount,
   getQueueItemExpectedImageCount,
   getQueueItemSnapshotPositivePrompt,
 } from '@features/queue/contracts';
 import { getQueueAction, QueueMenuItems, useQueueActions } from '@features/queue/menu';
+import { useActiveProgressTargets, useQueueItemSlotProgress } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Group } from '@platform/ui/Group';
@@ -71,6 +73,7 @@ export const QueueCluster = () => {
   const {
     activity,
     elsewhere,
+    isConcurrentProgress,
     modelLoads,
     progress: runningProgress,
     queueItems,
@@ -81,6 +84,25 @@ export const QueueCluster = () => {
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
     : undefined;
+  const activeProgressTargets = useActiveProgressTargets();
+  const terminalBackendItemIds = useMemo(
+    () => new Set([...(runningItem?.completedBackendItemIds ?? []), ...(runningItem?.cancelledBackendItemIds ?? [])]),
+    [runningItem]
+  );
+  // A batch has several independent backend executions. Preserve each identity,
+  // rather than letting whichever GPU sent its last frame own the queue tooltip.
+  const activeBackendItemIds = useMemo(
+    () =>
+      runningItem?.backendItemIds?.filter(
+        (backendItemId, index) =>
+          !terminalBackendItemIds.has(backendItemId) &&
+          activeProgressTargets.some(
+            (target) => target.queueItemId === runningItem?.id && target.itemIndex === index + 1
+          )
+      ) ?? [],
+    [activeProgressTargets, runningItem, terminalBackendItemIds]
+  );
+  const finishedCount = runningItem ? getFinishedImageCount(runningItem, runningProgress) : 0;
 
   const progressValue = getDeterminateProgressFraction(runningProgress?.percentage);
   const isCancellable = !cancelCurrent?.disabled;
@@ -139,8 +161,10 @@ export const QueueCluster = () => {
       <Group attached colorPalette={activityPalettes[activity]} flexShrink={0}>
         <QueueButtonTooltip
           activity={activity}
+          activeBackendItemIds={activeBackendItemIds}
           current={current}
           elsewhere={elsewhere}
+          isConcurrentProgress={isConcurrentProgress}
           item={runningItem}
           modelLoads={modelLoads}
           progress={runningProgress}
@@ -213,7 +237,10 @@ export const QueueCluster = () => {
 
       <QueueProgressAnnouncement
         activity={activity}
+        batchTotal={runningItem ? getQueueItemExpectedImageCount(runningItem) : total}
         current={current}
+        finishedCount={finishedCount}
+        isConcurrentProgress={isConcurrentProgress}
         progress={progressValue}
         remaining={remaining}
         total={total}
@@ -250,9 +277,11 @@ const ShiftKeyWatcher = ({ onChange }: { onChange: (isShiftHeld: boolean) => voi
 
 const QueueButtonTooltip = ({
   activity,
+  activeBackendItemIds,
   children,
   current,
   elsewhere,
+  isConcurrentProgress,
   item,
   modelLoads,
   progress,
@@ -260,9 +289,11 @@ const QueueButtonTooltip = ({
   total,
 }: {
   activity: QueueActivity;
+  activeBackendItemIds: number[];
   children: ReactNode;
   current: number;
   elsewhere: number;
+  isConcurrentProgress: boolean;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
@@ -273,8 +304,10 @@ const QueueButtonTooltip = ({
     () => (
       <QueueTooltip
         activity={activity}
+        activeBackendItemIds={activeBackendItemIds}
         current={current}
         elsewhere={elsewhere}
+        isConcurrentProgress={isConcurrentProgress}
         item={item}
         modelLoads={modelLoads}
         progress={progress}
@@ -282,7 +315,18 @@ const QueueButtonTooltip = ({
         total={total}
       />
     ),
-    [activity, current, elsewhere, item, modelLoads, progress, remaining, total]
+    [
+      activity,
+      activeBackendItemIds,
+      current,
+      elsewhere,
+      isConcurrentProgress,
+      item,
+      modelLoads,
+      progress,
+      remaining,
+      total,
+    ]
   );
 
   return (
@@ -295,13 +339,19 @@ const QueueButtonTooltip = ({
 // Quantize screen-reader announcements so progress events do not flood the live region.
 const QueueProgressAnnouncement = ({
   activity,
+  batchTotal,
   current,
+  finishedCount,
+  isConcurrentProgress,
   progress,
   remaining,
   total,
 }: {
   activity: QueueActivity;
+  batchTotal: number;
   current: number;
+  finishedCount: number;
+  isConcurrentProgress: boolean;
   progress: number | null;
   remaining: number;
   total: number;
@@ -318,9 +368,11 @@ const QueueProgressAnnouncement = ({
           : // The live region names no source: whether work is elsewhere flickers while the queue catches up.
             total === 0
             ? t('widgets.queueStatus.queued', { count: remaining })
-            : decile === null
-              ? t('topbar.queue.imageProgress', { current, total })
-              : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
+            : isConcurrentProgress
+              ? t('topbar.queue.imagesFinished', { current: finishedCount, total: batchTotal })
+              : decile === null
+                ? t('topbar.queue.imageProgress', { current, total })
+                : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
 
   return (
     <chakra.span aria-live="polite" srOnly>
@@ -331,8 +383,10 @@ const QueueProgressAnnouncement = ({
 
 const QueueTooltip = ({
   activity,
+  activeBackendItemIds,
   current,
   elsewhere,
+  isConcurrentProgress,
   item,
   modelLoads,
   progress,
@@ -340,9 +394,11 @@ const QueueTooltip = ({
   total,
 }: {
   activity: QueueActivity;
+  activeBackendItemIds: number[];
   current: number;
   /** Open work in the queue scope beyond the project's runs, which `remaining` includes. */
   elsewhere: number;
+  isConcurrentProgress: boolean;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
@@ -421,6 +477,7 @@ const QueueTooltip = ({
 
   const prompt = getQueueItemSnapshotPositivePrompt(item).trim();
   const expectedCount = getQueueItemExpectedImageCount(item);
+  const finishedCount = getFinishedImageCount(item, progress);
   const activeItemIndex = Math.min(
     expectedCount,
     Math.max(1, progress?.activeItemIndex ?? (progress?.completedItemCount ?? 0) + 1)
@@ -428,38 +485,70 @@ const QueueTooltip = ({
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];
   const progressLabel = modelLoads[0]
     ? t('widgets.queue.loadingModel', { model: modelLoads[0].label })
-    : progress?.message?.trim() || t('topbar.queue.waitingForProgress');
+    : (isConcurrentProgress ? '' : progress?.message?.trim()) || t('topbar.queue.waitingForProgress');
 
   return (
     <Stack gap="2" p="3" minW="18rem">
       <HStack justify="space-between" gap="3">
         <Text fontSize="md" fontWeight="800">
-          {t('topbar.queue.generatingImage', { current, total })}
+          {isConcurrentProgress
+            ? t('topbar.queue.imagesFinished', { current: finishedCount, total: expectedCount })
+            : t('topbar.queue.generatingImage', { current, total })}
         </Text>
         <Badge colorPalette="blue" fontSize="xs">
           {t(itemStatusLabelKeys[item.status])}
         </Badge>
       </HStack>
       <Stack gap="1">
-        <Text color="fg.subtle" fontSize="xs">
-          {progressLabel}
-        </Text>
+        {isConcurrentProgress && activeBackendItemIds.length > 0 ? (
+          <>
+            {modelLoads.length === 1 ? (
+              <Text color="fg.subtle" fontSize="xs">
+                {progressLabel}
+              </Text>
+            ) : null}
+            {activeBackendItemIds.slice(0, 4).map((backendItemId) => (
+              <ConcurrentIterationProgress
+                key={backendItemId}
+                backendItemId={backendItemId}
+                index={(item.backendItemIds?.indexOf(backendItemId) ?? 0) + 1}
+                queueItemId={item.id}
+                total={expectedCount}
+              />
+            ))}
+            {activeBackendItemIds.length > 4 ? (
+              <Text color="fg.subtle" fontSize="xs">
+                {t('topbar.queue.more', { count: activeBackendItemIds.length - 4 })}
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <Text color="fg.subtle" fontSize="xs">
+              {progressLabel}
+            </Text>
+            <Progress.Root
+              aria-label={t('topbar.queue.currentImageProgress')}
+              max={1}
+              value={isConcurrentProgress ? null : getDeterminateProgressFraction(progress?.percentage)}
+            >
+              <Progress.Track>
+                <Progress.Range />
+              </Progress.Track>
+            </Progress.Root>
+          </>
+        )}
         {modelLoads.length > 1 ? <ModelLoadList modelLoads={modelLoads} /> : null}
-        <Progress.Root
-          aria-label={t('topbar.queue.currentImageProgress')}
-          max={1}
-          value={getDeterminateProgressFraction(progress?.percentage)}
-        >
-          <Progress.Track>
-            <Progress.Range />
-          </Progress.Track>
-        </Progress.Root>
       </Stack>
       <Stack gap="1" color="fg.subtle" fontSize="xs">
-        <Text fontVariantNumeric="tabular-nums">
-          {t('topbar.queue.batchImage', { current: activeItemIndex, total: expectedCount })}
-          {activeBackendItemId !== undefined ? ` · ${t('topbar.queue.backendItem', { id: activeBackendItemId })}` : ''}
-        </Text>
+        {!isConcurrentProgress ? (
+          <Text fontVariantNumeric="tabular-nums">
+            {t('topbar.queue.batchImage', { current: activeItemIndex, total: expectedCount })}
+            {activeBackendItemId !== undefined
+              ? ` · ${t('topbar.queue.backendItem', { id: activeBackendItemId })}`
+              : ''}
+          </Text>
+        ) : null}
         <MiddleTruncate fontFamily="mono" text={t('topbar.queue.queueItem', { id: item.id })} />
         {item.backendBatchId ? (
           <MiddleTruncate fontFamily="mono" text={t('topbar.queue.backendBatch', { id: item.backendBatchId })} />
@@ -478,6 +567,41 @@ const QueueTooltip = ({
         </Text>
       ) : null}
       {alsoElsewhere}
+    </Stack>
+  );
+};
+
+/** Follow the same local iteration as Canvas, including progress from a called workflow's child. */
+const ConcurrentIterationProgress = ({
+  backendItemId,
+  index,
+  queueItemId,
+  total,
+}: {
+  backendItemId: number;
+  index: number;
+  queueItemId: string;
+  total: number;
+}) => {
+  const { t } = useTranslation();
+  const progress = useQueueItemSlotProgress(queueItemId, index);
+  const imageLabel = t('topbar.queue.batchImage', { current: index, total });
+
+  return (
+    <Stack data-queue-backend-progress={backendItemId} gap="1">
+      <HStack gap="2" justify="space-between">
+        <Text fontSize="xs" fontVariantNumeric="tabular-nums">
+          {imageLabel}
+        </Text>
+        <Text color="fg.subtle" fontSize="xs" truncate>
+          {progress?.message?.trim() || t('topbar.queue.waitingForProgress')}
+        </Text>
+      </HStack>
+      <Progress.Root aria-label={imageLabel} max={1} value={getDeterminateProgressFraction(progress?.percentage)}>
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
     </Stack>
   );
 };

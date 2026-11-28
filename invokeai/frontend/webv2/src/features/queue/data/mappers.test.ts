@@ -99,6 +99,18 @@ describe('queue transport mappers', () => {
 
   it('maps status and id-list response names at the adapter boundary', () => {
     expect(mapQueueItemIdsDTO({ item_ids: [9, 8] })).toEqual({ itemIds: [9, 8] });
+    expect(mapQueueItemIdsDTO({ item_ids: [9, 8], executing_root_item_ids: null })).toEqual({
+      itemIds: [9, 8],
+      executingRootItemIds: null,
+    });
+    expect(mapQueueItemIdsDTO({ item_ids: [9, 8], executing_root_item_ids: [] })).toEqual({
+      itemIds: [9, 8],
+      executingRootItemIds: [],
+    });
+    expect(mapQueueItemIdsDTO({ item_ids: [9, 8], executing_root_item_ids: [7] })).toEqual({
+      itemIds: [9, 8],
+      executingRootItemIds: [7],
+    });
     expect(
       mapQueueStatusDTO({
         processor: { is_processing: true, is_started: true },
