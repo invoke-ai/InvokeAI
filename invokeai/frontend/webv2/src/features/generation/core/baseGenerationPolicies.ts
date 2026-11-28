@@ -874,6 +874,7 @@ const componentSourceSlot = (
     modelTypes: TYPE_MAIN,
     valueKind: 'main',
     helpText,
+    placeholder: 'None',
     filter,
   });
 
@@ -1023,6 +1024,7 @@ const wanLowNoiseSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_MAIN,
     valueKind: 'main',
     helpText,
+    placeholder: 'None',
     // The loader pairs a single-file A14B model with a different single-file expert of its variant.
     filter: (candidate, ctx) =>
       ctx.model.type !== 'external_image_generator' && isWanLowNoiseExpertFor(ctx.model)(candidate),
@@ -1115,6 +1117,17 @@ const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
       ctx.settings.componentSourceModel && isFlux2EncoderSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
     ));
 
+/** The standalone encoder the FLUX.2 builder sends: a pick its loader would reject (a wrong-size Qwen3) counts as none. */
+export const getFlux2StandaloneEncoder = (
+  model: MainModelConfig,
+  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel'>
+): NonNullable<GenerateSettings['mistralEncoderModel' | 'qwen3EncoderModel']> | null => {
+  const encoder = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
+  const accepts = model.variant === 'dev' ? isFlux2MistralEncoder : isFlux2Qwen3EncoderForModel(model);
+
+  return encoder && accepts(encoder) ? encoder : null;
+};
+
 /** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
 export const getFlux2ComponentSource = (
   model: MainModelConfig,
@@ -1126,9 +1139,7 @@ export const getFlux2ComponentSource = (
     return undefined;
   }
 
-  const hasStandaloneEncoder = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
-
-  if (hasStandaloneEncoder) {
+  if (getFlux2StandaloneEncoder(model, settings)) {
     return source;
   }
 
@@ -1273,7 +1284,7 @@ export const getAutoFlux2ComponentSourceModel = (
     return undefined;
   }
 
-  const encoderModel = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
+  const encoderModel = getFlux2StandaloneEncoder(model, settings);
 
   if (isBundledFlux2Main(model) || (encoderModel && settings.vae)) {
     return null;
@@ -1604,6 +1615,7 @@ const getBaseComponentSectionPolicy = (
             'ERNIE-Image conditions on Ministral 3B, a different architecture from the Mistral Small 3 encoder FLUX.2 uses. Required for non-Diffusers ERNIE-Image models.',
             isErnieImageMistralEncoder
           ),
+          neverLoaded: isDiffusersPipeline,
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Ministral 3B encoder for non-Diffusers ERNIE-Image models.',
         },
@@ -1612,6 +1624,7 @@ const getBaseComponentSectionPolicy = (
             'ERNIE-Image decodes with the FLUX.2 32-channel VAE, which is the base it installs under. Required for non-Diffusers ERNIE-Image models.',
             isAcceptedVae
           ),
+          neverLoaded: isDiffusersPipeline,
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a VAE for non-Diffusers ERNIE-Image models.',
         },

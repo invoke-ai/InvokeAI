@@ -1827,6 +1827,18 @@ describe('a stored FLUX.2 component source', () => {
     expect(getAutoFlux2ComponentSourceModel(model, settings, [first])?.key).toBe(first.key);
   });
 
+  it('is replaced when the standalone encoder is the wrong size and the source cannot give the encoder', () => {
+    const wrongSize: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+
+    expect(
+      getAutoFlux2ComponentSourceModel(
+        model,
+        { ...settings, componentSourceModel: smaller, qwen3EncoderModel: wrongSize },
+        [smaller, first]
+      )?.key
+    ).toBe(first.key);
+  });
+
   it('is replaced when it cannot give the encoder the model needs', () => {
     expect(
       getAutoFlux2ComponentSourceModel(model, { ...settings, componentSourceModel: smaller }, [smaller, first])?.key
@@ -2253,6 +2265,28 @@ describe("a main model's default components", () => {
         switchTo(createModel('moss-image', { default_settings: { vae: sdxlVae.key }, format: 'checkpoint' }), [sdxlVae])
           .settings.vae
       ).toBeNull();
+    });
+
+    it('fills no VAE or Ministral default for a Diffusers ERNIE-Image, whose loader reads both from the pipeline', () => {
+      const ministral = {
+        base: 'any',
+        key: 'ministral',
+        name: 'Ministral 3B',
+        type: 'mistral_encoder',
+        variant: 'ministral3_3b',
+      } as ComponentModelConfig;
+      const ernie = (format: string) =>
+        createModel('ernie-image', {
+          default_settings: { components: { mistral_encoder: ministral.key }, vae: flux2Vae.key },
+          format,
+        });
+
+      const single = switchTo(ernie('checkpoint'), [flux2Vae, ministral]).settings;
+      const diffusers = switchTo(ernie('diffusers'), [flux2Vae, ministral]).settings;
+
+      expect(single).toMatchObject({ mistralEncoderModel: ministral, vae: flux2Vae });
+      expect(diffusers.mistralEncoderModel).toBeNull();
+      expect(diffusers.vae).toBeNull();
     });
 
     it('replaces a VAE of another family, as left behind by a fallback from an unsupported model', () => {

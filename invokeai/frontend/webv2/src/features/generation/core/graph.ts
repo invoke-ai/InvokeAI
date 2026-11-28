@@ -23,6 +23,7 @@ import {
   getExternalModeReason,
   getExternalProviderNodeType,
   getFlux2ComponentSource,
+  getFlux2StandaloneEncoder,
   getGenerationDimensions,
   getGenerationValidationReasons,
   isStrengthOnlyIPAdapterBase,
@@ -37,8 +38,6 @@ import {
   isErnieImageMistralEncoder,
   isGgufQwen3Vl4bEncoder,
   isGgufQwen3Vl8bEncoder,
-  isFlux2MistralEncoder,
-  isFlux2Qwen3EncoderForModel,
   isQwen3Vl4bVisionTower,
   isQwen3Vl8bEncoder,
   isQwen3Vl8bVisionTower,
@@ -1001,15 +1000,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
   const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
   // Both loaders take a source only for a main that bundles no components, so a pick left in the panel never loads.
   const loaderSource = isBundledFlux2Main(model) ? undefined : sourceModel;
-  const mistralEncoderModel =
-    settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
-      ? settings.mistralEncoderModel
-      : null;
-  const qwen3EncoderModel =
-    !isDev && settings.qwen3EncoderModel && isFlux2Qwen3EncoderForModel(model)(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
-  const encoderModel = isDev ? mistralEncoderModel : qwen3EncoderModel;
+  const encoderModel = getFlux2StandaloneEncoder(model, settings);
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!hasBundledComponents && (!vaeModel || !encoderModel)) {
@@ -1027,7 +1018,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
     isDev
       ? {
           id: 'model_loader',
-          mistral_encoder_model: mistralEncoderModel ?? undefined,
+          mistral_encoder_model: encoderModel ?? undefined,
           mistral_source_model: loaderSource,
           model,
           type: 'flux2_dev_model_loader',
@@ -1036,7 +1027,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
       : {
           id: 'model_loader',
           model,
-          qwen3_encoder_model: qwen3EncoderModel ?? undefined,
+          qwen3_encoder_model: encoderModel ?? undefined,
           qwen3_source_model: loaderSource,
           type: 'flux2_klein_model_loader',
           vae_model: vaeModel ?? undefined,

@@ -122,7 +122,10 @@ export const ModelSelect = ({
 }: {
   className?: string;
   disabled?: boolean;
-  /** Shown on the inert trigger instead of the empty-library message, for a slot whose empty value is itself meaningful. */
+  /**
+   * Shown on the trigger of an empty library instead of the empty-library message, for a slot whose empty value is
+   * itself meaningful. The trigger stays open-able, so the list can still say why nothing is offered.
+   */
   emptyLabel?: string;
   excludeKeys?: ReadonlySet<string>;
   filter?: (model: ModelConfig) => boolean;
@@ -210,7 +213,8 @@ export const ModelSelect = ({
     () => isEmpty && Boolean(excludeKeys?.size) && hasModelPickerCandidates(models, { filter, modelTypes }),
     [excludeKeys, filter, isEmpty, modelTypes, models]
   );
-  const isInert = isDisabled || isEmpty;
+  const isEmptyAndInert = isEmpty && emptyLabel === undefined;
+  const isInert = isDisabled || isEmptyAndInert;
 
   // Disabling closes an open picker. Running out of candidates does not: the list says so, and the user closes it, so
   // a load that admits nothing never snaps the popup shut under them.
@@ -376,7 +380,7 @@ export const ModelSelect = ({
                   flex={insideLabel ? '1' : undefined}
                   minW="0"
                   textAlign={insideLabel ? 'end' : undefined}
-                  title={missingText}
+                  title={missingText ?? (isEmpty ? emptyLabel : undefined)}
                   truncate
                 >
                   {missingText ??
@@ -385,7 +389,7 @@ export const ModelSelect = ({
                       : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel })))}
                 </Text>
               )}
-              {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
+              {canClear || isEmptyAndInert ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
             </Button>
           </Popover.Trigger>
           {canClear ? (

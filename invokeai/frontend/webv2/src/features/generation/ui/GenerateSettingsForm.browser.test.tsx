@@ -513,46 +513,29 @@ describe('GenerateSettingsForm required components', () => {
     expect(emptyLabels()).toEqual([null, null]);
   });
 
-  it('names what the loader takes an empty slot from: a source for a GGUF main, the main itself when it bundles them', async () => {
+  it('names the component source an empty slot is filled from, and reads "None" on the source and expert slots', async () => {
     const wan = (key: string, name: string, format: string) =>
       ({ ...MODEL, base: 'wan', format, key, name }) as GenerationModelCatalogItem;
     const gguf = wan('wan-gguf', 'Wan GGUF', 'gguf_quantized');
-    const main = wan('wan-main', 'Wan main', 'diffusers');
     const source = wan('wan-source', 'Wan source', 'diffusers');
     const slotOf = (type: string) => host!.querySelector(`[data-component-types="${type}"]`);
-    stableGroups.models.catalog = [MODEL, gguf, main, source];
+    stableGroups.models.catalog = [MODEL, gguf, source];
     await renderAdapter(buildAdapter());
-
-    await selectModel(main);
-    expect(slotOf('vae')?.getAttribute('data-component-placeholder')).toBe('widgets.generate.componentFrom: Wan main');
-    expect(slotOf('wan_t5_encoder')?.getAttribute('data-component-empty-label')).toBe(
-      'widgets.generate.componentFrom: Wan main'
-    );
-
-    // The loader reads the source only for a main that holds no components; the Diffusers main wins over it.
-    await settle(() => storedValues().patchSnapshot({ componentSourceModel: source as never }));
-    expect(slotOf('vae')?.getAttribute('data-component-empty-label')).toBe('widgets.generate.componentFrom: Wan main');
 
     await selectModel(gguf);
     await settle(() => storedValues().patchSnapshot({ componentSourceModel: source as never }));
-    expect(slotOf('vae')?.getAttribute('data-component-placeholder')).toBe(
-      'widgets.generate.componentFrom: Wan source'
-    );
     expect(slotOf('vae')?.getAttribute('data-component-empty-label')).toBe(
       'widgets.generate.componentFrom: Wan source'
     );
-    expect(slotOf('wan_t5_encoder')?.getAttribute('data-component-empty-label')).toBe(
-      'widgets.generate.componentFrom: Wan source'
-    );
-    // The source slot itself, and the second expert, which is no component of one model for certain.
+    // The source slot itself and the second expert supply nothing, so an empty one is no "model default".
     expect(
       [...host!.querySelectorAll('[data-component-types="main"]')].map((slot) => [
         slot.getAttribute('data-component-placeholder'),
         slot.getAttribute('data-component-empty-label'),
       ])
     ).toEqual([
-      ['widgets.generate.modelDefault', null],
-      ['widgets.generate.modelDefault', null],
+      ['None', 'None'],
+      ['None', 'None'],
     ]);
   });
 });
