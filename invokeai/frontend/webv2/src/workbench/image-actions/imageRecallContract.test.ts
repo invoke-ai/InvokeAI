@@ -386,6 +386,7 @@ const RECALLED_FIELDS = {
   size: true,
   steps: true,
   vae: true,
+  vaeSettings: true,
 } satisfies Record<ImageRecallResult['fields'][number], true>;
 
 const DEFAULT_KINDS: readonly ImageRecallKind[] = ['all', 'remix'];

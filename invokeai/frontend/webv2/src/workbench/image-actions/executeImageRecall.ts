@@ -12,7 +12,7 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { GALLERY_REQUEST_MAX_NAMES, galleryImages, galleryVideos } from '@features/gallery';
-import { fetchGalleryImageMetadata, galleryKeys } from '@features/gallery/queries';
+import { fetchGalleryImageMetadata, fetchGalleryImageWorkflow } from '@features/gallery/queries';
 import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
@@ -42,11 +42,11 @@ import type { CanvasRecallTarget } from './canvasRecall';
 
 import {
   buildImageRecallSettings,
+  dependsOnWorkflowRun,
   getImageRecallMessage,
   readMetadataReferenceImages,
   getImageRecallTitle,
   isImageRecallKindAvailable,
-  recordsLoaderSelections,
   type ImageRecallKind,
   type ImageRecallSkip,
 } from './imageRecall';
@@ -88,28 +88,22 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
 /**
  * Whether the image ran from a workflow, which only the embedded workflow itself says: `has_workflow` is set for every
  * image that stores its graph, so it cannot tell. A workflow's loader takes components that its metadata node never
- * names. Asked only where it decides something (a record that would otherwise vouch for its components), cached for
- * good because an image's embedded workflow never changes, and answered for the safe side when the read fails, so the
- * panel keeps its picks.
+ * names. Asked only where it decides something (`dependsOnWorkflowRun`), through the read Image Details shares, and
+ * answered for the safe side when the read fails, so the panel keeps its picks.
  */
 const readMayBeWorkflowRun = async (
   queryClient: QueryClient,
   metadata: unknown,
+  supportedModels: GenerateModelConfig[],
   imageName: string,
   owner: AccountScope
 ): Promise<boolean> => {
-  if (!recordsLoaderSelections(metadata)) {
+  if (!dependsOnWorkflowRun(metadata, supportedModels)) {
     return false;
   }
 
   try {
-    return await queryClient.fetchQuery({
-      queryFn: async ({ signal }) =>
-        (await galleryImages.workflow(imageName, AbortSignal.any([signal, owner.signal]))).workflow !== null,
-      queryKey: galleryKeys.imageEmbedsWorkflow(owner, imageName),
-      retry: false,
-      staleTime: Infinity,
-    });
+    return (await fetchGalleryImageWorkflow(queryClient, owner, imageName)).workflow !== null;
   } catch {
     return true;
   }
@@ -433,7 +427,7 @@ export const executeImageRecall = async ({
     // Read beside the reference lookup, not after it.
     const workflowRun =
       kind === 'all' || kind === 'remix'
-        ? readMayBeWorkflowRun(queryClient, metadata, image.imageName, owner)
+        ? readMayBeWorkflowRun(queryClient, metadata, supportedModels, image.imageName, owner)
         : Promise.resolve(false);
     const referenceRecord = kind === 'all' || kind === 'remix' ? readMetadataReferenceImages(metadata) : null;
     let referenceAssets = new Map<string, GalleryImage>();
@@ -647,6 +641,16 @@ export const executeImageRecall = async ({
         : getImageRecallMessage(result.fields, t),
       title: getImageRecallTitle(kind, t),
     });
+    // A cleared pick is often in the collapsed Advanced section, where the user would not see it go.
+    if (result.cleared.length > 0) {
+      commands.notifications.add({
+        kind: 'info',
+        message: t('widgets.gallery.itemActions.recall.componentsCleared', {
+          labels: result.cleared.map((slot) => t(`widgets.generate.switchSubjects.${slot}`)),
+        }),
+        title: getImageRecallTitle(kind, t),
+      });
+    }
     if (skipMessage) {
       commands.notifications.add({
         kind: 'info',

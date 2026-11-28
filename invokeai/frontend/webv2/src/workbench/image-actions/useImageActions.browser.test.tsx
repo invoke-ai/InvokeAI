@@ -144,6 +144,7 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
+  fetchGalleryImageWorkflow: () => Promise.resolve({ graph: null, workflow: null }),
   fetchGalleryVideoMetadata: () => Promise.resolve(null),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),

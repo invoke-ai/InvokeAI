@@ -6374,6 +6374,7 @@
           "appliedFields": "Applied {{fields, list}}.",
           "cannotRecallImage": "Cannot recall image data",
           "cannotRecallVideo": "Cannot recall video data",
+          "componentsCleared": "The image used its model's own components, so these picks were cleared: {{labels, list}}.",
           "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
           "fieldsApplied_one": "{{count}} field applied to Generate.",
           "fieldsApplied_other": "{{count}} fields applied to Generate.",

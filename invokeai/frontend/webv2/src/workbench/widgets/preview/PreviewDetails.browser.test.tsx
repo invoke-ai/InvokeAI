@@ -48,6 +48,7 @@ vi.mock('@features/gallery', async (importOriginal) => {
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryImageMetadata: galleryMocks.imageMetadata,
+  getGalleryImageWorkflow: galleryMocks.imageWorkflow,
   getGalleryVideoMetadata: galleryMocks.videoMetadata,
 }));
 vi.mock('@features/identity', async (importOriginal) => {

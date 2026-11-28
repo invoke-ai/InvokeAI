@@ -123,6 +123,7 @@ export const EMPTY_IMAGE_RECALL_CAPABILITIES: ImageRecallCapabilities = {
 type RecalledField =
   | 'model'
   | 'vae'
+  | 'vaeSettings'
   | 'prompts'
   | 'seed'
   | 'size'
@@ -161,6 +162,8 @@ export interface ImageRecallSkip {
 export interface ImageRecallResult {
   /** The component settings recall set from the image, an explicit empty one included; a pick it rejected is not. */
   appliedComponents: DefaultComponentSlot['setting'][];
+  /** The standalone picks recall emptied because the image's own supplier filled them; the panel held one before. */
+  cleared: (DefaultComponentSlot['setting'] | 'vae')[];
   fields: RecalledField[];
   skipped: ImageRecallSkip[];
   values: GenerateWidgetValues;
@@ -600,18 +603,30 @@ const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, '
 /**
  * A record whose writer named every standalone component its loaders received, so one it leaves out went unused: a
  * graph run's record (a generation record, or a Refine upscale, which writes no `generation_mode` but always
- * `creativity`; a Model only upscale copies its source's keys) that also carries `rand_device`. webv2's Generate and
- * Upscale graphs always write it, as do the legacy frontend's SD-1 and SDXL builders. Other writers name the model but
+ * `creativity`) that also carries `rand_device`. webv2's Generate and Upscale graphs always write it, as do the
+ * legacy frontend's SD-1 and SDXL builders; a Model only upscale copies its source's keys but not this one, since the
+ * copy cannot tell whether the source was a workflow run. Other writers name the model but
  * not every component: a Canvas save records only the panel's model and VAE, a denoise node that a workflow wires
  * straight to its decoder writes `generation_mode` and `model` but none of the loader's components, and the legacy
  * SD 3 and Z-Image builders left some out. None of them writes `rand_device`. A workflow opened from a Generate graph
  * keeps that graph's metadata node, `rand_device` included, while the user picks components on its loader, so a record
  * of a run that embeds a workflow is no evidence either (`mayBeWorkflowRun`).
  */
-export const recordsLoaderSelections = (metadata: unknown): boolean =>
+const recordsLoaderSelections = (metadata: unknown): boolean =>
   (isGenerationRecord(metadata) || getNumber(metadata, 'creativity') !== null) &&
   isRecord(metadata) &&
   'rand_device' in metadata;
+
+/**
+ * Whether recall reads this record differently for a workflow run (`mayBeWorkflowRun`): the clearing of picks needs a
+ * recalled main to judge, and the decode settings are ones a workflow's metadata node writes as defaults. The read
+ * that tells is made only where it can change the result.
+ */
+export const dependsOnWorkflowRun = (metadata: unknown, supportedModels: GenerateModelConfig[]): boolean =>
+  isRecord(metadata) &&
+  ('vae_precision' in metadata ||
+    'color_compensation' in metadata ||
+    (recordsLoaderSelections(metadata) && getSupportedMetadataModel(metadata, supportedModels) !== null));
 
 const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
   const value = getNumber(metadata, key);
@@ -954,6 +969,7 @@ const getMetadataFlux3PromptUpsampler = (
 
 /** The component source is not recalled by its slot key: only its per-family names below recall it. */
 type RecalledComponentSetting = DefaultComponentSlot['setting'];
+type SourceSuppliableSlot = ReturnType<typeof getSourceSuppliableSlots>[number];
 
 interface RecalledComponent {
   metadataKey: string;
@@ -999,8 +1015,8 @@ const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledCom
 
 /**
  * webv2 releases that passed a component to their loader without recording it, so its absence from their records
- * proves nothing. The server stamps `app_version`; a record whose version is missing or unreadable (`7.0.0-rc1` was
- * one) may come from any writer, so it proves nothing either.
+ * proves nothing. The server stamps `app_version`; a record whose version is missing or unreadable (empty or
+ * non-numeric) may come from any writer, so it proves nothing either.
  */
 const UNRECORDING_WRITERS: readonly {
   base: string;
@@ -1637,6 +1653,7 @@ export const buildImageRecallSettings = ({
   let restoredProviderSize = false;
   let referenceRecall: ReturnType<typeof readMetadataReferenceImages> | null = null;
   const appliedComponents: RecalledComponentSetting[] = [];
+  let cleared: ImageRecallResult['cleared'] = [];
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1714,14 +1731,11 @@ export const buildImageRecallSettings = ({
       : [];
     const isProvenUnused = (setting: RecalledComponentSetting): boolean =>
       !recordsComponent(setting) && !(judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, setting));
-    // A slot that hangs on another (the vision tower follows a GGUF encoder) says nothing while the record names that
-    // one and recall did not restore it: the panel's encoder stays, and so must what belongs to it.
-    const isRecordedButUnrestored = (slot: string): boolean =>
+    const isRecordedButUnrestored = (slot: SourceSuppliableSlot): boolean =>
       slot === 'vae'
         ? getRecordedVaeKey(metadata, effectiveModel) !== null &&
           getMetadataVae(metadata, effectiveModel, vaeModels) === undefined
-        : recordsComponent(slot as RecalledComponentSetting) &&
-          !fittingSettings.includes(slot as RecalledComponentSetting);
+        : recordsComponent(slot) && !fittingSettings.includes(slot);
     const hangsOnUnrestored = (setting: RecalledComponentSetting): boolean => {
       // A component source stands in for the encoders and the VAE it could supply: while the record names one of them
       // and recall did not restore it, the source in the panel is all that supplies it.
@@ -1729,6 +1743,8 @@ export const buildImageRecallSettings = ({
         return getSourceSuppliableSlots(effectiveModel.base).some(isRecordedButUnrestored);
       }
 
+      // A slot that hangs on another (the vision tower follows a GGUF encoder) says nothing while the record names that
+      // one and recall did not restore it: the panel's encoder stays, and so must what belongs to it.
       const parent = DEFAULT_COMPONENT_SLOTS.find(
         (slot) => slot.persistenceKey === DEFAULT_COMPONENT_SLOTS.find((entry) => entry.setting === setting)?.dependsOn
       )?.setting;
@@ -1817,14 +1833,21 @@ export const buildImageRecallSettings = ({
     }
 
     // After the transition, which resets what the model's panel does not show. Older records carry none.
-    const vaeSettings = getMetadataVaeSettings(metadata, values.model);
+    // A workflow's metadata node writes defaults for these (the editor's switch, a migrated workflow's first option)
+    // whatever its decode did, so a run that may be a workflow says nothing about them.
+    const vaeSettings = mayBeWorkflowRun ? {} : getMetadataVaeSettings(metadata, values.model);
 
     if (Object.keys(vaeSettings).length > 0) {
       values = { ...values, ...vaeSettings };
-      if (!fields.includes('vae')) {
-        fields.push('vae');
-      }
+      fields.push('vaeSettings');
     }
+
+    // After the transition, which can refill a slot: only a pick still gone counts as cleared.
+    const vaeCleared = suppliedByRecord.includes('vae') && getRecordedVaeKey(metadata, values.model) === null;
+
+    cleared = [...clearedSettings, ...(vaeCleared ? (['vae'] as const) : [])].filter(
+      (slot) => currentValues[slot] && !values[slot]
+    );
 
     // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
     // change too: a record can turn it off without touching the pick.
@@ -1997,7 +2020,7 @@ export const buildImageRecallSettings = ({
     skipped.length > 0 ||
     ((kind === 'all' || kind === 'remix') &&
       (hasCanvasRecall(metadata) || referenceRecall?.partial || (referenceRecall?.names.length ?? 0) > 0))
-    ? { appliedComponents, fields, skipped, values }
+    ? { appliedComponents, cleared, fields, skipped, values }
     : null;
 };
 

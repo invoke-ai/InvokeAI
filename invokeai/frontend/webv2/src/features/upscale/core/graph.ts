@@ -298,8 +298,12 @@ export const compileModelOnlyUpscaleGraph = ({
   addNode(graph, { id: 'seed', type: 'integer' });
 
   const upscaleScale = scale === 'native' ? getSpandrelNativeScale(upscaleModel) : scale;
-  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one.
+  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one. Nor does
+  // `rand_device`, the mark of a record whose writer named every loader selection: the copy embeds no workflow, so
+  // it cannot tell a workflow run (whose loader took picks the record never names) from the plain graph run that
+  // mark vouches for, and recall would clear picks the source used.
   const {
+    rand_device: _randDevice,
     upscale_initial_image: _initialImage,
     upscale_model: _model,
     upscale_scale: _scale,

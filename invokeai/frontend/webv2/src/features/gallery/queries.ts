@@ -1,6 +1,7 @@
 export {
   canonicalizeGalleryItemsFilter,
   fetchGalleryImageMetadata,
+  fetchGalleryImageWorkflow,
   fetchGalleryItemsPage,
   fetchGalleryVideoMetadata,
   fetchVerifiedGalleryItemPage,
@@ -10,6 +11,7 @@ export {
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
   galleryImageMetadataOptions,
+  galleryImageWorkflowOptions,
   galleryItemLocationOptions,
   galleryItemNamesOptions,
   galleryItemsPageOptions,
