@@ -4,7 +4,12 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
-import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
+import {
+  EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
+  getPromptTemplateSegments,
+  joinPromptTemplateSegments,
+  type PromptTemplateFieldValues,
+} from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { Field } from '@platform/ui';
@@ -21,10 +26,13 @@ import { usePromptTriggerPicker } from './usePromptTriggerPicker';
 
 const PROMPT_INPUT_DEBOUNCE_MS = 250;
 
-interface NegativePromptFieldProps {
+/** The active template's negative side, or null when none is applied, with what the template's fields hold. */
+type NegativeTemplateProps =
+  | { templateNegativePrompt?: undefined; templateFieldValues?: undefined }
+  | { templateNegativePrompt: string | null; templateFieldValues: PromptTemplateFieldValues };
+
+interface NegativePromptFieldBaseProps {
   heightPx: number;
-  /** The active template's negative side, or null when none is applied. */
-  templateNegativePrompt?: string | null;
   /** Show the merged prompt read-only instead of the authored text. */
   isTemplateViewMode?: boolean;
   onTemplateViewModeChange?: (viewMode: boolean) => void;
@@ -57,9 +65,10 @@ export const NegativePromptField = ({
   projectId,
   selectedModel,
   showSyntaxHighlighting,
+  templateFieldValues = EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
   templateNegativePrompt = null,
   value,
-}: NegativePromptFieldProps) => {
+}: NegativePromptFieldBaseProps & NegativeTemplateProps) => {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
@@ -146,9 +155,12 @@ export const NegativePromptField = ({
     [isViewingMerged, onEnabledChange, t, triggerPicker]
   );
 
-  const templateChunks = useMemo(
-    () => (viewedTemplatePrompt === null ? null : getPromptTemplateChunks(draftValue, viewedTemplatePrompt)),
-    [draftValue, viewedTemplatePrompt]
+  const templateSegments = useMemo(
+    () =>
+      viewedTemplatePrompt === null
+        ? null
+        : getPromptTemplateSegments(draftValue, viewedTemplatePrompt, templateFieldValues),
+    [draftValue, templateFieldValues, viewedTemplatePrompt]
   );
   const exitViewMode = useCallback(() => onTemplateViewModeChange?.(false), [onTemplateViewModeChange]);
 
@@ -176,10 +188,10 @@ export const NegativePromptField = ({
         fontFamily="mono"
         readOnly={isViewingMerged}
         showSyntaxHighlighting={showSyntaxHighlighting}
-        templateChunks={templateChunks}
+        templateSegments={templateSegments}
         textareaRef={handleTextareaRef}
         title={isViewingMerged ? t('widgets.generate.promptTemplates.editAuthored') : undefined}
-        value={templateChunks ? templateChunks.join('') : draftValue}
+        value={templateSegments ? joinPromptTemplateSegments(templateSegments) : draftValue}
         onBlur={autocomplete.close}
         onChange={handlePromptChange}
         onClick={isViewingMerged ? exitViewMode : handlePromptClick}

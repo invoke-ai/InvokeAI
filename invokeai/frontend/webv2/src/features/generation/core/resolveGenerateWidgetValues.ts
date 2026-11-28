@@ -13,7 +13,7 @@ import {
   isGenerateModelSelectable,
   pickFallbackGenerateModel,
 } from './baseGenerationPolicies';
-import { syncPromptTemplateWithCatalog } from './promptTemplates';
+import { EMPTY_PROMPT_TEMPLATE_FIELD_VALUES, syncPromptTemplateWithCatalog } from './promptTemplates';
 import {
   isGenerateWidgetValues,
   isSameModelFile,
@@ -47,6 +47,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(v
  */
 const DEFAULTS_READ_FROM_ABSENCE: Readonly<Partial<Record<keyof GenerateWidgetValues, unknown>>> = {
   dynamicPromptsEnabled: true,
+  // Matched by identity: normalizing an absent key returns this constant.
+  promptTemplateFieldValues: EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
 };
 
 const hasSystemDifference = (storedValues: unknown, values: GenerateWidgetValues): boolean => {

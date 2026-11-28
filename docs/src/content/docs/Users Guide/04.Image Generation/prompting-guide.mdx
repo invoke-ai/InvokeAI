@@ -171,6 +171,36 @@ While a template is applied, an eye button in the prompt toolbar (**Show the mer
 
 <Image src={templateMerged} alt="The merged prompt view: the prompt &quot;a red fox in the snow&quot; followed by the Photography (General) template's words, with the template's negative prompt below." width={480} />
 
+### Template fields
+
+A template can ask for more than your prompt. Write a name in braces anywhere in its text, such as `{subject}` or `{style}`, and that name becomes a **field**: a labelled input that appears under the prompt box while the template is applied. With the template
+
+```text
+a cinematic film still of {subject}. {prompt}. {style} style
+```
+
+two inputs appear, **Subject** and **Style**. Filling them with `a lighthouse keeper` and `film noir`, and writing `stormy night` in the prompt box, sends
+
+```text
+a cinematic film still of a lighthouse keeper. stormy night. film noir style
+```
+
+* A field name uses only the letters A–Z, numbers and underscores, starts with a letter and has no spaces: write `{art_style}`, not `{art style}`. Its label is the name with underscores shown as spaces, so `{art_style}` is labelled **Art style**. Upper and lower case are the same field.
+* `{prompt}` stays reserved for your prompt. Text such as `{red|blue}` or `${season}` is [dynamic prompt](#dynamic-prompts) syntax, not a field.
+* A field used several times, or in both the positive and the negative text, has one input that fills every copy.
+* A field you leave empty adds nothing, so the words around it are sent on their own.
+* A field only takes effect where its text is used. One that appears only in the template's negative text does nothing while the negative prompt is off or the model has none, and fields in the positive text do nothing while your prompt is JSON.
+* What you type is kept with the project and is shared with Upscale, like the prompt. It stays if you stop using the template, and switching to another template keeps the fields both have in common.
+* A field's text can contain dynamic prompt syntax and wildcards. They expand in the positive prompt, as they do in the prompt box.
+
+The merged prompt view shows field text as your words, not the template's. Images record the merged prompt, so **Use prompt** on an image brings back the full text without the template or its fields.
+
+A template you made earlier that already contains a one-word name in braces, such as `{style}`, now shows it as a field and sends nothing for it until you fill it in.
+
+In the workflow editor, the **Prompt Template** node fills the same fields through its **Values** input. Add a **Prompt Template Value** node for each field, give it the field's **Name** without braces and the text as its **Value**, and connect it to **Values**. For several fields, connect them through a **Collect** node. A field with no value connected adds nothing, a value whose name the template does not use is ignored, and two values for the same name stop the workflow with an error. The node replaces every `{prompt}` in the template, and does not add your prompt to a template that has none.
+
+Outside its workflow editor, the legacy web interface replaces only `{prompt}` when it applies a prompt template; other names in braces are left in the text there.
+
 ### Built-in templates
 
 InvokeAI ships with 18 templates covering common styles:
@@ -190,6 +220,8 @@ Click **New template** at the top of the popover. The editor has four fields:
 * **Prompt** — the template's positive text. The **`{prompt}`** button next to the field inserts the placeholder.
 * **Negative** — optional negative text, which may also contain `{prompt}`.
 * **Preview image** — an optional thumbnail for the list. Pick an image from the gallery, upload a file or drag one in.
+
+Under the negative text, the editor lists the [fields](#template-fields) it found in the template.
 
 Click **Save** to store the template. To change or remove one of your templates later, use the pencil and trash buttons on its row. Deleting a template cannot be undone. If you delete, or someone else deletes, a template you are currently using, it keeps shaping your prompt until you stop using it. The **Templates** button dims its name, and the popover notes that it was deleted.
 

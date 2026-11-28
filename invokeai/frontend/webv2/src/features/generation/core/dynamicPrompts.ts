@@ -1,6 +1,6 @@
 import { planSeedSubmission, type SeedMode, type SeedStep, type SeedSubmissionPlan } from '@platform/core/seed';
 
-import type { EffectivePrompts, PromptTemplateSnapshot } from './promptTemplates';
+import type { EffectivePrompts, PromptTemplateApplication } from './promptTemplates';
 import type { DynamicPromptsSettings } from './types';
 
 import { getEffectivePrompts, isJsonPrompt } from './promptTemplates';
@@ -387,17 +387,16 @@ export const sanitizeSampleSeed = (value: unknown): number =>
 export const createDynamicPromptsSampleSeed = (): number => Math.floor(Math.random() * SEED_MAX);
 
 /** The prompted, seeded values Generate, Canvas, Upscale and Video submit from. */
-export interface GenerateSubmissionSource {
+export type GenerateSubmissionSource = {
   batchCount: number;
   negativePrompt: string;
   negativePromptEnabled: boolean;
   positivePrompt: string;
-  promptTemplate?: PromptTemplateSnapshot | null;
   seed: number;
   seedMode: SeedMode;
   dynamicPromptsEnabled: boolean;
   dynamicPromptsSeedBehaviour?: DynamicPromptsSeedBehaviour;
-}
+} & PromptTemplateApplication;
 
 /** The prompt and seed fields of a queued generate submission; the host adds the graph and its node ids. */
 export interface GenerateSubmissionPrompts {

@@ -1,3 +1,4 @@
+import type { PromptTemplateSegment } from '@features/generation/core/promptTemplates';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
@@ -43,8 +44,8 @@ interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
   showSyntaxHighlighting: boolean;
   /** Number logical lines in a leading gutter, the way an editor does. */
   showLineNumbers?: boolean;
-  /** value must equal the concatenated chunks, and the input must be readOnly. */
-  templateChunks?: [string, string, string] | null;
+  /** value must equal the concatenated segments, and the input must be readOnly. */
+  templateSegments?: readonly PromptTemplateSegment[] | null;
   value: string;
 }
 
@@ -71,7 +72,7 @@ export const PromptTextarea = ({
   onScroll,
   showLineNumbers = false,
   showSyntaxHighlighting,
-  templateChunks = null,
+  templateSegments = null,
   textareaRef,
   value,
   ...props
@@ -81,8 +82,8 @@ export const PromptTextarea = ({
   const [textareaWrapWidth, setTextareaWrapWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
-  // Template chunk emphasis is independent of the syntax-highlighting preference.
-  const shouldHighlight = (highlightsSyntax || templateChunks !== null) && isWithinHighlightBudget;
+  // Template emphasis is independent of the syntax-highlighting preference.
+  const shouldHighlight = (highlightsSyntax || templateSegments !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
@@ -184,20 +185,17 @@ export const PromptTextarea = ({
             whiteSpace="pre-wrap"
             w={textareaWrapWidth ? `${textareaWrapWidth}px` : '100%'}
           >
-            {templateChunks ? (
-              <>
-                <Box as="span" color="fg.subtle">
-                  {templateChunks[0]}
+            {templateSegments ? (
+              templateSegments.map((segment, index) => (
+                // oxlint-disable-next-line react/no-array-index-key -- positional; the list is rebuilt whole on every change.
+                <Box key={index} as="span" color={segment.kind === 'template' ? 'fg.subtle' : undefined}>
+                  {segment.kind !== 'template' && highlightsSyntax ? (
+                    <HighlightedPrompt options={highlightOptions} prompt={segment.text} />
+                  ) : (
+                    segment.text
+                  )}
                 </Box>
-                {highlightsSyntax ? (
-                  <HighlightedPrompt options={highlightOptions} prompt={templateChunks[1]} />
-                ) : (
-                  templateChunks[1]
-                )}
-                <Box as="span" color="fg.subtle">
-                  {templateChunks[2]}
-                </Box>
-              </>
+              ))
             ) : (
               <HighlightedPrompt options={highlightOptions} prompt={value} />
             )}
@@ -215,7 +213,7 @@ export const PromptTextarea = ({
       scroll.left,
       scroll.top,
       shouldHighlight,
-      templateChunks,
+      templateSegments,
       textareaWrapWidth,
       value,
     ]

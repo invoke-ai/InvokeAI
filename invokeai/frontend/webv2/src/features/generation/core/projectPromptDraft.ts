@@ -1,7 +1,13 @@
-import type { PromptTemplateSnapshot } from './promptTemplates';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+
+import type { PromptTemplateFieldValues, PromptTemplateSnapshot } from './promptTemplates';
 import type { DynamicPromptsSettings } from './types';
 
-import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
+import {
+  isCanonicalPromptTemplateSnapshot,
+  normalizePromptTemplateFieldValues,
+  sanitizePromptTemplateSnapshot,
+} from './promptTemplates';
 import { normalizeDynamicPromptsSettings } from './settings';
 
 /**
@@ -13,6 +19,7 @@ export interface ProjectPromptDraft extends DynamicPromptsSettings {
   negativePromptEnabled: boolean;
   positivePrompt: string;
   promptTemplate: PromptTemplateSnapshot | null;
+  promptTemplateFieldValues: PromptTemplateFieldValues;
   /** Whether the prompt boxes show the template-merged prompt instead of the authored text. */
   promptTemplateViewMode: boolean;
 }
@@ -23,6 +30,7 @@ const TEXT_KEYS = ['negativePrompt', 'negativePromptEnabled', 'positivePrompt'] 
 const DRAFT_KEYS = [
   ...TEXT_KEYS,
   'promptTemplate',
+  'promptTemplateFieldValues',
   'promptTemplateViewMode',
   'dynamicPromptsCombinatorial',
   'dynamicPromptsEnabled',
@@ -45,6 +53,7 @@ export const getPromptDraftFromValues = (values: Record<string, unknown>): Proje
     negativePromptEnabled: values.negativePromptEnabled !== false,
     positivePrompt: typeof values.positivePrompt === 'string' ? values.positivePrompt : '',
     promptTemplate,
+    promptTemplateFieldValues: normalizePromptTemplateFieldValues(values.promptTemplateFieldValues),
     promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,
   };
 };
@@ -62,7 +71,9 @@ export const areProjectPromptDraftsEqual = (left: ProjectPromptDraft, right: Pro
   DRAFT_KEYS.every((key) =>
     key === 'promptTemplate'
       ? arePromptTemplatesEqual(left.promptTemplate, right.promptTemplate)
-      : Object.is(left[key], right[key])
+      : key === 'promptTemplateFieldValues'
+        ? areJsonValuesStructurallyEqual(left.promptTemplateFieldValues, right.promptTemplateFieldValues)
+        : Object.is(left[key], right[key])
   );
 
 /** Writes the text fields and whichever others the patch names, each read as the draft reads it. */

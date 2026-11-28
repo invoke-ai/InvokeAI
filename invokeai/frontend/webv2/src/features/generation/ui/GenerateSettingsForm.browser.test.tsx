@@ -6,6 +6,7 @@ import type { ComponentType } from 'react';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { promptTemplatesQueryOptions } from '@features/generation/data/promptTemplates';
 import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
@@ -789,6 +790,40 @@ describe('GenerateSettingsForm prompt changes past the prompt text', () => {
     expect(storedValues().getSnapshot()).toMatchObject({
       negativePrompt: 'blurry',
       positivePrompt: 'a fox in deep snow',
+    });
+  });
+
+  it('keeps field text still inside its debounce when another template is chosen', async () => {
+    const record = { hasImage: false, isDefault: false, isPublic: false, negativePrompt: '', userId: 'user-1' };
+    const still = { ...record, id: 'still', name: 'Still', positivePrompt: '{prompt}, {style}' };
+    const film = { ...record, id: 'film', name: 'Film', positivePrompt: '{prompt}, {style}, {stock}' };
+    queryClient.setQueryData(promptTemplatesQueryOptions().queryKey, [still, film]);
+    storedValues().patchSnapshot({
+      promptTemplate: { id: still.id, name: still.name, negativePrompt: '', positivePrompt: still.positivePrompt },
+    });
+    await renderAdapter(buildAdapter());
+    await settle(() => buttonNamed('widgets.generate.promptTemplates.title').click());
+    // Holds the debounce, so only the flush ahead of the switch can save the typing.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const style = host!.querySelector<HTMLInputElement>(
+      '[aria-label="widgets.generate.promptTemplates.fields"] input'
+    )!;
+
+    await settle(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(style, 'noir');
+      style.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(storedValues().getSnapshot().promptTemplateFieldValues).toEqual({});
+
+    await settle(() =>
+      [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"][data-part="content"] button')]
+        .find((candidate) => candidate.textContent?.includes('Film'))!
+        .click()
+    );
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      promptTemplate: { id: 'film' },
+      promptTemplateFieldValues: { style: 'noir' },
     });
   });
 });

@@ -15,6 +15,7 @@ describe('project prompt draft', () => {
       negativePromptEnabled: true,
       positivePrompt: '',
       promptTemplate: null,
+      promptTemplateFieldValues: {},
       promptTemplateViewMode: false,
     });
   });
@@ -55,6 +56,19 @@ describe('project prompt draft', () => {
     expect(applyProjectPromptDraft(values, { promptTemplate: null })).toMatchObject({
       promptTemplate: null,
       promptTemplateViewMode: false,
+    });
+  });
+
+  it('writes template field values, reads them back and keeps them when the template is cleared', () => {
+    const template = { id: 'film', name: 'Film', negativePrompt: '', positivePrompt: '{prompt}, {style}' };
+    const values = { positivePrompt: 'a fox', promptTemplate: template };
+    const applied = applyProjectPromptDraft(values, { promptTemplateFieldValues: { style: 'noir' } });
+
+    expect(getPromptDraftFromValues(applied).promptTemplateFieldValues).toEqual({ style: 'noir' });
+    expect(applyProjectPromptDraft(applied, { promptTemplateFieldValues: { style: 'noir' } })).toBe(applied);
+    expect(applyProjectPromptDraft(applied, { promptTemplate: null })).toMatchObject({
+      promptTemplate: null,
+      promptTemplateFieldValues: { style: 'noir' },
     });
   });
 

@@ -47,7 +47,11 @@ import {
   isOpenAIInputFidelity,
 } from './externalProvider';
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
-import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
+import {
+  isCanonicalPromptTemplateSnapshot,
+  normalizePromptTemplateFieldValues,
+  sanitizePromptTemplateSnapshot,
+} from './promptTemplates';
 import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
 import {
   DEFAULT_REFINER_CFG_SCALE,
@@ -755,6 +759,7 @@ export const cloneGenerateWidgetValues = (
   model: { ...values.model },
   mistralEncoderModel: values.mistralEncoderModel ? { ...values.mistralEncoderModel } : null,
   promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
+  promptTemplateFieldValues: { ...values.promptTemplateFieldValues },
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
@@ -1079,6 +1084,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     imageToPromptModelKey: typeof values.imageToPromptModelKey === 'string' ? values.imageToPromptModelKey : null,
     // Preserve canonical object identity to avoid false Object.is changes and reconciliation loops.
     promptTemplate,
+    promptTemplateFieldValues: normalizePromptTemplateFieldValues(values.promptTemplateFieldValues),
     promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,
     referenceImages: normalizeReferenceImages(values.referenceImages),
     scheduler: values.scheduler as string,

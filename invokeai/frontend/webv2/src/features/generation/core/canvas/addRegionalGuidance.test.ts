@@ -839,7 +839,12 @@ describe('getLayoutDraftRejectionReason', () => {
       positivePrompt: JSON.stringify({ ...draft, summary: { ...draft.summary, caption: '{prompt}' } }),
     };
     const withTemplate = (positivePrompt: string, promptTemplate: typeof prefix) =>
-      getLayoutDraftRejectionReason({ base: 'moss-image', positivePrompt, promptTemplate });
+      getLayoutDraftRejectionReason({
+        base: 'moss-image',
+        positivePrompt,
+        promptTemplate,
+        promptTemplateFieldValues: {},
+      });
 
     expect(withTemplate('{"bbox_coord_space": "abs", "items": [', prefix)).toBe(notJson);
     expect(withTemplate('a "neon" sign', scaffold)).toBe(notJson);

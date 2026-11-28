@@ -88,6 +88,7 @@ import {
   getPidDecoderBaseForMainBase,
   getPidDimensionOverrides,
 } from './pid';
+import { EMPTY_PROMPT_TEMPLATE_FIELD_VALUES } from './promptTemplates';
 import {
   DEFAULT_REFINER_CFG_SCALE,
   DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
@@ -598,6 +599,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     expandPromptModelKey: null,
     imageToPromptModelKey: null,
     promptTemplate: null,
+    promptTemplateFieldValues: EMPTY_PROMPT_TEMPLATE_FIELD_VALUES,
     promptTemplateViewMode: false,
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,

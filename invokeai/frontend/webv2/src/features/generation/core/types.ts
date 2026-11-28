@@ -1,6 +1,6 @@
 import type { BackendGraphContract, GraphContract } from '@features/generation/core/contracts';
 import type { DynamicPromptsSeedBehaviour } from '@features/generation/core/dynamicPrompts';
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { PromptTemplateFieldValues, PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { ModelRole } from '@features/models';
 import type { SeedMode } from '@platform/core/seed';
 
@@ -222,6 +222,8 @@ export interface GenerateSettings {
   negativePromptHeightPx: number;
   /** Stored template snapshots allow pure submission without catalog lookup. */
   promptTemplate: PromptTemplateSnapshot | null;
+  /** Kept when the template is cleared, so applying it again restores what was typed. */
+  promptTemplateFieldValues: PromptTemplateFieldValues;
   promptTemplateViewMode: boolean;
   /** Backend dynamic prompt expansion; projects saved before the toggle read as on. */
   dynamicPromptsEnabled: boolean;

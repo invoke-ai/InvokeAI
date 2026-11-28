@@ -4,6 +4,7 @@ import type {
   DynamicPromptsConfig,
   ProjectPromptDraft,
   ProjectPromptDraftPatch,
+  PromptTemplateFieldValues,
   PromptTemplateSnapshot,
 } from '@features/generation/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
@@ -16,6 +17,7 @@ import {
   flattenPromptTemplateExpansion,
   getDynamicPromptsConfig,
   getDynamicPromptsSettingsPatch,
+  retainPromptTemplateFieldValues,
 } from '@features/generation/settings';
 import { upscaleNegativePromptUsage } from '@features/upscale/core/settings';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
@@ -150,17 +152,28 @@ export const UpscalePromptFields = memo(
         if (change === 'synced' || template?.id === promptTemplate?.id) {
           onPatchPromptDraft(patch);
         } else if (template) {
-          patchWithUndo(patch, t('widgets.generate.promptTemplateApplied', { name: template.name }));
+          // Field typing still inside its debounce lands first, so the values kept are the ones on screen.
+          flushWorkbenchDrafts();
+          patchWithUndo(
+            {
+              ...patch,
+              promptTemplateFieldValues: retainPromptTemplateFieldValues(
+                readPromptDraft().promptTemplateFieldValues,
+                template
+              ),
+            },
+            t('widgets.generate.promptTemplateApplied', { name: template.name })
+          );
         } else {
           patchWithUndo(patch, t('widgets.generate.promptTemplateCleared', { name: promptTemplate?.name ?? '' }));
         }
       },
-      [onPatchPromptDraft, patchWithUndo, promptTemplate, t]
+      [onPatchPromptDraft, patchWithUndo, promptTemplate, readPromptDraft, t]
     );
 
     /** Bake the template into the authored prompt and stop applying it. */
     const flattenPromptTemplate = useCallback(
-      (positivePrompt: string) => {
+      (positivePrompt: string, fieldValues: PromptTemplateFieldValues) => {
         if (!promptTemplate) {
           onPatchPromptDraft({ positivePrompt, promptTemplateViewMode: false });
           return;
@@ -170,6 +183,7 @@ export const UpscalePromptFields = memo(
         patchWithUndo(
           flattenPromptTemplateExpansion({
             authoredNegativePrompt: readPromptDraft().negativePrompt,
+            fieldValues,
             selectedPositivePrompt: positivePrompt,
             template: promptTemplate,
           }),
@@ -228,6 +242,10 @@ export const UpscalePromptFields = memo(
       (positivePrompt: string) => onPatchPromptDraft({ positivePrompt }),
       [onPatchPromptDraft]
     );
+    const handleTemplateFieldValuesChange = useCallback(
+      (promptTemplateFieldValues: PromptTemplateFieldValues) => onPatchPromptDraft({ promptTemplateFieldValues }),
+      [onPatchPromptDraft]
+    );
     const handleNegativeChange = useCallback(
       (negativePrompt: string) => onPatchPromptDraft({ negativePrompt }),
       [onPatchPromptDraft]
@@ -262,11 +280,13 @@ export const UpscalePromptFields = memo(
           selectedModel={model ?? undefined}
           showSyntaxHighlighting={showSyntaxHighlighting}
           takesPendingTemplateDraft={false}
+          templateFieldValues={promptDraft.promptTemplateFieldValues}
           value={promptDraft.positivePrompt}
           onApplyPromptTemplate={applyPromptTemplate}
           onChange={handlePositiveChange}
           onFlattenPromptTemplate={flattenPromptTemplate}
           onResizeEnd={handlePositiveResizeEnd}
+          onTemplateFieldValuesChange={handleTemplateFieldValuesChange}
           onTemplateViewModeChange={setTemplateViewMode}
           onUsePrompt={handleUsePrompt}
         />
@@ -280,6 +300,7 @@ export const UpscalePromptFields = memo(
             projectId={projectId}
             selectedModel={model ?? undefined}
             showSyntaxHighlighting={showSyntaxHighlighting}
+            templateFieldValues={promptDraft.promptTemplateFieldValues}
             templateNegativePrompt={promptTemplate?.negativePrompt ?? null}
             value={promptDraft.negativePrompt}
             onChange={handleNegativeChange}

@@ -1116,6 +1116,7 @@ export const getUpscaleSubmissionSource = (
         dynamicPromptsEnabled: promptDraft.dynamicPromptsEnabled,
         dynamicPromptsSeedBehaviour: promptDraft.dynamicPromptsSeedBehaviour,
         promptTemplate: promptDraft.promptTemplate,
+        promptTemplateFieldValues: promptDraft.promptTemplateFieldValues,
       }),
 });
 

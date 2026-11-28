@@ -13,7 +13,7 @@ import type { ChangeEvent } from 'react';
 
 import { HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { GalleryMediaSlot } from '@features/gallery/mediaSlot';
-import { PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
+import { getPromptTemplateFields, PROMPT_TEMPLATE_PLACEHOLDER } from '@features/generation/core/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
@@ -97,6 +97,13 @@ export const PromptTemplateEditor = ({
 
   const trimmedName = draft.name.trim();
   const isPlaceholderPresent = draft.positivePrompt.includes(PROMPT_TEMPLATE_PLACEHOLDER);
+  const fieldLabels = useMemo(
+    () =>
+      getPromptTemplateFields({ negativePrompt: draft.negativePrompt, positivePrompt: draft.positivePrompt })
+        .map((field) => field.label)
+        .join(', '),
+    [draft.negativePrompt, draft.positivePrompt]
+  );
   const nameError = trimmedName.length > MAX_NAME_LENGTH ? t('widgets.generate.promptTemplates.nameTooLong') : null;
   const hasImage = draft.image.kind === 'replace' || (draft.image.kind === 'preserve' && template?.hasImage === true);
 
@@ -339,6 +346,12 @@ export const PromptTemplateEditor = ({
           }
         />
       </Field>
+
+      <Text color="fg.muted" fontSize="xs" textWrap="pretty" wordBreak="break-word">
+        {fieldLabels
+          ? t('widgets.generate.promptTemplates.fieldsDetected', { fields: fieldLabels })
+          : t('widgets.generate.promptTemplates.fieldsHelp')}
+      </Text>
 
       <Field label={t('widgets.generate.promptTemplates.image')}>
         <GalleryMediaSlot

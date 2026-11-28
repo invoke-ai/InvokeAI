@@ -178,6 +178,8 @@ export {
 export {
   flattenPromptTemplateExpansion,
   getEffectivePrompts,
+  retainPromptTemplateFieldValues,
+  type PromptTemplateFieldValues,
   type PromptTemplateSnapshot,
 } from './core/promptTemplates';
 export {

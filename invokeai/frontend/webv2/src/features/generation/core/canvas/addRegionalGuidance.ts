@@ -1,11 +1,11 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
 import type { FamilyConditioning } from '@features/generation/core/familyGraph';
-import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
+import type { PromptTemplateApplication } from '@features/generation/core/promptTemplates';
 
 import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
-import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
+import { getEffectivePrompts, unwrapPromptFence } from '@features/generation/core/promptTemplates';
 import { getArchitectureFeatures } from '@features/models/architectures';
 
 import type { Rect } from './types';
@@ -184,16 +184,14 @@ const getDraftRejectionReason = (prompt: string): string | null => {
  * Checks only the draft shape the layout node needs (`bbox_coord_space: "abs"`); the backend validates boxes.
  * Both authored and templated prompts are checked, since either can hide or break the other.
  */
-export const getLayoutDraftRejectionReason = (params: {
-  base: string;
-  positivePrompt: string;
-  promptTemplate?: PromptTemplateSnapshot | null;
-}): string | null => {
+export const getLayoutDraftRejectionReason = (
+  params: { base: string; positivePrompt: string } & PromptTemplateApplication
+): string | null => {
   // Only MOSS-Image compiles drafts; other layout bases (Ideogram 4) take `{` prompts verbatim.
   if (params.base !== 'moss-image') {
     return null;
   }
-  const effectivePrompt = getEffectivePositivePrompt(params.positivePrompt, params.promptTemplate ?? null);
+  const effectivePrompt = getEffectivePrompts({ ...params, negativePrompt: '' }).positivePrompt;
   return (
     getDraftRejectionReason(params.positivePrompt) ??
     (effectivePrompt === params.positivePrompt ? null : getDraftRejectionReason(effectivePrompt))

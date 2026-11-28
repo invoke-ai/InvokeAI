@@ -117,6 +117,7 @@ const NON_OVERRIDABLE_SETTINGS: ReadonlySet<string> = new Set([
   'negativePrompt',
   'positivePrompt',
   'promptTemplate',
+  'promptTemplateFieldValues',
   'referenceImages',
   'seed',
   'seedMode',

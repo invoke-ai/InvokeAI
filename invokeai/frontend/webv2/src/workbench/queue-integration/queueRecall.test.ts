@@ -186,6 +186,22 @@ describe('buildQueueRecallValues', () => {
     });
   });
 
+  it('recalls prompts with the template they ran under and the values of its fields', () => {
+    const promptTemplate = { id: 'film', name: 'Film', negativePrompt: '', positivePrompt: '{prompt}, {style}' };
+    const snapshot = makeValues({
+      positivePrompt: 'snap',
+      promptTemplate,
+      promptTemplateFieldValues: { style: 'noir' },
+    });
+    const withOtherValues = { ...current, promptTemplateFieldValues: { style: 'pastel', subject: 'a fox' } };
+
+    expect(buildQueueRecallValues('prompts', { current: withOtherValues, meta: {}, snapshot })).toMatchObject({
+      positivePrompt: 'snap',
+      promptTemplate,
+      promptTemplateFieldValues: { style: 'noir' },
+    });
+  });
+
   it('prefers the executed session seed and pins randomization off', () => {
     const snapshot = makeValues({ seed: 7, seedMode: 'fixed' });
 

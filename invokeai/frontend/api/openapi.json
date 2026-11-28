@@ -49282,6 +49282,9 @@
                   "$ref": "#/components/schemas/PromptTemplateInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/PromptTemplateValueInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/PromptsFromFileInvocation"
                 },
                 {
@@ -50003,6 +50006,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/PromptTemplateOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/PromptTemplateValueOutput"
                 },
                 {
                   "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
@@ -60241,6 +60247,9 @@
                 "$ref": "#/components/schemas/PromptTemplateInvocation"
               },
               {
+                "$ref": "#/components/schemas/PromptTemplateValueInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
               },
               {
@@ -60958,6 +60967,9 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateOutput"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateValueOutput"
               },
               {
                 "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
@@ -61992,6 +62004,9 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -63220,6 +63235,9 @@
           "prompt_template": {
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
+          "prompt_template_value": {
+            "$ref": "#/components/schemas/PromptTemplateValueOutput"
+          },
           "qwen_image_2_1_denoise": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
           },
@@ -63804,6 +63822,7 @@
           "pidi_edge_detection",
           "prompt_from_file",
           "prompt_template",
+          "prompt_template_value",
           "qwen_image_2_1_denoise",
           "qwen_image_2_1_i2l",
           "qwen_image_2_1_l2i",
@@ -64806,6 +64825,9 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -66138,6 +66160,9 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateValueInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -106756,7 +106781,7 @@
         "category": "prompt",
         "class": "invocation",
         "classification": "stable",
-        "description": "Applies a Style Preset template to positive and negative prompts.\n\nSelect a Style Preset and provide positive/negative prompts. The node replaces\n{prompt} placeholders in the template with your input prompts.",
+        "description": "Applies a Style Preset template to positive and negative prompts.\n\nSelect a Style Preset and provide positive/negative prompts. The node replaces\n{prompt} placeholders in the template with your input prompts, and the template's\nother {name} placeholders with the connected Prompt Template Values.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -106820,6 +106845,29 @@
             "type": "string",
             "ui_component": "textarea"
           },
+          "values": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromptTemplateValueField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PromptTemplateValueField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text for the template's other {name} placeholders. May be a single value or a collection. A placeholder without a value is removed.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Values"
+          },
           "type": {
             "const": "prompt_template",
             "default": "prompt_template",
@@ -106832,7 +106880,7 @@
         "tags": ["prompt", "template", "style", "preset"],
         "title": "Prompt Template",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/PromptTemplateOutput"
         }
@@ -106865,6 +106913,121 @@
         },
         "required": ["output_meta", "positive_prompt", "negative_prompt", "type", "type"],
         "title": "PromptTemplateOutput",
+        "type": "object"
+      },
+      "PromptTemplateValueField": {
+        "description": "The text for one custom placeholder of a prompt template",
+        "properties": {
+          "name": {
+            "description": "The placeholder's name, without braces",
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "description": "The text that replaces the placeholder",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": ["name", "value"],
+        "title": "PromptTemplateValueField",
+        "type": "object"
+      },
+      "PromptTemplateValueInvocation": {
+        "category": "prompt",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Sets the text for one of a prompt template's {name} placeholders.\n\nConnect it, or a collection of them, to a Prompt Template's Values.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The placeholder's name without braces: letters A-Z, numbers and underscores, starting with a letter. Upper and lower case are the same name.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Name"
+          },
+          "value": {
+            "default": "",
+            "description": "The text that replaces the placeholder",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Value",
+            "type": "string"
+          },
+          "type": {
+            "const": "prompt_template_value",
+            "default": "prompt_template_value",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "template", "style", "preset"],
+        "title": "Prompt Template Value",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/PromptTemplateValueOutput"
+        }
+      },
+      "PromptTemplateValueOutput": {
+        "class": "output",
+        "description": "Output for the Prompt Template Value node",
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/PromptTemplateValueField",
+            "description": "The placeholder's name and text, for a Prompt Template's Values",
+            "field_kind": "output",
+            "title": "Value",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "prompt_template_value_output",
+            "default": "prompt_template_value_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "value", "type", "type"],
+        "title": "PromptTemplateValueOutput",
         "type": "object"
       },
       "PromptsFromFileInvocation": {
