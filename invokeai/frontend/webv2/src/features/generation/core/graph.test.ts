@@ -66,7 +66,7 @@ const flux2DevGgufModel: MainModelConfig = {
 };
 const fluxKontextModel: MainModelConfig = {
   base: 'flux',
-  format: 'diffusers',
+  format: 'checkpoint',
   key: 'flux-kontext',
   name: 'FLUX Kontext dev',
   type: 'main',

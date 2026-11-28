@@ -101,7 +101,7 @@
     },
     "flux": {
       "componentsFilled": {
-        "diffusers": [
+        "checkpoint": [
           "clipEmbedModel",
           "t5EncoderModel",
           "vae"
