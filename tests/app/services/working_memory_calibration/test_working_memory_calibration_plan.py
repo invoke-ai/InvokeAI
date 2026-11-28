@@ -1167,14 +1167,14 @@ def test_a_flux_vae_skips_a_main_model_without_its_encoders(base, encoder) -> No
     "pipeline, bundled_line",
     [
         (_model("z-image", BaseModelType.ZImage, format="diffusers"), "decode_bf16"),
-        (_sdnq_pipeline("z-image", BaseModelType.ZImage), "decode_fp32"),
+        (_sdnq_pipeline("z-image", BaseModelType.ZImage), "decode_bf16"),
     ],
     ids=["diffusers", "sdnq"],
 )
 def test_a_z_image_model_decodes_with_the_vae_of_its_default_component_source(pipeline, bundled_line) -> None:
-    """Selecting the model fills its `component_source` slot (a Z-Image pipeline), whose own VAE the model loader node
-    then takes where no VAE is set: under `precision: float32` the pipeline's VAE loads in bf16 where a standalone FLUX
-    VAE stays fp32, and the case needs no VAE pick."""
+    """Selecting the model fills its `component_source` slot (a Z-Image Diffusers or SDNQ pipeline), whose own VAE the
+    model loader node then takes where no VAE is set: under `precision: float32` the pipeline's VAE loads in bf16 where a
+    standalone FLUX VAE stays fp32, and the case needs no VAE pick."""
     gguf = _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized")
     flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
     with_source = _with_default_components(gguf, component_source="z-image")
