@@ -22,6 +22,7 @@ from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_
 from invokeai.backend.util.vae_working_memory import (
     estimate_vae_working_memory_flux,
     should_pretile_vae_decode,
+    vae_compute_dtype,
 )
 
 
@@ -100,7 +101,7 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                     "VAE model type changed unexpectedly after loading."
                 )
 
-            vae_dtype = next(iter(vae.parameters())).dtype
+            vae_dtype = vae_compute_dtype(vae)
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
             # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).

@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Final, Literal, NamedTuple, Optional
 
 import torch
@@ -99,9 +98,6 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 )
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
-from invokeai.backend.model_manager.taxonomy import SubModelType
-from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import dtype_name, estimate_untiled_vae_decode
 from invokeai.backend.working_memory import fingerprint, user_fit
@@ -212,18 +208,11 @@ class DeviceMemory:
     `capacity_bytes`, which counts the RAM the host has available."""
 
 
-def _vae_dtypes(device: torch.device, models_path: Path) -> VaeDtypes:
-    """What the VAE loaders choose on `device`, by the loaders' own rules, for models installed under `models_path`."""
-
-    def sdnq_quantized_vae(config: Any) -> bool:
-        # Where `FluxSDNQDiffusersModel._load_model` looks, with the path the loader makes absolute.
-        pipeline = SimpleNamespace(path=models_path / config.path, submodels=getattr(config, "submodels", None))
-        return is_sdnq_folder(resolve_submodel_path(pipeline, SubModelType.VAE, pipeline.path / SubModelType.VAE.value))
-
+def _vae_dtypes(device: torch.device) -> VaeDtypes:
+    """What the VAE loaders choose on `device`, by the loaders' own rules."""
     return VaeDtypes(
         standalone_flux=dtype_name(TorchDevice.dtype_avoiding_float16(TorchDevice.choose_torch_dtype(device), device)),
         z_image_pipeline=dtype_name(TorchDevice.choose_bfloat16_safe_dtype(device)),
-        sdnq_quantized_vae=sdnq_quantized_vae,
     )
 
 
@@ -567,7 +556,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         ] = fingerprint.environment_for,
         untiled_decode_reservation: Callable[[str, int, int, str, torch.device], int] = _untiled_decode_reservation,
         device_memory: Optional[Callable[[torch.device], DeviceMemory]] = None,
-        vae_dtypes: Callable[[torch.device, Path], VaeDtypes] = _vae_dtypes,
+        vae_dtypes: Callable[[torch.device], VaeDtypes] = _vae_dtypes,
         is_model_missing: Callable[[AnyModelConfig, Path], bool] = is_model_missing,
     ) -> None:
         self._store = store
@@ -1847,7 +1836,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     def _vae_dtypes_on(self, device: Optional[torch.device]) -> VaeDtypes:
         """What the VAE loaders choose on `device`, by default the one models load onto."""
-        return self._vae_dtypes(device or TorchDevice.choose_torch_device(), self._services.configuration.models_path)
+        return self._vae_dtypes(device or TorchDevice.choose_torch_device())
 
     def _cache_memory(self, device: torch.device) -> DeviceMemory:
         """`DeviceMemory` for a GPU `device`: the capacity its model cache gives a calibration's lock, which that lock

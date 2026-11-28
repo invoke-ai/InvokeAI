@@ -883,7 +883,9 @@ class ZImageSDNQCheckpointModel(ModelLoader):
         from diffusers import AutoencoderKL
 
         vae_dir = resolve_submodel_path(config, SubModelType.VAE, Path(config.path) / "vae")
-        return AutoencoderKL.from_pretrained(vae_dir, local_files_only=True)
+        # The dtype `ZImageDiffusersModel` gives every component of a Diffusers pipeline.
+        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        return AutoencoderKL.from_pretrained(vae_dir, torch_dtype=dtype, local_files_only=True)
 
     def _load_from_singlefile(
         self,

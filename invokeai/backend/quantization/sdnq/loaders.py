@@ -48,6 +48,20 @@ def raise_on_incomplete_sdnq_load(
         raise ValueError(f"Missing keys loading {model_name} (required parameters left on meta): {real_missing}")
 
 
+def cast_unpacked_floats(state_dict: dict[str, Union[SDNQTensor, torch.Tensor]], dtype: torch.dtype) -> None:
+    """Cast the floating-point tensors that are not packed (norms, biases, unquantized layers) to ``dtype``, in place.
+
+    ``sdnq_sd_loader`` keeps them in the dtype on disk, while the packed weights dequantize to its ``compute_dtype``.
+    A module that does not cast its input, such as a group norm, then meets an input of the compute dtype and a
+    parameter of another one. ``from_pretrained(torch_dtype=...)`` makes the same cast for an ordinary model, but only
+    where the model declares no ``_keep_in_fp32_modules``: such a model (T5, several transformers) needs those modules
+    left wider, so this suits the VAEs, not every SDNQ load.
+    """
+    for key, value in state_dict.items():
+        if not isinstance(value, SDNQTensor) and value.is_floating_point() and value.dtype != dtype:
+            state_dict[key] = value.to(dtype)
+
+
 def _parse_quantization_config(config_path: Path) -> dict[str, Any]:
     """Parse quantization_config.json for SDNQ parameters."""
     if not config_path.exists():

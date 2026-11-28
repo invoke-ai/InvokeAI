@@ -133,7 +133,11 @@ from invokeai.backend.quantization.int8_convrot import (
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
-from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import (
+    cast_unpacked_floats,
+    raise_on_incomplete_sdnq_load,
+    sdnq_sd_loader,
+)
 from invokeai.backend.t5.t5_encoder import (
     infer_t5_encoder_config,
     make_t5_feed_forward_safe,
@@ -1786,9 +1790,11 @@ class Flux2SDNQCheckpointModel(ModelLoader):
             cls_name = AutoencoderKL.load_config(vae_dir, local_files_only=True).get("_class_name", "")
         except Exception:
             cls_name = ""
+        # bf16 like `Flux2DiffusersModel`, which forces it for every FLUX.2 pipeline component; without a dtype
+        # diffusers would load the bf16 weights on disk as fp32.
         if cls_name == "AutoencoderKLFlux2":
-            return AutoencoderKLFlux2.from_pretrained(vae_dir, local_files_only=True)
-        return AutoencoderKL.from_pretrained(vae_dir, local_files_only=True)
+            return AutoencoderKLFlux2.from_pretrained(vae_dir, torch_dtype=torch.bfloat16, local_files_only=True)
+        return AutoencoderKL.from_pretrained(vae_dir, torch_dtype=torch.bfloat16, local_files_only=True)
 
     def _load_from_singlefile(self, config: Main_SDNQ_Flux2_Config) -> AnyModel:
         from diffusers import Flux2Transformer2DModel
@@ -2475,13 +2481,14 @@ class FluxSDNQDiffusersModel(ModelLoader):
         """Load VAE - SDNQ or normal."""
         if _is_sdnq_folder(vae_path):
             return self._load_sdnq_vae(vae_path)
-        # Normal VAE
-        return AutoencoderKL.from_pretrained(vae_path, local_files_only=True)
+        # Normal VAE, in bf16 like every component of `FluxDiffusersModel`.
+        return AutoencoderKL.from_pretrained(vae_path, torch_dtype=torch.bfloat16, local_files_only=True)
 
     def _load_sdnq_vae(self, vae_path: Path) -> AnyModel:
         """Load SDNQ-quantized VAE."""
         # Load SDNQ state dict
         sd = sdnq_sd_loader(vae_path, compute_dtype=torch.bfloat16)
+        cast_unpacked_floats(sd, torch.bfloat16)
 
         # Load config and create model
         with accelerate.init_empty_weights():
