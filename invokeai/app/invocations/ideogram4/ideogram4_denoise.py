@@ -106,6 +106,15 @@ def _effective_guidance_schedule(
     return (polish_gw,) * polish_count + (main_gw,) * main_count
 
 
+def _explicit_mu(mu: float | None) -> float | None:
+    """The mu override the user set, or None when the node uses the sampler preset's.
+
+    Negative mu is valid, so only exactly 0 reads as unset: the workflow editor sends 0 for an optional float field the
+    user left alone. Both the schedule and the recorded metadata read the mu through here.
+    """
+    return mu if mu is not None and mu != 0.0 else None
+
+
 @invocation(
     "ideogram4_denoise",
     title="Denoise - Ideogram 4",
@@ -157,7 +166,8 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         default=None,
         ge=-4.0,
         le=4.0,
-        description="Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.",
+        description="Override the logit-normal schedule mean (resolution-adjusted internally). "
+        "Empty or 0 = use the preset (0 cannot be set as an override).",
     )
 
     def _build_metadata(self) -> MetadataField:
@@ -182,7 +192,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["ideogram4_steps"] = self.steps
         if self.guidance_scale is not None:
             updates["ideogram4_guidance_scale"] = self.guidance_scale
-        if self.mu is not None:
+        if _explicit_mu(self.mu) is not None:
             updates["ideogram4_mu"] = self.mu
         if getattr(self, "unconditional_transformer", None) is not None:
             updates["ideogram4_unconditional_model"] = self.unconditional_transformer.transformer
@@ -203,7 +213,9 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
 
         # Apply optional advanced overrides on top of the preset.
         num_steps = self.steps if self.steps is not None else preset.num_steps
-        mu = self.mu if self.mu is not None else preset.mu
+        mu = _explicit_mu(self.mu)
+        if mu is None:
+            mu = preset.mu
         guidance_schedule = _effective_guidance_schedule(
             preset.guidance_schedule, preset.num_steps, num_steps, self.guidance_scale
         )

@@ -748,7 +748,7 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation):
     title=f"{ZImageDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.2.0",
+    version="1.2.1",
     classification=Classification.Deprecated,
 )
 class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation):

@@ -561,6 +561,8 @@ def test_sd3_cogview4_zimage_anima_denoise_build_metadata() -> None:
     assert len(z_md["controlnets"]) == 1
     assert z_md["seed"] == 33
     assert z_node.model_copy(update={"shift": None})._build_metadata().root["z_image_shift"] == "auto"
+    # A shift of 0 runs the automatic schedule, so it is recorded as automatic, not as an override to recall.
+    assert z_node.model_copy(update={"shift": 0.0})._build_metadata().root["z_image_shift"] == "auto"
 
     ipa_id = _make_model_id(key="anima-ipa", base=BaseModelType.Anima, model_type=ModelType.IPAdapter)
     anima_md = (
@@ -692,6 +694,9 @@ def test_ernie_ideogram4_krea2_qwen_denoise_build_metadata() -> None:
     assert ideo_overrides_md["ideogram4_steps"] == 14
     assert ideo_overrides_md["ideogram4_guidance_scale"] == 5.5
     assert ideo_overrides_md["ideogram4_mu"] == 0.25
+    # A mu of 0 uses the preset's, so it is not recorded as an override. A negative mu is a real override.
+    assert "ideogram4_mu" not in ideo_node.model_copy(update={"mu": 0.0})._build_metadata().root
+    assert ideo_node.model_copy(update={"mu": -0.5})._build_metadata().root["ideogram4_mu"] == -0.5
 
     krea_node = Krea2DenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=1.0)]),
@@ -750,6 +755,10 @@ def test_ernie_ideogram4_krea2_qwen_denoise_build_metadata() -> None:
     assert len(qwen_md["controlnets"]) == 1
     assert qwen_md["seed"] == 88
     assert qwen_node.model_copy(update={"shift": None})._build_metadata().root["qwen_image_shift"] == "auto"
+    # Zero and negative shifts run the default schedule, so they are recorded as automatic.
+    for unset_shift in (0.0, -1.0):
+        unset_md = qwen_node.model_copy(update={"shift": unset_shift})._build_metadata().root
+        assert unset_md["qwen_image_shift"] == "auto"
 
     qwen21_node = QwenImage21DenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=0.9)]),

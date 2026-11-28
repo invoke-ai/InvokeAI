@@ -21170,7 +21170,7 @@ export type components = {
             guidance_scale?: number | null;
             /**
              * Mu
-             * @description Override the logit-normal schedule mean (resolution-adjusted internally). Empty = use the preset.
+             * @description Override the logit-normal schedule mean (resolution-adjusted internally). Empty or 0 = use the preset (0 cannot be set as an override).
              * @default null
              */
             mu?: number | null;
@@ -48174,7 +48174,7 @@ export type components = {
             seed?: number;
             /**
              * Shift
-             * @description Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.
+             * @description Override the sigma schedule shift. A positive value uses that fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Empty, 0 or a negative value uses the base model's default schedule, which is resolution-dependent up to the area of the scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.
              * @default null
              */
             shift?: number | null;
@@ -61903,7 +61903,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Shift
-             * @description Override the timestep shift for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
+             * @description Override the timestep shift for the sigma schedule. Leave blank or set 0 to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
              * @default null
              */
             shift?: number | null;
@@ -62041,7 +62041,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Shift
-             * @description Override the timestep shift for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
+             * @description Override the timestep shift for the sigma schedule. Leave blank or set 0 to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
              * @default null
              */
             shift?: number | null;

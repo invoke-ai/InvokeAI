@@ -387,3 +387,23 @@ def test_the_first_preview_is_sent_inside_the_transformer_lock(monkeypatch, tmp_
         node._run_diffusion(context)
 
     assert events == ["lock", "preview", "unlock"]
+
+
+def test_a_shift_of_zero_sets_the_same_mu_as_no_shift(monkeypatch, tmp_path) -> None:
+    # The workflow editor sends 0 for an optional float field left alone; log(0) would crash the run.
+    model_path = tmp_path / "qwen-image.gguf"
+    auto = _run_to_scheduler(monkeypatch, model_path, 1024, 1024, shift=None)
+    zero = _run_to_scheduler(monkeypatch, model_path, 1024, 1024, shift=0.0)
+
+    assert zero == pytest.approx(0.5 + 0.4 * 3840 / 7936, abs=1e-12)  # the stock fit at 4096 tokens
+    assert zero == auto
+
+
+def test_a_negative_shift_sets_the_same_mu_as_no_shift(monkeypatch, tmp_path) -> None:
+    # The field has no lower bound; log() of a negative shift would crash the run.
+    model_path = tmp_path / "qwen-image.gguf"
+    auto = _run_to_scheduler(monkeypatch, model_path, 1024, 1024, shift=None)
+    negative = _run_to_scheduler(monkeypatch, model_path, 1024, 1024, shift=-1.0)
+
+    assert negative == pytest.approx(0.5 + 0.4 * 3840 / 7936, abs=1e-12)
+    assert negative == auto

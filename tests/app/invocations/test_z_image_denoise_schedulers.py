@@ -6,8 +6,7 @@ instead of the shifted ones, started img2img at sigma 1.0 whatever the img2img b
 
 These tests drive the real `_run_diffusion` through the denoising loop with a stand-in transformer.
 The node's own manual Euler path is the reference for the schedule: it steps the clipped sigmas
-directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout. An interval of zero length,
-which an explicit shift of 0 leaves at sigma 0, is the exception: Heun would divide by zero there.
+directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout.
 """
 
 from contextlib import nullcontext
@@ -165,23 +164,33 @@ def test_heun_progress_reaches_every_step():
     )
 
 
-def test_heun_at_a_shift_of_zero_takes_the_single_step_to_zero_that_euler_takes():
-    # A shift of 0 schedules [1, 0, ..., 0]: one interval, then intervals of zero length at sigma 0, where Heun
-    # would divide 0 by 0.
-    heun, result, callbacks = _drive("heun", shift=0.0)
+@pytest.mark.parametrize("scheduler", ["euler", "heun"])
+@pytest.mark.parametrize("denoising_start", [0.0, 0.5])
+def test_a_shift_of_zero_runs_the_auto_schedule(scheduler: str, denoising_start: float):
+    # The workflow editor sends 0 for an optional float field left alone; that must read as unset, not as a shift.
+    auto, auto_result, _ = _drive(scheduler, denoising_start, shift=None)
+    zero, zero_result, _ = _drive(scheduler, denoising_start, shift=0.0)
 
-    # One step from unit noise at sigma 1 to sigma 0 at a constant velocity.
-    assert torch.allclose(result, torch.full_like(result, 1.0 - VELOCITY))
-    assert heun.sigmas == [1.0]
-    assert [callback.step for callback in callbacks] == [1]
-    assert calc_percentage(callbacks[-1]) == pytest.approx(1.0)
+    assert len(auto.sigmas) > 1
+    assert zero.sigmas == auto.sigmas
+    assert torch.equal(zero_result, auto_result)
 
 
-def test_heun_img2img_at_a_shift_of_zero_returns_the_blend_when_only_sigma_zero_is_left():
-    # Past the first step a shift of 0 leaves only sigma 0: the blend uses it, and no interval remains to denoise.
-    heun, result, callbacks = _drive("heun", denoising_start=0.5, shift=0.0)
+def test_heun_rejects_a_shift_whose_sigmas_collapse_in_float32():
+    # 1e-50 is positive, so it is a real shift, but every interior sigma rounds to 0 in float32 and Heun would
+    # divide 0 by 0 across the repeated zero intervals.
+    with pytest.raises(ValueError, match="collapse"):
+        _drive("heun", shift=1e-50)
 
-    # Zero init latents blended at sigma 0 stay zero.
-    assert torch.equal(result, torch.zeros_like(result))
-    assert heun.sigmas == []
-    assert callbacks == []
+
+def test_a_tiny_shift_that_float32_still_resolves_runs_finite_in_heun():
+    _, result, _ = _drive("heun", shift=1e-30)
+
+    assert torch.isfinite(result).all()
+
+
+def test_euler_steps_through_a_collapsed_schedule_unchanged():
+    # Euler's zero-length intervals are no-ops, so the Heun-only guard must not reject it.
+    _, result, _ = _drive("euler", shift=1e-50)
+
+    assert torch.isfinite(result).all()

@@ -71,6 +71,15 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
 Z_IMAGE_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 
 
+def _explicit_shift(shift: float | None) -> float | None:
+    """The shift the user set, or None when the node auto-calculates it from the image size.
+
+    Only a positive shift counts as set: the workflow editor sends 0 for an optional float field the user left alone,
+    and a shift of 0 is no schedule. Both the schedule and the recorded metadata read the shift through here.
+    """
+    return shift if shift is not None and shift > 0 else None
+
+
 @invocation(
     "z_image_denoise",
     title="Denoise - Z-Image",
@@ -138,7 +147,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
         default=None,
         ge=0.0,
         description="Override the timestep shift for the sigma schedule. "
-        "Leave blank to auto-calculate based on image dimensions (recommended). "
+        "Leave blank or set 0 to auto-calculate based on image dimensions (recommended). "
         "This is the shift itself, not the mu it is derived from: the auto-calculated value runs "
         "from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more "
         "of the input image, higher values less.",
@@ -164,7 +173,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             "steps": self.steps,
             "cfg_scale": self.guidance_scale,
             "guidance": self.guidance_scale,
-            "z_image_shift": self.shift if self.shift is not None else "auto",
+            "z_image_shift": _explicit_shift(self.shift) or "auto",
             "scheduler": self.scheduler,
             "denoising_start": self.denoising_start,
             "denoising_end": self.denoising_end,
@@ -304,7 +313,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            # The ends are fixed. Evaluated, t = 0 would divide by zero, and so would t = 1 at a shift of 0.
+            # The ends are fixed. Evaluated, t = 0 would divide by zero.
             sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
@@ -370,10 +379,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             neg_prompt_embeds = negative_regional_extension.regional_text_conditioning.prompt_embeds
 
         # Calculate shift based on image sequence length, or use override
-        if self.shift is not None:
-            shift = self.shift
-        else:
-            shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
+        shift = _explicit_shift(self.shift) or Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(shift, self.steps)
@@ -388,14 +394,15 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
         is_heun = self.scheduler == "heun"
         if is_heun:
-            # Heun divides by every sigma it evaluates the model at, so an interval of zero length at sigma 0 is
-            # 0/0 and turns the latents into NaN; an explicit shift of 0 schedules [1, 0, ..., 0]. Such an interval
-            # has nothing to integrate (Euler steps through it unchanged), so Heun runs only the others and counts
-            # its progress over them. With none left, the pass returns the blended latents, as Euler would.
-            sigmas = [
-                sigma for sigma, sigma_next in zip(sigmas[:-1], sigmas[1:], strict=True) if sigma != sigma_next
-            ] + sigmas[-1:]
-
+            # Heun's scheduler holds the sigmas as float32 and divides by every sigma it evaluates, so an interval of
+            # zero length at sigma 0 is 0/0 and turns the latents into NaN. A positive but tiny shift (1e-50) rounds
+            # the interior sigmas to zero there. Euler steps through such an interval unchanged; Heun cannot.
+            float32_sigmas = torch.tensor(sigmas, dtype=torch.float32)
+            if len(sigmas) > 1 and not bool((float32_sigmas[1:] < float32_sigmas[:-1]).all()):
+                raise ValueError(
+                    f"A shift of {shift:g} gives a schedule whose sigmas collapse to equal values in float32, which "
+                    "the Heun scheduler cannot step through. Use a larger shift, leave it empty, or use Euler."
+                )
         total_steps = len(sigmas) - 1
 
         # Load input latents if provided (image-to-image)
