@@ -70,23 +70,39 @@ const waitForSettledDocument = async (page) => {
   });
 };
 
-const openRepresentativePage = async (browser, path, viewport = { height: 1_000, width: 1_440 }, themeId) => {
+const openRepresentativePage = async (
+  browser,
+  path,
+  viewport = { height: 1_000, width: 1_440 },
+  themeId,
+  { rearrangeWithoutCustomize = true } = {}
+) => {
   const resetResponse = await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
 
   if (!resetResponse.ok) {
     throw new Error(`Could not reset representative backend: ${resetResponse.status}.`);
   }
 
-  if (themeId) {
+  if (themeId || !rearrangeWithoutCustomize) {
     const response = await fetch(
       `${backendOrigin}/api/v1/client_state/default/set_by_key?key=webv2%3Aworkbench-settings`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })),
+        // The representative account rearranges, as the mock seeds it (`scripts/mock-backend.mjs`), unless a journey asks
+        // for the locked default.
+        body: JSON.stringify(
+          JSON.stringify({
+            betaNoticeAcknowledged: true,
+            rearrangeWithoutCustomize,
+            ...(themeId ? { themeId } : {}),
+            whatsNewSeenVersion: 'fixture',
+            workspaceLockOfferShown: true,
+          })
+        ),
       }
     );
-    assert.ok(response.ok, `Could not set ${themeId} accessibility fixture theme.`);
+    assert.ok(response.ok, 'Could not set the accessibility fixture settings.');
   }
 
   const context = await browser.newContext({
@@ -133,7 +149,7 @@ const waitForNodes = async (page) => {
   await page.getByText('fixture-pack-01', { exact: true }).waitFor();
 };
 
-const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Layout preset' });
+const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Workspaces' });
 
 const waitForWorkbench = async (page) => {
   await page.getByRole('main', { exact: true, name: 'Fixture Project 001' }).waitFor();
@@ -154,7 +170,7 @@ const centerViewTrigger = (page, label) => page.getByRole('button', { exact: tru
 
 const selectLayoutPreset = async (page, preset, centerView) => {
   // Custom presets and Workflow tabs can share prefixes.
-  const name = new RegExp(`^${preset}(, unsaved changes)?$`);
+  const name = new RegExp(`^${preset}$`);
   const strip = presetStrip(page);
   const selected = strip.getByRole('tab', { name, selected: true });
 
@@ -856,6 +872,7 @@ const runTopbarMenuJourney = async (browser) => {
     assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
       'queue',
       'widgets',
+      'customize-workspace',
       'donate',
       'whats-new',
       'documentation',
@@ -863,10 +880,11 @@ const runTopbarMenuJourney = async (browser) => {
     ]);
     const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
     const widgetsItem = appMenu.locator('[role="menuitem"][data-value="widgets"]');
+    const customizeItem = appMenu.locator('[role="menuitem"][data-value="customize-workspace"]');
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, donationItem, widgetsItem, queueItem]) {
+    for (const item of [documentationItem, whatsNewItem, donationItem, customizeItem, widgetsItem, queueItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
@@ -930,17 +948,33 @@ const runTopbarMenuJourney = async (browser) => {
     await page.getByRole('main', { exact: true, name: otherProjectName }).waitFor();
 
     const customPresetNames = ['Custom One', 'Custom Two', 'Custom Three', 'Custom Four', 'Custom Five', 'Custom Six'];
-    for (const presetName of customPresetNames) {
-      await page.getByRole('button', { exact: true, name: 'Save this layout as a new preset' }).click();
-      const savePresetDialog = page.getByRole('dialog', { exact: true, name: 'Save as new preset' });
-      await savePresetDialog.getByRole('textbox', { exact: true, name: 'Preset name' }).fill(presetName);
-      await savePresetDialog.getByRole('button', { exact: true, name: 'Save preset' }).click();
-      await savePresetDialog.waitFor({ state: 'hidden' });
+    const customizeBar = page.locator('[data-customize-bar]');
+    const workspaceTabs = page.locator('[role="tab"][data-layout-preset-id]');
+    const tabsBefore = await workspaceTabs.count();
+    // New workspace drafts a copy of this one in Customize, its name focused; Cancel leaves no tab behind.
+    await page.getByRole('button', { exact: true, name: 'New workspace' }).click();
+    await customizeBar.waitFor();
+    await expectFocused(
+      customizeBar.getByRole('textbox', { exact: true, name: 'Workspace name' }),
+      'New workspace did not focus its name.'
+    );
+    await assertNoAxeViolations(page, `${id}:customize`);
+    await customizeBar.getByRole('button', { exact: true, name: 'Cancel' }).click();
+    await customizeBar.waitFor({ state: 'detached' });
+    assert.equal(await workspaceTabs.count(), tabsBefore);
+    // Done creates it.
+    for (const [index, presetName] of customPresetNames.entries()) {
+      await page.getByRole('button', { exact: true, name: 'New workspace' }).click();
+      await customizeBar.waitFor();
+      await customizeBar.getByRole('textbox', { exact: true, name: 'Workspace name' }).fill(presetName);
+      await customizeBar.getByRole('button', { exact: true, name: 'Done' }).click();
+      await customizeBar.waitFor({ state: 'detached' });
+      assert.equal(await workspaceTabs.count(), tabsBefore + index + 1);
     }
     for (const presetName of customPresetNames) {
       await page.getByRole('tab', { exact: true, name: presetName }).waitFor();
     }
-    assert.equal(await page.getByRole('button', { name: /^More layout presets/ }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: /^More workspaces/ }).count(), 0);
     const presetScroller = page.locator('[data-layout-preset-scroll]');
     await presetScroller.waitFor();
     const presetScrollerMetrics = await presetScroller.evaluate((scroller) => ({
@@ -948,7 +982,7 @@ const runTopbarMenuJourney = async (browser) => {
       scrollWidth: scroller.scrollWidth,
     }));
     assert.ok(presetScrollerMetrics.scrollWidth > presetScrollerMetrics.clientWidth);
-    const savePresetButton = page.getByRole('button', { exact: true, name: 'Save this layout as a new preset' });
+    const savePresetButton = page.getByRole('button', { exact: true, name: 'New workspace' });
     const [scrollerBounds, savePresetBounds] = await Promise.all([
       presetScroller.boundingBox(),
       savePresetButton.boundingBox(),
@@ -972,8 +1006,8 @@ const runTopbarMenuJourney = async (browser) => {
     }));
     assert.equal(presetLayoutMetrics.scrollWidth, presetLayoutMetrics.clientWidth);
 
-    await page.getByRole('tab', { name: /^Edit(?:, unsaved changes)?$/ }).click({ button: 'right' });
-    const switchLayout = page.getByRole('menuitem', { exact: true, name: 'Switch to this layout' });
+    await page.getByRole('tab', { name: /^Edit$/ }).click({ button: 'right' });
+    const switchLayout = page.getByRole('menuitem', { exact: true, name: 'Switch to this workspace' });
     await switchLayout.waitFor();
     assert.equal(await switchLayout.locator('svg.lucide-check').count(), 0);
     assert.equal(await switchLayout.locator('svg.lucide-arrow-right').count(), 1);
@@ -1272,25 +1306,110 @@ const runLayersPanesJourney = async (browser) => {
   }
 };
 
+/** The locked default a new account starts with: structural chrome absent, the editor audited as it first appears. */
+const runLockedWorkspaceJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(
+    browser,
+    representativeProjectPath,
+    undefined,
+    undefined,
+    { rearrangeWithoutCustomize: false }
+  );
+  const id = 'workbench-locked-default';
+
+  try {
+    await waitForWorkbench(page);
+    const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
+
+    await rail.getByRole('button').first().waitFor();
+    assert.equal(await rail.getByRole('button', { name: 'Right panel widgets' }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Status bar widgets' }).count(), 0);
+    await page.getByRole('button', { exact: true, name: 'New workspace' }).waitFor();
+    await assertNoAxeViolations(page, id);
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
+/**
+ * A locked workspace is never a dead end: a widget no workspace places opens as a guest window, and a tool whose
+ * subject is hidden says so in its frame with the way back.
+ */
+const runGuestsAndNeedsJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(
+    browser,
+    representativeProjectPath,
+    undefined,
+    undefined,
+    { rearrangeWithoutCustomize: false }
+  );
+  const id = 'workbench-guests-and-needs';
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
+
+    await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+    await page.getByRole('menuitem', { exact: true, name: 'Widgets…' }).click();
+    await page
+      .getByRole('dialog', { exact: true, name: 'Widgets' })
+      .getByRole('button', { exact: true, name: 'Show Diagnostics' })
+      .click();
+    const guestWindow = page.locator('[data-floating-window]');
+    await guestWindow.getByRole('button', { exact: true, name: 'Keep Diagnostics in workspace' }).waitFor();
+    assert.equal(await guestWindow.getByRole('button', { name: /^Dock to/ }).count(), 0, 'A guest has no Dock.');
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:guest-window`);
+    await guestWindow.getByRole('button', { exact: true, name: 'Close Diagnostics window' }).click();
+    await guestWindow.waitFor({ state: 'detached' });
+
+    await selectCenterView(page, 'Canvas', 'Preview');
+    const showCanvas = page.getByRole('button', { exact: true, name: 'Show Canvas' });
+    await showCanvas.waitFor();
+    await page.getByText('Canvas is hidden', { exact: true }).first().waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:unmet-need`);
+    await showCanvas.click();
+    await centerViewTrigger(page, 'Canvas').waitFor();
+    await showCanvas.waitFor({ state: 'detached' });
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const runFloatingWindowJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-floating-window';
 
   try {
     await waitForWorkbench(page);
-    await selectLayoutPreset(page, 'Video', 'Preview');
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
 
     const rail = page.getByRole('navigation', { exact: true, name: 'Right rail' });
-    const center = centerRegion(page);
     const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
     const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
+    // Edit's rail holds Preview beside the center's: floating it there leaves the center its Canvas.
+    // Every panel floats; the Preview panel's own button floats Preview.
     const floatPreviewFromRail = async () => {
-      await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
-      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
-      await page.keyboard.press('Escape');
-      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await page
+        .getByRole('group', { exact: true, name: 'Preview' })
+        .getByRole('button', { exact: true, name: 'Float Window' })
+        .click();
       await floatingWindow.waitFor();
       await marker.waitFor();
+      await centerViewTrigger(page, 'Canvas').waitFor();
     };
     const focusedRegion = () =>
       page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
@@ -1307,9 +1426,9 @@ const runFloatingWindowJourney = async (browser) => {
         region
       );
 
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).click();
     await floatPreviewFromRail();
     await waitForActiveWindow();
-    await center.getByText('Preview is in a floating window', { exact: true }).waitFor();
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:floating`);
 
@@ -1351,29 +1470,22 @@ const runFloatingWindowJourney = async (browser) => {
     await marker.click({ button: 'right' });
     assert.deepEqual(await page.getByRole('menuitem').allInnerTexts(), ['Dock to right panel', 'Remove Preview']);
     await page.getByRole('menuitem', { exact: true, name: 'Remove Preview' }).click();
-    await centerViewTrigger(page, 'Preview').waitFor();
     await floatingWindow.waitFor({ state: 'detached' });
     assert.equal(await marker.count(), 0, 'Removing the window must free its rail slot.');
-    await waitForFocusedRegion('center');
+    await waitForFocusedRegion('right');
 
+    await rail.getByRole('button', { exact: true, name: 'Right panel widgets' }).click();
+    await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
+    await page.keyboard.press('Escape');
     await floatPreviewFromRail();
-    await waitForActiveWindow();
-    await center.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
-    await centerViewTrigger(page, 'Preview').waitFor();
-    await floatingWindow.waitFor({ state: 'detached' });
-    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
-    await waitForFocusedRegion('center');
-    assert.equal(await focusedRegion(), 'center');
-
-    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
-    await floatingWindow.waitFor();
     await waitForActiveWindow();
     await floatingWindow.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
     await floatingWindow.waitFor({ state: 'detached' });
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
     await waitForFocusedRegion('right');
+    assert.equal(await focusedRegion(), 'right');
 
-    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
-    await floatingWindow.waitFor();
+    await floatPreviewFromRail();
     await waitForActiveWindow();
     await marker.focus();
     await page.keyboard.press('Shift+F10');
@@ -1383,11 +1495,17 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:docked`);
 
+    // Video's center holds only Preview; Image Map floats from its rails.
+    await selectLayoutPreset(page, 'Video', 'Preview');
+
     const floatImageMapFrom = async (widgetRail, menuName) => {
       await widgetRail.getByRole('button', { exact: true, name: menuName }).click();
       await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
       await page.keyboard.press('Escape');
-      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await page
+        .getByRole('group', { exact: true, name: 'Image Map' })
+        .getByRole('button', { exact: true, name: 'Float Window' })
+        .click();
       await floatingWindow.waitFor();
       await waitForActiveWindow();
     };
@@ -1824,7 +1942,7 @@ const runNativeUsersRecoveryJourney = async (browser) => {
     blocked = false;
     await page.getByRole('button', { name: 'Retry', exact: true }).press('Enter');
     await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
-    await page.getByText('0 accounts in this workspace.', { exact: true }).waitFor();
+    await page.getByText('0 accounts on this server.', { exact: true }).waitFor();
     assert.deepEqual(requests, [503, 200]);
     await page.getByRole('button', { name: 'Add user', exact: true }).click();
     await page.getByRole('dialog').waitFor();
@@ -1883,8 +2001,14 @@ try {
   if (!requestedJourney || requestedJourney === 'workbench-layers-panes') {
     reports.push(await runLayersPanesJourney(browser));
   }
+  if (!requestedJourney || requestedJourney === 'workbench-locked-default') {
+    reports.push(await runLockedWorkspaceJourney(browser));
+  }
   if (!requestedJourney || requestedJourney === 'workbench-floating-window') {
     reports.push(await runFloatingWindowJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-guests-and-needs') {
+    reports.push(await runGuestsAndNeedsJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));

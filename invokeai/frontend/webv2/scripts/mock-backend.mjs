@@ -436,11 +436,18 @@ const createState = (profile, clock) => {
   return {
     boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
-    // Dismiss the beta notice and What's New notes so journeys start on the requested page.
+    // Dismiss the beta notice and What's New notes so journeys start on the requested page. The account is one that
+    // used an earlier build and kept rearranging when offered the lock: structural chrome works without Customize, as
+    // the journeys expect, and no one-time offer covers the page.
     clientState: new Map([
       [
         'webv2:workbench-settings',
-        JSON.stringify({ betaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
+        JSON.stringify({
+          betaNoticeAcknowledged: true,
+          rearrangeWithoutCustomize: true,
+          whatsNewSeenVersion: MOCK_APP_VERSION,
+          workspaceLockOfferShown: true,
+        }),
       ],
     ]),
     externalProviders: createExternalProviderConfigs(fixture.models),

@@ -39,13 +39,15 @@ const PROJECT_FIELDS = {
   canvas: 'scanned',
   // Session-only; names every generated image.
   events: 'excluded',
-  floatingWidgets: 'scanned',
   id: 'scanned',
   invocation: 'scanned',
   lastFloatingGeometry: 'scanned',
-  layout: 'scanned',
+  // Written back while the project waits for the editor to migrate it.
+  droppedArrangements: 'excluded',
+  adoptedArrangements: 'excluded',
+  heldLegacyLayout: 'scanned',
+  legacyLayout: 'scanned',
   name: 'scanned',
-  presetWorkingLayouts: 'scanned',
   promptHistory: 'scanned',
   // Session-only; names every generated image.
   queue: 'excluded',
@@ -56,11 +58,12 @@ const PROJECT_FIELDS = {
   widgetGraphs: 'excluded',
   // Scanned without Gallery instances (below).
   widgetInstances: 'scanned',
-  widgetRegions: 'scanned',
+  views: 'scanned',
   // Session-only, never saved.
   workflowHistories: 'excluded',
   // Scanned without each workflow's last run (below).
   workflows: 'scanned',
+  workspaceId: 'scanned',
 } as const satisfies Record<keyof Project, 'excluded' | 'scanned'>;
 
 const isExcludedField = (key: string): boolean =>

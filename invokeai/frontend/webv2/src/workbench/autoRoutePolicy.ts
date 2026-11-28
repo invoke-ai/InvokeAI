@@ -7,7 +7,7 @@ import { VIDEO_UI_STATE_KEYS } from '@features/video';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
-import { isInvocationSourceAvailable } from './invocation';
+import { isInvocationSourceAvailable } from './invocationSources';
 
 export type { CanvasEditIntent };
 

@@ -144,7 +144,16 @@ export const deserializeProjectRecord = (record: ProjectWithWorkspaceDTO): Proje
   );
 
   if (result.status === 'loaded') {
-    return { project: withAuthoritativeProjectBoard(result.project, record.board_id), status: 'loaded' };
+    const { legacyLayout } = result.project;
+    const project = withAuthoritativeProjectBoard(result.project, record.board_id);
+
+    // When the stored layout was last saved: an account adopts its most recently used project's arrangements.
+    return {
+      project: legacyLayout
+        ? { ...project, legacyLayout: { ...legacyLayout, storedAt: record.workspace?.updated_at ?? record.updated_at } }
+        : project,
+      status: 'loaded',
+    };
   }
   if (result.status === 'refused') {
     return { refused: { ...result.refused, raw: record.data }, status: 'refused' };

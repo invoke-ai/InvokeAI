@@ -18,6 +18,7 @@ import { FocusRegionProvider, type WorkbenchFocusController } from '@workbench/f
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { closeWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import i18next from 'i18next';
 import { MapIcon, TagsIcon } from 'lucide-react';
 import { act, useState } from 'react';
@@ -43,6 +44,7 @@ const windowMocks = vi.hoisted(() => ({
 }));
 
 const project = {
+  guests: {},
   id: 'project-1',
   widgetInstances: {
     'image-map-instance': {
@@ -65,9 +67,13 @@ const recoveryOwner = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => recoveryOwner,
   useWorkbenchReload: () => async () => {},
+  useActiveLayoutSelector: (selector: (project: unknown) => unknown) => selector(project),
+  useWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeLayout: project, activeProject: project } as never),
   useActiveProjectSelector: (selector: (project: unknown) => unknown) => selector(project),
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
+    getAvailability: () => ({ getPresentation: () => 'view' }),
     getProject: (projectId: string) => (projectId === project.id ? project : null),
     getSnapshot: () => ({
       activeProject: { ...project, layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } } },
@@ -76,6 +82,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   }),
   useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
   useOptionalWorkbenchExtensions: () => windowMocks.extensions,
+  useOptionalWorkbenchSelector: (_selector: unknown, fallback: unknown) => fallback,
   useWorkbenchExtensions: () => windowMocks.extensions,
 }));
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
@@ -112,7 +119,6 @@ import { FloatingWidgetWindow } from './FloatingWidgetWindow';
 import { MissingWidgetFrame } from './WidgetRenderer';
 
 const manifest = {
-  allowFloating: true,
   allowedRegions: ['center', 'left', 'right'],
   failurePolicy: { isolateRenderFailure: false, onRegistrationFailure: 'disable' },
   icon: MapIcon,
@@ -274,6 +280,9 @@ afterEach(async () => {
   host = null;
   root = null;
 });
+
+// Dock and Close are structure: these windows belong to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('FloatingWidgetWindow chrome', () => {
   it("mounts the widget's own header actions in the title bar, for the floating region", async () => {

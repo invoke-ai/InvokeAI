@@ -163,12 +163,6 @@ export const isPlacedWidgetRegionItem = <Instance extends WidgetPlacementInstanc
   item: WidgetRegionItem<Instance>
 ): item is PlacedWidgetRegionItem<Instance> => item.isEnabled;
 
-export const isRequiredCenterView = (item: WidgetRegionItem, enabledCenterViewCount: number): boolean => {
-  const isView = item.widget.manifest.centerPlacement !== 'toolbar';
-
-  return isView && item.isEnabled && enabledCenterViewCount === 1;
-};
-
 export const isCompactBottomItem = <Instance extends WidgetPlacementInstanceMeta>(
   item: WidgetRegionItem<Instance>
 ): item is PlacedWidgetRegionItem<Instance> => item.isEnabled && item.status === 'enabled';
@@ -180,15 +174,3 @@ export const isExpandableBottomItem = <Instance extends WidgetPlacementInstanceM
 export const isPopoverBottomItem = <Instance extends WidgetPlacementInstanceMeta>(
   item: WidgetRegionItem<Instance>
 ): boolean => item.widget.manifest.bottomPanel === 'popover';
-
-export const canRemoveItem = (item: WidgetRegionItem, viewModel: WidgetRegionViewModel): boolean => {
-  if (viewModel.region !== 'center') {
-    return item.isEnabled;
-  }
-
-  const enabledCenterViewCount = viewModel.placedItems.filter(
-    (placedItem) => placedItem.status === 'enabled' && placedItem.widget.manifest.centerPlacement !== 'toolbar'
-  ).length;
-
-  return !isRequiredCenterView(item, enabledCenterViewCount);
-};

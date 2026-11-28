@@ -7,6 +7,7 @@ import type { DeferredResource, DeferredResourceStatus } from './deferredResourc
 import type { GraphId } from './graphContracts';
 import type { InvocationSourceId } from './invocationContracts';
 import type { WidgetRegion } from './layoutContracts';
+import type { OpenIntent, OpenResult } from './workspace/openIntent';
 
 export type FirstPartyWidgetTypeId =
   | 'autosave-status'
@@ -78,6 +79,11 @@ export interface WidgetViewProps {
   instance: WidgetInstanceRuntimeMeta;
   runtime: WidgetRuntimeApi;
   presentation?: 'compact' | 'expanded' | 'tooltip';
+  /**
+   * In a window (`region: 'floating'`), the docked region whose surface it shows: the one it returns to. A widget with
+   * a surface per region (`graphBearing.surfaces`) renders that one.
+   */
+  surface?: WidgetRegion;
 }
 
 export type WidgetView = ComponentType<WidgetViewProps>;
@@ -234,20 +240,14 @@ export interface WidgetSearchResult {
   commandId?: string;
 }
 
-export interface OpenWorkbenchWidgetOptions {
-  createNew?: boolean;
-  preferredRegions?: ReadonlyArray<WidgetRegion>;
-  requireCenterView?: boolean;
-}
-
 export type WidgetWorkbenchApiResult =
   | { ok: true; region?: WidgetRegion }
   | { ok: false; reason: 'unavailable' | 'unsupported' | 'not-found' };
 
+/** Widgets state what they want to see; the shell decides where. They cannot add, move or remove widgets. */
 export interface WidgetWorkbenchApi {
-  openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) => WidgetWorkbenchApiResult;
+  open: (intent: OpenIntent) => OpenResult;
   revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
-  closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
 
 /**
@@ -273,7 +273,11 @@ export interface WidgetManifest {
   /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
   compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
-  allowFloating?: boolean;
+  /**
+   * The widget types this one acts on. While one is not on screen the shell says so in this widget's frame and offers
+   * to show it; navigation only enters workspaces that place them.
+   */
+  needs?: WidgetTypeId[];
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
   chrome?: {
@@ -291,6 +295,7 @@ export interface WidgetManifest {
   settings?: SettingsContribution;
   state?: WidgetStateRegistration;
   graphBearing?: {
+    /** The one mapping from a widget type to the invocation source it runs. */
     sourceId: InvocationSourceId;
     defaultGraphId: GraphId;
     surfaces: WorkbenchRegion[];

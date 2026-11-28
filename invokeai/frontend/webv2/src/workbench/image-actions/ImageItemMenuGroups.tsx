@@ -14,9 +14,9 @@ import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { LAYER_KIND_ICONS } from '@workbench/widgets/layers/layerTypeIcon';
 import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import {
   AsteriskIcon,
   AudioLinesIcon,
@@ -170,25 +170,24 @@ const SingleImageHandOffItems = ({
 }) => {
   const { t } = useTranslation();
   const { generation, widgets } = useWorkbenchCommands();
-  const openWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const handleEditOnCanvas = useCallback(() => void actions.sendToCanvas([image], 'raster'), [actions, image]);
+  // Values belong to the project, so they land at once; the route waits for the panel, which may be a workspace away.
   const handleSendToUpscale = useCallback(() => {
-    openWidget('upscale', { preferredRegions: ['left'] });
     widgets.patchValues('upscale', {
       inputImage: { height: image.height, image_name: image.imageName, width: image.width },
     });
-    generation.setSource('upscale');
-  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
+    open({ surface: 'panel', typeId: 'upscale' }, { afterShown: () => generation.setSource('upscale') });
+  }, [generation, image.height, image.imageName, image.width, open, widgets]);
   const handleSendToVideo = useCallback(() => {
-    openWidget('video', { preferredRegions: ['left'] });
     // A frame, an initial video and Ref2VA references claim one conditioning slot: a frame clears the rivals.
     widgets.patchValues('video', {
       firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
       references: [],
       sourceVideo: null,
     });
-    generation.setSource('video');
-  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
+    open({ surface: 'panel', typeId: 'video' }, { afterShown: () => generation.setSource('video') });
+  }, [generation, image.height, image.imageName, image.width, open, widgets]);
 
   return (
     <>

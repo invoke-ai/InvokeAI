@@ -124,11 +124,13 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'openProjectSwitcher', ['mod+p']),
   // Use mod for the platform settings chord: Command on macOS, Control elsewhere.
   hotkey('app', 'openSettings', ['mod+,']),
-  hotkey('app', 'saveLayoutPreset', []),
-  hotkey('app', 'selectComposePreset', ['alt+1']),
-  hotkey('app', 'selectEditPreset', ['alt+2']),
-  hotkey('app', 'selectVideoPreset', ['alt+3']),
-  hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
+  // The ids keep "Preset" and "Layout" so saved bindings survive; the UI calls them workspaces.
+  hotkey('app', 'selectComposePreset', ['alt+1'], { title: 'Switch to Compose workspace' }),
+  hotkey('app', 'selectEditPreset', ['alt+2'], { title: 'Switch to Edit workspace' }),
+  hotkey('app', 'selectVideoPreset', ['alt+3'], { title: 'Switch to Video workspace' }),
+  hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Switch to Workflow workspace' }),
+  hotkey('app', 'customizeWorkspace', [], { title: 'Customize workspace' }),
+  hotkey('app', 'resetWorkspaceView', [], { title: 'Reset workspace view' }),
   // Each press stops one item; holding the key must not walk down the queue.
   hotkey('app', 'cancelQueueItem', ['shift+x'], { ignoreRepeat: true, title: 'Cancel current or next queue item' }),
   hotkey('app', 'clearQueue', ['mod+shift+x'], { ignoreRepeat: true, title: 'Cancel all queue items' }),
@@ -151,14 +153,22 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'focusPrompt', ['alt+a']),
   hotkey('app', 'toggleLeftPanel', ['t', 'o']),
   hotkey('app', 'toggleRightPanel', ['g']),
-  // Layout history: Mod+Z belongs to whichever editor holds focus, so layout steps take Alt with it.
-  hotkey('app', 'undoLayoutChange', ['mod+alt+z'], { title: 'Undo layout change' }),
-  hotkey('app', 'redoLayoutChange', ['mod+alt+shift+z'], { title: 'Redo layout change' }),
-  // No default key: it throws away unsaved arrangement (Undo layout change brings it back), and Mod+Shift+R is the
-  // browser's hard reload. The id keeps "Reset" so saved bindings survive.
-  hotkey('app', 'resetPanelLayout', [], { title: 'Revert layout to saved preset' }),
+  // Workspace history: Mod+Z belongs to whichever editor holds focus, so workspace steps take Alt with it.
+  hotkey('app', 'undoLayoutChange', ['mod+alt+z'], { title: 'Undo workspace change' }),
+  hotkey('app', 'redoLayoutChange', ['mod+alt+shift+z'], { title: 'Redo workspace change' }),
   hotkey('app', 'togglePanels', ['f']),
   hotkey('app', 'togglePreview', ['z']),
+  // Escape's last meaning in the center: anything else that handles it (a field, menu, popover, widget) goes first.
+  {
+    ...hotkey('app', 'backToStage', ['esc'], {
+      scope: { kind: 'focused-region', region: 'center' },
+      title: 'Back to main view',
+    }),
+    fallback: true,
+    preventDefault: false,
+  },
+  // No default key: Alt+Left, the usual Back, is the browser's and the Gallery's.
+  hotkey('app', 'backToPreviousWorkspace', [], { title: 'Back to previous workspace' }),
   // Canvas rows mirror the Canvas widget's own tables (canvasToolCommands, canvasHotkeyCommands, canvasHeaderCommands).
   hotkey('canvas', 'tool.view', ['h'], { title: 'Select View Tool' }),
   hotkey('canvas', 'tool.move', ['v'], { title: 'Select Move Tool' }),

@@ -69,10 +69,7 @@ const mocks = vi.hoisted(() => ({
   notificationsAdd: vi.fn(),
   notifyUndoable: vi.fn(),
   onImagesDeleted: vi.fn(),
-  openWorkbenchWidget: vi.fn((..._args: unknown[]): { ok: boolean; reason?: string; region?: string } => ({
-    ok: true,
-    region: 'center',
-  })),
+  open: vi.fn((..._args: unknown[]) => ({ changedWorkspace: false, ok: true, region: 'center', workspaceId: 'edit' })),
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
@@ -186,8 +183,8 @@ vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ undoable: (...args: unknown[]) => mocks.notifyUndoable(...args) }),
 }));
 
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
-  useOpenWorkbenchWidget: () => mocks.openWorkbenchWidget,
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({
+  useWorkspaceOpen: () => mocks.open,
 }));
 
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
@@ -495,10 +492,7 @@ describe('canvas destinations', () => {
       kind: 'success',
       title: 'widgets.canvas.import.newProjectSuccess',
     });
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
-      preferredRegions: ['center'],
-      requireCenterView: true,
-    });
+    expect(mocks.open).toHaveBeenCalledWith({ surface: 'stage', typeId: 'canvas' });
   });
 
   it('adds to the current canvas without creating a project', async () => {
@@ -516,10 +510,7 @@ describe('canvas destinations', () => {
     expect(mocks.importGalleryImagesToCanvas).toHaveBeenCalledWith(
       expect.objectContaining({ destination: 'raster', project: expect.objectContaining({ id: 'project-1' }) })
     );
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
-      preferredRegions: ['center'],
-      requireCenterView: true,
-    });
+    expect(mocks.open).toHaveBeenCalledWith({ surface: 'stage', typeId: 'canvas' });
   });
 
   it('keeps the destination captured when the import started after another project becomes active', async () => {
@@ -543,7 +534,7 @@ describe('canvas destinations', () => {
       expect.objectContaining({ project: expect.objectContaining({ id: 'project-1' }) })
     );
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'success', title: 'widgets.canvas.import.success' });
-    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+    expect(mocks.open).not.toHaveBeenCalled();
   });
 });
 
@@ -601,10 +592,7 @@ describe('load workflow from image', () => {
       await actionsRef.current?.loadImageWorkflow(image);
     });
 
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('workflow', {
-      preferredRegions: ['center'],
-      requireCenterView: true,
-    });
+    expect(mocks.open).toHaveBeenCalledWith({ surface: 'stage', typeId: 'workflow' });
     expect(mocks.requestWorkflowDocumentLoad).toHaveBeenCalledWith(
       { name: 'Embedded', nodes: [] },
       'widgets.gallery.itemActions.loadWorkflow.loadedLabel:Embedded'
@@ -669,7 +657,7 @@ describe('load workflow from image', () => {
       }),
       expect.any(String)
     );
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalled();
+    expect(mocks.open).toHaveBeenCalled();
     expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
   });
 
@@ -703,7 +691,7 @@ describe('load workflow from image', () => {
       });
 
       expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
-      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+      expect(mocks.open).not.toHaveBeenCalled();
       expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     }
   );
@@ -824,10 +812,7 @@ describe('video workflow loading', () => {
     });
 
     expect(mocks.videoWorkflow).toHaveBeenCalledWith('clip.mp4', expect.any(AbortSignal));
-    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('workflow', {
-      preferredRegions: ['center'],
-      requireCenterView: true,
-    });
+    expect(mocks.open).toHaveBeenCalledWith({ surface: 'stage', typeId: 'workflow' });
     expect(mocks.requestWorkflowDocumentLoad).toHaveBeenCalledWith(
       { name: 'Embedded', nodes: [] },
       'widgets.gallery.itemActions.loadWorkflow.loadedLabelVideo:Embedded'

@@ -43,12 +43,14 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectId: () => null,
   useActiveProjectSelector: (selector: (project: { queue: { items: never[] } }) => unknown) =>
     selector({ queue: { items: [] } }),
+  useWorkbenchCommands: () => ({}),
+  useWorkbenchQueries: () => ({}),
 }));
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => vi.fn(),
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: (commandId: string) =>
     commandId === 'app.openSettings' ? { aria: 'Control+Comma', display: 'Ctrl+,', parts: ['ctrl', ','] } : null,
@@ -144,7 +146,12 @@ describe('AppMenu', () => {
     await openMenu();
 
     const values = menuItems().map((item) => item.dataset.value);
-    expect(values.slice(values.indexOf('widgets') + 1)).toEqual(['whats-new', 'documentation', 'discord']);
+    expect(values.slice(values.indexOf('widgets') + 1)).toEqual([
+      'customize-workspace',
+      'whats-new',
+      'documentation',
+      'discord',
+    ]);
     expect(values).not.toContain('sign-out');
     expect(values).not.toContain('users');
     expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('ada@example.com');

@@ -36,6 +36,7 @@ const harness = vi.hoisted(() => ({
 }));
 const activeProject = () => harness.store!.getState().projects[0]!;
 
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => activeProject().id,

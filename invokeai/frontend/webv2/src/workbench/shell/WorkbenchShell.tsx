@@ -11,6 +11,7 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { GalleryDragCursor, GalleryDragScope } from '@features/gallery/utility';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
@@ -30,16 +31,25 @@ import {
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
   activateRailPlacement,
+  addWidgetPlacement,
   closeWidgetPlacement,
   dispatchWidgetDragEndPlacement,
   dockFloatingPlacement,
-  openWidgetPlacement,
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import {
+  useActiveLayoutSelector,
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
+import { takesLastCenterView } from '@workbench/workspace/structureReducer';
+import { startWorkspaceLock } from '@workbench/workspace/workspaceLockRuntime';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,16 +74,17 @@ import { GraphPreviewInvokeScope, TopBar } from './topbar';
 const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
-  const { notifications, widgets } = useWorkbenchCommands();
+  const { layout, notifications, widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
   const { t } = useTranslation();
-  const panels = useActiveProjectSelector((project) => project.layout.panels);
+  const panels = useActiveLayoutSelector((layout) => layout.panels);
   const projectId = useActiveProjectId();
   const projectName = useActiveProjectSelector((project) => project.name);
-  const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
-  const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
+  const leftRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.left);
+  const rightRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.right);
   // Placement only: a window's geometry, mode, and stacking change without re-rendering the shell or its rails.
-  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const placementProject = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const { floatingPlacements } = placementProject;
   const sensors = useSensors(
     useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }),
@@ -143,6 +154,7 @@ export const WorkbenchShell = () => {
       notifications.recordWidgetFailure(failure);
     }
   });
+  useMountEffect(() => startWorkspaceLock({ layout, notifications }));
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -218,9 +230,24 @@ export const WorkbenchShell = () => {
     },
     [focusRegion, placementProject, widgets]
   );
+  const handleFloat = useCallback(
+    (region: 'left' | 'right', instanceId: string) => {
+      // Floating unmounts the docked view; its drafts commit first. Focus follows it into its window.
+      flushWorkbenchDrafts();
+      widgets.float(instanceId, region, { height: window.innerHeight, width: window.innerWidth });
+      focusFloating(instanceId);
+    },
+    [focusFloating, widgets]
+  );
+  const handleFloatLeft = useCallback((instanceId: string) => handleFloat('left', instanceId), [handleFloat]);
+  const handleFloatRight = useCallback((instanceId: string) => handleFloat('right', instanceId), [handleFloat]);
+  // Floating takes the instance from every region; the structure refuses to take the center's last view.
+  const canFloat = useCallback(
+    (instanceId: string) => !takesLastCenterView(placementProject, instanceId, queries.getAvailability()),
+    [placementProject, queries]
+  );
   const handleRemoveFloating = useCallback(
     (instanceId: string) => {
-      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
       const removed = removeFloatingPlacement({ instanceId, project: placementProject, widgets });
 
       if (!removed) {
@@ -228,11 +255,6 @@ export const WorkbenchShell = () => {
       }
 
       // The marker's menu that asked and the marker itself are both gone.
-      if (removed.restoresCenter) {
-        focusRegion('center', typeId);
-        return;
-      }
-
       const isRailPanelShown =
         removed.returnRegion === 'left' ? isLeftPanelShown : removed.returnRegion === 'right' && isRightPanelShown;
 
@@ -246,14 +268,21 @@ export const WorkbenchShell = () => {
       item.isEnabled && item.isFloating
         ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
-          ? closeWidgetPlacement({ widgets, getWidgetById, instanceId: item.id, project: placementProject, region })
-          : openWidgetPlacement({
+          ? closeWidgetPlacement({
+              availability: queries.getAvailability(),
+              instanceId: item.id,
+              project: placementProject,
+              region,
               widgets,
+            })
+          : addWidgetPlacement({
+              createNew: item.allowMultiple,
               getWidgetsForRegion,
-              options: { createNew: item.allowMultiple, preferredRegions: [region] },
+              regions: [region],
               typeId: item.typeId,
+              widgets,
             }),
-    [placementProject, widgets]
+    [placementProject, queries, widgets]
   );
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) => toggleRailItem('left', item),
@@ -320,12 +349,14 @@ export const WorkbenchShell = () => {
                 role="region"
               >
                 <WidgetBar
+                  canFloat={canFloat}
                   edgeRegion={isLeftPanelShown ? 'left' : 'center'}
                   groups={leftRailGroups}
                   menuItems={leftMenuItems}
                   projectId={projectId}
                   side="left"
                   onDock={handleDock}
+                  onFloat={handleFloatLeft}
                   onRemoveFloating={handleRemoveFloating}
                   onSelect={handleSelect}
                   onToggle={handleToggleLeft}
@@ -334,12 +365,14 @@ export const WorkbenchShell = () => {
                 <CenterArea />
                 {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
                 <WidgetBar
+                  canFloat={canFloat}
                   edgeRegion={isRightPanelShown ? 'right' : 'center'}
                   groups={rightRailGroups}
                   menuItems={rightMenuItems}
                   projectId={projectId}
                   side="right"
                   onDock={handleDock}
+                  onFloat={handleFloatRight}
                   onRemoveFloating={handleRemoveFloating}
                   onSelect={handleSelect}
                   onToggle={handleToggleRight}

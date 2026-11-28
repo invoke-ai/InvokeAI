@@ -13,7 +13,7 @@ export const WorkbenchNotificationToaster = () => {
   const { i18n } = useTranslation();
   const queries = useWorkbenchQueries();
   const subscribe = useWorkbenchSubscription();
-  const { notifications, widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
   const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const focus = useWorkbenchFocus();
 
@@ -22,14 +22,13 @@ export const WorkbenchNotificationToaster = () => {
   useMountEffect(() =>
     startNotificationToasts({
       actionContext: createEditorNotificationActionContext({
+        commands,
         focus,
         getWidgetById,
         getWidgetsForRegion,
-        notifications,
         queries,
         retryQueueItems: queueCommands.retryItems,
         t: i18n.t,
-        widgets,
       }),
       getNotifications: () => queries.getSnapshot().notifications,
       getPreferences: getWorkbenchPreferences,

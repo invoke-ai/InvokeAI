@@ -95,7 +95,13 @@ export const submitActiveInvocation = async (
     ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
   };
   const models = getModels();
-  const route = resolveInvocationRoute(snapshot.activeProject, sourceId ? 'dialog' : 'global', invocation, models);
+  const route = resolveInvocationRoute(
+    snapshot.activeProject,
+    snapshot.activeLayout,
+    sourceId ? 'dialog' : 'global',
+    invocation,
+    models
+  );
 
   if (!isInvocationRouteValid(route) || snapshot.backendConnection.status !== 'connected') {
     return;

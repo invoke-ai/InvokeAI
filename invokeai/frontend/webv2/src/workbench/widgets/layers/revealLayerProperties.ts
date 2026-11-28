@@ -1,27 +1,26 @@
-import { openWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useOptionalWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback } from 'react';
 
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 
-/** Brings a layer's Properties into view; focus stays with the caller. */
-export const useRevealLayerProperties = (): ((layerId: string) => void) => {
-  const { widgets } = useWorkbenchCommands();
-  const registry = useOptionalWorkbenchWidgetRegistry();
+/**
+ * Brings a layer's Properties into view beside the Canvas. Focus stays with the caller unless `focus` names the widget
+ * to take it, wherever that shows: a rail, a window or a guest.
+ */
+export const useRevealLayerProperties = (): ((layerId: string, options?: { focus?: 'canvas' | 'layers' }) => void) => {
+  const open = useWorkspaceOpen();
 
   return useCallback(
-    (layerId: string) => {
-      if (registry) {
-        openWorkbenchWidget(widgets, registry.getWidgetsForRegion, 'canvas', {
-          preferredRegions: ['center'],
-          requireCenterView: true,
-        });
-      }
-      widgets.open({ region: 'right', widgetId: 'layers' });
-      requestLayerProperties(layerId);
+    (layerId: string, { focus }: { focus?: 'canvas' | 'layers' } = {}) => {
+      open(
+        [
+          { surface: 'stage', typeId: 'canvas' },
+          { surface: 'panel', typeId: 'layers' },
+        ],
+        { afterShown: () => requestLayerProperties(layerId), focus: focus ?? false }
+      );
     },
-    [registry, widgets]
+    [open]
   );
 };
 

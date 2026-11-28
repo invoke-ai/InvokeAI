@@ -1,6 +1,6 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type * as workbenchContext from '@workbench/WorkbenchContext';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -18,6 +18,10 @@ const storeRef = vi.hoisted(() => ({ current: null as WorkbenchInternalStore | n
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   shallowEqual: Object.is,
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSyncExternalStore(storeRef.current!.subscribe, storeRef.current!.getSnapshot).activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(useSyncExternalStore(storeRef.current!.subscribe, storeRef.current!.getSnapshot)),
   useActiveProjectSelector: (selector: (project: never) => unknown) => {
     const store = storeRef.current!;
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -51,11 +55,9 @@ const interact = (run: () => void): Promise<void> =>
 const Shell = ({ region }: { region: 'bottom' | 'left' | 'right' }) => {
   const store = storeRef.current!;
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const regionState = snapshot.activeProject.widgetRegions[region];
-  const panels = snapshot.activeProject.layout.panels;
-  const isOpen = region === 'left' ? panels.isLeftOpen : region === 'right' ? panels.isRightOpen : panels.isBottomOpen;
+  const regionState = snapshot.activeLayout.widgetRegions[region];
 
-  if (!isOpen || regionState.isCollapsed) {
+  if (regionState.isCollapsed) {
     return <div data-testid="collapsed" />;
   }
 
@@ -104,7 +106,7 @@ const drag = async (separator: Element, axis: 'clientX' | 'clientY', delta: numb
 };
 
 const getRegion = (region: 'bottom' | 'left' | 'right') =>
-  storeRef.current!.getSnapshot().activeProject.widgetRegions[region];
+  storeRef.current!.getSnapshot().activeLayout.widgetRegions[region];
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -113,7 +115,7 @@ beforeEach(() => {
   root = createRoot(host);
   storeRef.current = createWorkbenchStore();
 
-  const bottom = storeRef.current.getSnapshot().activeProject.widgetRegions.bottom;
+  const bottom = storeRef.current.getSnapshot().activeLayout.widgetRegions.bottom;
 
   storeRef.current.commands.widgets.select({
     projectId: storeRef.current.getSnapshot().activeProject.id,

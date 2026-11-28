@@ -5,7 +5,7 @@ import { isToastActivationKeyEvent } from '@platform/ui/toaster';
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
+import { useWorkbenchExtensions, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
 import { tinykeys } from 'tinykeys';
 
@@ -37,7 +37,7 @@ export const WorkbenchHotkeyRuntime = () => {
     stores.commands.list
   );
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const getFocusTarget = useWorkbenchFocusTarget();
 
@@ -78,6 +78,17 @@ export const WorkbenchHotkeyRuntime = () => {
     });
 
     if (!hotkey) {
+      return;
+    }
+
+    // The Canvas engine also listens on window and may come after this listener: a fallback waits for the whole
+    // dispatch, so a press any handler marked as used is never also taken here.
+    if (hotkey.fallback) {
+      globalThis.setTimeout(() => {
+        if (!event.defaultPrevented) {
+          executeHotkey(hotkey, source);
+        }
+      });
       return;
     }
 

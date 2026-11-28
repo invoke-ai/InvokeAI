@@ -11,7 +11,6 @@ import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicat
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { areLoggingPreferencesDefault, resetLoggingPreferences } from '@workbench/diagnostics/loggingPreferences';
-import { useOptionalWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { BrushCleaningIcon, CheckIcon, DatabaseIcon, RotateCcwIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -167,11 +166,9 @@ export const LoggingResetSettings = () => {
 export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onReveal'>) => {
   const { t } = useTranslation();
   const { canManageAppConfig } = useCapabilities();
-  const commands = useOptionalWorkbenchCommands();
   const [isDatabaseDialogMounted, setIsDatabaseDialogMounted] = useState(false);
   const [isDatabaseDialogOpen, setIsDatabaseDialogOpen] = useState(false);
 
-  const resetLayout = useCallback(() => commands?.layout.reset(), [commands]);
   const openDatabaseConfirmation = useCallback(() => {
     setIsDatabaseDialogMounted(true);
     setIsDatabaseDialogOpen(true);
@@ -182,12 +179,6 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
   return (
     <Stack gap="3">
       <HStack gap="2" wrap="wrap">
-        {commands ? (
-          <Button size="lg" variant="outline" onClick={resetLayout}>
-            <RotateCcwIcon />
-            {t('settings.revertLayout')}
-          </Button>
-        ) : null}
         {onReveal ? (
           <Button size="lg" variant="outline" onClick={openIntermediates}>
             <BrushCleaningIcon />

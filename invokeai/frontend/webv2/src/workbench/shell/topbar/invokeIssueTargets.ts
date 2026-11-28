@@ -2,7 +2,7 @@ import type { GenerationIssue } from '@features/generation/contracts';
 import type { InvocationSourceId, InvocationValidationReason, ResultDestination } from '@workbench/invocationContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
-import { getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
+import { getWidgetTypeIdForSourceId } from '@workbench/invocationSources';
 
 /** Where an issue is fixed, so Invoke's issue list can lead there. */
 export type InvocationIssueTarget =

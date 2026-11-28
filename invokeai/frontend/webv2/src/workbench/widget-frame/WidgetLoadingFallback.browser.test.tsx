@@ -16,6 +16,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   shallowEqual: Object.is,
+  useActiveLayoutSelector: (
+    selector: (project: {
+      widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[]; sizePx: number }>;
+    }) => unknown
+  ) =>
+    selector({
+      widgetRegions: {
+        bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+        right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
+      },
+    }),
   useActiveProjectSelector: (
     selector: (project: {
       widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[]; sizePx: number }>;

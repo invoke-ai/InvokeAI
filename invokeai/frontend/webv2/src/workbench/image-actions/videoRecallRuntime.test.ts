@@ -6,6 +6,7 @@ import type { TFunction } from 'i18next';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getLayoutOf } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -113,6 +114,9 @@ const setup = (panelModel: ModelConfig = WAN_I2V) => {
   const socket = createFakeSocketHub();
   const projectId = store.queries.getSnapshot().activeProject.id;
 
+  // Placed behind Generate: a recall may front it but never adds it.
+  store.commands.widgets.open({ projectId, region: 'left', widgetId: 'video' });
+  store.commands.widgets.open({ projectId, region: 'left', widgetId: 'generate' });
   store.commands.widgets.patchValues(
     'video',
     {
@@ -135,7 +139,7 @@ const setup = (panelModel: ModelConfig = WAN_I2V) => {
   /** Whether the Video widget is the visible tab of the project's left region. */
   const videoShown = (id = projectId) => {
     const project = store.queries.getProject(id)!;
-    const left = project.widgetRegions.left;
+    const left = getLayoutOf(store.getState(), store.queries.getProject(id)!).widgetRegions.left;
 
     return (
       !left.isCollapsed &&

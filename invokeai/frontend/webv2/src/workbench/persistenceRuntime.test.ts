@@ -39,6 +39,7 @@ const snapshot = (state: WorkbenchState, savedAt = '2026-07-17T00:00:00.000Z'): 
 });
 
 const saveResult = (state: WorkbenchState, savedAt?: string): WorkbenchSaveResult => ({
+  accountSaved: true,
   awaitsDecision: false,
   conflicts: [],
   error: null,
@@ -92,6 +93,9 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     },
     getPersistedRevision: () => revision,
     getState: () => state,
+    releaseHeldLayouts: (savedAccount) => {
+      events.push(`releaseHeldLayouts:${savedAccount.activeLayoutPresetId}`);
+    },
     hydrate: (nextState) => {
       state = structuredClone(nextState);
       revision += 1;
@@ -381,6 +385,40 @@ describe('Workbench persistence runtime', () => {
     clock.runAll();
     await flushPromises();
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+  });
+
+  it('releases projects held for adoption only once a save has written the account', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    vi.mocked(persistence.saveWorkbench)
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state),
+        accountSaved: false,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
+      .mockResolvedValueOnce(
+        saveResult({ ...aggregate.state, account: { ...aggregate.state.account, activeLayoutPresetId: 'saved' } })
+      );
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    const releases = () => aggregate.events.filter((event) => event.startsWith('releaseHeldLayouts'));
+
+    runtime.start();
+    await flushPromises();
+    aggregate.edit();
+    clock.runAll();
+    await flushPromises();
+
+    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
+    expect(releases()).toEqual([]);
+
+    clock.runAll();
+    await flushPromises();
+
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    // With the account that save wrote, not the editor's latest: only that one tells whether it carried the adoption.
+    expect(releases()).toEqual(['releaseHeldLayouts:saved']);
   });
 
   it('ignores server outcomes once its account lifetime has ended', async () => {

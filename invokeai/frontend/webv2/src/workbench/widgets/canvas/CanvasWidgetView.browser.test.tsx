@@ -37,7 +37,7 @@ import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/setti
 import { runNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
-import { createWorkbenchStore } from '@workbench/workbenchStore';
+import { createWorkbenchStore, type WorkbenchSnapshot } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
 import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -98,6 +98,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchQueries: () => harness.store!.queries,
+  useWorkbenchSelector: (selector: (snapshot: WorkbenchSnapshot) => unknown) =>
+    selector(useSyncExternalStore(harness.store!.subscribe, harness.store!.getSnapshot, harness.store!.getSnapshot)),
   useWorkbenchSubscription: () => harness.store!.subscribe,
 }));
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));

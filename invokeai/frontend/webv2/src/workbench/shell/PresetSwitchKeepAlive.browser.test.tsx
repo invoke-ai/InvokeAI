@@ -61,8 +61,11 @@ const keepAliveMocks = vi.hoisted(() => {
     rightInstanceId?: string;
   }) => ({
     floatingWidgets: [],
+    guests: {},
     id: projectId,
     invocation: { sourceId: 'generate' },
+    layout: { presetId: 'edit' },
+    workspaceId: 'edit',
     queue: { items: [] },
     widgetInstances,
     widgetRegions: {
@@ -164,9 +167,9 @@ vi.mock('@workbench/widgetRegionViewModel', () => ({
     }),
   }),
   getWidgetRegionItems: () => [],
-  isRequiredCenterView: () => true,
 }));
 vi.mock('@workbench/widgetRegistry', () => ({
+  isAdminWidgetSession: () => false,
   getWidgetById: (typeId: string) => keepAliveMocks.getWidgetById(typeId),
   getWidgetsForRegion: () => [],
 }));
@@ -175,11 +178,24 @@ vi.mock('@workbench/WorkbenchContext', async () => {
 
   return {
     useActiveProjectId: () => useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject).id,
+    useActiveLayoutSelector: (selector: (project: unknown) => unknown) =>
+      selector(useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)),
     useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
       selector(useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)),
+    useOptionalWorkbenchSelector: (_selector: unknown, fallback: unknown) => fallback,
     useWorkbenchCommands: () => ({ widgets: {} }),
-    useWorkbenchSelector: (selector: (snapshot: { backendConnection: { status: string } }) => unknown) =>
-      selector({ backendConnection: { status: 'connected' } }),
+    useWorkbenchQueries: () => ({
+      getAvailability: () => ({ getPresentation: () => 'view' }),
+      getSnapshot: () => ({ activeLayout: keepAliveMocks.getProject(), activeProject: keepAliveMocks.getProject() }),
+    }),
+    useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+      selector({
+        account: {},
+        ...((project) => ({ activeLayout: project, activeProject: project }))(
+          useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)
+        ),
+        backendConnection: { status: 'connected' },
+      }),
   };
 });
 vi.mock('@workbench/widget-frame', () => {

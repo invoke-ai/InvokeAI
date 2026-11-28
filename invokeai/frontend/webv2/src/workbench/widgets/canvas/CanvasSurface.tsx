@@ -35,13 +35,13 @@ export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEng
   // The engine's own keys ask the judge the hotkey runtime asks, with the same inputs, only on keydown: this canvas
   // owns the key, the Layers widget acting on its layers is a companion, and any other widget keeps it.
   const resolveKeyOwner = (event: KeyboardEvent): CanvasKeyOwner => {
-    const project = queries.getSnapshot().activeProject;
-    if (project.id !== engine.projectId) {
+    const snapshot = queries.getSnapshot();
+    if (snapshot.activeProject.id !== engine.projectId) {
       return 'elsewhere';
     }
     const target = resolveHotkeyTarget({
       focusTarget: getFocusTarget(),
-      project: getWidgetPlacementProject(project),
+      project: getWidgetPlacementProject(snapshot),
       targetWidget: getHotkeyTargetWidget(event.target),
     });
     return target.activeInstanceId === instanceId

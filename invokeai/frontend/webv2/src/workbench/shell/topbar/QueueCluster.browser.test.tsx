@@ -63,7 +63,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchSelector: (select: (snapshot: unknown) => unknown) =>
     select({ backendConnection: { status: state.isConnected ? 'connected' : 'disconnected' } }),
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 
 const { QueueCluster } = await import('./QueueCluster');
 

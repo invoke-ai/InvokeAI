@@ -2,7 +2,6 @@ import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { LayoutPreset } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { getProjectWidgetValues } from './widgetState';
@@ -146,16 +145,16 @@ describe('createWorkbenchStore', () => {
 
   it('coordinates layout preset activation across every command caller', async () => {
     const deferred = new Map<string, { promise: Promise<void>; resolve: () => void }>();
-    const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<void> => {
+    const loadLayoutWidgets = (_layout: unknown, workspaceId: string): Promise<void> => {
       let resolve!: () => void;
       const promise = new Promise<void>((next) => {
         resolve = next;
       });
 
-      deferred.set(preset.id, { promise, resolve });
+      deferred.set(workspaceId, { promise, resolve });
       return promise;
     };
-    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutWidgets });
 
     const stripActivation = store.commands.layout.activatePreset('compose');
     const hotkeyActivation = store.commands.layout.activatePreset('edit');
@@ -165,17 +164,17 @@ describe('createWorkbenchStore', () => {
     deferred.get('compose')?.resolve();
     await stripActivation;
 
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('edit');
     expect(store.getSnapshot().activeProject.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
   });
 
   it('discards a pending preset when project focus changes before loading finishes', async () => {
     let resolve!: () => void;
-    const loadLayoutPresetWidgets = (): Promise<void> =>
+    const loadLayoutWidgets = (): Promise<void> =>
       new Promise<void>((next) => {
         resolve = next;
       });
-    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutWidgets });
     const firstProjectId = store.getSnapshot().activeProject.id;
     const secondProject = store.commands.projects.create();
 
@@ -186,7 +185,7 @@ describe('createWorkbenchStore', () => {
     resolve();
     await activation;
 
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('compose');
   });
 
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {

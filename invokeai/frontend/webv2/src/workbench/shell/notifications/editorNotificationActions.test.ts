@@ -11,6 +11,7 @@ import {
   createEditorNotificationActionContext,
   type EditorNotificationActionSources,
 } from './editorNotificationActions';
+import { resolveNotificationActions } from './notificationActions';
 
 const englishCatalog = Object.values(
   import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
@@ -29,26 +30,45 @@ const setup = (overrides: Partial<EditorNotificationActionSources> = {}) => {
   const store = createWorkbenchStore();
   const focusMoves: FocusMove[] = [];
   const context = createEditorNotificationActionContext({
+    commands: store.commands,
     focus: {
       focusFloating: (instanceId) => focusMoves.push(['floating', instanceId]),
       focusRegion: (region, typeId) => focusMoves.push(['region', region, typeId]),
     },
     getWidgetById,
     getWidgetsForRegion,
-    notifications: store.commands.notifications,
     queries: store.queries,
     retryQueueItems: () => Promise.resolve([]),
     t: i18n.t,
-    widgets: store.commands.widgets,
     ...overrides,
   });
   const project = (): Project => store.getSnapshot().activeProject;
-  const frontOf = (region: WidgetRegion) => project().widgetInstances[project().widgetRegions[region].activeInstanceId];
+  const layout = () => store.getSnapshot().activeLayout;
+  const frontOf = (region: WidgetRegion) => project().widgetInstances[layout().widgetRegions[region].activeInstanceId];
 
-  return { context, focusMoves, frontOf, project, store };
+  return { context, focusMoves, frontOf, layout, project, store };
 };
 
 describe('editor notification actions', () => {
+  it('offers Lock workspaces and Keep rearranging only while the account rearranges', () => {
+    const { context } = setup();
+    const lockWorkspaces = vi.fn();
+    const offer = (isRearranging: boolean) =>
+      resolveNotificationActions([{ kind: 'lock-workspaces' }, { kind: 'keep-rearranging' }], {
+        ...context,
+        isRearranging: () => isRearranging,
+        lockWorkspaces,
+      });
+    const [lock, keep] = offer(true);
+
+    expect([lock?.label, keep?.label]).toEqual(['Lock workspaces', 'Keep rearranging']);
+    keep?.onClick();
+    expect(lockWorkspaces).not.toHaveBeenCalled();
+    lock?.onClick();
+    expect(lockWorkspaces).toHaveBeenCalledOnce();
+    expect(offer(false)).toEqual([]);
+  });
+
   it('names enabled widgets as the Gallery names itself and leaves out widgets this editor cannot show', () => {
     const [disabledGallery] = registerWidgets([{ ...galleryWidgetManifest, allowedRegions: [] }]);
     const { context } = setup();
@@ -61,13 +81,13 @@ describe('editor notification actions', () => {
   });
 
   it('focuses a widget already showing without changing the layout', () => {
-    const { context, focusMoves, frontOf, project } = setup();
-    const before = project().widgetRegions;
+    const { context, focusMoves, frontOf, layout } = setup();
+    const before = layout().widgetRegions;
 
     expect(frontOf('right')?.typeId).toBe('gallery');
     context.openWidget('gallery');
 
-    expect(project().widgetRegions).toBe(before);
+    expect(layout().widgetRegions).toBe(before);
     expect(focusMoves).toEqual([['region', 'right', 'gallery']]);
   });
 
@@ -81,26 +101,27 @@ describe('editor notification actions', () => {
   });
 
   it('raises a floating window instead of docking another copy', () => {
-    const { context, focusMoves, project, store } = setup();
+    const { context, focusMoves, layout, store } = setup();
     store.commands.widgets.float('queue');
 
     context.openWidget('queue');
 
-    expect(Object.keys(project().floatingWidgets ?? {})).toEqual(['queue']);
+    expect(Object.keys(layout().floatingWidgets ?? {})).toEqual(['queue']);
     expect(focusMoves).toEqual([['floating', 'queue']]);
   });
 
-  it('opens a widget the layout does not hold and focuses where it went', () => {
-    const { context, focusMoves, frontOf, project } = setup();
-    const holdsWorkflow = Object.values(project().widgetRegions).some((region) =>
-      region.instanceIds.some((instanceId) => project().widgetInstances[instanceId]?.typeId === 'workflow')
-    );
+  it('shows a widget no workspace places as a guest window and focuses it, writing no structure', () => {
+    const { context, focusMoves, layout, store } = setup();
+    const account = store.getSnapshot().account;
 
-    expect(holdsWorkflow).toBe(false);
-    context.openWidget('workflow');
+    context.openWidget('diagnostics');
 
-    expect(frontOf('center')?.typeId).toBe('workflow');
-    expect(focusMoves).toEqual([['region', 'center', 'workflow']]);
+    const [guestId] = Object.keys(layout().guests);
+    expect(guestId && layout().floatingWidgets?.[guestId]).toBeDefined();
+    expect(layout().widgetInstances[guestId!]?.typeId).toBe('diagnostics');
+    expect(store.getSnapshot().account).toBe(account);
+    expect(store.getSnapshot().notifications).toEqual([]);
+    expect(focusMoves).toEqual([['floating', guestId]]);
   });
 
   it('shows a queue item by opening the queue at it', () => {

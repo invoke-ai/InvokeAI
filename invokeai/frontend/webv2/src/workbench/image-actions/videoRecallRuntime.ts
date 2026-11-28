@@ -20,7 +20,7 @@ import {
   placeInitialVideo,
   placeVideoImage,
 } from './index';
-import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
+import { bringRecallWidgetToFront, createRecallEventRuntime, withRecallWidgetOffer } from './recallEventRuntime';
 
 /** The `video` of a `video_recall_requested` event: a gallery video, as the backend describes it. */
 interface VideoRecallEventVideo {
@@ -123,7 +123,7 @@ const IMAGE_PLACED_TITLES = {
  * Video widget is revealed when the project is still the one on screen.
  */
 export const createVideoRecallRuntime = ({
-  commands,
+  commands: runtimeCommands,
   getSessionUserId,
   hub,
   queries,
@@ -131,10 +131,10 @@ export const createVideoRecallRuntime = ({
   reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
+  commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
-  queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot' | 'getWorkspaceLayout'>;
   replay?: readonly PendingRecallEvent[];
   reveal: RecallRevealContext;
   /** Resolves against the current language at call time; captured once, at attach. */
@@ -144,6 +144,7 @@ export const createVideoRecallRuntime = ({
     event: VideoRecallRequestedEvent,
     { models, owner, projectId }: { models: ModelConfig[]; owner: AccountScope; projectId: string }
   ): Promise<void> => {
+    const commands = withRecallWidgetOffer(runtimeCommands, { projectId, queries, reveal, typeId: 'video' });
     const readVideoValues = () => {
       const project = queries.getProject(projectId);
       return project ? getProjectWidgetValues(project, 'video') : null;
@@ -293,7 +294,7 @@ export const createVideoRecallRuntime = ({
   return createRecallEventRuntime({
     apply,
     area: 'video-recall',
-    commands,
+    commands: runtimeCommands,
     eventName: 'video_recall_requested',
     getSessionUserId,
     hub,

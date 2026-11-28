@@ -1,31 +1,13 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { GalleryRevealTicket } from '@workbench/image-actions/revealGalleryItem';
-import type { WidgetRegion } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
 
 import { claimGalleryNavigationSequence, isGalleryNavigationCurrent } from '@features/gallery/contracts';
 import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback } from 'react';
-
-/**
- * Raise the gallery in its existing region to avoid duplicate placement. Prefer rails over center, where Preview
- * competes; absent grids use default placement.
- */
-const SIDE_REGIONS: readonly WidgetRegion[] = ['right', 'left', 'bottom', 'center'];
-
-const getGalleryRegions = (project: Project): WidgetRegion[] =>
-  SIDE_REGIONS.filter((region) =>
-    project.widgetRegions[region].instanceIds.some(
-      (instanceId) => project.widgetInstances[instanceId]?.typeId === 'gallery'
-    )
-  );
-
-/** Where a reveal that leaves the center alone may raise the Gallery. */
-const PANEL_REGIONS: readonly WidgetRegion[] = ['right', 'left', 'bottom'];
 
 export interface FindGalleryItemOptions {
   /**
@@ -36,14 +18,14 @@ export interface FindGalleryItemOptions {
 }
 
 /**
- * Raise Preview then Gallery immediately so Gallery wins shared regions, then lazy-load reveal. Claim the gesture
- * ticket before import to preserve press order and project fencing.
+ * Show Preview, then the Gallery beside it, in one gesture, then lazy-load the reveal. Claim the gesture ticket before
+ * import to preserve press order and project fencing.
  */
 export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalleryItemOptions) => void) => {
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
 
   return useCallback(
     (ref: GalleryItemRef, { revealPreview = true }: FindGalleryItemOptions = {}) => {
@@ -59,16 +41,14 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
         projectId: activeProject.id,
         sequence,
       };
-      const galleryRegions = getGalleryRegions(activeProject);
 
-      if (revealPreview) {
-        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
-        openWorkbenchWidget('gallery', galleryRegions.length > 0 ? { preferredRegions: galleryRegions } : undefined);
-      } else {
-        const panelRegions = galleryRegions.filter((region) => region !== 'center');
-
-        openWorkbenchWidget('gallery', { preferredRegions: panelRegions.length > 0 ? panelRegions : PANEL_REGIONS });
-      }
+      open(
+        revealPreview
+          ? [{ surface: 'stage', typeId: 'preview' }, { typeId: 'gallery' }]
+          : { surface: 'panel', typeId: 'gallery' },
+        // The grid takes focus, so the keys move around the found item.
+        { focus: 'gallery' }
+      );
 
       void import('@workbench/image-actions/revealGalleryItem')
         .then(({ revealGalleryItem }) => revealGalleryItem({ commands, queries, queryClient }, ref, ticket))
@@ -91,6 +71,6 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
         })
         .finally(locatorRequest.release);
     },
-    [commands, openWorkbenchWidget, queries, queryClient]
+    [commands, open, queries, queryClient]
   );
 };

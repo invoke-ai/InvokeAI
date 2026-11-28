@@ -11,7 +11,6 @@
     "buttonLabel": "Command palette",
     "buttonTooltip": "Command palette ({{hotkey}})",
     "inputLabel": "Search commands and settings",
-    "layoutPresetCommand": "{{name}} layout",
     "resultsLabel": "Command palette results",
     "opensInNewTab": "Opens in a new tab",
     "showWidget": "Show {{label}}",
@@ -81,7 +80,7 @@
       "gallery": "Gallery",
       "generation": "Generation",
       "images": "Images",
-      "layout": "Layout",
+      "layout": "Workspace",
       "models": "Models",
       "navigation": "Navigation",
       "projects": "Projects",
@@ -141,7 +140,7 @@
         "project": "Project",
         "queue": "Queue",
         "workflow": "Workflow",
-        "workspace": "Workspace"
+        "workspace": "Workspaces & data"
       },
       "settingsSection": "Settings: {{section}}",
       "toggles": {
@@ -171,7 +170,8 @@
       "failed": "Failed to load workflow",
       "loaded": "Loaded “{{name}}” from library",
       "warning": "Workflow load warning"
-    }
+    },
+    "workspaceCommand": "{{name}} workspace"
   },
   "common": {
     "requestTimedOut": "The request timed out. Retry the operation.",
@@ -201,6 +201,7 @@
     "openSelector": "Open selector",
     "searchOptions": "Search…",
     "undo": "Undo",
+    "redo": "Redo",
     "close": "Close",
     "colorPicker": {
       "format": "Color format: {{format}}",
@@ -379,7 +380,7 @@
       "strong": "Strong",
       "weak": "Weak"
     },
-    "profileDisplayNameHelp": "Shown instead of your email across the workspace.",
+    "profileDisplayNameHelp": "Shown to other people on this server instead of your email.",
     "sessionExpired": "Your session expired. Sign in again to pick up where you left off.",
     "sessionEndingTitle": "Your session ends soon",
     "sessionEndingDescription": "You'll be signed out at {{time}} if nothing is edited, saved or queued before then. Signing back in returns you here.",
@@ -392,7 +393,7 @@
     "showPassword": "Show password",
     "signIn": "Sign in",
     "signInFailed": "Sign-in failed. Check your email and password.",
-    "signInSubtitle": "Sign in to your workspace to continue.",
+    "signInSubtitle": "Sign in to Invoke to continue.",
     "signedInAs": "Signed in as {{email}}",
     "switchingAccount": "Switching account…",
     "signOut": "Sign out",
@@ -403,7 +404,7 @@
     "artworkBy": "Artwork by {{artist}}",
     "copyright": "© 2022-{{year}} Invoke Contributors | All rights reserved",
     "loadingApplication": "Loading Application",
-    "loadingWorkspace": "Loading workspace",
+    "loadingWorkspace": "Loading editor",
     "openingProject": "Opening project",
     "stayOnLaunchpad": "Stay on the Launchpad",
     "launchSkippedTitle": "Opened the Launchpad instead",
@@ -477,12 +478,12 @@
     },
     "invoke": {
       "actions": {
-        "addWidget": "Add {{label}}",
         "openModelManager": "Open Model Manager",
         "sendToGallery": "Send to Gallery",
         "show": "Show",
         "showLayer": "Show layer",
-        "showNode": "Show node"
+        "showNode": "Show node",
+        "showWidget": "Show {{label}}"
       },
       "addToQueue": "Add to queue",
       "expandingPrompts": "Expanding prompts…",
@@ -496,7 +497,7 @@
       "routeHint": "Down Arrow opens the route.",
       "routeIssues": {
         "emptyCanvasFrame": "The Canvas generation frame has no area.",
-        "sourceNotMounted": "The {{source}} widget is not in this layout. Add it, or run another source.",
+        "sourceNotMounted": "The {{source}} widget is not in this workspace. Add it, or run another source.",
         "videoNeedsGallery": "Video results can only go to the Gallery."
       },
       "summary": {
@@ -533,7 +534,6 @@
       "tooltip_other": "{{count}} iterations per invoke"
     },
     "presets": {
-      "builtIn": "Built-in",
       "builtInDescriptions": {
         "automate": "Build and run workflows",
         "compose": "Generate images from text",
@@ -546,41 +546,44 @@
         "edit": "Edit",
         "video": "Video"
       },
-      "custom": "Custom",
-      "customLayouts": "Custom layouts",
-      "defaultDestination": "Default destination",
-      "defaultSource": "Default source",
-      "delete": "Delete preset",
-      "deleteBody": "Delete “{{name}}”? This only removes the saved preset.",
+      "defaultDestination": "Destination",
+      "defaultSource": "Source",
+      "delete": "Delete workspace",
+      "deleteBody": "Delete “{{name}}”? Projects on it move to the default workspace.",
       "deleteNamed": "Delete {{name}}",
-      "deleteQuestion": "Delete layout preset?",
-      "deleteWithEllipsis": "Delete preset…",
-      "edit": "Edit layout preset",
+      "deleteQuestion": "Delete workspace?",
+      "deleteWithEllipsis": "Delete workspace…",
       "edited": "Edited",
-      "editNamed": "Edit {{name}}",
-      "editWithEllipsis": "Edit preset…",
       "icon": "Icon",
-      "iconPicker": "Layout preset icon",
-      "layoutPreset": "Layout preset",
-      "list": "Layout presets",
-      "manage": "Manage presets",
-      "more": "More layout presets",
-      "moreAvailable": "More layout presets, {{count}} available",
-      "name": "Preset name",
-      "none": "No custom presets yet. Arrange the dock, then choose Save as new preset.",
-      "noInvocationSource": "This layout does not contain an invocation source.",
-      "reorderInstructions": "To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.",
+      "iconPicker": "Workspace icon",
+      "list": "Workspaces",
+      "manage": "Manage workspaces",
+      "more": "More workspaces",
+      "moreAvailable": "More workspaces, {{count}} available",
+      "name": "Workspace name",
+      "noInvocationSource": "This workspace has no source to run.",
+      "reorderInstructions": "To reorder a workspace, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.",
       "reorderNamed": "Reorder {{name}}",
-      "restore": "Restore the built-in preset: its shipped arrangement, name, icon and source",
-      "restoreNamed": "Restore built-in {{name}}",
-      "revert": "Revert layout to saved preset",
-      "save": "Save preset",
-      "saveAs": "Save as new preset",
-      "saveAsTooltip": "Save this layout as a new preset",
-      "saveChanges": "Save changes",
-      "switch": "Switch to this layout",
-      "unsaved": "Unsaved changes",
-      "unsavedLayoutChanges": "Unsaved layout changes"
+      "restore": "Reset the built-in workspace to its shipped arrangement, name, icon and route",
+      "restoreBody": "Reset “{{name}}” to the arrangement, name, icon and route Invoke ships? Your changes to it are lost.",
+      "restoreNamed": "Reset built-in {{name}} to default",
+      "restoreQuestion": "Reset workspace?",
+      "saveAs": "Save as new workspace",
+      "switch": "Switch to this workspace",
+      "autoRoute": "Auto",
+      "autoRouteHint": "Invoke runs the first source this workspace fronts.",
+      "copyName": "{{name}} copy",
+      "nameRequired": "Name the workspace first",
+      "newWorkspace": "New workspace",
+      "resetToDefault": "Reset to default",
+      "resetView": "Reset view",
+      "resetViewUnavailable": "This project already shows the workspace as it is set up",
+      "route": "Route",
+      "routeNamed": "Route: {{route}}",
+      "routeSummary": "{{source}} → {{destination}}",
+      "workspace": "Workspace",
+      "workspaceNamed": "{{name}} workspace",
+      "workspaces": "Workspaces"
     },
     "projectSwitcher": {
       "trigger": "Switch project. Current project: {{name}}",
@@ -749,7 +752,7 @@
     "viewLabel": "Project layout",
     "exportOptions": {
       "includeWorkspace": "Include my settings for this project",
-      "workspaceDescription": "Your layout, generation settings, prompt history and staged results for this project. Turn this off to share the project without them."
+      "workspaceDescription": "Your settings for this project: its arrangement, generation settings, prompt history and staged results. Turn this off to share the project without them."
     },
     "fonts": {
       "exportTitle": "Export {{name}}",
@@ -765,14 +768,14 @@
     "deleteIntermediates": "Delete intermediates…"
   },
   "users": {
-    "accountCount_one": "{{count}} account in this workspace.",
-    "accountCount_other": "{{count}} accounts in this workspace.",
+    "accountCount_one": "{{count}} account on this server.",
+    "accountCount_other": "{{count}} accounts on this server.",
     "activeLabel": "{{name}} active",
     "addUser": "Add user",
     "admin": "Admin",
     "adminOnly": "User management is available to administrators only.",
     "administrator": "Administrator",
-    "administratorHelp": "Can manage users and all workspace settings.",
+    "administratorHelp": "Can manage users and all server settings.",
     "backendRejectedChange": "The backend rejected the change.",
     "backendRejectedRequest": "The backend rejected the request.",
     "cannotChangeSelfRole": "You cannot change your own role.",
@@ -792,7 +795,7 @@
     "deleteTitle": "Delete user?",
     "deleteUser": "Delete user",
     "deleteUserNamed": "Delete {{name}}",
-    "description": "Manage workspace accounts and roles.",
+    "description": "Manage the accounts and roles on this server.",
     "displayName": "Display name",
     "displayNameHelp": "Optional — shown instead of the email.",
     "editUser": "Edit user",
@@ -820,7 +823,7 @@
   },
   "fonts": {
     "title": "Fonts",
-    "description": "Browse fonts available to this Invoke workspace and add your own files.",
+    "description": "Browse fonts available on this Invoke server and add your own files.",
     "filterLabel": "Font library scope",
     "filterMenu": "Filter fonts",
     "library": "Font library",
@@ -2357,7 +2360,7 @@
     },
     "groups": {
       "manage": "Manage",
-      "workspace": "Workspace"
+      "workspace": "Your work"
     },
     "help": {
       "community": "Community",
@@ -2419,7 +2422,6 @@
   "settings": {
     "informationalPopoversDisabled": "Informational popovers disabled",
     "informationalPopoversDisabledDesc": "Re-enable them under Settings, in the Behavior section.",
-    "revertLayout": "Revert layout to saved preset",
     "clearData": {
       "action": "Clear saved data…",
       "title": "Clear all saved data?",
@@ -2436,8 +2438,8 @@
       "typeToConfirm": "Type {{word}} to confirm",
       "confirmWord": "DELETE",
       "confirm": "Delete everything",
-      "projectsFailed": "Saved projects could not all be deleted. Reloading to restore a consistent workspace.",
-      "settingsFailed": "Projects were deleted, but some local settings could not be. Reloading the workspace."
+      "projectsFailed": "Saved projects could not all be deleted. Reloading to restore a consistent state.",
+      "settingsFailed": "Projects were deleted, but some local settings could not be. Reloading Invoke."
     },
     "title": "Settings",
     "descriptionGlobal": "Global preferences for this single-user install. Project settings apply only to the active project.",
@@ -2454,7 +2456,7 @@
       "project": "Project",
       "queue": "Queue",
       "workflow": "Workflow",
-      "workspace": "Workspace",
+      "workspace": "Workspaces & data",
       "imageMap": "Image Map"
     },
     "about": {
@@ -2708,8 +2710,8 @@
         "description": "How many finished queue items the server keeps on startup. Changes require a server restart."
       },
       "workspaceActions": {
-        "label": "Data & workspace",
-        "description": "Revert the layout or manage intermediates. Administrators can also run database maintenance."
+        "label": "Data",
+        "description": "Manage intermediates. Administrators can also run database maintenance."
       },
       "clearSavedData": {
         "label": "Clear saved data",
@@ -2773,7 +2775,7 @@
         "imageMap": "Image Map",
         "developer": "Developer",
         "server": "Server",
-        "workspace": "Data & workspace",
+        "workspace": "Workspaces & data",
         "about": "About",
         "intermediates": "Intermediates"
       },
@@ -2787,27 +2789,52 @@
       },
       "resetLoggingDefaults": "Reset to defaults",
       "loggingDefaultsActive": "Default logging settings are active.",
-      "manageIntermediates": "Manage intermediates…"
+      "manageIntermediates": "Manage intermediates…",
+      "rearrangeWithoutCustomize": {
+        "label": "Rearrange without Customize",
+        "description": "Add, move, float and remove widgets, and edit workspaces, without entering Customize first."
+      }
     }
   },
   "shell": {
     "layoutUndo": {
-      "discardedCopy": "Discarded unsaved {{preset}} layout changes",
       "removedWidget": "{{label}} removed",
       "removedWidgetHint": "Add it again any time from Widgets.",
-      "reverted": "Reverted to the saved {{preset}} layout",
+      "resetView": "This project's view of {{preset}} was reset",
       "routeChanged": "Invoke now runs {{source}} and sends results to {{destination}}.",
-      "switchedPreset": "Switched to {{preset}}"
+      "switchedPreset": "Switched to {{preset}}",
+      "updatedWorkspace": "{{preset}} updated",
+      "workspaceChangedMessage": "The workspace changed after this step, so only how this project looks at it was put back.",
+      "workspaceChangedTitle": "Workspace not changed back"
+    },
+    "workspace": {
+      "backToStage": "Back to {{stage}}",
+      "customize": "Customize",
+      "customizeEndedDeletedMessage": "{{workspace}} was deleted, so the changes you were customizing were discarded.",
+      "customizeEndedMovedMessage": "This project moved off {{workspace}}, so the changes you were customizing were discarded.",
+      "customizeEndedTitle": "Customize ended",
+      "customizeWorkspace": "Customize workspace",
+      "customizing": "Customize {{name}}",
+      "keepRearranging": "Keep rearranging",
+      "lockOfferMessage": "Lock them so widgets stay where you put them, and change a workspace any time with Customize. Settings can switch this back.",
+      "lockOfferTitle": "Workspaces can now be locked",
+      "lockWorkspaces": "Lock workspaces",
+      "arrangementAdoptedMessage_one": "{{workspaces}} now uses this project's arrangement in every project.",
+      "arrangementAdoptedMessage_other": "{{workspaces}} now use this project's arrangement in every project.",
+      "arrangementAdoptedTitle": "Workspaces updated",
+      "arrangementDroppedMessage_one": "Workspaces now look the same in every project, so this project's own arrangement of {{workspaces}} was not kept. Customize the workspace to arrange it again.",
+      "arrangementDroppedMessage_other": "Workspaces now look the same in every project, so this project's own arrangements of {{workspaces}} were not kept. Customize a workspace to arrange it again.",
+      "arrangementDroppedTitle": "Workspaces are now shared"
     },
     "widgets": {
       "add": "Add",
       "addNamed": "Add {{label}}",
-      "description": "Every widget and where it is in this layout. Show brings one forward, Dock returns a window to its panel, and Remove takes it out of the layout.",
+      "description": "Every widget and where it is in this workspace. Show brings one forward, or shows one this workspace lacks as a guest; Dock returns a window to its panel, and Remove takes it out of the workspace.",
       "dock": "Dock",
       "dockNamed": "Dock {{label}}",
-      "inLayout": "In this layout",
+      "inLayout": "In this workspace",
       "menuItem": "Widgets…",
-      "notInLayout": "Not in this layout",
+      "notInLayout": "Not in this workspace",
       "placement": {
         "bottom": "Status bar",
         "center": "Center",
@@ -2821,9 +2848,10 @@
       "rowName": "{{label}} ({{placement}})",
       "show": "Show",
       "showNamed": "Show {{label}}",
-      "title": "Widgets"
+      "title": "Widgets",
+      "lockedDescription": "Every widget and where it is in this workspace. Show brings one forward, or shows one this workspace lacks as a guest; Customize adds, docks and removes them.",
+      "missingNeeds": "{{placement}} · Needs {{widgets}}, not in this workspace"
     },
-    "addCurrentLayout": "Add current layout...",
     "backendUnavailable": {
       "connectionFailed": "Could not reach the project server",
       "description": "The editor is paused so it cannot replace your saved session with incomplete data. Retry when the server is available, or export a browser draft below.",
@@ -2838,9 +2866,6 @@
       "retry": "Retry connection",
       "title": "Projects are temporarily unavailable"
     },
-    "builtInPresets": "Built-in presets",
-    "customLayout": "Custom layout {{number}}",
-    "customPresets": "Custom presets",
     "projectConflict": {
       "actionFailed": "The project recovery action failed.",
       "backupDescription": "Server saves continue, but browser crash recovery is unavailable until local storage recovers.",
@@ -2863,9 +2888,9 @@
       "export": "Export local draft",
       "revisionDescription": "The server and this tab contain different edits. You can keep both versions or replace this tab with the server version.",
       "revisionTitle": "Project changed elsewhere",
-      "workspaceRevisionDescription": "Your layout, prompts and generation settings for this project were saved from another tab or device. You can keep both versions, or use the server's settings and keep this tab's edits to the project.",
+      "workspaceRevisionDescription": "Your settings for this project (its arrangement, prompts and generation settings) were saved from another tab or device. You can keep both versions, or use the server's settings and keep this tab's edits to the project.",
       "workspaceRevisionTitle": "Your settings for this project changed elsewhere",
-      "workspaceUseServerConfirmBody": "Replace this tab's layout, prompts and generation settings with the server version? Your edits to the project itself are kept.",
+      "workspaceUseServerConfirmBody": "Replace this tab's settings for this project (its arrangement, prompts and generation settings) with the server version? Your edits to the project itself are kept.",
       "saveAsNew": "Save as new project",
       "saveAsNewConfirmBody": "Create a separate project from the local version? Editing is paused until the copy is safely created.",
       "schemaDescription": "This project needs a newer version of Invoke. Export it before discarding the local draft.",
@@ -2894,11 +2919,6 @@
       "title": "Queue run recovery available",
       "descriptionUnnamed": "A project not in your library has locally saved queue run recovery data."
     },
-    "deleteLayoutPreset": "Delete preset",
-    "deleteLayoutPresetBody": "Delete \"{{name}}\"? This only removes the saved preset.",
-    "deleteLayoutPresetQuestion": "Delete layout preset?",
-    "layoutPresetName": "Preset name",
-    "renameLayoutPreset": "Rename layout preset",
     "pasteMedia": {
       "title_one": "Pasted file",
       "title_other": "Pasted files",
@@ -2927,6 +2947,7 @@
     "centerViewsAdd": "Add to center",
     "failure": {
       "compactLabel": "{{label}} failed — select to retry",
+      "details": "{{label}} error details",
       "copiedError": "Error details copied",
       "copyError": "Copy error",
       "copyErrorFailed": "Could not copy the error details",
@@ -2940,7 +2961,7 @@
       "reloadReasons": {
         "inactive": "This recovery is no longer active. Return to the current editor and try again.",
         "unsaved": "Some project changes are not saved. Resolve pending saves or conflicts before reloading.",
-        "changed": "The workspace changed during recovery, including possible background updates. Retry reloading once the workspace has settled.",
+        "changed": "Projects changed during recovery, including possible background updates. Retry reloading once they have settled.",
         "pixels": "Canvas pixels could not be saved. The editor has stayed open; try again after saving succeeds.",
         "unavailable": "Project persistence is unavailable. The editor has stayed open.",
         "failed": "The editor could not be prepared for reload. It has stayed open with its histories intact."
@@ -2949,7 +2970,6 @@
       "retrying": "Retrying {{label}}"
     },
     "floating": {
-      "centerFloating": "{{label}} is in a floating window",
       "destinations": {
         "bottom": "bottom panel",
         "center": "center",
@@ -2968,7 +2988,6 @@
       "resizeValue": "{{width}} by {{height}} pixels",
       "restore": "Restore",
       "shade": "Collapse",
-      "showWindow": "Show window",
       "unshade": "Expand"
     },
     "loadingLabel": "Loading {{label}}",
@@ -6310,7 +6329,7 @@
       "middleClickOpensInNewTab": "Middle-click opens media in a new tab",
       "itemActions": {
         "loadWorkflow": {
-          "editorUnavailable": "The workflow editor is not available in this layout.",
+          "editorUnavailable": "The workflow editor is not available in this workspace.",
           "failed": "Could not load the image's workflow",
           "failedVideo": "Could not load the video's workflow",
           "label": "Load workflow",
@@ -7071,6 +7090,15 @@
       "skippedHint": "These items repeatedly failed to embed and were given up on.",
       "unavailableTitle": "Image map unavailable",
       "updating": "updating…"
+    },
+    "guest": {
+      "keep": "Keep in workspace",
+      "keepNamed": "Keep {{label}} in workspace"
+    },
+    "needs": {
+      "elsewhere": "{{widget}} is not in this workspace",
+      "hidden": "{{widget}} is hidden",
+      "show": "Show {{widget}}"
     }
   },
   "workflowLibrary": {
@@ -7466,8 +7494,8 @@
       "affected": "Documents that will lose references",
       "affectedProject_one": "Project “{{name}}” ({{count, number}} item)",
       "affectedProject_other": "Project “{{name}}” ({{count, number}} items)",
-      "affectedProjectWorkspace_one": "Workspace in project “{{name}}” ({{count, number}} item)",
-      "affectedProjectWorkspace_other": "Workspace in project “{{name}}” ({{count, number}} items)",
+      "affectedProjectWorkspace_one": "Your settings for project “{{name}}” ({{count, number}} item)",
+      "affectedProjectWorkspace_other": "Your settings for project “{{name}}” ({{count, number}} items)",
       "affectedWorkflow_one": "Workflow “{{name}}” ({{count, number}} item)",
       "affectedWorkflow_other": "Workflow “{{name}}” ({{count, number}} items)",
       "affectedOwner": "· {{owner}}",

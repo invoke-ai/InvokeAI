@@ -13,6 +13,7 @@ import { page } from 'vitest/browser';
 
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
+  projectId: 'project-a',
   patchValues: vi.fn(),
   updateGallerySettings: vi.fn(),
 }));
@@ -25,6 +26,7 @@ vi.mock('@workbench/image-map/api', async (importOriginal) => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => workbench.projectId,
   useWidgetValuesSelector: (widgetId: string, select: (values: Record<string, unknown>) => unknown) =>
     select(widgetId === 'gallery' ? workbench.galleryValues : {}),
   useWorkbenchCommands: () => ({
@@ -140,9 +142,11 @@ const registered = {
   commands: [] as { handler: () => unknown; id: string; runtime: string; disposed: boolean }[],
   hotkeys: [] as { commandId: string; defaultKeys: string[]; runtime: string; disposed: boolean }[],
 };
-const makeViewProps = (runtimeName: string) =>
+const makeViewProps = (runtimeName: string, region = 'center') =>
   ({
     runtime: {
+      instanceId: 'image-map',
+      region,
       commands: {
         register: (command: { handler: () => unknown; id: string }) => {
           const entry = { ...command, disposed: false, runtime: runtimeName };
@@ -212,6 +216,7 @@ const buttonLabels = (): string[] =>
 beforeEach(() => {
   vi.clearAllMocks();
   workbench.galleryValues = {};
+  workbench.projectId = 'project-a';
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
@@ -519,22 +524,48 @@ describe('Image Map cluster selection chip', () => {
     expect(document.activeElement).toBe(host!.querySelector('[data-image-map-surface]'));
   });
 
-  it('moves the Esc binding to the new project when the runtime changes without a remount', async () => {
-    await renderMap(null);
-    await renderMap(null, makeViewProps('project-b'));
+  it('binds Esc only while a cluster is selected, so with none it reaches Back to stage', async () => {
+    const escBound = () =>
+      registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc') && !entry.disposed).length;
 
-    const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));
-    expect(escBindings.map((entry) => [entry.runtime, entry.disposed])).toEqual([
-      ['project-a', true],
-      ['project-b', false],
-    ]);
-    expect(
-      registered.commands
-        .filter((entry) => entry.id === escBindings[0]!.commandId)
-        .map((entry) => [entry.runtime, entry.disposed])
-    ).toEqual([
-      ['project-a', true],
-      ['project-b', false],
-    ]);
+    await renderMap(null);
+    expect(escBound()).toBe(0);
+
+    selectCluster('sunset beach');
+    await renderMap(null);
+    expect(escBound()).toBe(1);
+    registered.commands.find((entry) => !entry.disposed)!.handler();
+    expect(workbench.patchValues).toHaveBeenCalledWith('gallery', CLEARED);
+
+    workbench.galleryValues = {};
+    await renderMap(null);
+    expect(escBound()).toBe(0);
   });
+
+  it.each([
+    ['project', () => (workbench.projectId = 'project-b'), 'center'],
+    ['region', () => undefined, 'right'],
+  ])(
+    'moves the Esc binding to the new runtime when its %s changes without a remount',
+    async (_what, change, region) => {
+      selectCluster('sunset beach');
+      await renderMap(null);
+      change();
+      await renderMap(null, makeViewProps('runtime-b', region));
+
+      const escBindings = registered.hotkeys.filter((entry) => entry.defaultKeys.includes('esc'));
+      expect(escBindings.map((entry) => [entry.runtime, entry.disposed])).toEqual([
+        ['project-a', true],
+        ['runtime-b', false],
+      ]);
+      expect(
+        registered.commands
+          .filter((entry) => entry.id === escBindings[0]!.commandId)
+          .map((entry) => [entry.runtime, entry.disposed])
+      ).toEqual([
+        ['project-a', true],
+        ['runtime-b', false],
+      ]);
+    }
+  );
 });

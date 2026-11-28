@@ -10,6 +10,7 @@ import { WorkbenchBackendUnavailableError } from './projects/syncedPersistence';
 
 export interface PersistenceAggregatePort {
   assignProjectBoard(assignment: WorkbenchSaveResult['projectBoardAssignments'][number]): void;
+  releaseHeldLayouts(savedAccount: WorkbenchState['account']): void;
   getPersistedRevision(): number;
   getState(): WorkbenchState;
   hydrate(state: WorkbenchState): void;
@@ -190,6 +191,9 @@ export const createWorkbenchPersistenceRuntime = ({
   const applySaveResult = (result: WorkbenchSaveResult): void => {
     for (const assignment of result.projectBoardAssignments) {
       aggregate.assignProjectBoard(assignment);
+    }
+    if (result.accountSaved) {
+      aggregate.releaseHeldLayouts(result.snapshot.state.account);
     }
   };
 

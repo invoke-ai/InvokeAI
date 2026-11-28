@@ -27,8 +27,8 @@ export interface PointerPipelineDeps {
   setTool(id: ToolId, opts?: { temporary?: boolean }): void;
   hasTool(id: ToolId): boolean;
   updateCursor(): void;
-  /** `gestureWasActive` allows session teardown while preserving committed selection. */
-  handleEscape?(opts: { gestureWasActive: boolean }): void;
+  /** `gestureWasActive` allows session teardown while preserving committed selection; true when it acted. */
+  handleEscape?(opts: { gestureWasActive: boolean }): boolean;
   /** True consumes the press to commit a modal text session, avoiding mid-gesture commit guards. */
   maybeCommitModalSession?(): boolean;
   /** Primary presses start no gesture then; panning stays available. */
@@ -394,8 +394,10 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (event.key === 'Escape') {
         const gestureWasActive = gestureActive;
         cancelGesture();
-        if (ownsSessionKey(event)) {
-          deps.handleEscape?.({ gestureWasActive });
+        const didAct = ownsSessionKey(event) && deps.handleEscape?.({ gestureWasActive }) === true;
+        // A press that cancelled something is marked, so the workbench's lowest-priority Escape leaves it alone.
+        if (gestureWasActive || didAct) {
+          event.preventDefault();
         }
         return;
       }

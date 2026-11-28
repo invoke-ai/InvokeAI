@@ -1,10 +1,12 @@
 import type { Project } from '@workbench/projectContracts';
 import type { ProjectWorkflowCollection } from '@workbench/projectWorkflows';
 import type { LayeredSettingKey } from '@workbench/settings/projectSettings';
+import type { HeldView, StoredProjectLayout } from '@workbench/workspace/migrateProjectLayout';
 
 import { stripInfiniteWindowAnchor, stripSessionScopedGallerySearch } from '@features/gallery/contracts';
 import { migrateProjectGraphToCollection, normalizeProjectWorkflowCollection } from '@workbench/projectWorkflows';
 import { getLayeredSettings } from '@workbench/settings/projectSettings';
+import { digestStoredLayout } from '@workbench/workspace/storedLayoutDigest';
 
 import { PROJECT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 
@@ -12,33 +14,91 @@ import { PROJECT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 
 export const PROJECT_DOCUMENT_MAX_BYTES = 32 * 1024 * 1024;
 
-export type ProjectDocumentV3 = Omit<
-  Pick<
-    Project,
-    | 'canvas'
-    | 'floatingWidgets'
-    | 'id'
-    | 'invocation'
-    | 'lastFloatingGeometry'
-    | 'layout'
-    | 'name'
-    | 'presetWorkingLayouts'
-    | 'promptHistory'
-    | 'settings'
-    | 'widgetGraphs'
-    | 'widgetInstances'
-    | 'widgetRegions'
-  >,
-  'floatingWidgets' | 'lastFloatingGeometry' | 'presetWorkingLayouts'
+export type ProjectDocumentV3 = Pick<
+  Project,
+  'canvas' | 'id' | 'invocation' | 'name' | 'promptHistory' | 'settings' | 'widgetGraphs' | 'widgetInstances'
 > & {
   documentSchemaVersion: typeof PROJECT_DOCUMENT_SCHEMA_VERSION;
-  floatingWidgets?: Project['floatingWidgets'];
   lastFloatingGeometry?: Project['lastFloatingGeometry'];
-  /** Optional and additive, so schema 3 holds: a build that predates it ignores it and leaves it out of its next save. */
-  presetWorkingLayouts?: Project['presetWorkingLayouts'];
   /** Additive; an older build drops it, and the next load coerces again (accepted: pins equal to the built-in). */
   settingsLayering?: number;
   workflows: ProjectWorkflowCollection;
+  /** The workspace the project is on, and how it looks at each; a document without them stored the layout below. */
+  workspaceId?: Project['workspaceId'];
+  views?: Project['views'];
+  /** Additive: workspaces whose own arrangement the project lost when its stored layout migrated, until it is told. */
+  droppedArrangements?: Project['droppedArrangements'];
+} & Partial<StoredLayoutFields>;
+
+/**
+ * The layout a document stored before structure and view split. A project loaded from one writes it back unchanged
+ * until the editor migrates it against the account, so a copy, import or export made meanwhile keeps it. `heldView` and
+ * `importedLayout` are additive within it, which a build before the split drops on save: what a held project shows and
+ * what the load that held it decided, read only beside the layout it was saved with (`layoutDigest`), and that the
+ * document came in through an import.
+ */
+interface StoredLayoutFields {
+  floatingWidgets: StoredProjectLayout['floatingWidgets'];
+  heldView: HeldView & { layoutDigest: string };
+  importedLayout: true;
+  layout: StoredProjectLayout['layout'];
+  presetWorkingLayouts: StoredProjectLayout['presetWorkingLayouts'];
+  widgetRegions: StoredProjectLayout['widgetRegions'];
+}
+
+/** What a held project saves beside its stored layout: what it shows, and what the load that held it decided. */
+const toHeldView = (
+  { droppedArrangements, views, workspaceId }: Pick<Project, 'droppedArrangements' | 'views' | 'workspaceId'>,
+  { adopted, dropped }: NonNullable<StoredProjectLayout['held']>
+): HeldView => ({
+  ...(adopted ? { adopted: true } : {}),
+  ...(dropped.length > 0 ? { dropped: [...dropped] } : {}),
+  ...(droppedArrangements?.length ? { untold: [...droppedArrangements] } : {}),
+  views,
+  workspaceId,
+});
+
+/**
+ * The layout fields a project's document holds: its workspace and views, or the stored layout it has not migrated or
+ * holds until its account's adoption is saved (`heldLegacyLayout`), which a later load migrates again and then shows as
+ * it was held.
+ */
+const toDocumentLayoutFields = (
+  project: Pick<Project, 'droppedArrangements' | 'heldLegacyLayout' | 'legacyLayout' | 'views' | 'workspaceId'>
+): Pick<
+  ProjectDocumentV3,
+  | 'droppedArrangements'
+  | 'floatingWidgets'
+  | 'heldView'
+  | 'importedLayout'
+  | 'layout'
+  | 'presetWorkingLayouts'
+  | 'views'
+  | 'widgetRegions'
+  | 'workspaceId'
+> => {
+  const { droppedArrangements, heldLegacyLayout, legacyLayout: unmigrated, views, workspaceId } = project;
+  const legacyLayout = unmigrated ?? heldLegacyLayout;
+
+  if (!legacyLayout) {
+    return { ...(droppedArrangements ? { droppedArrangements: [...droppedArrangements] } : {}), views, workspaceId };
+  }
+
+  const fields = {
+    ...(legacyLayout.floatingWidgets ? { floatingWidgets: legacyLayout.floatingWidgets } : {}),
+    layout: legacyLayout.layout,
+    ...(legacyLayout.presetWorkingLayouts ? { presetWorkingLayouts: legacyLayout.presetWorkingLayouts } : {}),
+    widgetRegions: legacyLayout.widgetRegions,
+  };
+  const heldView = unmigrated
+    ? unmigrated.heldView
+    : heldLegacyLayout?.held && toHeldView(project, heldLegacyLayout.held);
+
+  return {
+    ...fields,
+    ...(heldView ? { heldView: { ...heldView, layoutDigest: digestStoredLayout(fields) } } : {}),
+    ...(legacyLayout.imported ? { importedLayout: true } : {}),
+  };
 };
 
 /** Newer builds re-run steps above this on documents they already migrated: every step must be idempotent. */
@@ -74,19 +134,16 @@ export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 
   const document: ProjectDocumentV3 = {
     canvas: persistent.canvas,
     documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
-    ...(persistent.floatingWidgets ? { floatingWidgets: persistent.floatingWidgets } : {}),
     id: persistent.id,
     invocation: persistent.invocation,
     ...(persistent.lastFloatingGeometry ? { lastFloatingGeometry: persistent.lastFloatingGeometry } : {}),
-    layout: persistent.layout,
+    ...toDocumentLayoutFields(persistent),
     name: persistent.name,
-    ...(persistent.presetWorkingLayouts ? { presetWorkingLayouts: persistent.presetWorkingLayouts } : {}),
     promptHistory: persistent.promptHistory,
     settings: persistent.settings,
     settingsLayering: SETTINGS_LAYERING_VERSION,
     widgetGraphs: persistent.widgetGraphs,
     widgetInstances: persistent.widgetInstances,
-    widgetRegions: persistent.widgetRegions,
     workflows: persistent.workflows,
   };
 
@@ -105,16 +162,23 @@ export const serializeProjectDocumentV3Json = (
 /** Keeps fields this client does not know, minus session state, stamped with the current schema. */
 export const serializeProjectDocument = (project: Project): Record<string, unknown> => {
   const {
+    adoptedArrangements: _adoptedArrangements,
+    droppedArrangements,
     events: _events,
     graphHistory: _graphHistory,
+    heldLegacyLayout,
+    legacyLayout,
     queue: _queue,
     undoRedo: _undoRedo,
+    views,
     workflowHistories: _workflowHistories,
+    workspaceId,
     ...document
   } = stripSessionScopedGalleryState(project) as Project & { graphHistory?: unknown };
 
   return {
     ...document,
+    ...toDocumentLayoutFields({ droppedArrangements, heldLegacyLayout, legacyLayout, views, workspaceId }),
     documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
     settingsLayering: SETTINGS_LAYERING_VERSION,
   };
@@ -202,7 +266,11 @@ export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDo
     return { reason: `Unsupported project document schema ${String(version)}.`, status: 'malformed' };
   }
 
-  if (typeof data.id !== 'string' || typeof data.name !== 'string' || !isRecord(data.layout)) {
+  if (
+    typeof data.id !== 'string' ||
+    typeof data.name !== 'string' ||
+    (typeof data.workspaceId !== 'string' && !isRecord(data.layout))
+  ) {
     return { reason: 'The document is missing its project identity or layout.', status: 'malformed' };
   }
 

@@ -37,7 +37,7 @@ import {
   isWidgetInstanceDragData,
 } from '@workbench/widgetDnd';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { addWidgetPlacement, closeWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
   createWidgetRegionViewModelFromState,
@@ -46,8 +46,14 @@ import {
   isExpandableBottomItem,
   isPopoverBottomItem,
 } from '@workbench/widgetRegionViewModel';
-import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import {
+  useActiveLayoutSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { ArrowRightToLineIcon } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -124,9 +130,10 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const [capacity] = useState(createCompactWidgetCapacity);
   const bindSpacer = useCallback((element: HTMLDivElement | null) => capacity.bindSpacer(element), [capacity]);
   const { t } = useTranslation();
-  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
-  const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
+  const placementProject = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const bottomRegion = useActiveLayoutSelector((layout) => layout.widgetRegions.bottom);
   const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const getWidgetLabel = useCallback(
@@ -176,19 +183,20 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     (item: WidgetEnableMenuItem) =>
       item.isEnabled
         ? closeWidgetPlacement({
+            availability: queries.getAvailability(),
             widgets,
-            getWidgetById,
             instanceId: item.id,
             project: placementProject,
             region: 'bottom',
           })
-        : openWidgetPlacement({
-            widgets,
+        : addWidgetPlacement({
+            createNew: item.allowMultiple,
             getWidgetsForRegion,
-            options: { createNew: item.allowMultiple, preferredRegions: ['bottom'] },
+            regions: ['bottom'],
             typeId: item.typeId,
+            widgets,
           }),
-    [placementProject, widgets]
+    [placementProject, queries, widgets]
   );
   const handleSelect = useCallback(
     (instanceId: WidgetInstanceId) =>
@@ -211,6 +219,8 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   // The bottom panel's outline is drawn over this border.
   const isBottomOutlined = useHighlightedRegion() === 'bottom';
   const bottomWidgetsLabel = t('widgets.regionWidgets.bottom');
+  // Adding, removing and aligning chips is structure: offered only while the workspace may change.
+  const canEditStructure = useCanEditStructure();
 
   return (
     <CompactWidgetCapacityProvider capacity={capacity}>
@@ -233,7 +243,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
         sortableInstanceIds={sortableInstanceIds}
         strategy={horizontalListSortingStrategy}
         w="full"
-        onContextMenu={openEnableMenu}
+        onContextMenu={canEditStructure ? openEnableMenu : undefined}
       >
         <Flex
           data-status-bar-cluster
@@ -248,21 +258,23 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
               key={item.id}
               item={item}
               isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
-              onContextMenu={openInstanceMenu}
+              onContextMenu={canEditStructure ? openInstanceMenu : undefined}
               onSelect={handleSelect}
             />
           ))}
 
-          <WidgetEnableMenu
-            contextTarget={enableMenuTarget}
-            groupLabel={bottomWidgetsLabel}
-            items={items}
-            positioning={BOTTOM_MENU_POSITIONING}
-            trigger={BOTTOM_MENU_TRIGGER}
-            triggerLabel={bottomWidgetsLabel}
-            onContextClose={handleContextClose}
-            onToggle={toggleBottomWidget}
-          />
+          {canEditStructure ? (
+            <WidgetEnableMenu
+              contextTarget={enableMenuTarget}
+              groupLabel={bottomWidgetsLabel}
+              items={items}
+              positioning={BOTTOM_MENU_POSITIONING}
+              trigger={BOTTOM_MENU_TRIGGER}
+              triggerLabel={bottomWidgetsLabel}
+              onContextClose={handleContextClose}
+              onToggle={toggleBottomWidget}
+            />
+          ) : null}
           {showDropChrome ? <ClusterDropRing dropState={dropState} isOver={isOverStart} /> : null}
         </Flex>
 
@@ -273,18 +285,20 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
               key={item.id}
               item={item}
               isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
-              onContextMenu={openInstanceMenu}
+              onContextMenu={canEditStructure ? openInstanceMenu : undefined}
               onSelect={handleSelect}
             />
           ))}
         </BottomEndCluster>
-        <WidgetInstanceContextMenu
-          isAlignedEnd={isItemAlignedEnd}
-          target={instanceMenuTarget}
-          onClose={handleInstanceClose}
-          onRemove={toggleBottomWidget}
-          onSetAlignment={setItemAlignment}
-        />
+        {canEditStructure ? (
+          <WidgetInstanceContextMenu
+            isAlignedEnd={isItemAlignedEnd}
+            target={instanceMenuTarget}
+            onClose={handleInstanceClose}
+            onRemove={toggleBottomWidget}
+            onSetAlignment={setItemAlignment}
+          />
+        ) : null}
       </WidgetStrip>
     </CompactWidgetCapacityProvider>
   );
@@ -298,7 +312,7 @@ const CompactBottomWidget = ({
 }: {
   isActive: boolean;
   item: BottomWidgetItem;
-  onContextMenu: (item: BottomWidgetItem, event: MouseEvent) => void;
+  onContextMenu?: (item: BottomWidgetItem, event: MouseEvent) => void;
   onSelect: (widgetId: WidgetInstanceId) => void;
 }) => {
   const recovery = useWidgetRecovery(item.id, item.widget);
@@ -411,7 +425,7 @@ const CompactBottomWidget = ({
     ),
     [item.label, openFailedPanel, t]
   );
-  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
+  const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu?.(item, event), [item, onContextMenu]);
   const handlePopoverOpenChange = useCallback((event: { open: boolean }) => setIsPopoverOpen(event.open), []);
   const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
   const isRowActive = item.isPopover ? isPopoverOpen : isActive;
@@ -440,7 +454,7 @@ const CompactBottomWidget = ({
       _hover={isRowActive ? COMPACT_ROW_ACTIVE_HOVER_PROPS : COMPACT_ROW_HOVER_PROPS}
       {...activationProps}
       onClick={handleClick}
-      onContextMenu={handleContextMenu}
+      onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >
       {item.instance ? (
         <WidgetRendererById instanceId={item.id} widget={item.widget} presentation="compact" region="bottom" />

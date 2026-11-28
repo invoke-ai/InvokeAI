@@ -14,10 +14,8 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: { name?: string }) =>
       ({
         'common.done': 'Done',
-        'topbar.presets.edit': 'Edit layout preset',
         'topbar.presets.deleteNamed': `Delete ${options?.name ?? ''}`,
-        'topbar.presets.editNamed': `Edit ${options?.name ?? ''}`,
-        'topbar.presets.manage': 'Manage presets',
+        'topbar.presets.manage': 'Manage workspaces',
         'topbar.presets.reorderNamed': `Reorder ${options?.name ?? ''}`,
         'topbar.presets.restore': 'Restore shipped preset defaults',
         'topbar.presets.restoreNamed': `Restore ${options?.name ?? ''} defaults`,
@@ -98,14 +96,20 @@ const dialogNamed = (title: string): HTMLElement | null =>
 const buttonNamed = (container: Element, text: string): HTMLButtonElement =>
   Array.from(container.querySelectorAll('button')).find((button) => button.textContent === text)!;
 
-const editButton = (name: string): HTMLButtonElement | null =>
-  document.querySelector<HTMLButtonElement>(`button[aria-label="Edit ${name}"]`);
+const deleteButton = (name: string): HTMLButtonElement | null =>
+  document.querySelector<HTMLButtonElement>(`button[aria-label="Delete ${name}"]`);
+
+const deleteConfirmation = (): HTMLElement | null => document.querySelector<HTMLElement>('[role="alertdialog"]');
 
 beforeEach(() => {
   store = createWorkbenchStore();
-  store.commands.layout.createPreset('custom-1', 'Custom', 'star');
+  store.commands.layout.beginCustomize({ defaultRoute: null, iconId: 'star', id: 'custom-1', label: 'Custom' });
+  store.commands.layout.finishCustomize();
   store.commands.layout.reorderPresets('custom-1', 'edit');
-  store.commands.layout.renamePreset('compose', 'Writing');
+  store.commands.layout.applyPreset('compose');
+  store.commands.layout.beginCustomize();
+  store.commands.layout.setCustomizeDraft({ label: 'Writing' });
+  store.commands.layout.finishCustomize();
 });
 
 afterEach(async () => {
@@ -140,28 +144,44 @@ describe('LayoutPresetManagerDialogBody', () => {
   });
 
   it.each([
-    ['Cancel', () => userEvent.click(buttonNamed(dialogNamed('Edit layout preset')!, 'common.cancel'))],
+    ['Cancel', () => userEvent.click(buttonNamed(deleteConfirmation()!, 'common.cancel'))],
     ['Escape', () => userEvent.keyboard('{Escape}')],
-    [
-      'the close button',
-      () => userEvent.click(dialogNamed('Edit layout preset')!.querySelector('[data-part="close-trigger"]')!),
-    ],
-  ])('closes only the edit dialog stacked over the manager on %s', async (_way, dismiss) => {
+  ])('closes only the delete confirmation stacked over the manager on %s', async (_way, dismiss) => {
     await renderTopBarDialogs();
     await act(() => openLayoutPresetManager());
-    await expect.poll(() => dialogNamed('Manage presets')?.getAttribute('data-state')).toBe('open');
+    await expect.poll(() => dialogNamed('Manage workspaces')?.getAttribute('data-state')).toBe('open');
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      await act(() => userEvent.click(editButton('Writing')!));
-      await expect.poll(() => dialogNamed('Edit layout preset')?.getAttribute('data-state')).toBe('open');
-      await expect.poll(() => dialogNamed('Edit layout preset')?.contains(document.activeElement)).toBe(true);
+      await act(() => userEvent.click(deleteButton('Custom')!));
+      await expect.poll(() => deleteConfirmation()?.getAttribute('data-state')).toBe('open');
+      await expect.poll(() => deleteConfirmation()?.contains(document.activeElement)).toBe(true);
 
       await act(dismiss);
 
-      await expect.poll(() => dialogNamed('Edit layout preset')).toBeNull();
-      expect(dialogNamed('Manage presets')?.getAttribute('data-state')).toBe('open');
-      await expect.poll(() => document.activeElement).toBe(editButton('Writing'));
+      await expect.poll(deleteConfirmation).toBeNull();
+      expect(dialogNamed('Manage workspaces')?.getAttribute('data-state')).toBe('open');
+      await expect.poll(() => document.activeElement).toBe(deleteButton('Custom'));
     }
+  });
+
+  it('resets a changed built-in only once its confirmation says so', async () => {
+    await renderTopBarDialogs();
+    await act(() => openLayoutPresetManager());
+    const restore = () => document.querySelector<HTMLButtonElement>('button[aria-label="Restore Writing defaults"]');
+    const isOverridden = () => store.getSnapshot().account.layoutPresetMetadataOverrides?.compose !== undefined;
+    await expect.poll(restore).not.toBeNull();
+
+    await act(() => userEvent.click(restore()!));
+    await expect.poll(() => deleteConfirmation()?.textContent).toContain('topbar.presets.restoreQuestion');
+    expect(isOverridden()).toBe(true);
+    await act(() => userEvent.click(buttonNamed(deleteConfirmation()!, 'common.cancel')));
+    await expect.poll(deleteConfirmation).toBeNull();
+    expect(isOverridden()).toBe(true);
+
+    await act(() => userEvent.click(restore()!));
+    await expect.poll(deleteConfirmation).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed(deleteConfirmation()!, 'topbar.presets.resetToDefault')));
+    expect(isOverridden()).toBe(false);
   });
 
   it('renders one account-ordered list without preset descriptions', async () => {

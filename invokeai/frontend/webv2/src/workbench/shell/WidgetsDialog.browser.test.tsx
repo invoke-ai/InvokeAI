@@ -1,11 +1,14 @@
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -20,8 +23,14 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
 
   return {
     ...(await importOriginal<typeof WorkbenchContextModule>()),
+    useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot).activeLayout),
+    useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot)),
     useActiveProjectSelector: <Selected,>(selector: (project: unknown) => Selected) =>
       selector(useSyncExternalStore(workbench.store!.subscribe, () => workbench.store!.getSnapshot().activeProject)),
+    useOptionalWorkbenchSelector: <Selected,>(selector: (snapshot: unknown) => Selected) =>
+      selector(useSyncExternalStore(workbench.store!.subscribe, workbench.store!.getSnapshot)),
     useWorkbenchCommands: () => workbench.store!.commands,
     useWorkbenchQueries: () => workbench.store!.queries,
   };
@@ -45,6 +54,7 @@ let root: Root | null = null;
 
 const store = () => workbench.store!;
 const activeProject = () => store().getSnapshot().activeProject;
+const activeLayout = () => store().getSnapshot().activeLayout;
 const row = (key: string) => page.getByRole('dialog').element().querySelector(`[data-widgets-row="${key}"]`);
 const sectionItems = (name: string) => page.getByRole('list', { name }).getByRole('listitem').elements();
 
@@ -80,16 +90,19 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
+// Add, Dock and Remove are structure: this list belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
+
 describe('WidgetsDialog', () => {
   it('lists placed widgets with where they are, and brings a removed one back', async () => {
-    expect(sectionItems('In this layout')).toContain(row('queue'));
+    expect(sectionItems('In this workspace')).toContain(row('queue'));
     expect(row('queue')?.textContent).toContain('Right panel');
-    expect(sectionItems('Not in this layout')).toContain(row('type:layers'));
+    expect(sectionItems('Not in this workspace')).toContain(row('type:layers'));
 
     await act(() => page.getByRole('button', { name: 'Remove Queue (Right panel)' }).click());
 
-    expect(activeProject().widgetRegions.right.instanceIds).not.toContain('queue');
-    expect(sectionItems('Not in this layout')).toContain(row('type:queue'));
+    expect(activeLayout().widgetRegions.right.instanceIds).not.toContain('queue');
+    expect(sectionItems('Not in this workspace')).toContain(row('type:queue'));
     await expect.element(page.getByRole('button', { name: 'Add Queue' })).toHaveFocus();
 
     await act(() => page.getByRole('button', { name: 'Add Queue' }).click());
@@ -97,18 +110,18 @@ describe('WidgetsDialog', () => {
   });
 
   it('adds a removed status-bar chip back to the status bar', async () => {
-    const autosave = activeProject().widgetRegions.bottom.instanceIds.find(
+    const autosave = activeLayout().widgetRegions.bottom.instanceIds.find(
       (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'
     )!;
 
     await act(() => page.getByRole('button', { name: 'Remove Autosave (Status bar)' }).click());
-    expect(activeProject().widgetRegions.bottom.instanceIds).not.toContain(autosave);
+    expect(activeLayout().widgetRegions.bottom.instanceIds).not.toContain(autosave);
     await expect.element(page.getByRole('button', { name: 'Add Autosave' })).toHaveFocus();
 
     await act(() => page.getByRole('button', { name: 'Add Autosave' }).click());
 
     expect(
-      activeProject().widgetRegions.bottom.instanceIds.some(
+      activeLayout().widgetRegions.bottom.instanceIds.some(
         (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'
       )
     ).toBe(true);
@@ -116,7 +129,7 @@ describe('WidgetsDialog', () => {
 
   it('keeps the last center view, saying why its Remove is unavailable', async () => {
     await act(() => page.getByRole('button', { name: 'Remove Gallery (Center)' }).click());
-    const center = [...activeProject().widgetRegions.center.instanceIds];
+    const center = [...activeLayout().widgetRegions.center.instanceIds];
     const remove = page.getByRole('button', { name: 'Remove Preview (Center)' });
 
     await expect.element(remove).toHaveAttribute('aria-disabled', 'true');
@@ -125,7 +138,7 @@ describe('WidgetsDialog', () => {
     // A pointer click would be refused as disabled; dispatch one to prove the action itself is blocked.
     await act(() => (remove.element() as HTMLElement).click());
 
-    expect(activeProject().widgetRegions.center.instanceIds).toEqual(center);
+    expect(activeLayout().widgetRegions.center.instanceIds).toEqual(center);
     await expect.element(page.getByRole('dialog', { name: 'Widgets' })).toBeVisible();
   });
 
@@ -159,7 +172,7 @@ describe('WidgetsDialog', () => {
 
     await act(() => page.getByRole('button', { name: 'Dock Queue (Floating window)' }).click());
 
-    expect(activeProject().floatingWidgets?.queue).toBeUndefined();
+    expect(activeLayout().floatingWidgets?.queue).toBeUndefined();
     expect(row('queue')?.textContent).toContain('Right panel');
   });
 
@@ -167,5 +180,23 @@ describe('WidgetsDialog', () => {
     await act(() => page.getByRole('button', { name: 'Show Queue (Right panel)' }).click());
 
     await expect.element(page.getByRole('dialog', { name: 'Widgets' })).not.toBeInTheDocument();
+  });
+});
+
+describe('WidgetsDialog on a locked workspace', () => {
+  beforeEach(() => {
+    void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+  });
+
+  it('only shows widgets until Customize, from its footer, offers Add, Dock and Remove in place', async () => {
+    await expect.element(page.getByRole('button', { name: 'Show Queue (Right panel)' })).toBeVisible();
+    expect(page.getByRole('button', { name: 'Remove Queue (Right panel)' }).query()).toBeNull();
+    expect(page.getByRole('button', { name: 'Add Layers' }).query()).toBeNull();
+
+    await act(() => page.getByRole('button', { name: 'Customize', exact: true }).click());
+
+    await expect.element(page.getByRole('button', { name: 'Remove Queue (Right panel)' })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: 'Add Layers' })).toBeVisible();
+    expect(page.getByRole('button', { name: 'Customize', exact: true }).query()).toBeNull();
   });
 });

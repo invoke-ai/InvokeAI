@@ -1,60 +1,34 @@
 import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
-import type { Project } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
+import type { WorkspacePlacement } from '@workbench/workspace/workspaceDerivations';
 
 import { autoSwitchDestinations } from './autoRoutePolicy';
-import { getSourceLabel, isInvocationSourceAvailable } from './invocation';
-
-const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'video', 'workflow'] as const;
-
-export type GraphWidgetTypeId = (typeof graphWidgetTypeIds)[number];
-
-const sourceIdsByWidgetTypeId: Record<GraphWidgetTypeId, InvocationSourceId> = {
-  canvas: 'canvas',
-  generate: 'generate',
-  upscale: 'upscale',
-  video: 'video',
-  workflow: 'workflow',
-};
-
-const widgetTypeIdsBySourceId: Record<InvocationSourceId, GraphWidgetTypeId> = {
-  canvas: 'canvas',
-  generate: 'generate',
-  upscale: 'upscale',
-  video: 'video',
-  workflow: 'workflow',
-};
-
-export const isGraphWidgetTypeId = (typeId: WidgetTypeId): typeId is GraphWidgetTypeId =>
-  (graphWidgetTypeIds as readonly string[]).includes(typeId);
-
-export const getSourceIdForWidgetTypeId = (typeId: WidgetTypeId): InvocationSourceId | null =>
-  isGraphWidgetTypeId(typeId) ? sourceIdsByWidgetTypeId[typeId] : null;
-
-export const getWidgetTypeIdForSourceId = (sourceId: InvocationSourceId): GraphWidgetTypeId =>
-  widgetTypeIdsBySourceId[sourceId];
+import { getSourceLabel } from './invocation';
+import { findWidgetTypeIdForSourceId, invocationSources } from './invocationSources';
 
 export const getNaturalDestination = (sourceId: InvocationSourceId): ResultDestination =>
   autoSwitchDestinations[sourceId];
 
 export interface GraphWidgetSource {
   sourceId: InvocationSourceId;
-  typeId: GraphWidgetTypeId;
+  typeId: WidgetTypeId;
   label: string;
 }
 
-export const graphWidgetSources: GraphWidgetSource[] = graphWidgetTypeIds
-  .map((typeId) => ({
-    label: getSourceLabel(sourceIdsByWidgetTypeId[typeId]),
-    sourceId: sourceIdsByWidgetTypeId[typeId],
-    typeId,
-  }))
-  .filter((source) => isInvocationSourceAvailable(source.sourceId));
+let graphWidgetSources: GraphWidgetSource[] | undefined;
+
+/** Every available source a widget runs, with that widget type, in picker order. */
+export const getGraphWidgetSources = (): readonly GraphWidgetSource[] =>
+  (graphWidgetSources ??= invocationSources.flatMap(({ available, id }) => {
+    const typeId = available ? findWidgetTypeIdForSourceId(id) : null;
+
+    return typeId ? [{ label: getSourceLabel(id), sourceId: id, typeId }] : [];
+  }));
 
 /** Floating graph widgets are both visible and placed, so include them in invocation-source discovery. */
-const addFloatingWidgetTypeIds = (project: Project, typeIds: Set<WidgetTypeId>): void => {
-  for (const instanceId of Object.keys(project.floatingWidgets ?? {})) {
-    const typeId = project.widgetInstances[instanceId]?.typeId;
+const addFloatingWidgetTypeIds = (layout: WorkspacePlacement, typeIds: Set<WidgetTypeId>): void => {
+  for (const instanceId of Object.keys(layout.floatingWidgets ?? {})) {
+    const typeId = layout.widgetInstances[instanceId]?.typeId;
 
     if (typeId) {
       typeIds.add(typeId);
@@ -63,11 +37,11 @@ const addFloatingWidgetTypeIds = (project: Project, typeIds: Set<WidgetTypeId>):
 };
 
 // Collapsed regions still count as visible because disclosure does not change routing.
-export const getVisibleWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
+export const getVisibleWidgetTypeIds = (layout: WorkspacePlacement): Set<WidgetTypeId> => {
   const typeIds = new Set<WidgetTypeId>();
 
-  for (const region of Object.values(project.widgetRegions)) {
-    const typeId = project.widgetInstances[region.activeInstanceId]?.typeId;
+  for (const region of Object.values(layout.widgetRegions)) {
+    const typeId = layout.widgetInstances[region.activeInstanceId]?.typeId;
 
     if (typeId) {
       typeIds.add(typeId);
@@ -75,17 +49,17 @@ export const getVisibleWidgetTypeIds = (project: Project): Set<WidgetTypeId> => 
   }
 
   // Shaded and maximized windows count too, for the same reason.
-  addFloatingWidgetTypeIds(project, typeIds);
+  addFloatingWidgetTypeIds(layout, typeIds);
 
   return typeIds;
 };
 
-export const getPlacedWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
+export const getPlacedWidgetTypeIds = (layout: WorkspacePlacement): Set<WidgetTypeId> => {
   const typeIds = new Set<WidgetTypeId>();
 
-  for (const region of Object.values(project.widgetRegions)) {
+  for (const region of Object.values(layout.widgetRegions)) {
     for (const instanceId of region.instanceIds) {
-      const typeId = project.widgetInstances[instanceId]?.typeId;
+      const typeId = layout.widgetInstances[instanceId]?.typeId;
 
       if (typeId) {
         typeIds.add(typeId);
@@ -93,7 +67,7 @@ export const getPlacedWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
     }
   }
 
-  addFloatingWidgetTypeIds(project, typeIds);
+  addFloatingWidgetTypeIds(layout, typeIds);
 
   return typeIds;
 };

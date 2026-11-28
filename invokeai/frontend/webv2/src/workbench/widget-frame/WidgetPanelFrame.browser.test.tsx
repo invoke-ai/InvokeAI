@@ -20,6 +20,19 @@ const frameMocks = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   shallowEqual: Object.is,
+  useActiveLayoutSelector: (
+    selector: (project: {
+      widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[]; sizePx: number }>;
+    }) => unknown
+  ) => {
+    const region = {
+      activeInstanceId: 'test-instance',
+      instanceIds: ['test-instance'],
+      sizePx: frameMocks.sizePx,
+    };
+
+    return selector({ widgetRegions: { bottom: region, center: region, left: region, right: region } });
+  },
   useActiveProjectSelector: (
     selector: (project: {
       widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[]; sizePx: number }>;

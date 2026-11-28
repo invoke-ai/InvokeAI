@@ -4,7 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type * as SettingsStoreModule from '@workbench/settings/store';
 import type * as WidgetFrameModule from '@workbench/widget-frame';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors } from '@dnd-kit/core';
@@ -28,11 +28,16 @@ const runtime = vi.hoisted(() => ({
   store: null as unknown as WorkbenchInternalStore,
   extensions: null as unknown as ExtensionRegistry,
   customHotkeys: {} as Record<string, string[]>,
+  rearrangeWithoutCustomize: false,
   registrations: 0,
   releases: 0,
 }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot).activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot)),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) => {
     const state = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
     return selector(state.activeProject);
@@ -47,10 +52,15 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<typeof SettingsStoreModule>()),
   useWorkbenchPreferenceSelector: <Selected,>(
-    select: (preferences: { customHotkeys: Record<string, string[]>; showFocusRegionHighlight: boolean }) => Selected
+    select: (preferences: {
+      customHotkeys: Record<string, string[]>;
+      rearrangeWithoutCustomize: boolean;
+      showFocusRegionHighlight: boolean;
+    }) => Selected
   ) =>
     select({
       customHotkeys: runtime.customHotkeys,
+      rearrangeWithoutCustomize: runtime.rearrangeWithoutCustomize,
       showFocusRegionHighlight: true,
     }),
 }));
@@ -176,6 +186,7 @@ beforeEach(async () => {
   runtime.extensions = createExtensionRegistry();
   runtime.registrations = 0;
   runtime.releases = 0;
+  runtime.rearrangeWithoutCustomize = false;
   runtime.customHotkeys = {
     'app.openCommandPalette': ['mod+j'],
     'app.invoke': ['mod+shift+j'],
@@ -273,41 +284,68 @@ describe('contextual status-bar guide', () => {
     root = null;
     expect(runtime.releases).toBe(1);
   });
-  it('fits remaining footer space after other widgets and keeps Notifications visible when their labels grow', async () => {
-    await leaveCanvas();
-    await act(() =>
-      widgetWidths.setSnapshot({
+  it.each([
+    ['locked, without the widget menu', false],
+    ['rearranging without Customize, beside the widget menu', true],
+  ])(
+    'fits remaining footer space after other widgets and keeps Notifications visible when their labels grow, %s',
+    async (_state, rearrangeWithoutCustomize) => {
+      runtime.rearrangeWithoutCustomize = rearrangeWithoutCustomize;
+      const otherChips = {
         'server-status': 220,
         'queue-status': 100,
         'gallery:bottom': 60,
         'autosave-status': 80,
         notifications: 128,
-      })
-    );
-    await page.viewport(700, 600);
-    await render(700);
-    const footer = host!.querySelector('footer')!;
-    const guide = page.getByRole('button', SHORTCUTS_CHIP);
-    const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
-    await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
-    await expect.poll(() => notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
-    expect(guide.element().getBoundingClientRect().width).toBeLessThan(80);
-    await act(() => widgetWidths.setSnapshot({ ...widgetWidths.getSnapshot(), 'server-status': 250 }));
-    await render(700);
-    await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(28);
-    expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
-    await expect.element(guide).toHaveAccessibleName('Shortcuts');
-    expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
-    await guide.click();
-    await expect.element(page.getByRole('dialog')).toBeVisible();
-    await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('Invoke');
-    await userEvent.keyboard('{Escape}');
-    await act(() =>
-      runtime.store.commands.widgets.setAlignment({ align: 'start', instanceId: 'shortcuts', region: 'bottom' })
-    );
-    await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
-    expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
-  });
+      };
+      await leaveCanvas();
+      await act(() => widgetWidths.setSnapshot(otherChips));
+      await page.viewport(700, 600);
+      await render(700);
+      const footer = host!.querySelector('footer')!;
+      const guide = page.getByRole('button', SHORTCUTS_CHIP);
+      const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
+      const menuTrigger = footer.querySelector('button[aria-label="Status bar widgets"]');
+      expect(menuTrigger !== null).toBe(rearrangeWithoutCustomize);
+      // The footer's content box less the other chips, the widget menu when offered, and a gap between neighbours.
+      const remainingWidth = (chips: Record<string, number>) => {
+        const style = getComputedStyle(footer);
+        const gap = parseFloat(getComputedStyle(footer.querySelector('[data-status-bar-cluster]')!).columnGap);
+        const items = Object.keys(chips).length + (menuTrigger ? 2 : 1);
+        return (
+          footer.clientWidth -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight) -
+          Object.values(chips).reduce((sum, width) => sum + width, 0) -
+          (menuTrigger?.getBoundingClientRect().width ?? 0) -
+          (items - 2) * gap
+        );
+      };
+      await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
+      await expect.poll(() => notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
+      const remaining = remainingWidth(otherChips);
+      expect(guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(remaining + 0.5);
+      // Server status grows until not even the guide's label fits beside its icon.
+      const iconOnly = { ...otherChips, 'server-status': otherChips['server-status'] + remaining - 28 };
+      await act(() => widgetWidths.setSnapshot(iconOnly));
+      await render(700);
+      await expect
+        .poll(() => guide.element().getBoundingClientRect().width)
+        .toBeLessThanOrEqual(remainingWidth(iconOnly));
+      expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
+      await expect.element(guide).toHaveAccessibleName('Shortcuts');
+      expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
+      await guide.click();
+      await expect.element(page.getByRole('dialog')).toBeVisible();
+      await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('Invoke');
+      await userEvent.keyboard('{Escape}');
+      await act(() =>
+        runtime.store.commands.widgets.setAlignment({ align: 'start', instanceId: 'shortcuts', region: 'bottom' })
+      );
+      await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
+      expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
+    }
+  );
   it('keeps the chip, padding included, within its space at every width as its content steps down', async () => {
     await leaveCanvas();
     await page.viewport(700, 600);

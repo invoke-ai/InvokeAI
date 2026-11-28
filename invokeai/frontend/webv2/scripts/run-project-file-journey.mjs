@@ -204,12 +204,12 @@ const getDocumentVideoName = (project) =>
 
 const workflowRequests = async () => (await fetchJson('/__workflow-requests')).requests;
 
-const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Layout preset' });
+const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Workspaces' });
 
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
 const selectLayoutPreset = async (page, preset, centerView) => {
-  const name = new RegExp(`^${preset}(, unsaved changes)?$`);
+  const name = new RegExp(`^${preset}$`);
   const strip = presetStrip(page);
   const selected = strip.getByRole('tab', { name, selected: true });
 
@@ -306,6 +306,16 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await exportPage.getByRole('menuitem', { name: /^Download board/ }).waitFor();
   await exportPage.keyboard.press('Escape');
 
+  // Stored before structure and view split, the project opened migrated: its working copy of Edit is now its view of
+  // Edit, which fronts Upscale in the left rail.
+  await exportPage.getByRole('tab', { exact: true, name: 'Edit' }).click();
+  await exportPage
+    .getByRole('navigation', { exact: true, name: 'Left rail' })
+    .getByRole('button', { exact: true, name: 'Upscale', pressed: true })
+    .waitFor();
+  await exportPage.getByRole('tab', { exact: true, name: 'Compose' }).click();
+  await exportPage.getByRole('tab', { exact: true, name: 'Compose', selected: true }).waitFor();
+
   const downloadPromise = exportPage.waitForEvent('download');
 
   await exportPage
@@ -342,6 +352,16 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   const archivedWorkspace = readEntryJson(entries, 'workspace.json');
   assert.equal(archivedContent.documentSchemaVersion, 4);
   assert.equal(archivedContent.layout, undefined);
+  // The migrated workspace half: the new stamp, the stored arrangement as views, none of the stored layout fields.
+  assert.equal(archivedWorkspace.documentSchemaVersion, 5);
+  assert.equal(archivedWorkspace.workspaceId, 'compose');
+  assert.deepEqual(archivedWorkspace.views, {
+    compose: { sizes: { left: 520 } },
+    edit: { fronts: { left: 'upscale' }, sizes: { right: 380 } },
+  });
+  for (const field of ['floatingWidgets', 'layout', 'presetWorkingLayouts', 'widgetRegions']) {
+    assert.equal(archivedWorkspace[field], undefined, field);
+  }
   assert.ok(
     archivedContent.workflows.entries.some(
       (entry) => entry.document.id === archivedWorkspace.workflows.activeWorkflowId

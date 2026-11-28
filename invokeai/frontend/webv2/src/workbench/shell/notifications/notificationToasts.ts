@@ -3,6 +3,7 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { TFunction } from 'i18next';
 
 import { ACTION_TOAST_DURATION_MS, createActionToast } from '@platform/ui/toaster';
+import i18next from 'i18next';
 
 import {
   getNotificationActionWithdrawals,
@@ -20,12 +21,32 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
   success: 'success',
 };
 
+/** List values in the reader's language: each name translated, the list joined as the language joins one. */
+const translateListValues = (
+  lists: NonNullable<WorkbenchNotification['messageListValues']>,
+  t: TFunction
+): Record<string, string> => {
+  const format = new Intl.ListFormat(i18next.resolvedLanguage, { style: 'long', type: 'conjunction' });
+
+  return Object.fromEntries(
+    Object.entries(lists).map(([name, items]) => [
+      name,
+      format.format(items.map(({ key, text }) => (key ? t(key, { defaultValue: text }) : text))),
+    ])
+  );
+};
+
 /** A notification's title and message in the current language; the English text stands in where no key exists. */
 export const resolveNotificationText = (
   notification: WorkbenchNotification,
   t: TFunction
 ): { message: string | undefined; title: string } => ({
-  message: notification.messageKey ? t(notification.messageKey, notification.messageValues) : notification.message,
+  message: notification.messageKey
+    ? t(notification.messageKey, {
+        ...notification.messageValues,
+        ...(notification.messageListValues ? translateListValues(notification.messageListValues, t) : {}),
+      })
+    : notification.message,
   title: notification.titleKey ? t(notification.titleKey, notification.titleValues) : notification.title,
 });
 

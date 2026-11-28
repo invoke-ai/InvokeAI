@@ -20,12 +20,12 @@ import { WidgetOverlayOwnerContext } from '@platform/ui/widgetOverlays';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { memo, Suspense, use, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
+import { UnmetNeedNotice } from './UnmetNeedNotice';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 import { WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
 import { WidgetIdentityIcon } from './WidgetIdentityIcon';
@@ -51,6 +51,8 @@ interface WidgetChromeSlotByIdProps {
   /** The runtime region for chrome hoisted outside center, so close/reveal target the right placement. */
   region?: WorkbenchRegion;
   slot: WidgetChromeSlotName;
+  /** In a window, the surface its view shows (`WidgetViewProps.surface`), so its chrome matches it. */
+  surface?: WidgetRegion;
   widget: RegisteredWidget;
 }
 
@@ -64,7 +66,13 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
 };
 
 /** Resolve widget chrome with the view's implementation/runtime for center and floating hosts. */
-export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widget }: WidgetChromeSlotByIdProps) => {
+export const WidgetChromeSlotById = ({
+  instanceId,
+  region = 'center',
+  slot,
+  surface,
+  widget,
+}: WidgetChromeSlotByIdProps) => {
   const selection = useActiveProjectSelector(
     (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
     areProjectWidgetRenderInstancesEqual
@@ -86,7 +94,7 @@ export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widg
       {slot === 'icon' ? (
         <WidgetImplementationIcon widget={widget} />
       ) : (
-        <WidgetChromeSlot instance={selection.instance} region={region} slot={slot} widget={widget} />
+        <WidgetChromeSlot instance={selection.instance} region={region} slot={slot} surface={surface} widget={widget} />
       )}
     </WidgetRecoveryBoundary>
   ) : null;
@@ -101,28 +109,29 @@ const WidgetChromeSlot = ({
   instance,
   region,
   slot,
+  surface,
   widget,
 }: {
   instance: WidgetInstanceContract;
   region: WorkbenchRegion;
   slot: WidgetChromeSlotName;
+  surface?: WidgetRegion;
   widget: RegisteredWidget;
 }) => {
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
+  // The title is the workspace's: its structure names the instance.
+  const title = project.widgetInstances[instance.id]?.title;
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
     () => ({
       createdAt: instance.createdAt,
       id: instance.id,
-      title: instance.title,
+      title,
       typeId: instance.typeId,
     }),
-    [instance.createdAt, instance.id, instance.title, instance.typeId]
+    [instance.createdAt, instance.id, title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
-    getWidgetById,
-    getWidgetsForRegion,
     instance: instanceMeta,
     project,
     region,
@@ -132,9 +141,15 @@ const WidgetChromeSlot = ({
   const actions = useMemo(
     () =>
       HeaderActions ? (
-        <HeaderActions instance={instanceMeta} manifest={widget.manifest} region={region} runtime={runtime} />
+        <HeaderActions
+          instance={instanceMeta}
+          manifest={widget.manifest}
+          region={region}
+          runtime={runtime}
+          surface={surface}
+        />
       ) : null,
-    [HeaderActions, instanceMeta, region, runtime, widget.manifest]
+    [HeaderActions, instanceMeta, region, runtime, surface, widget.manifest]
   );
 
   if (widget.manifest.chrome?.header === 'hidden') {
@@ -175,7 +190,13 @@ const WidgetChromeSlot = ({
   );
 };
 
-export const WidgetRenderer = ({ instance, presentation = 'expanded', region, widget }: WidgetRendererProps) => {
+export const WidgetRenderer = ({
+  instance,
+  presentation = 'expanded',
+  region,
+  surface,
+  widget,
+}: WidgetRendererProps) => {
   const loadingFallback = useMemo(
     () => <WidgetLoadingFallback instance={instance} presentation={presentation} region={region} widget={widget} />,
     [instance, presentation, region, widget]
@@ -189,7 +210,13 @@ export const WidgetRenderer = ({ instance, presentation = 'expanded', region, wi
       slot={presentation ?? 'expanded'}
     >
       <Suspense fallback={loadingFallback}>
-        <LoadedWidgetRenderer instance={instance} presentation={presentation} region={region} widget={widget} />
+        <LoadedWidgetRenderer
+          instance={instance}
+          presentation={presentation}
+          region={region}
+          surface={surface}
+          widget={widget}
+        />
       </Suspense>
     </WidgetRecoveryBoundary>
   );
@@ -304,26 +331,25 @@ export const WidgetRecoveryAnnouncement = ({
   return <VisuallyHidden role="status">{announced.text}</VisuallyHidden>;
 };
 
-const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+const LoadedWidgetRenderer = ({ instance, presentation, region, surface, widget }: WidgetRendererProps) => {
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const implementation = use(widget.implementation.load());
   const View = implementation.view;
   useMountEffect(() => {
     markSemanticReady(getWidgetReadyMark(region, instance.typeId));
   });
+  // The title is the workspace's: its structure names the instance.
+  const title = project.widgetInstances[instance.id]?.title;
   const instanceMeta: WidgetInstanceRuntimeMeta = useMemo(
     () => ({
       createdAt: instance.createdAt,
       id: instance.id,
-      title: instance.title,
+      title,
       typeId: instance.typeId,
     }),
-    [instance.createdAt, instance.id, instance.title, instance.typeId]
+    [instance.createdAt, instance.id, title, instance.typeId]
   );
   const runtime = useWidgetRuntime({
-    getWidgetById,
-    getWidgetsForRegion,
     instance: instanceMeta,
     project,
     region,
@@ -335,6 +361,7 @@ const LoadedWidgetRenderer = ({ instance, presentation, region, widget }: Widget
       presentation={presentation}
       region={region}
       runtime={runtime}
+      surface={surface}
     />
   );
 
@@ -390,9 +417,7 @@ const WidgetShellFrame = ({
     return <WidgetTooltipFrame icon={widget.manifest.icon}>{children}</WidgetTooltipFrame>;
   }
 
-  // Floating windows provide their own chrome (FloatingWidgetWindow), so the view renders bare, like popovers and
-  // dialogs.
-  if (region === 'popover' || region === 'dialog' || region === 'floating' || presentation === 'compact') {
+  if (region === 'popover' || region === 'dialog' || presentation === 'compact') {
     return children;
   }
 
@@ -408,6 +433,17 @@ const WidgetShellFrame = ({
       />
     </WidgetRecoveryBoundary>
   ) : null;
+
+  // A window's title bar is its header (FloatingWidgetWindow); its body is sized as a docked panel's.
+  if (region === 'floating') {
+    return (
+      <Flex direction="column" flex="1" minH="0" minW="0">
+        <PanelBodySlot body={widget.manifest.chrome?.body}>{children}</PanelBodySlot>
+        <UnmetNeedNotice instanceId={instance.id} manifest={widget.manifest} />
+        {footer}
+      </Flex>
+    );
+  }
 
   if (region === 'left' || region === 'right' || region === 'bottom') {
     return (
@@ -436,6 +472,7 @@ const WidgetShellFrame = ({
           </WidgetRecoveryBoundary>
         )}
         <PanelBodySlot body={widget.manifest.chrome?.body}>{children}</PanelBodySlot>
+        <UnmetNeedNotice instanceId={instance.id} manifest={widget.manifest} />
         {footer}
       </WidgetPanelFrame>
     );
@@ -455,6 +492,7 @@ const WidgetShellFrame = ({
       <Box flex="1" minH="0" overflow="hidden" position="relative">
         {children}
       </Box>
+      <UnmetNeedNotice instanceId={instance.id} manifest={widget.manifest} />
       {footer}
     </Flex>
   );

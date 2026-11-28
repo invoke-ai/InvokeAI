@@ -150,6 +150,91 @@ describe('loadWorkbenchSettings', () => {
   });
 });
 
+describe('Rearrange without Customize', () => {
+  it('starts a new account locked, with nothing to offer', async () => {
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({
+      rearrangeWithoutCustomize: false,
+      workspaceLockOfferShown: true,
+    });
+    expect(readBackendPreferences()).toMatchObject({ rearrangeWithoutCustomize: false });
+  });
+
+  it('keeps an account from an earlier build rearranging, stores that at once, and offers the lock once', async () => {
+    seedBackendPreferences({ themeId: 'mono' });
+
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({
+      rearrangeWithoutCustomize: true,
+      workspaceLockOfferShown: false,
+    });
+    expect(readBackendPreferences()).toMatchObject({ rearrangeWithoutCustomize: true, themeId: 'mono' });
+
+    const { startWorkspaceLock } = await import('@workbench/workspace/workspaceLockRuntime');
+    const commands = { layout: { clearHistory: vi.fn() }, notifications: { add: vi.fn() } };
+
+    startWorkspaceLock(commands)();
+    startWorkspaceLock(commands)();
+    expect(commands.notifications.add).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(readBackendPreferences().workspaceLockOfferShown).toBe(true));
+  });
+
+  it('clears the layout history when rearranging turns off, so a locked undo cannot change structure', async () => {
+    seedBackendPreferences({ rearrangeWithoutCustomize: true, workspaceLockOfferShown: true });
+    await store.loadWorkbenchSettings();
+    const { startWorkspaceLock } = await import('@workbench/workspace/workspaceLockRuntime');
+    const commands = { layout: { clearHistory: vi.fn() }, notifications: { add: vi.fn() } };
+    const stop = startWorkspaceLock(commands);
+
+    await store.patchWorkbenchPreferences({ themeId: 'mono' });
+    expect(commands.layout.clearHistory).not.toHaveBeenCalled();
+    await store.patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+    expect(commands.layout.clearHistory).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('respects a stored choice without writing it again', async () => {
+    seedBackendPreferences({ rearrangeWithoutCustomize: false, workspaceLockOfferShown: true });
+
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({ rearrangeWithoutCustomize: false });
+    expect(api.setClientStateValue).not.toHaveBeenCalled();
+  });
+
+  it('keeps a decision made offline in the mirror, without pushing an older local copy over the server', async () => {
+    storage.set('invokeai:v7:webv2:settings', JSON.stringify({ preferences: { themeId: 'mono' } }));
+    seedBackendPreferences({ themeId: 'light' });
+    api.getClientStateValue.mockRejectedValueOnce(new Error('offline'));
+
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({
+      rearrangeWithoutCustomize: true,
+      themeId: 'mono',
+    });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({
+      rearrangeWithoutCustomize: true,
+      themeId: 'light',
+    });
+    expect(readBackendPreferences()).toMatchObject({ rearrangeWithoutCustomize: true, themeId: 'light' });
+  });
+
+  it('restores the decision after an older build drops it, rather than deciding or offering again', async () => {
+    seedBackendPreferences({ themeId: 'mono' });
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ rearrangeWithoutCustomize: false, workspaceLockOfferShown: true });
+    // An older build's write: the whole blob, without the keys it does not know.
+    seedBackendPreferences({ themeId: 'mono' });
+    vi.resetModules();
+    store = await import('./store');
+
+    await expect(store.loadWorkbenchSettings()).resolves.toMatchObject({
+      rearrangeWithoutCustomize: false,
+      workspaceLockOfferShown: true,
+    });
+    expect(readBackendPreferences()).toMatchObject({ rearrangeWithoutCustomize: false });
+  });
+});
+
 describe('patchWorkbenchPreferences', () => {
   it('persists to the backend and localStorage', async () => {
     seedBackendPreferences({ themeId: 'osakaJade' });

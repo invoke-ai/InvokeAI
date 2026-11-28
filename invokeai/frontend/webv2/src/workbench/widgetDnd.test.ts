@@ -1,5 +1,4 @@
 import type { CollisionDetection, DroppableContainer } from '@dnd-kit/core';
-import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { getGalleryItemDragData } from '@features/gallery/utility';
@@ -14,9 +13,10 @@ import {
   getWidgetRegionEndDropId,
   resolveWidgetDragEnd,
   widgetCollisionDetection,
+  type WidgetDndProject,
 } from './widgetDnd';
 import { getCanvasImageDropData } from './widgets/canvas/canvasImageDnd';
-import { createInitialWorkbenchState } from './workbenchState';
+import { createInitialWorkbenchState, getLayoutOf } from './workbenchState.testing';
 
 type CollisionArgs = Parameters<CollisionDetection>[0];
 
@@ -73,16 +73,11 @@ const getWidget = (typeId: WidgetTypeId) => {
   return widgets[typeId];
 };
 
-const getActiveProject = (state: WorkbenchState): Project => {
-  const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
+/** What the default project shows, as the drag resolver reads it. */
+const getDefaultLayout = (): WidgetDndProject => getLayoutOf(createInitialWorkbenchState());
 
-  expect(project).toBeDefined();
-
-  return project as Project;
-};
-
-const createProjectWithPreviewInCenterAndRight = (): Project => {
-  const project = getActiveProject(createInitialWorkbenchState());
+const createProjectWithPreviewInCenterAndRight = (): WidgetDndProject => {
+  const project = getDefaultLayout();
 
   return {
     ...project,
@@ -94,8 +89,8 @@ const createProjectWithPreviewInCenterAndRight = (): Project => {
   };
 };
 
-const createProjectWithBottomEndCluster = (): Project => {
-  const project = getActiveProject(createInitialWorkbenchState());
+const createProjectWithBottomEndCluster = (): WidgetDndProject => {
+  const project = getDefaultLayout();
 
   return {
     ...project,
@@ -249,7 +244,7 @@ describe('widget dnd helpers', () => {
   });
 
   it('moves to another eligible region when dropped on that region bar', () => {
-    const project = getActiveProject(createInitialWorkbenchState());
+    const project = getDefaultLayout();
     const projectWithoutRightPreview = {
       ...project,
       widgetRegions: {

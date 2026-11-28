@@ -4,10 +4,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSearch } from './projects/session';
 
+import { getLayoutPreset } from './layoutPresets';
+
 const harness = vi.hoisted(() => ({
+  applyPreset: vi.fn(),
   hydrate: vi.fn(),
   navigate: vi.fn(),
   open: vi.fn(),
+  openInWorkspace: vi.fn(),
+  setSource: vi.fn(),
   switchTo: vi.fn(),
 }));
 
@@ -18,13 +23,27 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('./WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({
+    generation: { setSource: harness.setSource },
+    layout: { applyPreset: harness.applyPreset },
     notifications: { add: vi.fn() },
     projects: { open: harness.open, switchTo: harness.switchTo },
   }),
   useWorkbenchHasHydrated: () => true,
   useWorkbenchPersistenceService: () => ({ hydrateProjectFromServer: harness.hydrate }),
+  // Compose as entered, its route locked to Upscale: the job is still Generate.
+  useWorkbenchQueries: () => ({
+    getSnapshot: () => ({
+      account: {},
+      activeLayout: getLayoutPreset('compose').snapshot,
+      activeProject: {
+        ...getLayoutPreset('compose').snapshot,
+        invocation: { sourceId: 'upscale', sourceLocked: true },
+      },
+    }),
+  }),
   useWorkbenchSelector: () => ['previous'],
 }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => harness.openInWorkspace }));
 
 import { WorkbenchSessionController } from './WorkbenchSessionController';
 
@@ -45,6 +64,25 @@ afterEach(async () => {
 });
 
 const render = (search: WorkbenchSearch) => act(() => root.render(<WorkbenchSessionController search={search} />));
+
+it('enters an intent’s workspace and leaves a source that is its job to the entry', async () => {
+  await render({ intent: 'generate', new: true });
+
+  expect(harness.applyPreset).toHaveBeenCalledWith('compose');
+  expect(harness.openInWorkspace).not.toHaveBeenCalled();
+});
+
+it('enters an intent’s workspace, then shows and aims at a source that is not its job', async () => {
+  await render({ intent: 'upscale', new: true });
+
+  expect(harness.applyPreset).toHaveBeenCalledWith('compose');
+  expect(harness.openInWorkspace).toHaveBeenCalledWith(
+    { typeId: 'upscale' },
+    expect.objectContaining({ focus: false, mode: 'stay' })
+  );
+  harness.openInWorkspace.mock.calls[0]![1].afterShown();
+  expect(harness.setSource).toHaveBeenCalledWith('upscale');
+});
 
 it('consumes an open-project link so reload cannot override a later project selection', async () => {
   await render({ project: 'previous' });

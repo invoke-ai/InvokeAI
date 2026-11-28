@@ -8,23 +8,25 @@ import { Dialog } from '@platform/ui/Dialog';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { ListStack } from '@platform/ui/list/ListStack';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
+  addWidgetToWorkspace,
   closeWidgetPlacement,
   dockFloatingPlacement,
   removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { startCustomizing } from '@workbench/workspace/workspaceNavigation';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { closeWidgetsDialog, getWidgetsDialogReturnFocus } from './widgetsDialogStore';
-import { addWidgetToLayout, canAddWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
+import { canAddWidget, canOpenWidget, getWidgetsListRows, type WidgetsListRow } from './widgetsListModel';
 
 const REGIONS: readonly WidgetRegion[] = ['left', 'center', 'right', 'bottom'];
 
@@ -57,11 +59,14 @@ const focusRow = (row: WidgetsListRow) =>
 
 export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean; onExitComplete: () => void }) => {
   const { t } = useTranslation();
-  const { widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const { widgets } = commands;
   const queries = useWorkbenchQueries();
-  const focus = useWorkbenchFocus();
-  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
-  const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const open = useWorkspaceOpen();
+  // Locked, the list only shows: Add, Dock and Remove are Customize's, one press away in the footer.
+  const canEditStructure = useCanEditStructure();
+  const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const project = useWorkbenchSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   // Show moves focus to the widget; closing then must not pull it back to whatever opened the list.
   const [returnsFocus, setReturnsFocus] = useState(true);
   const allWidgets = useMemo(() => {
@@ -80,12 +85,12 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const rows = useMemo(
     () =>
       getWidgetsListRows({
+        availability: queries.getAvailability(),
         getLabel: (manifest) => resolveWidgetLabel(manifest, t),
-        getWidgetById,
         project,
         widgets: allWidgets,
       }),
-    [allWidgets, getWidgetById, project, t]
+    [allWidgets, project, queries, t]
   );
   const placedRows = useMemo(() => rows.filter((row) => row.instanceId !== null), [rows]);
   const hiddenRows = useMemo(() => rows.filter((row) => row.instanceId === null), [rows]);
@@ -99,7 +104,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const actions = useMemo(
     () => ({
       add: (row: WidgetsListRow) => {
-        addWidgetToLayout({ getWidgetsForRegion, widget: row.widget, widgets });
+        addWidgetToWorkspace({ getWidgetsForRegion, widget: row.widget, widgets });
         focusRow(row);
       },
       dock: (row: WidgetsListRow) => {
@@ -116,7 +121,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
           removeFloatingPlacement({ instanceId: row.instanceId, project, widgets });
         } else if (row.placement.kind === 'docked') {
           closeWidgetPlacement({
-            getWidgetById,
+            availability: queries.getAvailability(),
             instanceId: row.instanceId,
             project,
             region: row.placement.region,
@@ -125,13 +130,15 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
         }
         focusRow(row);
       },
+      customize: () => startCustomizing({ commands, queries }, { focusBar: false }),
       show: (row: WidgetsListRow) => {
         setReturnsFocus(false);
         closeWidgetsDialog();
-        revealOrOpenWorkbenchWidget({ focus, getWidgetsForRegion, queries, widgets }, row.widget.manifest.id);
+        // The list describes this workspace, so Show stays in it: one it lacks shows as a guest.
+        open({ typeId: row.widget.manifest.id }, { mode: 'stay' });
       },
     }),
-    [focus, getWidgetById, getWidgetsForRegion, project, queries, widgets]
+    [commands, getWidgetsForRegion, open, project, queries, widgets]
   );
 
   return (
@@ -158,13 +165,28 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
             <Dialog.Body>
               <Stack data-widgets-list="" gap="4">
                 <Dialog.Description color="fg.muted" fontSize="sm">
-                  {t('shell.widgets.description')}
+                  {t(canEditStructure ? 'shell.widgets.description' : 'shell.widgets.lockedDescription')}
                 </Dialog.Description>
-                <WidgetsGroup actions={actions} label={t('shell.widgets.inLayout')} rows={placedRows} />
-                <WidgetsGroup actions={actions} label={t('shell.widgets.notInLayout')} rows={hiddenRows} />
+                <WidgetsGroup
+                  actions={actions}
+                  canEditStructure={canEditStructure}
+                  label={t('shell.widgets.inLayout')}
+                  rows={placedRows}
+                />
+                <WidgetsGroup
+                  actions={actions}
+                  canEditStructure={canEditStructure}
+                  label={t('shell.widgets.notInLayout')}
+                  rows={hiddenRows}
+                />
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
+              {canEditStructure ? null : (
+                <Button me="auto" variant="outline" onClick={actions.customize}>
+                  {t('shell.workspace.customize')}
+                </Button>
+              )}
               <Button data-widgets-done="" variant="ghost" onClick={closeWidgetsDialog}>
                 {t('common.done')}
               </Button>
@@ -180,10 +202,12 @@ type WidgetsListActions = Record<'add' | 'dock' | 'remove' | 'show', (row: Widge
 
 const WidgetsGroup = ({
   actions,
+  canEditStructure,
   label,
   rows,
 }: {
   actions: WidgetsListActions;
+  canEditStructure: boolean;
   label: string;
   rows: readonly WidgetsListRow[];
 }) =>
@@ -193,24 +217,53 @@ const WidgetsGroup = ({
       <ListSectionHeader count={rows.length} label={label} />
       <ListStack label={label} dividers>
         {rows.map((row) => (
-          <WidgetsRow key={getRowKey(row)} actions={actions} row={row} />
+          <WidgetsRow key={getRowKey(row)} actions={actions} canEditStructure={canEditStructure} row={row} />
         ))}
       </ListStack>
     </Stack>
   );
 
 /** Rows are static: their buttons are the tab stops, so a row's surface never takes focus itself. */
-const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: WidgetsListRow }) => {
-  const { t } = useTranslation();
+const WidgetsRow = ({
+  actions,
+  canEditStructure,
+  row,
+}: {
+  actions: WidgetsListActions;
+  canEditStructure: boolean;
+  row: WidgetsListRow;
+}) => {
+  const { i18n, t } = useTranslation();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
   const placementLabel = t(
     PLACEMENT_LABEL_KEYS[row.placement.kind === 'docked' ? row.placement.region : row.placement.kind]
   );
-  const isOpenable = canAddWidget(row.widget, getWidgetsForRegion);
+  const isAddable = canEditStructure && canAddWidget(row.widget, getWidgetsForRegion);
+  const canShowAsGuest = canOpenWidget(row.widget, getWidgetsForRegion);
   const run = (action: keyof WidgetsListActions) => () => actions[action](row);
   // A type can be placed more than once (a Gallery view and a Gallery panel), so placed rows name where they are.
   const name =
     row.instanceId === null ? row.label : t('shell.widgets.rowName', { label: row.label, placement: placementLabel });
+  const missingNeeds = canEditStructure
+    ? row.missingNeeds.flatMap((typeId) => {
+        const needed = REGIONS.flatMap((region) => getWidgetsForRegion(region)).find(
+          (widget) => widget.manifest.id === typeId
+        );
+
+        return needed ? [resolveWidgetLabel(needed.manifest, t)] : [];
+      })
+    : [];
+  // The row's first action is its primary one: Show for a placed widget, Add for a missing one while editable.
+  const showButton = (variant: 'ghost' | 'outline') => (
+    <Button
+      aria-label={t('shell.widgets.showNamed', { label: name })}
+      size="xs"
+      variant={variant}
+      onClick={run('show')}
+    >
+      {t('shell.widgets.show')}
+    </Button>
+  );
 
   return (
     // The list item carries the keys focusRow looks rows up by; ListItem renders the row inside it.
@@ -218,27 +271,23 @@ const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: Widget
       <ListItem
         actions={
           row.instanceId === null ? (
-            isOpenable ? (
-              <Button
-                aria-label={t('shell.widgets.addNamed', { label: name })}
-                size="xs"
-                variant="outline"
-                onClick={run('add')}
-              >
-                {t('shell.widgets.add')}
-              </Button>
-            ) : null
+            <>
+              {isAddable ? (
+                <Button
+                  aria-label={t('shell.widgets.addNamed', { label: name })}
+                  size="xs"
+                  variant="outline"
+                  onClick={run('add')}
+                >
+                  {t('shell.widgets.add')}
+                </Button>
+              ) : null}
+              {canShowAsGuest ? showButton(isAddable ? 'ghost' : 'outline') : null}
+            </>
           ) : (
             <>
-              <Button
-                aria-label={t('shell.widgets.showNamed', { label: name })}
-                size="xs"
-                variant="outline"
-                onClick={run('show')}
-              >
-                {t('shell.widgets.show')}
-              </Button>
-              {row.placement.kind === 'floating' ? (
+              {showButton('outline')}
+              {canEditStructure && row.placement.kind === 'floating' ? (
                 <Button
                   aria-label={t('shell.widgets.dockNamed', { label: name })}
                   size="xs"
@@ -249,19 +298,30 @@ const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: Widget
                 </Button>
               ) : null}
               {/* The center always keeps one view, so its last one cannot be removed; the button says why. */}
-              <Button
-                aria-label={t('shell.widgets.removeNamed', { label: name })}
-                size="xs"
-                unavailableReason={row.isRequired ? t('widgets.requiredCenterView') : undefined}
-                variant="ghost"
-                onClick={run('remove')}
-              >
-                {t('shell.widgets.remove')}
-              </Button>
+              {canEditStructure ? (
+                <Button
+                  aria-label={t('shell.widgets.removeNamed', { label: name })}
+                  size="xs"
+                  unavailableReason={row.isRequired ? t('widgets.requiredCenterView') : undefined}
+                  variant="ghost"
+                  onClick={run('remove')}
+                >
+                  {t('shell.widgets.remove')}
+                </Button>
+              ) : null}
             </>
           )
         }
-        description={placementLabel}
+        description={
+          missingNeeds.length > 0
+            ? t('shell.widgets.missingNeeds', {
+                placement: placementLabel,
+                widgets: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+                  missingNeeds
+                ),
+              })
+            : placementLabel
+        }
         leading={<WidgetIcon boxSize="4" color="fg.muted" flexShrink={0} icon={row.widget.manifest.icon} />}
         role="presentation"
         title={row.label}

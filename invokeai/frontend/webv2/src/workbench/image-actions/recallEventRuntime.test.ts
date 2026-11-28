@@ -4,7 +4,7 @@ import { accountLifecycle, captureAccountScope } from '@platform/state/accountLi
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { bringRecallWidgetToFront } from './recallEventRuntime';
+import { bringRecallWidgetToFront, withRecallWidgetOffer } from './recallEventRuntime';
 
 /** The registry's view of the Video widget: placeable on the left, nothing to preload. */
 const videoWidget = {
@@ -26,17 +26,15 @@ const videoInstanceId = (store: Store, projectId: string) =>
 
 /** Where the Video widget is visible: the active tab of an expanded region whose panel is open, or floating. */
 const videoWidgetPlacement = (store: Store, projectId: string): 'hidden' | 'floating' | 'shown' => {
-  const project = store.queries.getProject(projectId)!;
+  const layout = store.getSnapshot().activeLayout;
   const id = videoInstanceId(store, projectId);
 
-  if (id && project.floatingWidgets?.[id]) {
+  if (id && layout.floatingWidgets?.[id]) {
     return 'floating';
   }
-  const left = project.widgetRegions.left;
+  const left = layout.widgetRegions.left;
 
-  return id && left.activeInstanceId === id && !left.isCollapsed && project.layout.panels.isLeftOpen
-    ? 'shown'
-    : 'hidden';
+  return id && left.activeInstanceId === id && !left.isCollapsed ? 'shown' : 'hidden';
 };
 
 const setup = () => {
@@ -60,12 +58,25 @@ describe('bringRecallWidgetToFront', () => {
     accountLifecycle.activate('owner');
   });
 
-  it('opens the widget when the layout has none', () => {
+  it('adds nothing where the workspace has none, and offers the way there only on notices after it wrote values', () => {
     const { projectId, reveal, store } = setup();
+    const regionsBefore = store.getSnapshot().activeLayout.widgetRegions;
+    const commands = withRecallWidgetOffer(store.commands, {
+      projectId,
+      queries: store.queries,
+      reveal: testRevealContext(),
+      typeId: 'video',
+    });
 
+    commands.notifications.add({ kind: 'info', title: 'Nothing to recall' });
+    commands.widgets.patchValues('video', { positivePrompt: 'recalled' }, projectId);
+    commands.notifications.add({ kind: 'success', title: 'Recalled' });
     reveal();
 
-    expect(videoWidgetPlacement(store, projectId)).toBe('shown');
+    expect(store.getSnapshot().activeLayout.widgetRegions).toBe(regionsBefore);
+    const [recalled, nothing] = store.queries.getSnapshot().notifications;
+    expect(recalled).toMatchObject({ actions: [{ kind: 'open-widget', widgetId: 'video' }], title: 'Recalled' });
+    expect(nothing).not.toHaveProperty('actions');
   });
 
   it('selects its tab when another widget is in front of it', () => {
@@ -100,9 +111,9 @@ describe('bringRecallWidgetToFront', () => {
     store.commands.widgets.open({ projectId, region: 'left', widgetId: 'generate' });
     const videoId = videoInstanceId(store, projectId)!;
     store.commands.widgets.float(videoId);
-    const generateId = store.queries.getProject(projectId)!.widgetRegions.left.activeInstanceId!;
+    const generateId = store.getSnapshot().activeLayout.widgetRegions.left.activeInstanceId!;
     store.commands.widgets.float(generateId);
-    const stackOrder = () => store.queries.getProject(projectId)!.floatingWidgets![videoId]!.stackOrder;
+    const stackOrder = () => store.getSnapshot().activeLayout.floatingWidgets![videoId]!.stackOrder;
     expect(stackOrder()).toBe(1);
 
     reveal();
@@ -120,27 +131,31 @@ describe('bringRecallWidgetToFront', () => {
 
     reveal();
 
-    expect(store.queries.getProject(projectId)!.floatingWidgets![videoId]!.mode).toBe('windowed');
+    expect(store.getSnapshot().activeLayout.floatingWidgets![videoId]!.mode).toBe('windowed');
   });
 
   it('opens the panel of an active, expanded tab whose panel is closed', () => {
     const { projectId, store } = setup();
     store.commands.widgets.open({ projectId, region: 'left', widgetId: 'video' });
-    // Only layout presets close a panel; stand in for one having done so.
+    // A closed panel is a collapsed one; stand in for a workspace that closes the left panel.
     const queries = {
+      ...store.queries,
       getSnapshot: () => {
         const snapshot = store.queries.getSnapshot();
-        const { activeProject } = snapshot;
+        const { activeLayout } = snapshot;
         return {
           ...snapshot,
-          activeProject: {
-            ...activeProject,
-            layout: { ...activeProject.layout, panels: { ...activeProject.layout.panels, isLeftOpen: false } },
+          activeLayout: {
+            ...activeLayout,
+            widgetRegions: {
+              ...activeLayout.widgetRegions,
+              left: { ...activeLayout.widgetRegions.left, isCollapsed: true },
+            },
           },
         };
       },
     };
-    const open = vi.spyOn(store.commands.widgets, 'open');
+    const front = vi.spyOn(store.commands.widgets, 'front');
 
     bringRecallWidgetToFront({
       commands: store.commands,
@@ -151,7 +166,7 @@ describe('bringRecallWidgetToFront', () => {
       typeId: 'video',
     });
 
-    expect(open).toHaveBeenCalledWith({ projectId, region: 'left', widgetId: 'video' });
+    expect(front).toHaveBeenCalledWith({ instanceId: videoInstanceId(store, projectId), projectId, region: 'left' });
   });
 
   it('does nothing for an account that has since signed out', () => {

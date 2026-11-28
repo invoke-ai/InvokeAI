@@ -40,6 +40,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectId: () => null,
   useActiveProjectSelector: (selector: (project: { queue: { items: never[] } }) => unknown) =>
     selector({ queue: { items: [] } }),
+  useWorkbenchCommands: () => ({}),
+  useWorkbenchQueries: () => ({}),
   useOptionalWorkbenchCommands: () => null,
   useOptionalWorkbenchPersistenceService: () => null,
 }));
@@ -52,7 +54,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useNavigate: () => vi.fn(),
 }));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: () => null,
   useShortcutLabel: () => null,
@@ -73,7 +75,7 @@ import { WorkspaceSettings } from './CustomSettingsEditors';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('database maintenance in Data & workspace settings', () => {
+describe('database maintenance in Workspaces & data settings', () => {
   let host: HTMLDivElement;
   let root: Root;
   let queryClient: QueryClient;

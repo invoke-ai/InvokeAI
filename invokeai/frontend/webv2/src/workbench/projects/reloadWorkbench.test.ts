@@ -17,6 +17,7 @@ afterEach(() => {
 const fixture = () => {
   const store = createWorkbenchStore();
   const result: WorkbenchSaveResult = {
+    accountSaved: true,
     awaitsDecision: false,
     conflicts: [],
     error: null,

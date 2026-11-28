@@ -51,6 +51,7 @@ const createDeps = () => {
     commands: {
       canvas: {} as WorkbenchCommands['canvas'],
       generation: {} as WorkbenchCommands['generation'],
+      layout: {} as WorkbenchCommands['layout'],
       notifications: { reportError } as unknown as WorkbenchCommands['notifications'],
       widgets: {} as WorkbenchCommands['widgets'],
     },
@@ -59,7 +60,7 @@ const createDeps = () => {
     queries: {
       getProject: () => null,
       getSnapshot: () => ({ activeProject: active }),
-    } as unknown as Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>,
+    } as unknown as Pick<WorkbenchQueries, 'getProject' | 'getSnapshot' | 'getWorkspaceLayout'>,
     received,
     reveal: { getWidgetsForRegion: () => [], isEditingText: () => false },
     t: ((key: string) => key) as unknown as TFunction,

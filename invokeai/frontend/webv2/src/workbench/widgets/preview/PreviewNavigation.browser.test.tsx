@@ -114,7 +114,6 @@ const mocks = vi.hoisted(() => {
 
   return {
     openWidget: vi.fn(),
-    revealPlacedWidget: vi.fn((..._args: unknown[]): unknown => null),
     commands: {
       account: { updateProjectPreferences: vi.fn() },
       gallery: {
@@ -191,13 +190,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@workbench/widgetPlacementCommands', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  revealPlacedWidget: (...args: unknown[]) => mocks.revealPlacedWidget(...args),
-}));
-
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
-  useOpenWorkbenchWidget: () => mocks.openWidget,
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({
+  useWorkspaceOpen: () => mocks.openWidget,
 }));
 
 const subscribeWidgetValues = (listener: () => void) => {
@@ -209,6 +203,7 @@ const getWidgetValuesVersion = () => mocks.widgetValues.version;
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project 1',
+  useActiveLayoutSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
@@ -229,10 +224,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchInternalStore: () => null,
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
-  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
+  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeLayout: mocks.project, activeProject: mocks.project }) }),
   useWorkbenchSubscription: () => () => () => {},
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ backendConnection: { status: 'connected' } }),
+    selector({ activeLayout: mocks.project, activeProject: mocks.project, backendConnection: { status: 'connected' } }),
 }));
 
 const mockProgressTargets = () => {
@@ -600,7 +595,6 @@ const runtime = {
     },
   },
   instanceId: 'preview-instance',
-  workbench: { closeWidgetInstance: () => {} },
 } as unknown as WidgetViewProps['runtime'];
 const manifest = { id: 'preview', label: 'Preview' } as unknown as WidgetViewProps['manifest'];
 const instance = { id: 'preview-instance', typeId: 'preview' } as unknown as WidgetViewProps['instance'];

@@ -1,6 +1,6 @@
 import type { GalleryItemRef, GalleryVideoItem } from '@features/gallery';
 import type { VideoUiAdapter } from '@features/video';
-import type { OpenWorkbenchWidgetResult } from '@workbench/useOpenWorkbenchWidget';
+import type { OpenResult } from '@workbench/workspace/openIntent';
 import type { ReactNode } from 'react';
 
 import { claimGalleryNavigationSequence } from '@features/gallery/contracts';
@@ -23,17 +23,15 @@ import { VideoUiAdapterProvider } from './VideoUiAdapter';
  */
 
 let adapter: VideoUiAdapter;
-let openResult: OpenWorkbenchWidgetResult;
+let openResult: OpenResult;
 let activeProjectId: string;
 
-const openWorkbenchWidget = vi.fn(() => openResult);
+const open = vi.fn(() => openResult);
 const selectItem = vi.fn();
 const reportError = vi.fn();
 const revealGalleryItem = vi.fn(
   (_context: unknown, _ref: GalleryItemRef, _ticket: { projectId: string; sequence: number }) => Promise.resolve()
 );
-/** The regions the project's single gallery instance occupies. */
-let galleryRegions: string[] = ['right'];
 /** The store's projects, read by `queries.getProject` at call time. */
 let storedProjects: Record<string, unknown> = {};
 
@@ -57,7 +55,7 @@ vi.mock('@features/gallery/queries', () => ({
 vi.mock('@workbench/image-actions/revealGalleryItem', () => ({ revealGalleryItem }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('@workbench/settings/store', () => ({ useWorkbenchPreferenceSelector: () => false }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => openWorkbenchWidget }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => open }));
 /** The active project's widget instances, read by the adapter's project selectors. */
 let widgetInstances: Record<string, unknown> = {};
 
@@ -80,16 +78,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     getProject: (projectId: string) => storedProjects[projectId] ?? null,
     isActiveProject: (projectId: string) => projectId === activeProjectId,
     getSnapshot: () => ({
-      activeProject: {
-        id: activeProjectId,
-        widgetInstances: { 'gallery-1': { typeId: 'gallery' } },
-        widgetRegions: Object.fromEntries(
-          (['left', 'right', 'bottom', 'center'] as const).map((region) => [
-            region,
-            { instanceIds: galleryRegions.includes(region) ? ['gallery-1'] : [] },
-          ])
-        ),
-      },
+      activeProject: { id: activeProjectId },
     }),
   }),
 }));
@@ -106,13 +95,12 @@ const renderAdapter = async (): Promise<void> => {
 };
 
 beforeEach(async () => {
-  openResult = { ok: true, region: 'center' };
+  openResult = { changedWorkspace: false, ok: true, region: 'center', workspaceId: 'compose' };
   activeProjectId = 'project-1';
-  openWorkbenchWidget.mockClear();
+  open.mockClear();
   selectItem.mockClear();
   revealGalleryItem.mockClear();
   reportError.mockClear();
-  galleryRegions = ['right'];
   storedProjects = {};
   widgetInstances = {};
   galleryQueries.canAddToCachedGalleryBoard.mockReset().mockReturnValue(true);
@@ -212,14 +200,11 @@ describe('videoSpanPlayback', () => {
 });
 
 describe('findInGallery', () => {
-  it('raises the grid where it already lives, not where the manifest would place it', async () => {
+  it('shows Preview on the stage and then the Gallery, as one gesture', async () => {
     act(() => adapter.findInGallery({ kind: 'video', name: 'clip.mp4' }));
 
-    // Find must relocate Gallery explicitly; an unqualified open can leave it listed in two regions. Raise Preview
-    // first so Gallery wins a shared region.
-    expect(openWorkbenchWidget.mock.calls).toEqual([
-      ['preview', { preferredRegions: ['center'], requireCenterView: true }],
-      ['gallery', { preferredRegions: ['right'] }],
+    expect(open.mock.calls).toEqual([
+      [[{ surface: 'stage', typeId: 'preview' }, { typeId: 'gallery' }], { focus: 'gallery' }],
     ]);
 
     await vi.waitFor(() => expect(revealGalleryItem).toHaveBeenCalledTimes(1));

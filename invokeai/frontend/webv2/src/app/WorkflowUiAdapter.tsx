@@ -12,7 +12,6 @@ import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/work
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
@@ -23,9 +22,10 @@ import {
   subscribeWorkbenchPreferences,
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchInternalStore, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkspaceNavigationPorts, useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
+import { showWorkflowForm } from '@workbench/workspace/workspaceNavigation';
 import { useMemo } from 'react';
 
 import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
@@ -105,26 +105,26 @@ const createPairedSource = <A, B>(
 
 const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode }) => {
   const commands = useWorkbenchCommands();
-  const openWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
       focusSource: (sourceId) => {
         if (sourceId) {
-          openWidget(sourceId);
+          open({ typeId: sourceId });
         }
       },
       openDocumentInNewProject: (document, label, source) => {
         // Create first: the new project's blank placeholder is what the document takes over.
         commands.projects.create();
         commands.workflows.add(document, { label, reusePlaceholder: true, source });
-        openWidget('workflow');
+        open({ surface: 'stage', typeId: 'workflow' });
       },
       openWorkflowEditor: () => {
-        openWidget('workflow');
+        open({ surface: 'stage', typeId: 'workflow' });
       },
     }),
-    [commands, openWidget]
+    [commands, open]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;
@@ -136,7 +136,8 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const notify = useNotify();
-  const { focusRegion } = useWorkbenchFocus();
+  const navigation = useWorkspaceNavigationPorts();
+  const open = useWorkspaceOpen();
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -244,22 +245,21 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         void patchWorkbenchPreferences(patch);
       },
       widgets: {
-        // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
-        open: (options) => {
-          commands.widgets.open(options);
-          focusRegion(options.region, options.widgetId);
-        },
+        // Workflow opens widgets from its buttons, so the one opened takes focus.
+        open: ({ surface, widgetId }) => void open({ surface, typeId: widgetId }),
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
+        showForm: () => showWorkflowForm(navigation),
       },
     }),
     [
       capabilities,
       commands,
       findInGallery,
-      focusRegion,
+      navigation,
       notify.error,
       notify.info,
       notify.success,
+      open,
       persistence,
       preferences,
       project,

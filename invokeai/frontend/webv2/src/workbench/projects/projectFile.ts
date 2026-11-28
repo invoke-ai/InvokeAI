@@ -306,7 +306,15 @@ export const importProjectFile = async (
 
   // Lazy: this file is shared with the Launchpad, which never loads the workflow core eagerly.
   const { stripProjectWorkflowSources } = await import('@workbench/projectWorkflows');
-  const project = { ...loaded.project, workflows: stripProjectWorkflowSources(loaded.project.workflows) };
+  const { heldView: _exporters, ...legacyLayout } = loaded.project.legacyLayout ?? {};
+  const project: Project = {
+    ...loaded.project,
+    // Someone else's arrangement, and what they saw of it: it never adopts into this account.
+    ...(loaded.project.legacyLayout
+      ? { legacyLayout: { ...(legacyLayout as NonNullable<Project['legacyLayout']>), imported: true } }
+      : {}),
+    workflows: stripProjectWorkflowSources(loaded.project.workflows),
+  };
 
   const { serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);

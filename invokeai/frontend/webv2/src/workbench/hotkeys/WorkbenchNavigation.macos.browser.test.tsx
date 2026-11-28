@@ -1,8 +1,8 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -12,7 +12,7 @@ import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
-import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, withArrangement } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -33,6 +33,10 @@ const runtime = vi.hoisted(() => ({
 }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot).activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot)),
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) => {
     const snapshot = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
     return selector(snapshot.activeProject);
@@ -62,7 +66,7 @@ const positions = {
 };
 
 const Region = ({ region }: { region: 'center' | 'left' }) => {
-  const { activeProject: project } = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
+  const { activeLayout: project } = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
   const id = project.widgetRegions[region].activeInstanceId;
   return (
     <Box {...useFocusRegionProps(region)} style={{ ...positions[region], position: 'absolute' }} tabIndex={-1}>
@@ -88,19 +92,7 @@ const focusedRegion = () => document.activeElement?.closest('[data-focus-region]
 beforeEach(async () => {
   accountLifecycle.activate('workbench-navigation-macos-test');
   await patchWorkbenchPreferences({ customHotkeys: {} });
-  const state = createInitialWorkbenchState();
-  const initial = state.projects[0]!;
-  initial.widgetRegions.left = {
-    ...initial.widgetRegions.left,
-    activeInstanceId: 'generate',
-    instanceIds: ['generate'],
-  };
-  initial.widgetRegions.center = {
-    ...initial.widgetRegions.center,
-    activeInstanceId: 'canvas',
-    instanceIds: ['canvas'],
-  };
-  initial.layout.panels = { isBottomOpen: false, isLeftOpen: true, isRightOpen: false };
+  const state = withArrangement(createInitialWorkbenchState(), 'compose', { center: ['canvas'], left: ['generate'] });
   runtime.store = createWorkbenchStore(state);
   runtime.extensions = createExtensionRegistry();
   queryClient = new QueryClient();

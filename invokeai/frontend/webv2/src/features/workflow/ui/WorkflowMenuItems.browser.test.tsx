@@ -1,5 +1,5 @@
 import type { ProjectGraphState, ProjectWorkflowSource, WorkflowNode } from '@features/workflow/core/types';
-import type { WorkflowRegion, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
+import type { WorkflowRegion, WorkflowRuntimeApi, WorkflowWidgetViewProps } from '@features/workflow/ui/contracts';
 import type {
   WorkflowProjectPersistence,
   WorkflowReadPort,
@@ -231,13 +231,14 @@ describe('WorkflowMenuItems', () => {
 
   const renderMenu = async (graph: ProjectGraphState, source?: ProjectWorkflowSource) => {
     const project = createMutablePort(projectSnapshot(graph, source));
+    const widgets = { open: vi.fn(), patchValues: vi.fn(), showForm: vi.fn() };
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally minimal test adapter
     const adapter = {
       commands,
       getProjectGraph: () => graph,
       notifications,
       project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
+      widgets,
     } as unknown as WorkflowUiAdapter;
 
     await act(() => {
@@ -255,6 +256,8 @@ describe('WorkflowMenuItems', () => {
         </ChakraProvider>
       );
     });
+
+    return widgets;
   };
   /** A mounted editor, as far as the PNG export needs one: its offscreen view and its flow instance. */
   const mountEditor = () => {
@@ -311,6 +314,16 @@ describe('WorkflowMenuItems', () => {
       expect.objectContaining({ flowElement: editor.flowElement, workflowName: 'Portraits' })
     );
     expect(notifications.error).not.toHaveBeenCalled();
+  });
+
+  it('opens Details on the form surface, never a panel the graph could answer', async () => {
+    const widgets = await renderMenu(createProjectGraph('workflow-1'));
+
+    await act(() => userEvent.click(menuItem('Details…')));
+
+    expect(widgets.showForm).toHaveBeenCalledOnce();
+    expect(widgets.open).not.toHaveBeenCalled();
+    expect(widgets.patchValues).toHaveBeenCalledExactlyOnceWith('workflow', { editTab: 'details', panelMode: 'edit' });
   });
 
   it('blocks export and copy with action-specific translated feedback', async () => {
@@ -407,7 +420,11 @@ describe('WorkflowHeaderActions', () => {
 
   const renderHeader = async (
     source?: ProjectWorkflowSource,
-    { history = NO_HISTORY, region = 'center' }: { history?: HistoryState; region?: WorkflowRegion } = {}
+    {
+      history = NO_HISTORY,
+      region = 'center',
+      surface,
+    }: { history?: HistoryState; region?: WorkflowRegion; surface?: WorkflowWidgetViewProps['surface'] } = {}
   ) => {
     const graph = createProjectGraph('workflow-1');
     project = createMutablePort({ ...projectSnapshot(graph, source), ...history });
@@ -427,7 +444,7 @@ describe('WorkflowHeaderActions', () => {
       root.render(
         <ChakraProvider value={system}>
           <WorkflowUiProvider adapter={adapter}>
-            <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
+            <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} surface={surface} />
           </WorkflowUiProvider>
         </ChakraProvider>
       );
@@ -464,6 +481,11 @@ describe('WorkflowHeaderActions', () => {
     expect(actionLabels()).toEqual(['Undo', 'Redo', 'Workflow library']);
     await renderHeader(undefined, { region: 'left' });
     expect(actionLabels()).toEqual(['Workflow library']);
+    // A window shows the surface of the region it stands for.
+    await renderHeader(undefined, { region: 'floating', surface: 'left' });
+    expect(actionLabels()).toEqual(['Workflow library']);
+    await renderHeader(undefined, { region: 'floating', surface: 'bottom' });
+    expect(actionLabels()).toEqual(['Undo', 'Redo', 'Workflow library']);
   });
 
   it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {

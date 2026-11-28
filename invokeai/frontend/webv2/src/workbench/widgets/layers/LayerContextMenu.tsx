@@ -39,7 +39,6 @@ import {
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
-import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { useLayerPanelState } from '@workbench/layerPanelState';
@@ -716,14 +715,12 @@ const LayerMenu = ({
     }
   }, [engine, layer.id, makeStatusError]);
 
-  const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
     // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
     clearLayerChildSelection();
-    revealProperties(layer.id);
-    focusRegion('right', 'layers');
+    revealProperties(layer.id, { focus: 'layers' });
     revealLayerSection();
-  }, [focusRegion, layer.id, revealProperties]);
+  }, [layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {

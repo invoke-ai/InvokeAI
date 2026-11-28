@@ -2,7 +2,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { createDocumentModel } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
@@ -27,6 +27,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(mocks.store.getSnapshot().activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(mocks.store.getSnapshot()),
+  useActiveWorkspaceId: () => mocks.store.getSnapshot().activeProject.workspaceId,
   useActiveProjectSelector: <Selected,>(selector: (project: Project) => Selected) =>
     selector(mocks.store.getSnapshot().activeProject),
   useOptionalWorkbenchCommands: () => mocks.store.commands,

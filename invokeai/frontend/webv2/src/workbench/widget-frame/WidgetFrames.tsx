@@ -21,8 +21,10 @@ import { useFocusRegionProps, useHighlightedRegion, useWorkbenchFocus } from '@w
 import { isWidgetRegion } from '@workbench/layoutContracts';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { clampPanelSize, getPanelSizeBounds, getVisiblePanelCollapseThreshold } from '@workbench/workbenchState';
+import { useActiveLayoutSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { clampRegionSize, getPanelCollapseThreshold, getRegionSizeBounds } from '@workbench/workspace/structure';
+import { takesLastCenterView } from '@workbench/workspace/structureReducer';
+import { useCanEditStructure } from '@workbench/workspace/useStructureLock';
 import { PictureInPicture2Icon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,13 +47,12 @@ export const WidgetPanelFrame = ({
   typeId?: WidgetTypeId;
 }) => {
   const { t } = useTranslation();
-  const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
+  const regionState = useActiveLayoutSelector((layout) => layout.widgetRegions[region]);
   const { layout } = useWorkbenchCommands();
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
-  // Clamped at render, not just on commit, so a persisted size from before a bounds change heals on screen immediately
-  // instead of on the next resize.
-  const displaySizePx = clampPanelSize(region, regionState.sizePx);
+  // The resolved size is clamped already (`resolveLayout`, repair 6).
+  const displaySizePx = regionState.sizePx;
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [measuredSizePx, setMeasuredSizePx] = useState<number | null>(null);
   // Side widths are preferences the viewport may squeeze; drags, keyboard floors, and ARIA use the rendered width.
@@ -78,7 +79,7 @@ export const WidgetPanelFrame = ({
     [isBottom]
   );
   const visibleSizePx = measuredSizePx === null ? displaySizePx : Math.min(measuredSizePx, displaySizePx);
-  const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
+  const { max: maxPanelSizePx, min: minPanelSizePx } = getRegionSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
   // This panel's outline, or a side divider's center neighbour, is drawn over the divider.
   const highlightedRegion = useHighlightedRegion();
@@ -86,7 +87,7 @@ export const WidgetPanelFrame = ({
 
   const commitSize = useCallback(
     (sizePx: number) => {
-      const nextSizePx = clampPanelSize(region, sizePx);
+      const nextSizePx = clampRegionSize(region, sizePx);
 
       if (nextSizePx !== regionState.sizePx) {
         layout.setRegionSize(region, nextSizePx);
@@ -98,7 +99,7 @@ export const WidgetPanelFrame = ({
   const collapse = useMemo(
     () => ({
       // Overshoot is measured from the rendered width when the viewport squeezes the panel below its preference.
-      at: getVisiblePanelCollapseThreshold(region, visibleSizePx) + (displaySizePx - visibleSizePx),
+      at: getPanelCollapseThreshold(region, visibleSizePx) + (displaySizePx - visibleSizePx),
       onCollapse: () => layout.setRegionCollapsed(region, true),
       preview: 0,
     }),
@@ -156,11 +157,9 @@ export const WidgetPanelFrame = ({
 
 export const WidgetFloatButton = ({
   instanceId,
-  manifest,
   region,
 }: {
   instanceId: WidgetInstanceId;
-  manifest: WidgetManifest;
   region: WorkbenchRegion;
 }) => {
   const { t } = useTranslation();
@@ -178,7 +177,11 @@ export const WidgetFloatButton = ({
     widgets.float(instanceId, dockableRegion, { height: window.innerHeight, width: window.innerWidth });
     focusFloating(instanceId);
   }, [dockableRegion, focusFloating, instanceId, widgets]);
-  const canFloat = Boolean(manifest.allowFloating) && dockableRegion !== undefined;
+  const availability = useWorkbenchQueries().getAvailability();
+  // Floating takes the instance from every region; the structure refuses to take the center's last view.
+  const takesCenterView = useActiveLayoutSelector((layout) => takesLastCenterView(layout, instanceId, availability));
+  // Floating a placed widget is structure; any widget a side region holds can float.
+  const canFloat = useCanEditStructure() && dockableRegion !== undefined && !takesCenterView;
 
   if (!canFloat) {
     return null;
@@ -229,7 +232,7 @@ export const WidgetHeaderActionsGroup = ({
           runtime={runtime}
         />
       ) : null}
-      <WidgetFloatButton instanceId={instance.id} manifest={manifest} region={region} />
+      <WidgetFloatButton instanceId={instance.id} region={region} />
       <WidgetActionsMenu
         HeaderMenu={HeaderMenu}
         instance={instance}

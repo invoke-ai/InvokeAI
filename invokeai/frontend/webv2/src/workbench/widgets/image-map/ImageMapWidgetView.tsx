@@ -32,15 +32,46 @@ import {
   setImageMapMediaKind,
 } from '@workbench/image-map/imageMapStore';
 import { isIndexing } from '@workbench/image-map/indexProgress';
-import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { ClusterSelectionChip } from './ClusterSelectionChip';
+import { ClusterSelectionChip, selectClusterSelectionId } from './ClusterSelectionChip';
 import { ImageIndexActivityBadge, ImageIndexProgressPanel } from './ImageIndexProgress';
 import { useClearClusterSelection } from './useSelectMapImage';
 
 const CLEAR_CLUSTER_SELECTION_COMMAND = 'image-map.clearClusterSelection';
+
+const isClusterSelected = (values: Record<string, unknown>): boolean => selectClusterSelectionId(values) !== null;
+
+/**
+ * Esc while the map owns focus, the keyboard path to the chip's clear; mounted only while a cluster is selected, and
+ * again for each project, instance and region its runtime registers under.
+ */
+const ClearClusterSelectionHotkey = ({ runtime }: { runtime: WidgetViewProps['runtime'] }) => {
+  const { t } = useTranslation();
+  const clearClusterSelection = useClearClusterSelection();
+
+  // `clearClusterSelection` reads the active project's values through the store, the same for the mount's lifetime.
+  useMountEffect(() => {
+    const title = t('widgets.imageMap.clearClusterSelection');
+    const disposers = [
+      runtime.commands.register({ handler: clearClusterSelection, id: CLEAR_CLUSTER_SELECTION_COMMAND, title }),
+      runtime.hotkeys.register({
+        allowInEditable: false,
+        commandId: CLEAR_CLUSTER_SELECTION_COMMAND,
+        defaultKeys: ['esc'],
+        id: CLEAR_CLUSTER_SELECTION_COMMAND,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+
+  return null;
+};
+
 // In the center area the view selector floats over the content's top-left corner; the shell publishes its height so
 // overlays can start below it.
 const OVERLAY_COLUMN_TOP = 'calc(var(--chakra-spacing-2) + var(--wb-center-chrome-inset, 0px))';
@@ -77,7 +108,7 @@ const plotLoadingFallback = (
 
 /** Show backend embeddings projected by UMAP and colored by cluster; point selection drives Gallery and Preview. */
 export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   // Server configuration and installed models are the administrator's; others are told whom to ask.
   const { canManageAppConfig, canManageModels } = useCapabilities();
   const { data, error, indexCounts, indexUpdatedAt, loadState, renderError } = imageMapStore.useSnapshot();
@@ -91,32 +122,8 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     document.getElementById(IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID)?.focus();
     galleryCommands.updateSettings({ mediaFilter: 'all' });
   }, [galleryCommands]);
-  const clearClusterSelection = useClearClusterSelection();
-
-  // Esc while the map owns focus, the keyboard path to the chip's clear.
-  const { commands: runtimeCommands, hotkeys: runtimeHotkeys } = runtime;
-
-  useEffect(() => {
-    const clearClusterSelectionLabel = t('widgets.imageMap.clearClusterSelection');
-    const disposers = [
-      runtimeCommands.register({
-        handler: clearClusterSelection,
-        id: CLEAR_CLUSTER_SELECTION_COMMAND,
-        title: clearClusterSelectionLabel,
-      }),
-      runtimeHotkeys.register({
-        allowInEditable: false,
-        commandId: CLEAR_CLUSTER_SELECTION_COMMAND,
-        defaultKeys: ['esc'],
-        id: CLEAR_CLUSTER_SELECTION_COMMAND,
-        title: clearClusterSelectionLabel,
-      }),
-    ];
-
-    return () => {
-      disposers.forEach((dispose) => dispose());
-    };
-  }, [clearClusterSelection, runtimeCommands, runtimeHotkeys, t]);
+  const hasClusterSelection = useWidgetValuesSelector('gallery', isClusterSelected);
+  const projectId = useActiveProjectId();
 
   // Before the first load, so it carries the chosen strength rather than fetching at the default and immediately
   // refetching.
@@ -188,6 +195,12 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
           zIndex="1"
         >
           <ClusterSelectionChip />
+          {hasClusterSelection ? (
+            <ClearClusterSelectionHotkey
+              key={`${projectId}:${runtime.instanceId}:${runtime.region}:${i18n.language}`}
+              runtime={runtime}
+            />
+          ) : null}
           {isIndexing(indexCounts) ? <ImageIndexActivityBadge counts={indexCounts} updatedAt={indexUpdatedAt} /> : null}
         </Stack>
       </Box>

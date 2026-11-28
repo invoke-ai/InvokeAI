@@ -11,9 +11,9 @@ import {
 } from '@workbench/canvas-operations/api';
 import { appendReferenceImage } from '@workbench/image-actions/appendReferenceImage';
 import { useNotify } from '@workbench/useNotify';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWorkspaceOpen } from '@workbench/workspace/useWorkspaceOpen';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,7 +33,7 @@ export const useCreateFromBbox = (
   const notify = useNotify();
   const queries = useWorkbenchQueries();
   const { canvas, generation, notifications } = useWorkbenchCommands();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const open = useWorkspaceOpen();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const isCreating = creatingProjects.useValue(engine?.projectId ?? '') === true;
 
@@ -76,7 +76,7 @@ export const useCreateFromBbox = (
             if (appended.status === 'appended') {
               generation.patchSettings({ referenceImages: appended.referenceImages }, project.id);
               notify.success(t('widgets.canvas.contextMenu.referenceImageAdded'));
-              openWorkbenchWidget('generate', { preferredRegions: ['left'] });
+              open({ surface: 'panel', typeId: 'generate' });
             } else if (appended.status === 'full') {
               notify.info(t('widgets.canvas.contextMenu.referenceImageFull'));
             } else {
@@ -109,7 +109,7 @@ export const useCreateFromBbox = (
         }
       });
     },
-    [canvas, engine, generation, models, notifications, notify, openWorkbenchWidget, queries, t]
+    [canvas, engine, generation, models, notifications, notify, open, queries, t]
   );
 
   return { createFromBbox, isCreating };

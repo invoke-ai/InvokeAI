@@ -990,6 +990,67 @@ const createWorkflowDocument = ({ description, graphId, index, name, workflowNod
   };
 };
 
+const composeRegions = () => ({
+  bottom: {
+    activeInstanceId: 'gallery:bottom',
+    alignEndInstanceIds: ['shortcuts', 'notifications'],
+    instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
+    isCollapsed: true,
+    sizePx: 180,
+  },
+  center: { activeInstanceId: 'preview', instanceIds: ['preview', 'gallery:center'], isCollapsed: false, sizePx: 0 },
+  left: { activeInstanceId: 'generate', instanceIds: ['generate', 'upscale'], isCollapsed: false, sizePx: 520 },
+  right: {
+    activeInstanceId: 'gallery',
+    instanceIds: ['gallery', 'image-map', 'queue'],
+    isCollapsed: false,
+    sizePx: 450,
+  },
+});
+
+/** The layout fields a document stored before structure and view split, as those builds wrote them. */
+const createStoredLayout = () => ({
+  layout: {
+    centerViewId: 'preview',
+    panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
+    presetId: 'compose',
+  },
+  presetWorkingLayouts: [
+    {
+      presetId: 'edit',
+      snapshot: {
+        layout: {
+          centerViewId: 'canvas',
+          panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
+          presetId: 'edit',
+        },
+        widgetInstances: Object.fromEntries(
+          [
+            'canvas',
+            'gallery:bottom',
+            'generate',
+            'layers',
+            'preview',
+            'upscale',
+            'server-status',
+            'queue-status',
+            'shortcuts',
+            'notifications',
+            'autosave-status',
+          ].map((id) => [id, { id, typeId: id.split(':')[0] }])
+        ),
+        widgetRegions: {
+          ...composeRegions(),
+          center: { activeInstanceId: 'canvas', instanceIds: ['canvas', 'preview'], isCollapsed: false, sizePx: 0 },
+          left: { activeInstanceId: 'upscale', instanceIds: ['generate', 'upscale'], isCollapsed: false, sizePx: 450 },
+          right: { activeInstanceId: 'layers', instanceIds: ['layers', 'preview'], isCollapsed: false, sizePx: 380 },
+        },
+      },
+    },
+  ],
+  widgetRegions: composeRegions(),
+});
+
 /** Project 0 is schema 3 with two workflows; project 1 stays schema 2 for the project-file journey's migration. */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   const id = fixtureProjectId(index);
@@ -1055,11 +1116,10 @@ const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
       sourceLocked: false,
     },
     ...(workflows ? { documentSchemaVersion: 3 } : { documentSchemaVersion: 2 }),
-    layout: {
-      centerViewId: 'preview',
-      panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-      presetId: 'canvas-default',
-    },
+    // Every project is on the default workspace and looks at it as it ships, except project 002: stored by a build
+    // before structure and view split, its wider left rail and its working copy of Edit (Upscale fronted on the left, a
+    // narrower right rail) migrate to views when the editor opens it.
+    ...(workflows ? { views: {}, workspaceId: 'compose' } : createStoredLayout()),
     name: `Fixture Project ${ordinal(index, 3)}`,
     promptHistory: [],
     ...(workflows ? { workflows } : { projectGraph: primaryWorkflow }),

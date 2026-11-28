@@ -93,8 +93,9 @@ const renderProbe = () =>
 
 const store = () => workbench.store!;
 const project = () => store().getSnapshot().activeProject;
+const layout = () => store().getSnapshot().activeLayout;
 const isPlaced = (typeId: string) =>
-  Object.values(project().widgetRegions).some((region) =>
+  Object.values(layout().widgetRegions).some((region) =>
     region.instanceIds.some((instanceId) => project().widgetInstances[instanceId]?.typeId === typeId)
   );
 const actionsFor = (issue: InvocationIssue) => getActions!(issue);
@@ -123,7 +124,7 @@ beforeEach(async () => {
     modelKey: sdxlModel.key,
   };
   resetArchitectureCapabilities();
-  workbench.store = createWorkbenchStore();
+  workbench.store = createWorkbenchStore(undefined, { isLoaded: () => true });
   store().commands.layout.applyPreset('compose');
   store().commands.generation.setSettings(values);
   host = document.createElement('div');
@@ -188,18 +189,20 @@ describe('useInvokeIssueActions', () => {
     expect(workbench.managerRequests).toEqual([{ modelType: 'main', projectId: project().id }]);
   });
 
-  it('opens the workflow editor in the center to show a node', async () => {
+  it('enters the workspace built around the workflow editor to show a node', async () => {
     await run({ message: 'Missing input.', target: { kind: 'workflowNode', nodeId: 'node-1' } }, 'show');
 
-    const center = project().widgetRegions.center;
+    expect(project().workspaceId).toBe('automate');
+    const center = layout().widgetRegions.center;
     expect(project().widgetInstances[center.activeInstanceId]?.typeId).toBe('workflow');
   });
 
-  it('adds a source widget the layout lacks', async () => {
+  it('shows a source widget this workspace lacks in the workspace that places it', async () => {
     expect(isPlaced('video')).toBe(false);
 
-    await run({ message: 'Not in this layout.', target: { kind: 'mountSource', sourceId: 'video' } }, 'add');
+    await run({ message: 'Not in this layout.', target: { kind: 'mountSource', sourceId: 'video' } }, 'show');
 
+    expect(project().workspaceId).toBe('video');
     expect(isPlaced('video')).toBe(true);
   });
 

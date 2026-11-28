@@ -57,7 +57,7 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useAuthSession: () => session,
 }));
 vi.mock('@workbench/projects/useProjectFileActions', () => ({ useExportLibraryProject: () => noop }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => noop }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => noop }));
 vi.mock('./GalleryImageActionsBridge', () => ({
   GalleryItemActionsAdapter: () => null,
   GalleryImageContextMenu: () => null,
@@ -110,12 +110,12 @@ describe('Gallery adapter subscriptions', () => {
       const previousAdapter = adapter;
       const previousRenderCount = renderCount;
       const previousSnapshot = store.getSnapshot();
-      const nextWidth = previousSnapshot.activeProject.widgetRegions.left.sizePx + 20;
+      const nextWidth = previousSnapshot.activeLayout.widgetRegions.left.sizePx + 20;
 
       await act(() => store.commands.layout.setRegionSize('left', nextWidth));
 
       expect(store.getSnapshot()).not.toBe(previousSnapshot);
-      expect(store.getSnapshot().activeProject.widgetRegions.left.sizePx).toBe(nextWidth);
+      expect(store.getSnapshot().activeLayout.widgetRegions.left.sizePx).toBe(nextWidth);
       expect(adapter).toBe(previousAdapter);
       expect(renderCount).toBe(previousRenderCount);
     }

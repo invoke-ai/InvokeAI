@@ -9,9 +9,11 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface CenterAreaTestProject {
-  floatingWidgets?: Record<string, { returnIndex: number; returnRegion: string }>;
+  guests: Record<string, 'center' | 'window'>;
   id: string;
   invocation: { sourceId: string };
+  layout: { presetId: string };
+  workspaceId: string;
   queue: { items: never[] };
   widgetInstances: Record<string, { id: string; title?: string; typeId: string }>;
   widgetRegions: {
@@ -48,8 +50,11 @@ const centerAreaMocks = vi.hoisted(() => {
   };
 
   const project: CenterAreaTestProject = {
+    guests: {},
     id: 'test-project',
     invocation: { sourceId: 'generate' },
+    layout: { presetId: 'compose' },
+    workspaceId: 'compose',
     queue: { items: [] },
     widgetInstances: {},
     widgetRegions: {
@@ -63,11 +68,7 @@ const centerAreaMocks = vi.hoisted(() => {
       actions: ComponentType<{ region: 'center' }>;
       label: ComponentType<{ region: 'center' }>;
     },
-    dockFloating: vi.fn(),
-    focusFloating: vi.fn(),
-    focusRegion: vi.fn(),
     project,
-    revealFloating: vi.fn(),
     trailingActionsWidth: '189px',
   };
 });
@@ -96,20 +97,16 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
 vi.mock('@workbench/focusRegions', () => ({
   useFocusRegionProps: () => ({}),
   useHighlightedRegion: () => null,
-  useWorkbenchFocus: () => ({
-    focusFloating: centerAreaMocks.focusFloating,
-    focusRegion: centerAreaMocks.focusRegion,
-    getTarget: () => null,
-  }),
+  useWorkbenchFocus: () => ({ focusFloating: vi.fn(), focusRegion: vi.fn(), getTarget: () => null }),
 }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
   createWidgetRegionViewModelFromState: ({ regionState }: { regionState: { instanceIds: string[] } }) => ({
     placedItems: regionState.instanceIds.length > 0 ? [centerAreaMocks.activeItem] : [],
   }),
   getWidgetRegionItems: () => [],
-  isRequiredCenterView: () => true,
 }));
 vi.mock('@workbench/widgetRegistry', () => ({
+  isAdminWidgetSession: () => false,
   getWidgetById: (typeId: string) =>
     typeId === 'preview' ? { manifest: { id: 'preview', label: 'Preview' }, status: 'enabled' } : undefined,
   getWidgetsForRegion: () => [],
@@ -122,13 +119,24 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => recoveryOwner,
   useWorkbenchReload: () => async () => {},
   useActiveProjectId: () => centerAreaMocks.project.id,
+  useActiveLayoutSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
+    selector(centerAreaMocks.project),
   useActiveProjectSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
     selector(centerAreaMocks.project),
-  useWorkbenchCommands: () => ({
-    widgets: { dockFloating: centerAreaMocks.dockFloating, revealFloating: centerAreaMocks.revealFloating },
+  useWorkbenchCommands: () => ({ widgets: {} }),
+  useWorkbenchQueries: () => ({
+    getAvailability: () => ({ getPresentation: () => 'view' }),
+    getSnapshot: () => ({ activeLayout: centerAreaMocks.project, activeProject: centerAreaMocks.project }),
   }),
-  useWorkbenchSelector: (selector: (snapshot: { backendConnection: { status: string } }) => unknown) =>
-    selector({ backendConnection: { status: 'connected' } }),
+  useWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+    selector({
+      account: {},
+      activeLayout: centerAreaMocks.project,
+      activeProject: centerAreaMocks.project,
+      backendConnection: { status: 'connected' },
+    }),
+  useOptionalWorkbenchSelector: (selector: (snapshot: object) => unknown) =>
+    selector({ activeLayout: centerAreaMocks.project, activeProject: centerAreaMocks.project }),
 }));
 vi.mock('@workbench/widget-frame', () => ({
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
@@ -181,12 +189,6 @@ void i18n.use(initReactI18next).init({
           centerRegion: 'Center view',
           centerViewEmpty: 'No view',
           centerViewLabel: 'Center view: {{label}}',
-          floating: {
-            centerFloating: '{{label}} is in a floating window',
-            destinations: { right: 'right panel' },
-            dockTo: 'Dock to {{destination}}',
-            showWindow: 'Show window',
-          },
         },
       },
     },
@@ -351,64 +353,6 @@ describe('CenterArea view menu beside wide actions', () => {
     expect(name.getClientRects().length).toBe(0);
     expect(trigger.getBoundingClientRect().width).toBeLessThanOrEqual(36);
     expect(startIsland.textContent).toContain('Panther and the Flask');
-  });
-});
-
-describe('CenterArea with its last view floating', () => {
-  const dockedCenter = centerAreaMocks.project.widgetRegions.center;
-
-  afterEach(() => {
-    centerAreaMocks.project.floatingWidgets = undefined;
-    centerAreaMocks.project.widgetInstances = {};
-    centerAreaMocks.project.widgetRegions.center = dockedCenter;
-    centerAreaMocks.dockFloating.mockClear();
-    centerAreaMocks.focusFloating.mockClear();
-    centerAreaMocks.focusRegion.mockClear();
-    centerAreaMocks.revealFloating.mockClear();
-  });
-
-  const floatLastView = () => {
-    centerAreaMocks.project.floatingWidgets = { 'preview-instance': { returnIndex: 2, returnRegion: 'right' } };
-    centerAreaMocks.project.widgetInstances = {
-      'preview-instance': { id: 'preview-instance', typeId: 'preview' },
-    };
-    centerAreaMocks.project.widgetRegions.center = { ...dockedCenter, instanceIds: [] };
-  };
-  const button = (name: string) =>
-    [...host!.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name);
-
-  it('says where the view went and offers both ways back, instead of calling it unavailable', async () => {
-    floatLastView();
-    await render(<CenterArea />);
-
-    expect(host?.textContent).toContain('Preview is in a floating window');
-    expect(button('Show window')).not.toBeUndefined();
-    expect(host?.textContent).not.toContain('unavailable');
-
-    await act(async () => {
-      button('Show window')?.click();
-      await Promise.resolve();
-    });
-
-    expect(centerAreaMocks.revealFloating).toHaveBeenCalledWith('preview-instance');
-    expect(centerAreaMocks.focusFloating).toHaveBeenCalledWith('preview-instance');
-    expect(centerAreaMocks.dockFloating).not.toHaveBeenCalled();
-
-    await act(async () => {
-      button('Dock to right panel')?.click();
-      await Promise.resolve();
-    });
-
-    expect(centerAreaMocks.dockFloating).toHaveBeenCalledWith('preview-instance');
-    expect(centerAreaMocks.focusRegion).toHaveBeenCalledWith('center', 'preview');
-  });
-
-  it('still reports an empty center whose view is not floating as unavailable', async () => {
-    centerAreaMocks.project.widgetRegions.center = { ...dockedCenter, instanceIds: [] };
-    await render(<CenterArea />);
-
-    expect(host?.textContent).toContain('common.widgetViewUnavailable');
-    expect(button('Show window')).toBeUndefined();
   });
 });
 

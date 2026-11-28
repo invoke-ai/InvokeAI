@@ -24,6 +24,7 @@ const shellMocks = vi.hoisted(() => ({
     id: 'project-1',
     layout: { panels: { isLeftOpen: false, isRightOpen: true } },
     name: 'Test project',
+    panels: { isBottomOpen: false, isLeftOpen: false, isRightOpen: true },
     widgetInstances: {
       'image-map-instance': { createdAt: 0, id: 'image-map-instance', state: { values: {} }, typeId: 'image-map' },
       gallery: { createdAt: 0, id: 'gallery', state: { values: {} }, typeId: 'gallery' },
@@ -65,9 +66,14 @@ const shellMocks = vi.hoisted(() => ({
 
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => shellMocks.project.id,
+  useActiveLayoutSelector: <Selected,>(selector: (project: typeof shellMocks.project) => Selected) =>
+    selector(shellMocks.project),
+  useWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeLayout: shellMocks.project, activeProject: shellMocks.project } as never),
   useActiveProjectSelector: <Selected,>(selector: (project: typeof shellMocks.project) => Selected) =>
     selector(shellMocks.project),
   useWorkbenchCommands: () => ({ notifications: { recordWidgetFailure: vi.fn() }, widgets: shellMocks.widgets }),
+  useWorkbenchQueries: () => ({ getAvailability: () => ({ getPresentation: () => 'view' }) }),
 }));
 
 vi.mock('@features/gallery/utility', () => ({
@@ -118,6 +124,7 @@ vi.mock('@workbench/widgetRegionViewModel', () => ({
   getWidgetRegionItems: () => [],
 }));
 vi.mock('@workbench/widgetRegistry', () => ({
+  isAdminWidgetSession: () => false,
   getWidgetById: () => undefined,
   getWidgetsForRegion: () => [],
   widgetRegistrationFailures: [],

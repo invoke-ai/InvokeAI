@@ -32,6 +32,7 @@ const submitActiveInvocation = vi.hoisted(() =>
 const workbench = vi.hoisted(() => ({
   commands: { layout: {}, notifications: {}, queue: {}, widgets: {} } as Record<string, unknown>,
   generateValues: {} as Record<string, unknown>,
+  opened: [] as unknown[],
   queryClient: null as unknown,
 }));
 const recallFixtures = vi.hoisted(() => ({
@@ -43,6 +44,13 @@ const recallFixtures = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation }));
+vi.mock('@workbench/workspace/workspaceNavigation', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openInWorkspace: (_ports: unknown, intents: unknown) => {
+    workbench.opened.push(intents);
+    return { ok: false, reason: 'unavailable' };
+  },
+}));
 vi.mock('@workbench/image-actions/selectedImage', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getSelectedGalleryImage: () => recallFixtures.image,
@@ -133,6 +141,7 @@ afterEach(async () => {
   recallFixtures.item = null;
   workbench.commands = { layout: {}, notifications: {}, queue: {}, widgets: {} };
   workbench.generateValues = {};
+  workbench.opened = [];
 });
 
 it('recalls from hotkeys on top of recalls and edits committed while the image record loaded', async () => {
@@ -182,7 +191,7 @@ it('recalls from hotkeys on top of recalls and edits committed while the image r
     layout: {},
     notifications: { add: vi.fn() },
     queue: {},
-    widgets: { open: vi.fn() },
+    widgets: {},
   };
   await renderCommands();
 
@@ -235,7 +244,6 @@ describe('viewer recall keys on a selected video', () => {
 
   const pressOnVideo = async (commandId: string) => {
     const patchValues = vi.fn();
-    const open = vi.fn();
 
     accountLifecycle.activate('hotkey-video-recall-account');
     setArchitectureCapabilities(architectureCapabilitiesFixture);
@@ -254,18 +262,18 @@ describe('viewer recall keys on a selected video', () => {
       layout: {},
       notifications: { add: vi.fn() },
       queue: {},
-      widgets: { open, patchValues },
+      widgets: { patchValues },
     };
     await renderCommands();
     await act(async () => {
       await handlers.get(commandId)?.();
     });
 
-    return { open, patchValues };
+    return { patchValues };
   };
 
   it('remixes the video into the Video panel and opens it, not Generate', async () => {
-    const { open, patchValues } = await pressOnVideo('viewer.remix');
+    const { patchValues } = await pressOnVideo('viewer.remix');
 
     expect(recallFixtures.metadata).not.toHaveBeenCalled();
     expect(patchValues).toHaveBeenCalledExactlyOnceWith(
@@ -274,17 +282,17 @@ describe('viewer recall keys on a selected video', () => {
       'project-1'
     );
     expect(patchValues.mock.calls[0]?.[1]).not.toMatchObject({ seed: 4321 });
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ widgetId: 'video' }));
+    expect(workbench.opened).toEqual([{ surface: 'panel', typeId: 'video' }]);
   });
 
   it('recalls the size alone for Use Size', async () => {
-    const { open, patchValues } = await pressOnVideo('viewer.useSize');
+    const { patchValues } = await pressOnVideo('viewer.useSize');
 
     const [widget, values] = patchValues.mock.calls[0] ?? [];
     expect(widget).toBe('video');
     expect(values).toMatchObject({ aspectRatioId: '9:16', targetResolution: '720p' });
     expect(values).not.toMatchObject({ positivePrompt: 'a fox running' });
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ widgetId: 'video' }));
+    expect(workbench.opened).toEqual([{ surface: 'panel', typeId: 'video' }]);
   });
 
   it('keeps a selected image on the image recall', async () => {
@@ -310,7 +318,6 @@ describe('viewer recall keys on a selected video', () => {
     workbench.queryClient = new QueryClient();
     workbench.generateValues = { modelKey: sdxl.key, steps: 20 };
     const patchValues = vi.fn();
-    const open = vi.fn();
     workbench.commands = {
       generation: {
         setSettings: (values: Record<string, unknown>) => {
@@ -320,7 +327,7 @@ describe('viewer recall keys on a selected video', () => {
       layout: {},
       notifications: { add: vi.fn() },
       queue: {},
-      widgets: { open, patchValues },
+      widgets: { patchValues },
     };
     await renderCommands();
     await act(async () => {
@@ -330,7 +337,7 @@ describe('viewer recall keys on a selected video', () => {
     expect(workbench.generateValues).toMatchObject({ seed: 7 });
     expect(recallFixtures.videoMetadata).not.toHaveBeenCalled();
     expect(patchValues).not.toHaveBeenCalled();
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ widgetId: 'generate' }));
+    expect(workbench.opened).toEqual([{ surface: 'panel', typeId: 'generate' }]);
   });
 });
 

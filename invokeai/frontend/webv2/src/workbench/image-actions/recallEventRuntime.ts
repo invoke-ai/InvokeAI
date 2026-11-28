@@ -7,7 +7,7 @@ import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchSt
 
 import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { openWidgetPlacement, revealPlacedWidget } from '@workbench/widgetPlacementCommands';
+import { getWorkspaceOffer, openInWorkspace } from '@workbench/workspace/workspaceNavigation';
 
 export interface RecallRuntime {
   dispose(): void;
@@ -49,7 +49,7 @@ export const createRecallEventRuntime = <Event extends { user_id: string }>({
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   isEvent: (payload: unknown) => payload is Event;
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   replay?: readonly PendingRecallEvent[];
 }): RecallRuntime => {
   let disposed = false;
@@ -128,9 +128,69 @@ export interface RecallRevealContext {
 }
 
 /**
- * Bring the widget a recall just changed to the front of its project so the caller sees the result: reveal it where
- * the layout has it (see `revealPlacedWidget`), else open it. A floating window stays floating. Nothing moves while the
- * user types or once the project is off screen; the notification reports the change either way.
+ * The commands a recall applies through. Once it writes the widget's values (Generate's settings, a widget patch), each
+ * notice it records offers the way to that widget when this workspace cannot show it: a socket event never navigates,
+ * so the recall's own notice says what changed and where. Notices before any write, such as "nothing applied", stay
+ * plain.
+ */
+export const withRecallWidgetOffer = <
+  Commands extends Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'> &
+    Partial<Pick<WorkbenchCommands, 'generation'>>,
+>(
+  commands: Commands,
+  {
+    projectId,
+    queries,
+    reveal,
+    typeId,
+  }: {
+    projectId: string;
+    queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
+    reveal: RecallRevealContext;
+    typeId: WidgetTypeId;
+  }
+): Commands => {
+  let hasWritten = false;
+  const written =
+    <Args extends unknown[]>(write: (...args: Args) => void) =>
+    (...args: Args): void => {
+      hasWritten = true;
+      write(...args);
+    };
+  const { generation } = commands;
+
+  return {
+    ...commands,
+    ...(generation
+      ? {
+          generation: {
+            ...generation,
+            patchSettings: written(generation.patchSettings),
+            setSettings: written(generation.setSettings),
+          },
+        }
+      : {}),
+    notifications: {
+      ...commands.notifications,
+      add: (notice: Parameters<WorkbenchCommands['notifications']['add']>[0]) => {
+        const offer =
+          hasWritten && queries.getSnapshot().activeProject.id === projectId
+            ? getWorkspaceOffer({ commands, getWidgetsForRegion: reveal.getWidgetsForRegion, queries }, { typeId })
+            : [];
+
+        commands.notifications.add(
+          offer.length > 0 ? { ...notice, actions: [...(notice.actions ?? []), ...offer] } : notice
+        );
+      },
+    },
+    widgets: { ...commands.widgets, patchValues: written(commands.widgets.patchValues) },
+  };
+};
+
+/**
+ * Bring the widget a recall just changed to the front where this workspace places it, so the caller sees the result.
+ * A socket event is no gesture: it never enters another workspace, adds a widget or moves focus, and leaves the offer
+ * to its notice (`withRecallWidgetOffer`). Nothing moves while the user types or once the project is off screen.
  */
 export const bringRecallWidgetToFront = ({
   commands,
@@ -140,10 +200,10 @@ export const bringRecallWidgetToFront = ({
   reveal,
   typeId,
 }: {
-  commands: Pick<WorkbenchCommands, 'widgets'>;
+  commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   owner: AccountScope;
   projectId: string;
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   reveal: RecallRevealContext;
   typeId: WidgetTypeId;
 }): void => {
@@ -153,15 +213,9 @@ export const bringRecallWidgetToFront = ({
     return;
   }
 
-  if (revealPlacedWidget({ project, typeId, widgets: commands.widgets })) {
-    return;
-  }
-
-  openWidgetPlacement({
-    getWidgetsForRegion: reveal.getWidgetsForRegion,
-    options: { preferredRegions: ['left'] },
-    projectId,
-    typeId,
-    widgets: commands.widgets,
-  });
+  openInWorkspace(
+    { commands, getWidgetsForRegion: reveal.getWidgetsForRegion, queries },
+    { typeId },
+    { background: true }
+  );
 };

@@ -9,8 +9,10 @@ import type {
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { system } from '@theme/system';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import { createWidgetRegionViewModel } from '@workbench/widgetRegionViewModel';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import i18next from 'i18next';
 import { MapIcon } from 'lucide-react';
 import { act } from 'react';
@@ -82,7 +84,14 @@ await i18n.use(initReactI18next).init({
   },
 });
 
-const handlers = { onDock: vi.fn(), onRemoveFloating: vi.fn(), onSelect: vi.fn(), onToggle: vi.fn() };
+const handlers = {
+  canFloat: vi.fn(() => true),
+  onDock: vi.fn(),
+  onFloat: vi.fn(),
+  onRemoveFloating: vi.fn(),
+  onSelect: vi.fn(),
+  onToggle: vi.fn(),
+};
 const GROUPS: WidgetBarGroup[] = [
   {
     activeId: 'gallery',
@@ -146,6 +155,9 @@ afterEach(async () => {
   host = null;
   root = null;
 });
+
+// Menus, docking and reordering are structure: this rail belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('WidgetBar floating marker', () => {
   it('keeps the floated widget in its slot as a badged marker that is not a sortable tab', async () => {
@@ -293,5 +305,25 @@ describe('WidgetBar floating marker', () => {
 
     expect(menuItem('remove-widget')).not.toBeNull();
     expect(menuItem('dock-widget')).toBeNull();
+  });
+});
+
+describe('WidgetBar on a locked workspace', () => {
+  beforeEach(() => {
+    void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false });
+  });
+
+  it('switches panels and shows windows, but offers no widgets menu, Dock, Remove or reordering', async () => {
+    await renderBar();
+
+    expect(slot('Right panel widgets')).toBeNull();
+    expect(slot('Gallery')).not.toHaveAttribute('aria-roledescription');
+    await openMenu(slot('Gallery'));
+    await openMenu(marker());
+    await openMenu(host!.querySelector('nav')!);
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+
+    await act(() => userEvent.click(marker()));
+    expect(handlers.onSelect).toHaveBeenCalledWith('right', 'image-map');
   });
 });

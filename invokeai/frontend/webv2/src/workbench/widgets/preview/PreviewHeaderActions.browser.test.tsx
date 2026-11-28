@@ -160,9 +160,9 @@ vi.mock('./previewHeaderStore', async (importOriginal) => ({
   }),
 }));
 
-vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => ({
+vi.mock('@workbench/workspace/useWorkspaceOpen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useOpenWorkbenchWidget: () => vi.fn(),
+  useWorkspaceOpen: () => vi.fn(),
 }));
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

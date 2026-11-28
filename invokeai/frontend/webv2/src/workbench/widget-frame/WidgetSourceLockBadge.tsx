@@ -2,7 +2,7 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { Icon } from '@chakra-ui/react';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { getSourceIdForWidgetTypeId } from '@workbench/graphWidgets';
+import { getSourceIdForWidgetTypeId } from '@workbench/invocationSources';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { LockKeyholeIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

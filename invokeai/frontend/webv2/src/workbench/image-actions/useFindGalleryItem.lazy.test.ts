@@ -5,7 +5,7 @@ vi.mock('@features/gallery/queries', () => {
 });
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: vi.fn() }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: vi.fn(),
   useWorkbenchQueries: vi.fn(),

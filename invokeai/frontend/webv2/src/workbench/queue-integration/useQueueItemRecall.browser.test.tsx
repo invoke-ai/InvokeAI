@@ -72,9 +72,9 @@ vi.mock('@features/models', async (importOriginal) => ({
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ error: vi.fn(), info: mocks.notifyInfo, success: mocks.notifySuccess }),
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => ({
+vi.mock('@workbench/workspace/useWorkspaceOpen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useOpenWorkbenchWidget: () => mocks.openWidget,
+  useWorkspaceOpen: () => mocks.openWidget,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -148,7 +148,7 @@ describe('useQueueItemRecall', () => {
     await recall('all');
 
     expect(mocks.setSettings).toHaveBeenCalledWith(generateSnapshot, 'active-project');
-    expect(mocks.openWidget).toHaveBeenCalledWith('generate', { preferredRegions: ['left'] });
+    expect(mocks.openWidget).toHaveBeenCalledWith({ surface: 'panel', typeId: 'generate' });
     expect(mocks.notifySuccess).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.settingsRecalledDescription');
   });
 });

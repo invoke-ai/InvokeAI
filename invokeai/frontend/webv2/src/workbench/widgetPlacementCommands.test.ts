@@ -1,6 +1,7 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
-import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchState } from '@workbench/projectContracts';
 import type { NormalizedWidgetManifest, RegisteredWidget } from '@workbench/widgetContracts';
+import type { ResolvedLayout } from '@workbench/workspace/resolveLayout';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,27 +11,20 @@ import type { WorkbenchWidgetCommands } from './workbenchStore';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import {
   activateRailPlacement,
-  closeWidgetPlacement,
+  addWidgetPlacement,
   cycleRegionWidget,
   dockFloatingPlacement,
-  openWidgetPlacement,
-  revealPlacedWidget,
   revealWidgetPlacement,
-  toggleCenterPreview,
 } from './widgetPlacementCommands';
 import { getWidgetPlacementProject } from './widgetPlacementMeta';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getActiveProject, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 
 const TestIcon = () => null;
 const TestView = () => null;
 
-const getActiveProject = (state: WorkbenchState): Project => {
-  const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
-
-  expect(project).toBeDefined();
-
-  return project as Project;
-};
+/** The placement projection the shell hands the commands, from the reducer's state. */
+const placementOf = (state: WorkbenchState) =>
+  getWidgetPlacementProject({ activeLayout: getLayoutOf(state), activeProject: getActiveProject(state) });
 
 const createWidget = (
   overrides: Partial<NormalizedWidgetManifest> & Pick<NormalizedWidgetManifest, 'id' | 'label'>
@@ -73,7 +67,11 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
     dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
   dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
   closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
+  closeGuest: (instanceId) => dispatch({ instanceId, type: 'closeGuest' }),
+  keepGuest: (instanceId, allowMultiple) => dispatch({ allowMultiple, instanceId, type: 'keepGuest' }),
+  showGuest: (options) => dispatch({ ...options, type: 'showGuest' }),
   float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),
+  front: (options) => dispatch({ ...options, type: 'frontRegionWidget' }),
   raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
   move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
   setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
@@ -93,15 +91,22 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
 });
 
 describe('widget placement commands', () => {
-  it('cycles eligible docked widgets in both directions, wrapping without moving or selecting other regions', () => {
-    const initial = createInitialWorkbenchState();
-    const project = getActiveProject(initial);
-    project.widgetRegions.left = {
-      ...project.widgetRegions.left,
-      activeInstanceId: 'generate',
+  it('cycles eligible docked widgets in both directions, wrapping and skipping what cannot show', () => {
+    const select = vi.fn();
+    const widgets = { select } as unknown as WorkbenchWidgetCommands;
+    const left = (activeInstanceId: string) => ({
+      activeInstanceId,
       instanceIds: ['generate', 'missing', 'upscale', 'queue'],
-      isCollapsed: false,
-    };
+    });
+    const placement = (activeInstanceId: string) => ({
+      ...placementOf(createInitialWorkbenchState()),
+      widgetInstances: {
+        generate: { id: 'generate', typeId: 'generate' },
+        queue: { id: 'queue', typeId: 'queue' },
+        upscale: { id: 'upscale', typeId: 'upscale' },
+      },
+      widgetRegions: { ...placementOf(createInitialWorkbenchState()).widgetRegions, left: left(activeInstanceId) },
+    });
     const registry = createRegistry({
       left: [
         createWidget({ id: 'generate', label: 'Generate' }),
@@ -109,23 +114,23 @@ describe('widget placement commands', () => {
         createWidget({ id: 'queue', label: 'Queue' }),
       ],
     });
-    const cycle = (state: WorkbenchState, direction: -1 | 1) =>
-      applyCommand(state, (widgets) => {
-        cycleRegionWidget({
-          direction,
-          getWidgetsForRegion: registry,
-          project: getWidgetPlacementProject(getActiveProject(state)),
-          region: 'left',
-          widgets,
-        });
+    const cycle = (activeInstanceId: string, direction: -1 | 1) =>
+      cycleRegionWidget({
+        direction,
+        getWidgetsForRegion: registry,
+        project: placement(activeInstanceId),
+        region: 'left',
+        widgets,
       });
-    const next = cycle(initial, 1);
-    expect(getActiveProject(next).widgetRegions.left.activeInstanceId).toBe('queue');
-    expect(getActiveProject(next).widgetRegions.left.instanceIds).toEqual(['generate', 'missing', 'upscale', 'queue']);
-    expect(getActiveProject(next).widgetRegions.right).toBe(project.widgetRegions.right);
-    const wrapped = cycle(next, 1);
-    expect(getActiveProject(wrapped).widgetRegions.left.activeInstanceId).toBe('generate');
-    expect(getActiveProject(cycle(wrapped, -1)).widgetRegions.left.activeInstanceId).toBe('queue');
+
+    expect(cycle('generate', 1)).toBe('queue');
+    expect(cycle('queue', 1)).toBe('generate');
+    expect(cycle('generate', -1)).toBe('queue');
+    expect(select.mock.calls.map(([options]) => (options as { region: string }).region)).toEqual([
+      'left',
+      'left',
+      'left',
+    ]);
   });
 
   it('opens a singleton already in the target region without duplicating it', () => {
@@ -133,15 +138,15 @@ describe('widget placement commands', () => {
     const widget = createWidget({ id: 'queue', label: 'Queue' });
     const nextState = applyCommand(state, (widgets) => {
       expect(
-        openWidgetPlacement({
+        addWidgetPlacement({
           widgets,
           getWidgetsForRegion: createRegistry({ right: [widget] }),
-          options: { preferredRegions: ['right'] },
+          regions: ['right'],
           typeId: 'queue',
         })
       ).toEqual({ ok: true, region: 'right' });
     });
-    const rightRegion = getActiveProject(nextState).widgetRegions.right;
+    const rightRegion = getLayoutOf(nextState).widgetRegions.right;
 
     expect(rightRegion.instanceIds.filter((instanceId) => instanceId === 'queue')).toHaveLength(1);
     expect(rightRegion.activeInstanceId).toBe('queue');
@@ -153,10 +158,11 @@ describe('widget placement commands', () => {
     const widgets = createWidgetCommands((action) => actions.push(action));
     const widget = createWidget({ allowMultiple: false, id: 'queue', label: 'Queue' });
 
-    openWidgetPlacement({
+    addWidgetPlacement({
+      createNew: true,
       widgets,
       getWidgetsForRegion: createRegistry({ right: [widget] }),
-      options: { createNew: true, preferredRegions: ['right'] },
+      regions: ['right'],
       typeId: 'queue',
     });
 
@@ -173,91 +179,49 @@ describe('widget placement commands', () => {
     const widgets = createWidgetCommands(dispatch);
 
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           left: [createWidget({ allowedRegions: ['center'], id: 'models', label: 'Models' })],
         }),
-        options: { preferredRegions: ['left'] },
+        regions: ['left'],
         typeId: 'models',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           bottom: [createWidget({ bottomPanel: 'tooltip', id: 'server-status', label: 'Server Status' })],
         }),
-        options: { preferredRegions: ['bottom'] },
+        regions: ['bottom'],
         typeId: 'server-status',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(
-      openWidgetPlacement({
+      addWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
           center: [createWidget({ centerPlacement: 'toolbar', id: 'toolbar-tools', label: 'Toolbar Tools' })],
         }),
-        options: { preferredRegions: ['center'] },
+        regions: ['center'],
         typeId: 'toolbar-tools',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(actions).toEqual([]);
   });
 
-  it('prevents removing the last center view', () => {
-    const actions: WorkbenchAction[] = [];
-    const widgets = createWidgetCommands((action) => actions.push(action));
-    const project = getActiveProject(createInitialWorkbenchState());
-
-    expect(
-      closeWidgetPlacement({
-        widgets,
-        getWidgetById: (typeId) => createWidget({ id: typeId, label: typeId }),
-        instanceId: 'canvas',
-        project: {
-          ...project,
-          widgetRegions: {
-            ...project.widgetRegions,
-            center: { ...project.widgetRegions.center, activeInstanceId: 'canvas', instanceIds: ['canvas'] },
-          },
-        },
-        region: 'center',
-      })
-    ).toEqual({ ok: false, reason: 'unsupported' });
-    expect(actions).toEqual([]);
-  });
-
   it('reveals a placement and uncollapses its region', () => {
-    const state = createInitialWorkbenchState();
-    const project = getActiveProject(state);
-    const collapsedState: WorkbenchState = {
-      ...state,
-      projects: state.projects.map((candidate) =>
-        candidate.id === project.id
-          ? {
-              ...candidate,
-              widgetRegions: {
-                ...candidate.widgetRegions,
-                right: { ...candidate.widgetRegions.right, activeInstanceId: 'layers', isCollapsed: true },
-              },
-            }
-          : candidate
-      ),
-    };
+    const collapsedState = workbenchReducer(createInitialWorkbenchState(), {
+      isCollapsed: true,
+      region: 'right',
+      type: 'setRegionWidgetCollapsed',
+    });
     const nextState = applyCommand(collapsedState, (widgets) => {
-      revealWidgetPlacement({
-        widgets,
-        instanceId: 'queue',
-        project: getActiveProject(collapsedState),
-        region: 'right',
-      });
+      revealWidgetPlacement({ widgets, instanceId: 'queue', project: placementOf(collapsedState), region: 'right' });
     });
 
-    expect(getActiveProject(nextState).widgetRegions.right).toMatchObject({
-      activeInstanceId: 'queue',
-      isCollapsed: false,
-    });
+    expect(getLayoutOf(nextState).widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', isCollapsed: false });
   });
 });
 
@@ -266,13 +230,13 @@ describe('floating window rail commands', () => {
   const run = <Result>(
     state: WorkbenchState,
     command: (widgets: WorkbenchWidgetCommands, project: ReturnType<typeof getWidgetPlacementProject>) => Result
-  ): { project: Project; result: Result } => {
+  ): { project: ResolvedLayout; result: Result } => {
     let result!: Result;
     const next = applyCommand(state, (widgets) => {
-      result = command(widgets, getWidgetPlacementProject(getActiveProject(state)));
+      result = command(widgets, placementOf(state));
     });
 
-    return { project: getActiveProject(next), result };
+    return { project: getLayoutOf(next), result };
   };
   const float = (state: WorkbenchState, instanceId: string, region?: WidgetRegion): WorkbenchState =>
     workbenchReducer(state, region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' });
@@ -280,7 +244,7 @@ describe('floating window rail commands', () => {
   it('activates a marker by raising and expanding its window, not by docking it', () => {
     let state = float(float(createInitialWorkbenchState(), 'image-map'), 'gallery');
     state = workbenchReducer(state, { instanceId: 'image-map', mode: 'shaded', type: 'setFloatingWidgetMode' });
-    const railBefore = getActiveProject(state).widgetRegions.right;
+    const railBefore = getLayoutOf(state).widgetRegions.right;
 
     const { project, result } = run(state, (widgets, placement) =>
       activateRailPlacement({ instanceId: 'image-map', project: placement, region: 'right', widgets })
@@ -288,7 +252,7 @@ describe('floating window rail commands', () => {
 
     expect(result).toBe('window');
     expect(project.floatingWidgets?.['image-map']).toMatchObject({ mode: 'windowed', stackOrder: 2 });
-    expect(project.widgetRegions.right).toBe(railBefore);
+    expect(project.widgetRegions.right).toEqual(railBefore);
   });
 
   it('docks a window where it came from and names that region', () => {
@@ -305,81 +269,5 @@ describe('floating window rail commands', () => {
     expect(docked.project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
     // Nothing floats there: no dispatch, no region to move focus to.
     expect(stale.result).toBeNull();
-  });
-});
-
-const previewRegistry = createRegistry({ center: [createWidget({ id: 'preview', label: 'Preview' })] });
-
-const createPreviewToggleHarness = (
-  initial = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' })
-) => {
-  let state = initial;
-  const dispatch = (action: WorkbenchAction): void => {
-    state = workbenchReducer(state, action);
-  };
-  const widgets = {
-    open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
-    select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
-  } as WorkbenchWidgetCommands;
-  const toggle = () =>
-    toggleCenterPreview({
-      getWidgetsForRegion: previewRegistry,
-      project: getWidgetPlacementProject(getActiveProject(state)),
-      widgets,
-    });
-
-  return {
-    getProject: () => getActiveProject(state),
-    getRegions: () => getActiveProject(state).widgetRegions,
-    select: widgets.select,
-    toggle,
-  };
-};
-
-describe('toggleCenterPreview', () => {
-  it('swaps the preview into the center and back to the view it replaced', () => {
-    const { getRegions, toggle } = createPreviewToggleHarness();
-
-    expect(getRegions().center.activeInstanceId).toBe('workflow:center');
-    expect(toggle()).toBe(true);
-    expect(getRegions().center.activeInstanceId).toBe('preview');
-    expect(toggle()).toBe(true);
-    expect(getRegions().center.activeInstanceId).toBe('workflow:center');
-  });
-
-  it('docks a floating preview back to its rail slot, behind the tab already showing, and fronts it in the center', () => {
-    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
-    const railBefore = getActiveProject(state).widgetRegions.right;
-    state = workbenchReducer(state, { instanceId: 'preview', region: 'right', type: 'floatWidget' });
-    const { getProject, toggle } = createPreviewToggleHarness(state);
-
-    expect(toggle()).toBe(true);
-
-    expect(getProject().floatingWidgets).toBeUndefined();
-    expect(getProject().widgetRegions.center.activeInstanceId).toBe('preview');
-    expect(getProject().widgetRegions.right).toMatchObject({
-      activeInstanceId: railBefore.activeInstanceId,
-      instanceIds: railBefore.instanceIds,
-    });
-  });
-});
-
-describe('revealPlacedWidget', () => {
-  const reveal = (state: WorkbenchState) => {
-    let result: ReturnType<typeof revealPlacedWidget> = null;
-    const next = applyCommand(state, (widgets) => {
-      result = revealPlacedWidget({ project: getActiveProject(state), typeId: 'preview', widgets });
-    });
-    return { regions: getActiveProject(next).widgetRegions, result };
-  };
-
-  it('fronts a tab behind the rail before the one behind the center view', () => {
-    // Edit keeps Preview behind Canvas in the center and behind Layers in the right rail.
-    const edit = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
-    const { regions, result } = reveal(edit);
-
-    expect(result).toEqual({ kind: 'docked', region: 'right' });
-    expect(regions.right.activeInstanceId).toBe('preview');
-    expect(regions.center).toBe(getActiveProject(edit).widgetRegions.center);
   });
 });

@@ -73,7 +73,7 @@ const BUTTON_TARGET = { closest: () => ({}), tagName: 'BUTTON' };
 const createHarness = (
   opts: {
     tools?: ToolId[];
-    handleEscape?: (o: { gestureWasActive: boolean }) => void;
+    handleEscape?: (o: { gestureWasActive: boolean }) => boolean;
     hasFocus?: () => boolean;
     maybeCommitModalSession?: () => boolean;
     replaying?: () => boolean;
@@ -220,6 +220,22 @@ describe('pointer pipeline: Escape priority (handleEscape)', () => {
     h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape' }));
     expect(h.tool.cancels).toBe(1);
     expect(handleEscape).toHaveBeenCalledWith({ gestureWasActive: true });
+  });
+
+  it('marks only a press that cancelled something, so a later handler can tell it was used', () => {
+    const idle = makeKeyEvent({ key: 'Escape' });
+    createHarness({ handleEscape: () => false }).pipeline.onKeyDown(idle);
+    expect(idle.preventDefault).not.toHaveBeenCalled();
+
+    const cancelling = makeKeyEvent({ key: 'Escape' });
+    createHarness({ handleEscape: () => true }).pipeline.onKeyDown(cancelling);
+    expect(cancelling.preventDefault).toHaveBeenCalled();
+
+    const midGesture = makeKeyEvent({ key: 'Escape' });
+    const h = createHarness({ handleEscape: () => false });
+    h.pipeline.onPointerDown(makePointerEvent({}));
+    h.pipeline.onKeyDown(midGesture);
+    expect(midGesture.preventDefault).toHaveBeenCalled();
   });
 
   it('does not run handleEscape when Escape targets an editable field', () => {

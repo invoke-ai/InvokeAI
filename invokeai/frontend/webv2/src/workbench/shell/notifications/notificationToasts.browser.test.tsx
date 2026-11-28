@@ -54,17 +54,16 @@ const NotifyProbe = () => {
 const start = (store: ReturnType<typeof createWorkbenchStore>) =>
   startNotificationToasts({
     actionContext: createEditorNotificationActionContext({
+      commands: store.commands,
       focus: {
         focusFloating: (instanceId) => focusMoves.push(`floating:${instanceId}`),
         focusRegion: (region, typeId) => focusMoves.push(`${region}:${typeId ?? ''}`),
       },
       getWidgetById,
       getWidgetsForRegion,
-      notifications: store.commands.notifications,
       queries: store.queries,
       retryQueueItems: () => Promise.resolve([]),
       t: i18next.t,
-      widgets: store.commands.widgets,
     }),
     getNotifications: () => store.getSnapshot().notifications,
     getPreferences: () => ({ notifyOnEnqueue: true }),
@@ -142,8 +141,8 @@ describe('notification toasts in the editor', () => {
     expect(buttonLabels(toast)).toEqual(['Open Queue']);
     await act(() => actionButtons(toast)[0]!.click());
 
-    const project = store().getSnapshot().activeProject;
-    expect(project.widgetInstances[project.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
+    const { activeLayout } = store().getSnapshot();
+    expect(activeLayout.widgetInstances[activeLayout.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
     expect(focusMoves).toEqual(['right:queue']);
     await expect.poll(() => isGone('No image selected')).toBe(true);
     expect(structuredClone(recordedNotifications()[0]?.actions)).toEqual([
@@ -172,8 +171,8 @@ describe('notification toasts in the editor', () => {
     expect(buttonLabels(toast)).toEqual(['Show in queue', 'Retry']);
     await act(() => actionButtons(toast)[0]!.click());
 
-    const project = store().getSnapshot().activeProject;
-    expect(project.widgetInstances[project.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
+    const { activeLayout } = store().getSnapshot();
+    expect(activeLayout.widgetInstances[activeLayout.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
   });
 
   it('undoes an undoable action once, from its toast, without a closure in workbench state', async () => {

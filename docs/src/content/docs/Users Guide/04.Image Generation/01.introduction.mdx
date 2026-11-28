@@ -60,15 +60,15 @@ Every press of **Invoke** has a *route*: a **source**, the panel whose settings 
 * **Gallery** — the image is saved to the Gallery, on the board selected there, and shown in the Preview.
 * **Canvas** — the image lands in the Canvas's staging area, where you can compare the results and accept one onto the canvas as a new layer.
 
-Each layout preset starts with the route that suits its purpose. The **Compose** preset routes the Generate panel to the **Gallery**. The **Edit** preset routes to the **Canvas**, using the Canvas's layers and bounding box as the source, so results come back to the canvas for further editing. Switching presets switches to the new preset's route, unless the routing is locked.
+Each workspace starts with the route that suits its purpose. The **Compose** workspace routes the Generate panel to the **Gallery**. The **Edit** workspace routes to the **Canvas**, using the Canvas's layers and bounding box as the source, so results come back to the canvas for further editing. Switching workspaces switches to the new workspace's route, unless the routing is locked.
 
 The route lives in the **Invoke** card. Hover over **Invoke** to see it, or open it to make changes: right-click **Invoke**, or press <kbd>↓</kbd> while **Invoke** has keyboard focus. The card stays open while you change the route:
 
-* **Source** lists the panels in the current layout that can run a generation, such as Generate, Canvas, Upscale and Video.
+* **Source** lists the panels in the current workspace that can run a generation, such as Generate, Canvas, Upscale and Video.
 * **Destination** chooses **Gallery** or **Canvas**. Video always goes to the Gallery, so with Video as the source there is nothing to choose.
 * The lock button beside **Source** keeps the route fixed. While the route is locked, a small dot shows on the corner of **Invoke**.
 
-The route also follows your work. When you change a setting in a different panel, that panel becomes the source, and the destination changes to match: the Canvas sends results to the Canvas, and the other panels send them to the Gallery. For example, editing the prompt in the Generate panel while you are in the Edit layout sends the next results to the Gallery. Lock the routing if you want results to keep going to one place while you work in several panels. To send a single run to the other destination without changing the route, press **Alt+Ctrl+Enter** (**Alt+Cmd+Enter** on macOS).
+The route also follows your work. When you change a setting in a different panel, that panel becomes the source, and the destination changes to match: the Canvas sends results to the Canvas, and the other panels send them to the Gallery. For example, editing the prompt in the Generate panel while you are in the Edit workspace sends the next results to the Gallery. Lock the routing if you want results to keep going to one place while you work in several panels. To send a single run to the other destination without changing the route, press **Alt+Ctrl+Enter** (**Alt+Cmd+Enter** on macOS).
 
 The route is saved with the project, so each project remembers where its results go. See [Projects](/users-guide/projects/introduction/#what-a-project-keeps) for everything a project keeps.
 

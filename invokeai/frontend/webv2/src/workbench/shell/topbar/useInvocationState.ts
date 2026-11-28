@@ -25,7 +25,7 @@ import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@f
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
+import { getGraphWidgetSources, getPlacedWidgetTypeIds, getVisibleWidgetTypeIds } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
   isInvocationRouteValid,
@@ -36,7 +36,7 @@ import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import {
-  useActiveProjectSelector,
+  useActiveLayoutSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
   useWorkbenchSelector,
@@ -119,7 +119,7 @@ export interface InvocationState {
   workflowBatchSize?: number | null;
   isPreparing: boolean;
   isValid: boolean;
-  sources: GraphWidgetSource[];
+  sources: readonly GraphWidgetSource[];
   visibleTypeIds: ReadonlySet<WidgetTypeId>;
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
@@ -138,9 +138,11 @@ export interface InvokeOptions {
 /** Invoke's state for the active route, or for `sourceId`'s route with the active destination (graph preview). */
 export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId } = {}): InvocationState => {
   const { t } = useTranslation();
-  const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
-  const visibleTypeIds = useActiveProjectSelector(getVisibleWidgetTypeIds, areTypeIdSetsEqual);
-  const placedTypeIds = useActiveProjectSelector(getPlacedWidgetTypeIds, areTypeIdSetsEqual);
+  const routeInput = useWorkbenchSelector(({ activeLayout, activeProject }) =>
+    selectInvocationRouteInput(activeProject, activeLayout)
+  );
+  const visibleTypeIds = useActiveLayoutSelector(getVisibleWidgetTypeIds, areTypeIdSetsEqual);
+  const placedTypeIds = useActiveLayoutSelector(getPlacedWidgetTypeIds, areTypeIdSetsEqual);
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
@@ -263,7 +265,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
     placedTypeIds,
     promptExpansion,
     sourceValues,
-    sources: graphWidgetSources,
+    sources: getGraphWidgetSources(),
     visibleTypeIds,
     ...(resolvedRoute.workflowBatch ? { workflowBatchSize: resolvedRoute.workflowBatch.size } : {}),
   };

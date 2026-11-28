@@ -98,15 +98,14 @@ export const registeredWidgets = registerFirstPartyWidgets();
  * Admin widgets require a multi-user admin session; the route resolves session before mounting and remounts on user
  * changes.
  */
-const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
-  if (!widget.manifest.requiresAdmin) {
-    return true;
-  }
-
+export const isAdminWidgetSession = (): boolean => {
   const session = getAuthSession();
 
   return session.multiuserEnabled && session.user?.is_admin === true;
 };
+
+const isWidgetAvailable = (widget: RegisteredWidget): boolean =>
+  !widget.manifest.requiresAdmin || isAdminWidgetSession();
 
 export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
   registeredWidgets.filter(

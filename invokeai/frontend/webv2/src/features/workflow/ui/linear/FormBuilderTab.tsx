@@ -427,7 +427,7 @@ const BuilderElementBase = ({
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    widgets.open({ region: 'center', widgetId: 'workflow' });
+                    widgets.open({ surface: 'stage', widgetId: 'workflow' });
                     requestNodeSelection([element.data.fieldIdentifier.nodeId]);
                   }}
                 >

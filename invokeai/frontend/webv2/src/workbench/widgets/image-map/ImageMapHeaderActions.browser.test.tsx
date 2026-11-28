@@ -17,6 +17,8 @@ const workbench = vi.hoisted(() => ({
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
+  useActiveLayoutSelector: (selector: (layout: unknown) => unknown) =>
+    selector({ widgetInstances: {}, widgetRegions: { center: { activeInstanceId: '', instanceIds: [] } } }),
   useActiveProjectId: () => 'project-1',
   useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
     selector({ id: 'project-1', widgetInstances: {}, widgetRegions: {} }),
@@ -26,7 +28,15 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     gallery: { updateSettings: workbench.updateSettings },
     widgets: { float: vi.fn(), patchValues: vi.fn() },
   }),
-  useWorkbenchQueries: () => ({ getProject: () => null, isActiveProject: () => true }),
+  useWorkbenchQueries: () => ({
+    getAvailability: () => ({ getPresentation: () => 'view' }),
+    getProject: () => null,
+    isActiveProject: () => true,
+  }),
+}));
+
+vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
+  useWorkbenchWidgetRegistry: () => ({ getWidgetById: () => undefined, getWidgetsForRegion: () => [] }),
 }));
 
 vi.mock('react-i18next', () => ({

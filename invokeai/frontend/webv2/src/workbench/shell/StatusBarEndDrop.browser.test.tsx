@@ -8,6 +8,7 @@ import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { system } from '@theme/system';
 import { WidgetStrip, useWidgetSortable } from '@workbench/widget-frame';
 import { getWidgetRegionEndDropData, getWidgetRegionEndDropId, widgetCollisionDetection } from '@workbench/widgetDnd';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -96,6 +97,9 @@ afterEach(async () => {
   host = null;
   root = null;
 });
+
+// Dragging a chip is structure: this status bar belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('status bar end-zone drop (real dnd pipeline)', () => {
   it('reports the end zone as the drop target for a pointer over the spacer', async () => {

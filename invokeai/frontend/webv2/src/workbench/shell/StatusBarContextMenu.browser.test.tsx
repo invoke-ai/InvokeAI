@@ -1,10 +1,10 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { RegisteredWidget, WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WidgetRegistry from '@workbench/widgetRegistry';
 import type * as WorkbenchContext from '@workbench/WorkbenchContext';
-import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors } from '@dnd-kit/core';
@@ -14,9 +14,10 @@ import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
-import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createInitialWorkbenchState, withArrangement } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { rearrangeWithoutCustomizeInEachTest } from '@workbench/workspace/structureLock.testing';
 import { createInstance } from 'i18next';
 import { CircleIcon } from 'lucide-react';
 import { act, type ReactNode, useState } from 'react';
@@ -46,6 +47,10 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchQueries: () => runtime.store.queries,
   useActiveProjectId: () =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => s.activeProject.id),
+  useActiveLayoutSelector: <Selected,>(selector: (layout: WorkbenchSnapshot['activeLayout']) => Selected) =>
+    selector(runtime.store.getSnapshot().activeLayout),
+  useWorkbenchSelector: <Selected,>(selector: (snapshot: WorkbenchSnapshot) => Selected) =>
+    selector(runtime.store.getSnapshot()),
   useActiveProjectSelector: <T,>(select: (project: Project) => T, equal?: (a: T, b: T) => boolean) =>
     useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => select(s.activeProject), equal),
 }));
@@ -89,9 +94,14 @@ const FixtureView = ({ presentation }: WidgetViewProps) => {
 };
 
 const makeState = (): WorkbenchState => {
-  const state = createInitialWorkbenchState();
-  const project = state.projects[0]!;
-  project.widgetInstances = {
+  const state = withArrangement(
+    createInitialWorkbenchState(),
+    'compose',
+    { bottom: ['fixture'], center: [], left: [], right: [] },
+    { fixture: 'fixture' }
+  );
+
+  state.projects[0]!.widgetInstances = {
     fixture: {
       id: 'fixture',
       typeId: 'fixture',
@@ -99,11 +109,6 @@ const makeState = (): WorkbenchState => {
       state: { id: 'fixture', label: 'fixture', values: {}, version: 1 },
     },
   };
-  for (const region of Object.values(project.widgetRegions)) {
-    region.instanceIds = [];
-    region.activeInstanceId = '';
-  }
-  project.widgetRegions.bottom.instanceIds = ['fixture'];
   return state;
 };
 
@@ -190,6 +195,9 @@ afterEach(async () => {
   host.remove();
   accountLifecycle.invalidate();
 });
+
+// The widgets menu is structure: this status bar belongs to an account that rearranges without Customize.
+rearrangeWithoutCustomizeInEachTest();
 
 describe('status bar context menus', () => {
   it('leaves a right-click inside a widget popover to the popover', async () => {

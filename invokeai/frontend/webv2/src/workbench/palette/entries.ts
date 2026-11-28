@@ -164,6 +164,7 @@ const groupRank = (group: string): number => {
 
 /** Omit navigation, caret nudges, and the palette toggle from searchable rows. */
 const PALETTE_HIDDEN_COMMANDS = new Set([
+  'app.backToStage',
   'app.openCommandPalette',
   // Both palettes already ship `buildOpenSettingsEntry` under this id, and it carries search keywords and an
   // empty-state slot the catalog entry lacks.
@@ -207,8 +208,11 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
 
 /** App-category commands regrouped into palette-facing sections. */
 const APP_COMMAND_GROUPS: Record<string, string> = {
+  'app.backToPreviousWorkspace': 'Navigation',
   'app.cancelQueueItem': 'Queue',
   'app.clearQueue': 'Queue',
+  'app.customizeWorkspace': 'Layout',
+  'app.resetWorkspaceView': 'Layout',
   'app.focusPrompt': 'Generation',
   'app.invoke': 'Generation',
   'app.invokeFront': 'Generation',
@@ -216,7 +220,6 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.promptHistoryPrev': 'Generation',
   'app.openWidgets': 'Layout',
   'app.redoLayoutChange': 'Layout',
-  'app.resetPanelLayout': 'Layout',
   'app.undoLayoutChange': 'Layout',
   'app.selectCanvasTab': 'Navigation',
   'app.selectGenerateTab': 'Navigation',

@@ -29,12 +29,13 @@ const WorkflowStatusBarItem = () => {
   );
 };
 
-export const WorkflowWidgetView = ({ presentation, region, runtime }: WorkflowWidgetViewProps) => {
+export const WorkflowWidgetView = ({ presentation, region, runtime, surface }: WorkflowWidgetViewProps) => {
   if (region === 'bottom') {
     return presentation === 'expanded' ? <WorkflowEditorView runtime={runtime} /> : <WorkflowStatusBarItem />;
   }
 
-  if (region === 'left') {
+  // The form is the left rail's surface, in the rail or in a window standing for it.
+  if (region === 'left' || (region === 'floating' && surface === 'left')) {
     return <WorkflowLinearPanel />;
   }
 

@@ -1,4 +1,5 @@
 import type { ToastAction } from '@platform/ui/toaster';
+import type { LayoutPresetId } from '@workbench/layoutContracts';
 import type { WorkbenchNotification, WorkbenchNotificationAction } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
@@ -15,11 +16,17 @@ import {
 
 /** What the editor lends action handlers. Read when a toast opens (labels) and when its button is pressed. */
 export interface NotificationActionContext {
+  /** Enters Customize on the named workspace (switching to it first) or the active one, unless already customizing. */
+  customizeWorkspace: (workspaceId?: LayoutPresetId) => void;
+  /** Whether this account rearranges without Customize; the one-time offer retires once it does not. */
+  isRearranging: () => boolean;
+  /** Turns "Rearrange without Customize" off. */
+  lockWorkspaces: () => void;
   /** The widget's label while this editor can show it; null leaves its action out. */
   getWidgetLabel: (widgetId: WidgetTypeId) => string | null;
   /** Whether the project is still open in this editor; an undo scoped to a closed project is not offered. */
   isProjectOpen: (projectId: string) => boolean;
-  /** Brings the widget forward where the layout has it, otherwise opens it, and moves focus there. */
+  /** Opens the widget through the workspace resolver, as a gesture: here, in the workspace that has it, or a guest. */
   openWidget: (widgetId: WidgetTypeId) => void;
   revealQueueItem: (itemId: number) => void;
   /** Whether a notice may still offer Retry for these backend items: not once they were retried from one. */
@@ -47,6 +54,19 @@ interface NotificationActionHandler<Action extends WorkbenchNotificationAction> 
 const handlers: {
   [Kind in NotificationActionKind]: NotificationActionHandler<Extract<WorkbenchNotificationAction, { kind: Kind }>>;
 } = {
+  'customize-workspace': {
+    label: (_action, { t }) => t('shell.workspace.customize'),
+    run: ({ workspaceId }, { customizeWorkspace }) => customizeWorkspace(workspaceId),
+  },
+  'keep-rearranging': {
+    label: (_action, { isRearranging, t }) => (isRearranging() ? t('shell.workspace.keepRearranging') : null),
+    // The button only answers the offer: its toast closes, and the setting stays as it is.
+    run: () => undefined,
+  },
+  'lock-workspaces': {
+    label: (_action, { isRearranging, t }) => (isRearranging() ? t('shell.workspace.lockWorkspaces') : null),
+    run: (_action, { lockWorkspaces }) => lockWorkspaces(),
+  },
   'open-widget': {
     label: ({ widgetId }, { getWidgetLabel, t }) => {
       const widget = getWidgetLabel(widgetId);

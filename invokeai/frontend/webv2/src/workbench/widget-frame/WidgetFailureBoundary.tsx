@@ -167,7 +167,14 @@ const WidgetFailureCard = ({
         {t('widgets.failure.title', { label })}
       </Text>
       <ScrollArea.Root maxH="8rem" variant="hover">
-        <ScrollArea.Viewport ref={viewportRef} maxH="8rem">
+        {/* Zag makes the viewport focusable only when both axes overflow; a stack overflows one, so it opts in. */}
+        <ScrollArea.Viewport
+          ref={viewportRef}
+          aria-label={t('widgets.failure.details', { label })}
+          maxH="8rem"
+          role="region"
+          tabIndex={0}
+        >
           <ScrollArea.Content>
             <Code display="block" p="2" whiteSpace="pre-wrap">
               {details}

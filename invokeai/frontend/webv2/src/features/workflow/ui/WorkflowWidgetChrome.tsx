@@ -517,7 +517,7 @@ export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
   const isHeaderHistoryHidden = headerHistoryStore.useSelector((snapshot) => Boolean(snapshot.hiddenIn[headerKey]));
 
   const openDetailsPanel = useCallback(() => {
-    widgets.open({ region: 'left', widgetId: 'workflow' });
+    widgets.showForm();
     widgets.patchValues('workflow', { editTab: 'details', panelMode: 'edit' });
   }, [widgets]);
   const exportWorkflow = useCallback(() => {
@@ -680,7 +680,7 @@ const WorkflowHistoryActions = () => {
 };
 
 export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
-  const { region } = props;
+  const { region, surface } = props;
   const observeHeaderHistory = useHeaderHistoryObserver(getHeaderKey(props));
   const { t } = useTranslation();
   const session = useAuthSession();
@@ -703,8 +703,9 @@ export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
   // A pending save without browser recovery has no safety net at all; say so rather than showing the same cloud.
   const persistenceLabel =
     status === 'pending' && !hasLocalRecovery ? t('widgets.workflow.persistencePendingNoRecovery') : t(view.labelKey);
-  // History steps show wherever the editor renders; the left region's linear form has no editor.
-  const showsHistory = region !== 'left';
+  // History steps show wherever the editor renders; the linear form (the left rail, or a window standing for it) has
+  // no editor.
+  const showsHistory = region !== 'left' && !(region === 'floating' && surface === 'left');
 
   return (
     <HStack gap="0.5">

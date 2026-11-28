@@ -21,7 +21,7 @@ const noop = () => undefined;
 let commands = { layout: { activatePreset: (() => Promise.resolve(null)) as ActivatePreset } };
 
 const createCommands = (activatePreset: ActivatePreset) => ({
-  layout: { activatePreset, createPreset: noop, reorderPresets: noop, reset: noop, savePreset: noop },
+  layout: { activatePreset, reorderPresets: noop },
 });
 
 vi.mock('@workbench/WorkbenchContext', () => {
@@ -29,12 +29,19 @@ vi.mock('@workbench/WorkbenchContext', () => {
 
   return {
     shallowEqual: Object.is,
+    useActiveWorkspaceId: () => useSnapshot().activeProject.workspaceId,
+    useActiveLayoutSelector: <Selected,>(
+      selector: (layout: ReturnType<typeof useSnapshot>['activeLayout']) => Selected
+    ) => selector(useSnapshot().activeLayout),
     useActiveProjectSelector: <Selected,>(
       selector: (project: ReturnType<typeof useSnapshot>['activeProject']) => Selected
     ) => selector(useSnapshot().activeProject),
     useDebouncedWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
+    useOptionalWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
+      selector(useSnapshot()),
     useWorkbenchCommands: () => commands,
+    useWorkbenchQueries: () => ({}),
     useWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
   };
@@ -42,7 +49,7 @@ vi.mock('@workbench/WorkbenchContext', () => {
 
 vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => ({
   ...(await importOriginal<typeof LayoutPresetActivationModule>()),
-  preloadLayoutPresetWidgets: () => undefined,
+  preloadLayoutWidgets: () => undefined,
 }));
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: () => null,
@@ -126,7 +133,7 @@ describe('LayoutPresetStrip acknowledgment', () => {
     expect(presetTab('edit').hasAttribute('data-selected')).toBe(true);
     expect(presetTab('compose').getAttribute('aria-selected')).toBe('false');
     expect(presetTab('compose').hasAttribute('data-selected')).toBe(false);
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+    expect(store.getSnapshot().activeProject.workspaceId).toBe('compose');
   });
 
   it('activates on the frame after the acknowledgment, not inside the handler', async () => {

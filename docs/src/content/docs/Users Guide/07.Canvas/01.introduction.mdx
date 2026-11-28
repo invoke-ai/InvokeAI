@@ -18,7 +18,7 @@ The **Canvas** is where you build and refine an image in layers. You can paint, 
 
 The Canvas lives in the **Edit** layout (**Alt+2**): the Canvas is in the center, the **Generate** panel on the left supplies the model, prompt and settings, and the **Layers** panel on the right lists the canvas's layers and their settings.
 
-<Image src={editLayout} alt="The Edit layout: the Generate panel on the left, the Canvas with a glowing jellyfish over a city at dusk in the center, its inpaint masks and regional guidance areas visible, and the Layers panel with its color picker, layer list and Properties on the right." />
+<Image src={editLayout} alt="The Edit workspace: the Generate panel on the left, the Canvas with a glowing jellyfish over a city at dusk in the center, its inpaint masks and regional guidance areas visible, and the Layers panel with its color picker, layer list and Properties on the right." />
 
 This page introduces the main ideas and tasks. The [Canvas guide](/users-guide/canvas/canvas-guide/) and the [Layers panel guide](/users-guide/canvas/layers-panel/) describe every tool, menu and setting.
 
@@ -62,7 +62,7 @@ When the Canvas is the source of a generation, InvokeAI looks at what is inside 
 
 ## Sending generations to the Canvas
 
-In the Edit layout, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. Hover over **Invoke** to see the route in its card. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
+In the Edit workspace, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. Hover over **Invoke** to see the route in its card. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
 
 When the source is the Canvas, the **Size** section's width and height are the frame's, and **Render at** at the bottom of the section chooses the size the model generates at before the result is scaled back to the frame (legacy versions called this *Scale before processing*): the frame's own size, the model's optimal size, or a custom size. The **Render** section adds **Denoising strength** below the guidance scale: how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%, and the section header shows the current value. The Generate panel also adds a **Compositing** section at the bottom, which sets how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
 
@@ -175,7 +175,7 @@ The tool strip also has shape, gradient and text tools, which are described in t
 
 There are four ways to bring an existing image onto the canvas:
 
-* **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as raster layer**, **Add as control layer**, **Add as regional reference image**, **Add as inpaint mask** and **Add as resized control layer**, which scales the image to the model's optimal size.
+* **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose workspace with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as raster layer**, **Add as control layer**, **Add as regional reference image**, **Add as inpaint mask** and **Add as resized control layer**, which scales the image to the model's optimal size.
 * **Drag it from your computer.** Drag one or more image files (PNG, JPEG or WebP) from your file manager or the desktop onto the canvas. The same drop zones appear. The files are uploaded to the Gallery, to the board new results go to, and then added as the zone says. Other kinds of files are refused with a notice. While an operation such as a filter is running, the canvas says it is busy and takes no drop, and until an upload finishes, another drop is refused. An image dragged from a web page often arrives as a link rather than a file; save it first, then drag the file.
 * **Use the image's menu.** Right-click an image in the Gallery or Preview, or open **Edit** in the Preview's header. **Edit on Canvas** adds it as an image layer and opens Canvas; **Add to Canvas as…** lets you choose the kind of layer. **New project from image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.

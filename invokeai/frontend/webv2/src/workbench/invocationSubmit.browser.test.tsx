@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveInvocationRoute } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
-import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
+import { createInitialWorkbenchState, getLayoutOf, workbenchReducer } from './workbenchState.testing';
 import { createWorkbenchStore } from './workbenchStore';
 
 /**
@@ -93,7 +93,7 @@ const buildGenerateProject = () => {
 /** Submits a plain Generate run bound for the gallery; `dispatched` records the moment the reducer took it. */
 const submitGenerate = () => {
   const project = buildGenerateProject();
-  const route = resolveInvocationRoute(project, 'global', {
+  const route = resolveInvocationRoute(project, getLayoutOf(createInitialWorkbenchState(), project), 'global', {
     destination: 'gallery',
     destinationLocked: false,
     sourceId: 'generate',

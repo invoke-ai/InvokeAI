@@ -1,11 +1,7 @@
 import type { WorkbenchFocusController } from '@workbench/focusRegions';
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
-import type {
-  WorkbenchNotificationCommands,
-  WorkbenchQueries,
-  WorkbenchWidgetCommands,
-} from '@workbench/workbenchStore';
+import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { describeQueueRetry } from '@features/queue';
@@ -16,21 +12,22 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
+import { selectStructureLock } from '@workbench/workspace/structureLock';
+import { customizeWorkspaceById, openInWorkspace } from '@workbench/workspace/workspaceNavigation';
 
 import type { NotificationActionContext } from './notificationActions';
 
 export interface EditorNotificationActionSources {
+  commands: Pick<WorkbenchCommands, 'layout' | 'notifications' | 'widgets'>;
   focus: Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion'>;
   getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  notifications: Pick<WorkbenchNotificationCommands, 'add' | 'withdrawRetry'>;
-  queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+  queries: Pick<WorkbenchQueries, 'getSnapshot' | 'getWorkspaceLayout'>;
   /** Queue's retry command (`queueCommands.retryItems`): the ids of the items that re-run the given ones. */
   retryQueueItems: (itemIds: number[]) => Promise<number[]>;
   t: TFunction;
-  widgets: WorkbenchWidgetCommands;
 }
 
 /** Retries already asked for, keyed by the items retried, so a rerun queues once; session-only, per account. */
@@ -42,19 +39,27 @@ registerAccountOwnedResource({ clear: () => retryStates.clear(), name: 'notifica
 
 /** The context notification actions run in inside the editor: its store, widget registry and focus. */
 export const createEditorNotificationActionContext = ({
+  commands,
   focus,
   getWidgetById,
   getWidgetsForRegion,
-  notifications,
   queries,
   retryQueueItems,
   t,
-  widgets,
 }: EditorNotificationActionSources): NotificationActionContext => {
-  const openWidget = (widgetId: WidgetTypeId): void =>
-    revealOrOpenWorkbenchWidget({ focus, getWidgetsForRegion, queries, widgets }, widgetId);
+  const { notifications } = commands;
+  const ports = { commands, focus, getWidgetsForRegion, queries };
+  const openWidget = (widgetId: WidgetTypeId): void => void openInWorkspace(ports, { typeId: widgetId });
+  const getLock = () => selectStructureLock(queries.getSnapshot(), getWorkbenchPreferences().rearrangeWithoutCustomize);
 
   return {
+    customizeWorkspace: (workspaceId) => {
+      if (!getLock().isCustomizing) {
+        customizeWorkspaceById({ commands, queries }, workspaceId);
+      }
+    },
+    isRearranging: () => getWorkbenchPreferences().rearrangeWithoutCustomize,
+    lockWorkspaces: () => void patchWorkbenchPreferences({ rearrangeWithoutCustomize: false }),
     getWidgetLabel: (widgetId) => {
       const widget = getWidgetById(widgetId);
 

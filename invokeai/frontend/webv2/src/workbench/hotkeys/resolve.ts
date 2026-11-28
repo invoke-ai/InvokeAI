@@ -12,6 +12,12 @@ export const toPlatformHotkey = (hotkey: string, isMacOs = IS_MAC_OS): string =>
   );
 
 const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): number => {
+  const priority = getScopeMatchPriority(hotkey, context);
+
+  return hotkey.fallback && priority >= 0 ? 0 : priority;
+};
+
+const getScopeMatchPriority = (hotkey: RegisteredHotkey, context: HotkeyContext): number => {
   const { scope } = hotkey;
 
   if (hotkey.source && hotkey.source.projectId !== context.projectId) {
@@ -89,6 +95,7 @@ export const resolveHotkey = ({
       .filter((hotkey) => hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
       .filter((hotkey) => hotkey.allowInEditable || !isOwnedByTarget)
       .filter((hotkey) => isClaimedTarget(hotkey, event.target))
+      .filter((hotkey) => !hotkey.fallback || !event.defaultPrevented)
       .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
       .filter(({ priority }) => priority >= 0)

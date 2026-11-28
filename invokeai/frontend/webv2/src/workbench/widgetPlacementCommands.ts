@@ -1,7 +1,5 @@
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
 import type {
-  OpenWorkbenchWidgetOptions,
   RegisteredWidget,
   WidgetInstanceId,
   WidgetTypeId,
@@ -9,25 +7,32 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
-import { createExternalStore } from '@platform/state/externalStore';
 
 import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetDragEndResolution } from './widgetDnd';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
+import type { LayoutAvailability, ResolvedLayout } from './workspace/resolveLayout';
 
-import { isAwaitedCenterView } from './floatingWindows';
+import { takesLastCenterView } from './workspace/structureReducer';
 
 export interface WidgetPlacementProject {
-  /** Where each floating window returns to; absent means none float, as with `Project.floatingWidgets`. */
+  /** Where each placed window returns to; absent means none float. Guest windows return nowhere and are not here. */
   floatingPlacements?: Record<WidgetInstanceId, FloatingWidgetPlacement>;
+  /** What the layout shows that the workspace does not place (`ResolvedLayout.guests`). */
+  guests?: ResolvedLayout['guests'];
   projectId?: string;
   widgetInstances: WidgetPlacementMeta;
   widgetRegions: Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>>;
 }
 
-const DEFAULT_OPEN_REGIONS: ReadonlyArray<WidgetRegion> = ['center', 'right', 'left', 'bottom'];
+/** Where a structural add puts a widget when the control names no region. */
+export const DEFAULT_ADD_REGIONS: readonly WidgetRegion[] = ['center', 'right', 'left', 'bottom'];
+
+/** A widget that lives only as a status-bar chip: it renders no panel, so a region add refuses it. */
+export const isStatusChipWidget = (widget: RegisteredWidget): boolean =>
+  widget.manifest.allowedRegions.includes('bottom') &&
+  (widget.manifest.bottomPanel === 'tooltip' || widget.manifest.bottomPanel === 'popover');
 
 export type WidgetPlacementCommandResult = WidgetWorkbenchApiResult;
 
@@ -47,85 +52,87 @@ export const canRenderWidgetInRegion = (widget: RegisteredWidget, region: Widget
   return true;
 };
 
-export const getOpenableWidgetPlacement = ({
+/**
+ * Structural: adds the widget to the first of `regions` that renders it, or fronts the instance that region already
+ * holds. Only the shell's add controls call it; navigation opens through the workspace resolver.
+ */
+export const addWidgetPlacement = ({
+  createNew,
   getWidgetsForRegion,
-  options = {},
+  projectId,
+  regions = DEFAULT_ADD_REGIONS,
   typeId,
+  widgets,
 }: {
+  createNew?: boolean;
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  projectId?: string;
+  regions?: readonly WidgetRegion[];
   typeId: WidgetTypeId;
-  options?: OpenWorkbenchWidgetOptions;
-}): { region: WidgetRegion; widget: RegisteredWidget } | null => {
-  const preferredRegions = options.preferredRegions ?? DEFAULT_OPEN_REGIONS;
-  const seenRegions = new Set<WidgetRegion>();
-
-  for (const region of preferredRegions) {
-    if (seenRegions.has(region) || (options.requireCenterView && region !== 'center')) {
-      continue;
-    }
-
-    seenRegions.add(region);
-
+  widgets: WorkbenchWidgetCommands;
+}): WidgetPlacementCommandResult => {
+  for (const region of regions) {
     const widget = getWidgetsForRegion(region).find((candidate) => candidate.manifest.id === typeId);
 
     if (widget && canRenderWidgetInRegion(widget, region)) {
       widget.implementation.preload();
-      return { region, widget };
+      widgets.open({
+        createNew: widget.manifest.allowMultiple ? createNew : undefined,
+        initialValues: widget.manifest.state?.createInitial(),
+        projectId,
+        region,
+        widgetId: typeId,
+      });
+
+      return { ok: true, region };
     }
   }
 
-  return null;
+  return { ok: false, reason: 'unavailable' };
 };
 
-export const openWidgetPlacement = ({
+/**
+ * Structural: puts a widget in this workspace where it opens by default; a status chip goes back to the status bar.
+ * The Widgets list's Add uses it.
+ */
+export const addWidgetToWorkspace = ({
   getWidgetsForRegion,
-  options,
-  projectId,
-  typeId,
+  widget,
   widgets,
 }: {
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  projectId?: string;
-  typeId: WidgetTypeId;
+  widget: RegisteredWidget;
   widgets: WorkbenchWidgetCommands;
-  options?: OpenWorkbenchWidgetOptions;
-}): WidgetPlacementCommandResult => {
-  const target = getOpenableWidgetPlacement({ getWidgetsForRegion, options, typeId });
+}): boolean => {
+  const { allowMultiple, id: typeId, state } = widget.manifest;
 
-  if (!target) {
-    return { ok: false, reason: 'unavailable' };
+  if (addWidgetPlacement({ createNew: allowMultiple, getWidgetsForRegion, typeId, widgets }).ok) {
+    return true;
+  }
+
+  if (widget.status !== 'enabled' || !isStatusChipWidget(widget)) {
+    return false;
   }
 
   widgets.open({
-    createNew: target.widget.manifest.allowMultiple ? options?.createNew : undefined,
-    initialValues: target.widget.manifest.state?.createInitial(),
-    projectId,
-    region: target.region,
+    createNew: allowMultiple ? true : undefined,
+    initialValues: state.createInitial(),
+    region: 'bottom',
     widgetId: typeId,
   });
 
-  return { ok: true, region: target.region };
+  return true;
 };
 
-export const getEnabledCenterViewCount = (
-  project: WidgetPlacementProject,
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined
-): number =>
-  project.widgetRegions.center.instanceIds.filter((instanceId) => {
-    const instance = project.widgetInstances[instanceId];
-    const widget = instance ? getWidgetById(instance.typeId) : undefined;
-
-    return widget?.status === 'enabled' && widget.manifest.centerPlacement !== 'toolbar';
-  }).length;
-
 export const closeWidgetPlacement = ({
-  getWidgetById,
+  availability,
   instanceId,
   project,
   region,
   widgets,
 }: {
-  getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined;
+  /** What the center's last view is read by (`takesLastCenterView`). */
+  availability: Pick<LayoutAvailability, 'getPresentation'>;
   project: WidgetPlacementProject;
   region: WidgetRegion;
   instanceId: WidgetInstanceId;
@@ -139,14 +146,8 @@ export const closeWidgetPlacement = ({
     return { ok: false, reason: 'unsupported' };
   }
 
-  if (region === 'center') {
-    const instance = project.widgetInstances[instanceId];
-    const widget = getWidgetById(instance.typeId);
-    const isCenterView = widget?.manifest.centerPlacement !== 'toolbar';
-
-    if (isCenterView && getEnabledCenterViewCount(project, getWidgetById) === 1) {
-      return { ok: false, reason: 'unsupported' };
-    }
+  if (region === 'center' && takesLastCenterView(project, instanceId, availability)) {
+    return { ok: false, reason: 'unsupported' };
   }
 
   flushWorkbenchDrafts();
@@ -177,62 +178,6 @@ export const revealWidgetPlacement = ({
   widgets.select({ projectId: project.projectId, region, widgetId: instanceId });
 
   return { ok: true, region };
-};
-
-const PANEL_OPEN_KEYS = { bottom: 'isBottomOpen', left: 'isLeftOpen', right: 'isRightOpen' } as const;
-
-/** Rails before the center, so a widget docked beside the work surface is revealed there without replacing it. */
-const PLACED_REVEAL_ORDER: readonly WidgetRegion[] = ['right', 'left', 'bottom', 'center'];
-
-export type PlacedWidgetReveal =
-  | { kind: 'floating'; instanceId: WidgetInstanceId }
-  | { kind: 'docked'; region: WidgetRegion };
-
-/**
- * Bring a widget type to the front where the layout already has it, never moving it: raise (and unshade) its floating
- * window; leave it alone where it already shows; otherwise select its tab, expanding the region and opening its panel,
- * in a region that already fronts it, else a rail before the center. Null when the layout has none, for the caller's
- * own open.
- */
-export const revealPlacedWidget = ({
-  project,
-  typeId,
-  widgets,
-}: {
-  project: Pick<Project, 'floatingWidgets' | 'id' | 'layout' | 'widgetInstances' | 'widgetRegions'>;
-  typeId: WidgetTypeId;
-  widgets: Pick<WorkbenchWidgetCommands, 'open' | 'revealFloating'>;
-}): PlacedWidgetReveal | null => {
-  const isTarget = (instanceId: string | null | undefined) =>
-    instanceId !== null && instanceId !== undefined && project.widgetInstances[instanceId]?.typeId === typeId;
-  const floating = Object.keys(project.floatingWidgets ?? {}).find(isTarget);
-
-  if (floating) {
-    widgets.revealFloating(floating);
-    return { instanceId: floating, kind: 'floating' };
-  }
-
-  const placed = PLACED_REVEAL_ORDER.filter((region) => project.widgetRegions[region].instanceIds.some(isTarget));
-  const fronting = placed.filter((region) => isTarget(project.widgetRegions[region].activeInstanceId));
-  const shown = fronting.find(
-    (region) =>
-      !project.widgetRegions[region].isCollapsed &&
-      (region === 'center' || project.layout.panels[PANEL_OPEN_KEYS[region]])
-  );
-
-  if (shown) {
-    return { kind: 'docked', region: shown };
-  }
-
-  const region = fronting[0] ?? placed[0];
-
-  if (!region) {
-    return null;
-  }
-
-  // Opening a type its region already holds activates that instance, expands the region and opens its panel.
-  widgets.open({ projectId: project.id, region, widgetId: typeId });
-  return { kind: 'docked', region };
 };
 
 /** Cycle docked panel views in their displayed order, leaving windows and toolbar/popover controls alone. */
@@ -322,8 +267,7 @@ export const dockFloatingPlacement = ({
 
 /**
  * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route on
- * the way. Reports where the window would have returned and whether the reducer hands an emptied center its view back,
- * so focus can go somewhere instead of dying with the window.
+ * the way. Reports where the window would have returned, so focus can go somewhere instead of dying with the window.
  */
 export const removeFloatingPlacement = ({
   instanceId,
@@ -333,19 +277,17 @@ export const removeFloatingPlacement = ({
   project: WidgetPlacementProject;
   instanceId: WidgetInstanceId;
   widgets: WorkbenchWidgetCommands;
-}): { restoresCenter: boolean; returnRegion: WidgetRegion } | null => {
+}): { returnRegion: WidgetRegion } | null => {
   const placement = project.floatingPlacements?.[instanceId];
 
   if (!placement) {
     return null;
   }
 
-  const restoresCenter = isAwaitedCenterView(project.widgetRegions.center, instanceId);
-
   flushWorkbenchDrafts();
   widgets.closeFloating(instanceId);
 
-  return { restoresCenter, returnRegion: placement.returnRegion };
+  return { returnRegion: placement.returnRegion };
 };
 
 export const dispatchWidgetDragEndPlacement = ({
@@ -385,78 +327,4 @@ export const dispatchWidgetDragEndPlacement = ({
   }
 
   return { ok: true, region: resolution.toRegion };
-};
-
-const PREVIEW_TYPE_ID = 'preview';
-
-/** The center view each project showed before the preview was swapped in; session-lived. */
-const returnStore = createExternalStore<{ byProject: Record<string, WidgetInstanceId> }>({ byProject: {} });
-
-registerAccountOwnedResource({
-  clear: () => returnStore.setSnapshot({ byProject: {} }),
-  name: 'center-preview-toggle',
-});
-
-export interface CenterPreviewToggleState {
-  isPreviewActive: boolean;
-  returnInstanceId: WidgetInstanceId | null;
-}
-
-export const getCenterPreviewToggleState = (project: WidgetPlacementProject): CenterPreviewToggleState => {
-  const center = project.widgetRegions.center;
-  const previewInstanceId =
-    center.instanceIds.find((id) => project.widgetInstances[id]?.typeId === PREVIEW_TYPE_ID) ?? null;
-  const isPreviewActive = previewInstanceId !== null && center.activeInstanceId === previewInstanceId;
-  const remembered = project.projectId ? returnStore.getSnapshot().byProject[project.projectId] : undefined;
-  const returnInstanceId =
-    remembered && remembered !== previewInstanceId && center.instanceIds.includes(remembered)
-      ? remembered
-      : (center.instanceIds.find((id) => id !== previewInstanceId) ?? null);
-
-  return { isPreviewActive, returnInstanceId };
-};
-
-const rememberReturnView = (project: WidgetPlacementProject): void => {
-  if (!project.projectId) {
-    return;
-  }
-
-  const { byProject } = returnStore.getSnapshot();
-
-  returnStore.setSnapshot({
-    byProject: { ...byProject, [project.projectId]: project.widgetRegions.center.activeInstanceId },
-  });
-};
-
-/**
- * Swaps the preview into the center and back to the view it replaced. Opening it in the center hands any rail fronting
- * the same instance to its neighbour (see `openRegionWidget`).
- */
-export const toggleCenterPreview = ({
-  getWidgetsForRegion,
-  project,
-  widgets,
-}: {
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
-  project: WidgetPlacementProject;
-  widgets: WorkbenchWidgetCommands;
-}): boolean => {
-  const { isPreviewActive, returnInstanceId } = getCenterPreviewToggleState(project);
-
-  if (isPreviewActive) {
-    return (
-      returnInstanceId !== null &&
-      revealWidgetPlacement({ instanceId: returnInstanceId, project, region: 'center', widgets }).ok
-    );
-  }
-
-  rememberReturnView(project);
-
-  return openWidgetPlacement({
-    getWidgetsForRegion,
-    options: { preferredRegions: ['center'], requireCenterView: true },
-    projectId: project.projectId,
-    typeId: PREVIEW_TYPE_ID,
-    widgets,
-  }).ok;
 };

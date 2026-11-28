@@ -5,7 +5,6 @@ import { MapIcon } from 'lucide-react';
 import { imageMapSettingsContribution } from './settingsContribution';
 
 export const imageMapWidgetManifest: WidgetManifest = {
-  allowFloating: true,
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center'],
   chrome: { body: 'fill' },

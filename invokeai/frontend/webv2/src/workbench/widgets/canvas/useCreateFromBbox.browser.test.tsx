@@ -32,7 +32,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   }),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => mocks.notify }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/workspace/useWorkspaceOpen', () => ({ useWorkspaceOpen: () => vi.fn() }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 type Handle = ReturnType<typeof useCreateFromBbox>;

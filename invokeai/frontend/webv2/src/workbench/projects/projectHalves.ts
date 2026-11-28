@@ -1,6 +1,10 @@
 import type { ProjectDocumentMigration, ProjectDocumentV3 } from './projectDocument';
 
-import { PROJECT_DOCUMENT_SCHEMA_VERSION, PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+import {
+  PROJECT_DOCUMENT_SCHEMA_VERSION,
+  PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+  PROJECT_WORKSPACE_SCHEMA_VERSION,
+} from './documentSchemaVersion';
 
 /*
  * The project document as the server stores it from schema 4: the project **content** (what the project is, shared
@@ -24,7 +28,10 @@ export interface ProjectContentV4 {
 
 export interface ProjectWorkspaceV4 extends Pick<
   ProjectDocumentV3,
+  | 'droppedArrangements'
   | 'floatingWidgets'
+  | 'heldView'
+  | 'importedLayout'
   | 'invocation'
   | 'lastFloatingGeometry'
   | 'layout'
@@ -32,11 +39,14 @@ export interface ProjectWorkspaceV4 extends Pick<
   | 'promptHistory'
   | 'settings'
   | 'settingsLayering'
+  | 'views'
   | 'widgetGraphs'
   | 'widgetInstances'
   | 'widgetRegions'
+  | 'workspaceId'
 > {
-  documentSchemaVersion: typeof PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION;
+  /** 5 with `workspaceId` and `views`; 4 with the layout stored before structure and view split. */
+  documentSchemaVersion: typeof PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION | typeof PROJECT_WORKSPACE_SCHEMA_VERSION;
   canvas: { selectedLayerId: string | null; stagingArea: CanvasState['stagingArea'] };
   workflows: { activeWorkflowId: string; lastRuns: Record<string, ProjectWorkflowRunPreview> };
 }
@@ -48,8 +58,14 @@ export interface ProjectWorkspaceV4 extends Pick<
 export const PROJECT_DOCUMENT_HALVES = {
   canvas: 'both',
   documentSchemaVersion: 'both',
+  // What this member is still to be told about the project's migration: per member.
+  droppedArrangements: 'workspace',
   floatingWidgets: 'workspace',
+  // How a held project looks, beside its stored layout: per member.
+  heldView: 'workspace',
   id: 'content',
+  // Where this member's copy came from: per member, like the stored layout it is about.
+  importedLayout: 'workspace',
   invocation: 'workspace',
   lastFloatingGeometry: 'workspace',
   layout: 'workspace',
@@ -59,10 +75,13 @@ export const PROJECT_DOCUMENT_HALVES = {
   settings: 'workspace',
   // Says how the workspace's settings and widget values read, so it travels with them.
   settingsLayering: 'workspace',
+  // How this member looks at the project: per member, like the rest of the workspace.
+  views: 'workspace',
   widgetGraphs: 'workspace',
   widgetInstances: 'workspace',
   widgetRegions: 'workspace',
   workflows: 'both',
+  workspaceId: 'workspace',
 } as const satisfies Record<keyof ProjectDocumentV3, 'both' | 'content' | 'workspace'>;
 
 export interface ProjectHalves {
@@ -92,18 +111,25 @@ export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves
   };
   const workspace: ProjectWorkspaceV4 = {
     canvas: { selectedLayerId: document.canvas.document.selectedLayerId, stagingArea },
-    documentSchemaVersion: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+    // A document that still holds its stored layout keeps that layout's schema until the editor migrates it.
+    documentSchemaVersion:
+      document.workspaceId === undefined ? PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION : PROJECT_WORKSPACE_SCHEMA_VERSION,
+    ...(document.droppedArrangements ? { droppedArrangements: document.droppedArrangements } : {}),
     ...(document.floatingWidgets ? { floatingWidgets: document.floatingWidgets } : {}),
+    ...(document.heldView ? { heldView: document.heldView } : {}),
+    ...(document.importedLayout ? { importedLayout: document.importedLayout } : {}),
     invocation: document.invocation,
     ...(document.lastFloatingGeometry ? { lastFloatingGeometry: document.lastFloatingGeometry } : {}),
-    layout: document.layout,
+    ...(document.layout ? { layout: document.layout } : {}),
     ...(document.presetWorkingLayouts ? { presetWorkingLayouts: document.presetWorkingLayouts } : {}),
     promptHistory: document.promptHistory,
     settings: document.settings,
     ...(document.settingsLayering ? { settingsLayering: document.settingsLayering } : {}),
+    ...(document.views ? { views: document.views } : {}),
     widgetGraphs: document.widgetGraphs,
     widgetInstances: document.widgetInstances,
-    widgetRegions: document.widgetRegions,
+    ...(document.widgetRegions ? { widgetRegions: document.widgetRegions } : {}),
+    ...(document.workspaceId === undefined ? {} : { workspaceId: document.workspaceId }),
     // Keyed by workflow id as own properties, whatever the id (`__proto__` through an object literal would not be).
     workflows: { activeWorkflowId: document.workflows.activeWorkflowId, lastRuns: Object.fromEntries(lastRuns) },
   };
@@ -159,7 +185,11 @@ export const joinProjectDocument = (
   workspace: Record<string, unknown> | null,
   defaults: () => Omit<ProjectWorkspaceV4, 'documentSchemaVersion'>
 ): ProjectDocumentMigration => {
-  if (workspace !== null && workspace.documentSchemaVersion !== PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION) {
+  if (
+    workspace !== null &&
+    workspace.documentSchemaVersion !== PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION &&
+    workspace.documentSchemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION
+  ) {
     return { reason: 'The workspace has an unsupported document schema.', status: 'malformed' };
   }
   const canvas = isRecord(content.canvas) ? content.canvas : null;

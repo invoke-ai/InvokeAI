@@ -69,9 +69,9 @@ vi.mock('@workbench/useNotify', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNotify: () => mocks.notify,
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => ({
+vi.mock('@workbench/workspace/useWorkspaceOpen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useOpenWorkbenchWidget: () => mocks.openWidget,
+  useWorkspaceOpen: () => mocks.openWidget,
 }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
   const useStoreSelector = <Selected,>(
@@ -328,7 +328,7 @@ describe('Queue entry recall', () => {
     await act(() => page.getByRole('menuitem', { exact: true, name: 'Recall all' }).click());
 
     await vi.waitFor(() => expect(generateValues()).toMatchObject({ positivePrompt: 'A recalled castle', steps: 33 }));
-    expect(mocks.openWidget).toHaveBeenCalledWith('generate', { preferredRegions: ['left'] });
+    expect(mocks.openWidget).toHaveBeenCalledWith({ surface: 'panel', typeId: 'generate' });
     expect(mocks.notify.success).toHaveBeenCalledWith(
       'Recalled image metadata',
       'Loaded these settings into Generate.'
