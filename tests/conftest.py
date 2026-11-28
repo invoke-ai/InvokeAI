@@ -66,6 +66,9 @@ from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
 
+# Splits CI runs by test file (`--shard`); inert without that option.
+pytest_plugins = ["tests.sharding"]
+
 # The app installs this from apply_monkeypatches(); the suite runs real transformers forwards on the CPU, so on a
 # CUDA torch build without a device (NVIDIA's Windows ARM64 build on a GPU-less runner) it needs the same shim.
 # Only there: every other CUDA build raises rather than crashes, and a process-wide patch would hide what the

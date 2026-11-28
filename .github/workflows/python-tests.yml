@@ -2,6 +2,9 @@
 #
 # Checks for changes to python files before running the tests.
 # If always_run is true, always runs the tests.
+#
+# Windows ARM64 runs in shards, in jobs of its own, whenever the Python tests run. The
+# `py3.12: windows-arm64` job is its single status, meant to be marked required by a maintainer.
 
 name: 'python tests'
 
@@ -55,7 +58,6 @@ jobs:
           - macos-default
           - windows-cpu
           - windows-ffmpeg
-          - windows-arm64
         include:
           - platform: linux-cpu
             os: blacksmith-4vcpu-ubuntu-2404
@@ -93,23 +95,6 @@ jobs:
             # Roughly 1.5x the pytest step's two-worker wall time (~6 min), plus the job's ~1 min
             # of checkout and install, plus margin.
             timeout-minutes: 15
-          # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
-          # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
-          # onnxruntime 1.31, sentencepiece 0.2.2 and the self-built opencv/blake3/tiktoken wheels. uv
-          # installs an x86_64 CPython on ARM64 Windows unless the request names the architecture.
-          - platform: windows-arm64
-            os: windows-11-arm
-            uv-python: cpython-3.12-windows-aarch64-none
-            github-env: $env:GITHUB_ENV
-            # Two workers for the same reason as windows-ffmpeg. The job also downloads the NVIDIA torch
-            # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
-            pytest-workers: '2'
-            # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
-            # inside the job timeout.
-            pytest-args: '--timeout=600'
-            # The latest main-synced run reached 98% before hitting the 60-minute job limit.
-            # Keep the per-test timeout and allow the suite 15 more minutes to report its result.
-            timeout-minutes: 75
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.
@@ -150,7 +135,8 @@ jobs:
         # - https://github.com/tj-actions/changed-files/issues/2463
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
-          files_yaml: |
+          # `windows-arm64-changes` reuses this list through the anchor.
+          files_yaml: &python-test-inputs |
             python:
               - 'pyproject.toml'
               # The lockfile pins pytest-xdist, which this workflow's pytest command depends on.
@@ -194,19 +180,8 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
-          # The ARM64 lane's torch wheel unpacks to several GB of binaries; cached per lock hash it would crowd the
-          # other lanes out of the repository's cache, and re-downloading it costs a couple of minutes.
-          enable-cache: ${{ matrix.platform != 'windows-arm64' }}
-          python-version: ${{ matrix.uv-python || matrix.python-version }}
-
-      - name: prepare the ARM64 runner
-        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
-        # The imageio-ffmpeg sdist bundles no ffmpeg binary; the video tests find one on PATH. Chocolatey's
-        # package is an x64 build, which Windows on ARM runs under emulation.
-        run: |
-          uv run --no-project python -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
-          choco install ffmpeg --version 9.0.2 -y --no-progress
-          ffmpeg -version | Select-Object -First 1
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
@@ -230,18 +205,152 @@ jobs:
           uv run --no-sync python -c "import cv2, mediapipe; print(cv2.__version__, mediapipe.__version__)"
           if ($LASTEXITCODE -ne 0) { throw 'cv2 or mediapipe still fails to import after preparing the runner' }
 
-      - name: import the self-built and platform-specific wheels
-        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
-        # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
-        run: uv run --no-sync python -c "import blake3, cv2, onnxruntime, tiktoken, torch, torchvision; print(torch.__version__, torchvision.__version__, cv2.__version__, 'cuda available:', torch.cuda.is_available())"
-
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         # `logical`, not `auto`: xdist's `auto` asks psutil for *physical* cores, which is half
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
-        # matrix carries the count, because windows-ffmpeg and windows-arm64 need a lower one.
-        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}" ${{ matrix.pytest-args }}
+        # matrix carries the count, because windows-ffmpeg needs a lower one.
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}"
+
+  # Decides whether the ARM64 jobs run: always with `always_run`; otherwise for every change the matrix's Python
+  # filter matches, on every event. ARM64 has failures of its own that no other platform shows, so no change that
+  # the Python suite can see is ruled out by what it mentions.
+  windows-arm64-changes:
+    name: 'windows-arm64: change detection'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ inputs.always_run == true || steps.changed-files.outputs.python_any_changed == 'true' }}
+    steps:
+      - name: checkout
+        if: ${{ inputs.always_run != true }}
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: check for changed python files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        # Pinned to the _hash_ for v45.0.9, see the matrix job above.
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
+        with:
+          files_yaml: *python-test-inputs
+
+  # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
+  # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
+  # onnxruntime 1.31, sentencepiece 0.2.2 and the self-built opencv/blake3/tiktoken wheels. uv
+  # installs an x86_64 CPython on ARM64 Windows unless the request names the architecture.
+  # The suite is split by test file across the shards (tests/sharding.py), balanced by the recorded
+  # durations in tests/shard_durations.json.
+  windows-arm64:
+    needs: windows-arm64-changes
+    if: ${{ needs.windows-arm64-changes.outputs.run == 'true' }}
+    strategy:
+      # Let the other shards finish when one fails, so a rerun repeats only the failed shard.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: 'py3.12: windows-arm64 ${{ matrix.shard }}/${{ strategy.job-total }}'
+    runs-on: windows-11-arm
+    # Setup (runner preparation, ffmpeg, dependency install) takes ~4 min. Shards are balanced by the recorded
+    # per-file durations, and a file runs on one worker, so the longest file sets a floor for its shard. The
+    # per-test timeout turns a hang into a failure inside this limit.
+    timeout-minutes: 45
+    env:
+      PIP_USE_PEP517: '1'
+      # One compute thread per worker, as in the matrix job.
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: restore LFS cache
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        run: git lfs pull
+        shell: bash
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
+          # The torch wheel unpacks to several GB of binaries; cached per lock hash it would crowd the
+          # other lanes out of the repository's cache, and re-downloading it costs a couple of minutes.
+          enable-cache: false
+          python-version: cpython-3.12-windows-aarch64-none
+
+      - name: prepare the ARM64 runner
+        # The imageio-ffmpeg sdist bundles no ffmpeg binary; the video tests find one on PATH. Chocolatey's
+        # package is an x64 build, which Windows on ARM runs under emulation.
+        run: |
+          uv run --no-project python -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
+          if ($LASTEXITCODE -ne 0) { throw 'the runner or its Python is not ARM64' }
+          choco install ffmpeg --version 9.0.2 -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'installing ffmpeg failed' }
+          ffmpeg -version | Select-Object -First 1
+
+      - name: install dependencies
+        run: uv sync --no-progress --locked --extra test
+
+      - name: import the self-built and platform-specific wheels
+        # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
+        run: uv run --no-sync python -c "import blake3, cv2, onnxruntime, tiktoken, torch, torchvision; print(torch.__version__, torchvision.__version__, cv2.__version__, 'cuda available:', torch.cuda.is_available())"
+
+      - name: run pytest
+        # Two workers: the ffmpeg tests spawn decoders and encoders with threads of their own, which
+        # `OMP_NUM_THREADS` does not cap. A per-test timeout turns a hang into a failure with a traceback,
+        # so pytest still reaches its summary inside the job timeout.
+        run: >-
+          uv run --no-sync pytest -n 2 --max-worker-restart=0 -m "not slow" --timeout=600
+          --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+          --shard-durations=tests/shard_durations.json
+          --shard-record=${{ runner.temp }}/shard-durations-${{ matrix.shard }}.json
+
+      # The recordings refresh tests/shard_durations.json (see the Windows ARM64 section of the testing guide).
+      - name: upload the measured durations
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: shard-durations-${{ matrix.shard }}
+          path: ${{ runner.temp }}/shard-durations-${{ matrix.shard }}.json
+          if-no-files-found: ignore
+          # One writer per name: a re-run of failed jobs uploads again.
+          overwrite: true
+
+  # The status for Windows ARM64, meant to be marked required by a maintainer; once it is, the merge queue blocks on
+  # ARM64 for every change that runs the Python tests. A skipped job passes a required check, so this one always
+  # runs and passes only when change detection succeeded and every shard succeeded, or was skipped because no
+  # Python test runs.
+  windows-arm64-tests:
+    name: 'py3.12: windows-arm64'
+    if: ${{ always() }}
+    needs: [windows-arm64-changes, windows-arm64]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: require every ARM64 shard
+        env:
+          CHANGES: ${{ needs.windows-arm64-changes.result }}
+          RUN: ${{ needs.windows-arm64-changes.outputs.run }}
+          RESULT: ${{ needs.windows-arm64.result }}
+        run: |
+          expected=skipped
+          if [ "$RUN" = true ]; then expected=success; fi
+          echo "change detection: $CHANGES, shards needed: ${RUN:-unknown}; shards: $RESULT"
+          [ "$CHANGES" = success ] || exit 1
+          [ "$RESULT" = "$expected" ] || exit 1
+        shell: bash
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
