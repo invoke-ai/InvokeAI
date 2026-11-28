@@ -25,6 +25,7 @@ from typing_extensions import Annotated
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._limits import MAX_MODEL_IDENTIFICATION_BATCH_SIZE
 from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
@@ -36,6 +37,7 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelInstallJob,
 )
 from invokeai.app.services.model_load.model_load_common import distinct_caches
+from invokeai.app.services.model_manager.model_manager_common import ModelIdentificationPreview
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -481,6 +483,41 @@ def reidentify_model(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@model_manager_router.get(
+    "/i/{key}/identification",
+    operation_id="get_model_identification",
+    responses={
+        200: {"description": "What reidentifying the model would do"},
+        400: {"description": "The model's files are missing or unreadable"},
+        404: {"description": "The model could not be found"},
+    },
+)
+def get_model_identification(
+    key: Annotated[str, Path(description="Key of the model to identify.")],
+    current_admin: AdminUserOrDefault,
+) -> ModelIdentificationPreview:
+    """Preview what reidentifying a model would do, without changing anything.
+
+    Probing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a
+    meta-device torch.load for .ckpt/.pt/.bin. That skips the tensor data of a zip checkpoint, while a legacy
+    non-zip pickle is streamed through torch.load and scanned whole. It takes no claim on the key, because nothing
+    is written.
+    """
+    try:
+        preview = ApiDependencies.invoker.services.model_manager.identify_model(key)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _prepare_identification_for_response(preview)
+
+
+def _prepare_identification_for_response(preview: ModelIdentificationPreview) -> ModelIdentificationPreview:
+    if preview.proposed is None:
+        return preview
+    return preview.model_copy(update={"proposed": prepare_model_config_for_response(preview.proposed, ApiDependencies)})
+
+
 class FoundModel(BaseModel):
     path: str = Field(description="Path to the model")
     is_installed: bool = Field(description="Whether or not the model is already installed")
@@ -801,6 +838,29 @@ class BulkReidentifyModelsRequest(BaseModel):
     keys: List[str] = Field(description="List of model keys to reidentify")
 
 
+class BulkIdentifyModelsRequest(BaseModel):
+    """Request body for previewing the reidentification of several models."""
+
+    keys: List[str] = Field(
+        description="Keys of the models to identify",
+        max_length=MAX_MODEL_IDENTIFICATION_BATCH_SIZE,
+    )
+
+
+class ModelIdentificationResult(BaseModel):
+    """The preview for one key, or why it could not be produced."""
+
+    key: str = Field(description="The model key")
+    preview: Optional[ModelIdentificationPreview] = Field(default=None, description="Set when identification ran")
+    error: Optional[str] = Field(default=None, description="Set when it could not run, e.g. the key is unknown")
+
+
+class BulkIdentifyModelsResponse(BaseModel):
+    """Response body for the bulk identification preview."""
+
+    results: List[ModelIdentificationResult] = Field(description="One entry per distinct key, in request order")
+
+
 class BulkReidentifyModelsResponse(BaseModel):
     """Response body for bulk model reidentification."""
 
@@ -898,6 +958,40 @@ def bulk_reidentify_models(
 
     logger.info(f"Bulk reidentify completed: {len(succeeded)} succeeded, {len(failed)} failed")
     return BulkReidentifyModelsResponse(succeeded=succeeded, failed=failed)
+
+
+@model_manager_router.post(
+    "/i/bulk_identification",
+    operation_id="bulk_get_model_identification",
+    responses={
+        200: {"description": "Previews produced (possibly with some per-key errors)"},
+        422: {"description": "More keys than one request may carry"},
+    },
+    status_code=200,
+)
+def bulk_get_model_identification(
+    current_admin: AdminUserOrDefault,
+    request: BulkIdentifyModelsRequest = Body(description="Keys of the models to identify"),
+) -> BulkIdentifyModelsResponse:
+    """Preview what reidentifying several models would do, without changing anything.
+
+    A key that cannot be identified is reported in its own entry; it does not fail the request. Repeated keys are
+    identified once.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    model_manager = ApiDependencies.invoker.services.model_manager
+
+    results: List[ModelIdentificationResult] = []
+    for key in dict.fromkeys(request.keys):
+        try:
+            preview = _prepare_identification_for_response(model_manager.identify_model(key))
+            results.append(ModelIdentificationResult(key=key, preview=preview))
+        except (UnknownModelException, InvalidModelException) as e:
+            results.append(ModelIdentificationResult(key=key, error=str(e)))
+        except Exception as e:
+            logger.error(f"Failed to identify model {key}: {e}")
+            results.append(ModelIdentificationResult(key=key, error=str(e)))
+    return BulkIdentifyModelsResponse(results=results)
 
 
 @model_manager_router.delete(

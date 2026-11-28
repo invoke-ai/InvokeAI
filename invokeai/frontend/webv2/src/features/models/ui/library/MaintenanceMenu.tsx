@@ -1,14 +1,16 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { emptyModelCache } from '@features/models/data/api';
-import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
+import { getModelsSnapshot, refreshModels, useModelsSelector } from '@features/models/data/modelsStore';
+import { IdentifyUnknownModelsDialog } from '@features/models/ui/library/IdentifyUnknownModelsDialog';
 import { OrphanedModelsDialog } from '@features/models/ui/library/OrphanedModelsDialog';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog, IconButton, MenuContent } from '@platform/ui';
-import { BrushCleaningIcon, FolderSearchIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
+import { BrushCleaningIcon, FolderSearchIcon, SearchCheckIcon, MoreHorizontalIcon, RefreshCcwIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +19,10 @@ export const MaintenanceMenu = () => {
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const syncDialog = useExitPresence(isSyncDialogOpen);
+  const { canManageModels } = useModelsUi();
+  const hasUnknownModels = useModelsSelector((snapshot) => snapshot.models.some((model) => model.type === 'unknown'));
+  const [isIdentifyOpen, setIsIdentifyOpen] = useState(false);
+  const identifyDialog = useExitPresence(isIdentifyOpen);
   const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
   // Separate instances: run ignores re-entry, and a slow cache emptying must not swallow a refresh (or vice versa).
   const { run: runEmptyCache } = useScopedAction();
@@ -74,6 +80,12 @@ export const MaintenanceMenu = () => {
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('models.cleanupOrphaned')}</Menu.ItemText>
               </Menu.Item>
+              {canManageModels && hasUnknownModels ? (
+                <Menu.Item value="identify-unknown" onClick={() => setIsIdentifyOpen(true)}>
+                  <Icon as={SearchCheckIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('models.checkUnknownModels')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
               <Menu.Item value="empty-cache" onClick={() => setIsEmptyCacheConfirmOpen(true)}>
                 <Icon as={BrushCleaningIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('models.emptyCache')}</Menu.ItemText>
@@ -88,6 +100,14 @@ export const MaintenanceMenu = () => {
           isOpen={syncDialog.isOpen}
           onClose={() => setIsSyncDialogOpen(false)}
           onExitComplete={syncDialog.release}
+        />
+      ) : null}
+      {identifyDialog.isMounted ? (
+        <IdentifyUnknownModelsDialog
+          key={identifyDialog.generation}
+          isOpen={identifyDialog.isOpen}
+          onClose={() => setIsIdentifyOpen(false)}
+          onExitComplete={identifyDialog.release}
         />
       ) : null}
       <ConfirmDialog

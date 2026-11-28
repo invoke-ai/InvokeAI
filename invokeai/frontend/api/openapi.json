@@ -4529,6 +4529,60 @@
         }
       }
     },
+    "/api/v2/models/i/{key}/identification": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Model Identification",
+        "description": "Preview what reidentifying a model would do, without changing anything.\n\nProbing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a\nmeta-device torch.load for .ckpt/.pt/.bin. That skips the tensor data of a zip checkpoint, while a legacy\nnon-zip pickle is streamed through torch.load and scanned whole. It takes no claim on the key, because nothing\nis written.",
+        "operationId": "get_model_identification",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model to identify.",
+              "title": "Key"
+            },
+            "description": "Key of the model to identify."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What reidentifying the model would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelIdentificationPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The model's files are missing or unreadable"
+          },
+          "404": {
+            "description": "The model could not be found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/models/scan_folder": {
       "get": {
         "tags": ["model_manager"],
@@ -4869,6 +4923,45 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/models/i/bulk_identification": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Bulk Get Model Identification",
+        "description": "Preview what reidentifying several models would do, without changing anything.\n\nA key that cannot be identified is reported in its own entry; it does not fail the request. Repeated keys are\nidentified once.",
+        "operationId": "bulk_get_model_identification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkIdentifyModelsRequest",
+                "description": "Keys of the models to identify"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Previews produced (possibly with some per-key errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkIdentifyModelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "More keys than one request may carry"
           }
         },
         "security": [
@@ -24993,6 +25086,39 @@
         "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadStartedEvent",
         "type": "object"
+      },
+      "BulkIdentifyModelsRequest": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Keys",
+            "description": "Keys of the models to identify"
+          }
+        },
+        "type": "object",
+        "required": ["keys"],
+        "title": "BulkIdentifyModelsRequest",
+        "description": "Request body for previewing the reidentification of several models."
+      },
+      "BulkIdentifyModelsResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ModelIdentificationResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "One entry per distinct key, in request order"
+          }
+        },
+        "type": "object",
+        "required": ["results"],
+        "title": "BulkIdentifyModelsResponse",
+        "description": "Response body for the bulk identification preview."
       },
       "BulkReidentifyModelsRequest": {
         "properties": {
@@ -98253,6 +98379,638 @@
         ],
         "title": "ModelFormat",
         "description": "Storage format of model."
+      },
+      "ModelIdentificationPreview": {
+        "properties": {
+          "proposed": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_SDXLRefiner_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_ErnieImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_ErnieImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_SDNQ_Diffusers_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PiDDecoder_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Diffusers_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_MossImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_ErnieImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_OMI_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_OMI_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_SD3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_MossImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Ideogram4_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlLoRA_LyCORIS_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_SDNQ_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Qwen3VLEncoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLVisionTower_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen35Encoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_SDNQ_Folder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MistralEncoder_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MistralEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MistralEncoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma2Encoder_Gemma2Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QwenVLEncoder_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QwenVLEncoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QwenVLEncoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WanT5Encoder_WanT5Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WanT5Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_File_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_File_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_File_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_Folder_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_Folder_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TI_Folder_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_InvokeAI_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T2IAdapter_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Spandrel_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Diffusers_G_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_G_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPEmbed_Checkpoint_L_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SigLIP_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExternalApiModelConfig"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Unknown_Config"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed",
+            "description": "The record re-identification would write, with the user's fields kept. None when the files were not identified as any model."
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed",
+            "description": "Whether the proposed record differs from the stored one in type, format, base or variant."
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal",
+            "description": "Why a model class that recognised the files rejected them as unusable, if one did."
+          }
+        },
+        "type": "object",
+        "required": ["changed"],
+        "title": "ModelIdentificationPreview",
+        "description": "What re-identifying a model record would do, without doing it."
+      },
+      "ModelIdentificationResult": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The model key"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentificationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when identification ran"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Set when it could not run, e.g. the key is unknown"
+          }
+        },
+        "type": "object",
+        "required": ["key"],
+        "title": "ModelIdentificationResult",
+        "description": "The preview for one key, or why it could not be produced."
       },
       "ModelIdentifierField": {
         "properties": {

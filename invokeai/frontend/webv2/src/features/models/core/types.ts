@@ -366,3 +366,18 @@ export interface DeleteOrphanedModelsResponse {
   deleted: string[];
   errors: Record<string, string>;
 }
+
+/** What re-identifying a model would do, previewed without writing anything. */
+export interface ModelIdentification {
+  /** Whether the proposal differs from the stored record in type, format, base or variant. */
+  changed: boolean;
+  /** The record re-identification would write; null when the files were not identified as any model. */
+  proposed: ModelConfig | null;
+  /** Why a model class that recognised the files rejected them as unusable; null when none did. */
+  refusal: string | null;
+}
+
+/** One key of a bulk identification: the preview, or why none could be produced. */
+export type ModelIdentificationOutcome =
+  | { identification: ModelIdentification; key: string; status: 'identified' }
+  | { error: string; key: string; status: 'failed' };

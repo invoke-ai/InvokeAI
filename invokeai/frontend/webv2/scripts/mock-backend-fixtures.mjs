@@ -610,6 +610,57 @@ const controlSeed = (name, base, preprocessor, fields = {}) => ({
 
 /** Sets for `POST /__models`; `probe` is what reidentify fills in for a record installed before it recorded them. */
 export const MODEL_SEED_SETS = Object.freeze({
+  // What the identification preview offers: Unknown records the probe now recognises (one of them a .gguf file that
+  // is checked on opening, the other refused as unusable), an SDXL checkpoint filed as SD-1, a .ckpt filed as SD-1
+  // that is only checked on request and a correctly filed model.
+  identification: [
+    {
+      probe: { base: 'sdxl', format: 'checkpoint', type: 'main' },
+      record: seedModel({
+        base: 'unknown',
+        format: 'unknown',
+        key: 'seed-ident-unknown-sdxl',
+        name: 'Mystery Checkpoint',
+        type: 'unknown',
+      }),
+    },
+    {
+      probe: { base: 'flux', format: 'gguf', type: 'main' },
+      record: seedModel({
+        base: 'unknown',
+        format: 'unknown',
+        key: 'seed-ident-unknown-flux',
+        name: 'Mystery GGUF',
+        path: 'seeds/seed-ident-unknown-flux.gguf',
+        type: 'unknown',
+      }),
+    },
+    {
+      record: seedModel({
+        base: 'unknown',
+        format: 'unknown',
+        key: 'seed-ident-unknown-broken',
+        name: 'Broken Encoder',
+        type: 'unknown',
+      }),
+      refusal: 'Qwen3-VL encoder is missing its projection weights.',
+    },
+    {
+      probe: { base: 'sdxl' },
+      record: seedModel({ base: 'sd-1', key: 'seed-ident-wrong-base', name: 'Wrong Base Checkpoint', type: 'main' }),
+    },
+    {
+      probe: { base: 'sdxl' },
+      record: seedModel({
+        base: 'sd-1',
+        key: 'seed-ident-wrong-base-ckpt',
+        name: 'Wrong Base CKPT',
+        path: 'seeds/seed-ident-wrong-base-ckpt.ckpt',
+        type: 'main',
+      }),
+    },
+    { record: seedModel({ base: 'sd-1', key: 'seed-ident-fine', name: 'Correctly Filed', type: 'main' }) },
+  ],
   'anima-lllite': [
     {
       record: seedModel({

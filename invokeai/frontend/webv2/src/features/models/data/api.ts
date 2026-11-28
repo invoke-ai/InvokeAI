@@ -7,6 +7,8 @@ import type {
   HFTokenStatus,
   HuggingFaceModels,
   ModelConfig,
+  ModelIdentification,
+  ModelIdentificationOutcome,
   ModelInstallJob,
   ModelRecordChanges,
   OrphanedModelInfo,
@@ -94,6 +96,51 @@ export const bulkReidentifyModels = (keys: string[], signal?: AbortSignal): Prom
     method: 'POST',
     signal,
   });
+
+/** Wire shape of `ModelIdentificationPreview`. */
+interface ModelIdentificationWire {
+  changed: boolean;
+  proposed?: ModelConfig | null;
+  refusal?: string | null;
+}
+
+const toModelIdentification = (wire: ModelIdentificationWire): ModelIdentification => ({
+  changed: wire.changed,
+  proposed: wire.proposed ?? null,
+  refusal: wire.refusal ?? null,
+});
+
+/** Preview what re-identifying the model would do, without writing anything. Administrators only. */
+export const getModelIdentification = async (key: string, signal?: AbortSignal): Promise<ModelIdentification> =>
+  toModelIdentification(
+    await requestJson<ModelIdentificationWire>(`${MODELS_BASE}/i/${encodeURIComponent(key)}/identification`, {
+      signal,
+    })
+  );
+
+/**
+ * Preview several models at once; the backend accepts at most 100 keys per request. A key that cannot be previewed
+ * fails alone.
+ */
+export const bulkGetModelIdentification = async (
+  keys: string[],
+  signal?: AbortSignal
+): Promise<ModelIdentificationOutcome[]> => {
+  const body = await requestJson<{
+    results?: { error?: string | null; key: string; preview?: ModelIdentificationWire | null }[];
+  }>(`${MODELS_BASE}/i/bulk_identification`, {
+    body: JSON.stringify({ keys }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    signal,
+  });
+
+  return (body.results ?? []).map((result): ModelIdentificationOutcome =>
+    result.preview
+      ? { identification: toModelIdentification(result.preview), key: result.key, status: 'identified' }
+      : { error: result.error ?? '', key: result.key, status: 'failed' }
+  );
+};
 
 export const convertModelToDiffusers = (key: string, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/convert/${encodeURIComponent(key)}`, { method: 'PUT', signal });

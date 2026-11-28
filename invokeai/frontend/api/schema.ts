@@ -761,6 +761,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/i/{key}/identification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Identification
+         * @description Preview what reidentifying a model would do, without changing anything.
+         *
+         *     Probing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a
+         *     meta-device torch.load for .ckpt/.pt/.bin. That skips the tensor data of a zip checkpoint, while a legacy
+         *     non-zip pickle is streamed through torch.load and scanned whole. It takes no claim on the key, because nothing
+         *     is written.
+         */
+        get: operations["get_model_identification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/scan_folder": {
         parameters: {
             query?: never;
@@ -857,6 +882,29 @@ export type paths = {
          *     Returns a list of successfully reidentified keys and failed reidentifications with error messages.
          */
         post: operations["bulk_reidentify_models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/bulk_identification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Get Model Identification
+         * @description Preview what reidentifying several models would do, without changing anything.
+         *
+         *     A key that cannot be identified is reported in its own entry; it does not fail the request. Repeated keys are
+         *     identified once.
+         */
+        post: operations["bulk_get_model_identification"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7598,6 +7646,28 @@ export type components = {
              * @default system
              */
             user_id: string;
+        };
+        /**
+         * BulkIdentifyModelsRequest
+         * @description Request body for previewing the reidentification of several models.
+         */
+        BulkIdentifyModelsRequest: {
+            /**
+             * Keys
+             * @description Keys of the models to identify
+             */
+            keys: string[];
+        };
+        /**
+         * BulkIdentifyModelsResponse
+         * @description Response body for the bulk identification preview.
+         */
+        BulkIdentifyModelsResponse: {
+            /**
+             * Results
+             * @description One entry per distinct key, in request order
+             */
+            results: components["schemas"]["ModelIdentificationResult"][];
         };
         /**
          * BulkReidentifyModelsRequest
@@ -42684,6 +42754,45 @@ export type components = {
          * @enum {string}
          */
         ModelFormat: "omi" | "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai" | "t5_encoder" | "qwen3_encoder" | "qwen_vl_encoder" | "qwen3_vl_encoder" | "mistral_encoder" | "wan_t5_encoder" | "gemma2_encoder" | "gemma4_encoder" | "bnb_quantized_int8b" | "bnb_quantized_nf4b" | "gguf_quantized" | "external_api" | "sdnq_quantized" | "unknown";
+        /**
+         * ModelIdentificationPreview
+         * @description What re-identifying a model record would do, without doing it.
+         */
+        ModelIdentificationPreview: {
+            /**
+             * Proposed
+             * @description The record re-identification would write, with the user's fields kept. None when the files were not identified as any model.
+             */
+            proposed?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"]) | null;
+            /**
+             * Changed
+             * @description Whether the proposed record differs from the stored one in type, format, base or variant.
+             */
+            changed: boolean;
+            /**
+             * Refusal
+             * @description Why a model class that recognised the files rejected them as unusable, if one did.
+             */
+            refusal?: string | null;
+        };
+        /**
+         * ModelIdentificationResult
+         * @description The preview for one key, or why it could not be produced.
+         */
+        ModelIdentificationResult: {
+            /**
+             * Key
+             * @description The model key
+             */
+            key: string;
+            /** @description Set when identification ran */
+            preview?: components["schemas"]["ModelIdentificationPreview"] | null;
+            /**
+             * Error
+             * @description Set when it could not run, e.g. the key is unknown
+             */
+            error?: string | null;
+        };
         /** ModelIdentifierField */
         ModelIdentifierField: {
             /**
@@ -63793,6 +63902,52 @@ export interface operations {
             };
         };
     };
+    get_model_identification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Key of the model to identify. */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What reidentifying the model would do */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelIdentificationPreview"];
+                };
+            };
+            /** @description The model's files are missing or unreadable */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     scan_for_models: {
         parameters: {
             query?: {
@@ -64081,6 +64236,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    bulk_get_model_identification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkIdentifyModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Previews produced (possibly with some per-key errors) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkIdentifyModelsResponse"];
+                };
+            };
+            /** @description More keys than one request may carry */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
