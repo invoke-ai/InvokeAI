@@ -5,6 +5,7 @@ import { Box, Stack } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
   getComponentSlotIssue,
+  getEmptyComponentSupplier,
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -121,21 +122,22 @@ const ComponentPicker = ({
   const error = slotIssue ?? (shownIssue ? describeGenerationIssue(t, shownIssue) : undefined);
   // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
   const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
+  const supplier = getEmptyComponentSupplier(ctx.model, ctx.selectedComponents, slot.key);
+  const emptyPlaceholder =
+    slot.placeholder ??
+    (supplier ? t('widgets.generate.componentFrom', { name: supplier.name }) : t('widgets.generate.modelDefault'));
 
   return (
     // A fix button carries the issue id itself; without one this wrapper does, so a reveal lands on the slot.
     <Box data-issue-id={shownIssue && !shownIssue.fix ? shownIssue.id : undefined}>
       <Field label={slot.label} labelPlacement="inside" helpText={slot.helpText} error={error}>
         <ModelSelect
+          emptyLabel={!isRequired && (slot.placeholder || supplier) ? emptyPlaceholder : undefined}
           filter={slot.filter ? filter : undefined}
           invalid={Boolean(error)}
           isClearable
           modelTypes={modelTypes}
-          placeholder={
-            isRequired
-              ? t('widgets.generate.selectComponent')
-              : (slot.placeholder ?? t('widgets.generate.modelDefault'))
-          }
+          placeholder={isRequired ? t('widgets.generate.selectComponent') : emptyPlaceholder}
           relatedTo={ctx.model.key}
           value={selectedValue}
           onChange={onChange}

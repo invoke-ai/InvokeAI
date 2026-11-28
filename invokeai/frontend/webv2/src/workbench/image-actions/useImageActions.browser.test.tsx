@@ -1,6 +1,7 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type * as GalleryMediaUsageModule from '@features/gallery/mediaUsage';
 import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
+import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as QueueUtilityModule from '@features/queue/utility';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/contracts';
 import type * as WorkflowReact from '@features/workflow/react';
@@ -138,7 +139,8 @@ vi.mock('@features/workflow/preview', async () => {
   return { storedGraphToDocument };
 });
 
-vi.mock('@features/gallery/queries', () => ({
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  galleryKeys: (await importOriginal<typeof GalleryQueriesModule>()).galleryKeys,
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),

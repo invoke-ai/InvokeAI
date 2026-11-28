@@ -34,7 +34,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 
 No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backend, which picks its own free port. Arguments go to `vite dev`. Default Vite port 5174 taken: pick a spare, `pnpm dev:mock --port 5273 --strictPort`. `pnpm dev` alone proxies to a real backend at `http://127.0.0.1:9090`.
 
-- `INVOKEAI_MOCK_BACKEND_PROFILE`: `representative` (default) or `empty`. `POST /__reset` on the mock origin printed at startup restores fixtures; `?profile=` switches them. Unimplemented endpoints return 404. Opt-in model seeds: [VERIFICATION.md](VERIFICATION.md#start-from-a-known-state).
+- `INVOKEAI_MOCK_BACKEND_PROFILE`: `representative` (default) or `empty`. `POST /__reset` on the mock origin printed at startup restores fixtures; `?profile=` switches them. Unimplemented endpoints return 404. Opt-in model seeds and image metadata: [VERIFICATION.md](VERIFICATION.md#start-from-a-known-state).
 - Stop servers by PID (`ss -ltnp`), not `pkill -f`: its pattern can match the invoking shell. Restart after merges that add mock endpoints.
 - Provider/context error from a `?t=` module after source edits: full reload before calling it a product bug. HMR can split context modules.
 
@@ -66,7 +66,7 @@ The package keeps a lean suite and lets code speak for itself. These rules tight
 - Missing engines for completion: `pnpm exec playwright install chromium firefox webkit` (`--with-deps` in Linux CI).
 - Colocate tests: unit `*.test.ts`/`*.test.tsx`, browser `*.browser.test.ts`/`*.browser.test.tsx`.
 - Use real IndexedDB, Web Locks, focus, pointer, rendering where mocks cannot prove correctness.
-- Every metadata key a graph builder writes needs an entry in `src/workbench/image-actions/imageRecallContract.test.ts` or `src/workbench/image-actions/videoRecallContract.test.ts`. They fail only for keys their coverage fixtures write: a key written under some setting needs that setting tuned in the fixtures (`recallTunedSettingsFor` for images).
+- Every metadata key a graph builder writes needs an entry in `src/workbench/image-actions/imageRecallContract.test.ts` or `src/workbench/image-actions/videoRecallContract.test.ts`. They fail only for keys their coverage fixtures write: a key written under some setting needs that setting tuned in the fixtures (`recallTunedSettingsFor` for images). Component models reach the record from the graph's loader nodes through `RECORDED_COMPONENT_FIELDS` in `src/features/generation/core/graphBuilder.ts`; a new loader field needs an entry there (`src/workbench/image-actions/recordedComponents.test.ts` fails otherwise) and a `RECALLED_COMPONENTS` entry for its key (`vae`, `qwen_image_vae` and `refiner_model` have dedicated readers instead). `src/workbench/image-actions/imageRecordWriteGate.test.ts` fails when a setting changes the graph (Generate or any Canvas mode) without changing the record: record the setting, or add an `EXCEPTIONS` entry with its reason. A `VARIATIONS` entry must reach some fixture graph.
 - Droppable enabled only after drag start: drag through dnd-kit mouse sensors with `dragWithMouse` (`@platform/browser/mouseDrag.testing`). Single-jump drags such as `userEvent.dragAndDrop` miss it.
 
 Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.

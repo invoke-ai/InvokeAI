@@ -11714,6 +11714,18 @@ export type components = {
              */
             vae?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Vae Precision
+             * @description The VAE precision requested for decoding and encoding (SD 1.x, SD 2.x, SDXL); the backend may run the VAE in fp32 regardless, e.g. on CPU
+             * @default null
+             */
+            vae_precision?: ("fp16" | "fp32") | null;
+            /**
+             * Color Compensation
+             * @description Whether the SDXL image encode applied VAE color compensation
+             * @default null
+             */
+            color_compensation?: boolean | null;
+            /**
              * @description The Qwen3 text encoder model used for Z-Image inference
              * @default null
              */
@@ -11723,6 +11735,16 @@ export type components = {
              * @default null
              */
             mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks
+             * @default null
+             */
+            mistral_source?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description The Tile or Union ControlNet an upscale held the tiles to the source image with
+             * @default null
+             */
+            tile_controlnet?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Ideogram4 Caption
              * @description The structured JSON caption encoded for Ideogram 4 inference
@@ -39950,7 +39972,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "width" | "height" | "seed" | "rand_device" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step" | "denoising_start" | "denoising_end" | "strength" | "init_image" | "add_noise" | "shift" | "dype_preset" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_enabled" | "hrf_method" | "hrf_strength" | "refiner_model" | "refiner_cfg_scale" | "refiner_steps" | "refiner_scheduler" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "pid_mode" | "pid_steps" | "pid_decoder" | "gemma2_encoder" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "t5_encoder" | "t5_encoder_model" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "mistral_encoder_model" | "qwen3_encoder" | "qwen3_encoder_model" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "qwen3_vl_vision_tower" | "qwen_vl_encoder" | "glm_encoder" | "anima_inpaint_adapter" | "anima_inpaint_adapter_weight" | "flux3_caption" | "flux3_prompt_upsampler" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_guidance_scale" | "ideogram4_mu" | "ideogram4_sampler_preset" | "ideogram4_steps" | "ideogram4_unconditional_model" | "krea2_rebalance_enabled" | "krea2_rebalance_multiplier" | "krea2_rebalance_weights" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "krea2_seed_variance_randomize_percent" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_component_source" | "ltx2_conditioning_role" | "ltx2_context_frames" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_schedule" | "ltx2_stg_scale" | "ltx2_text_encoder_model" | "ltx2_two_stage" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_hybrid_start_block" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "moss_image_layout_prompt" | "moss_image_uncond_skip_layers" | "qwen_image_2_1_prefix_kv_cache" | "qwen_image_component_source" | "qwen_image_quantization" | "qwen_image_qwen_vl_encoder" | "qwen_image_shift" | "qwen_image_vae" | "wan_component_source" | "wan_guidance_scale_low_noise" | "wan_t5_encoder_model" | "wan_transformer_low_noise" | "z_image_seed_variance_enabled" | "z_image_seed_variance_randomize_percent" | "z_image_seed_variance_strength" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "width" | "height" | "seed" | "rand_device" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "vae_precision" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step" | "denoising_start" | "denoising_end" | "strength" | "init_image" | "add_noise" | "color_compensation" | "shift" | "dype_preset" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_enabled" | "hrf_method" | "hrf_strength" | "refiner_model" | "refiner_cfg_scale" | "refiner_steps" | "refiner_scheduler" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "pid_mode" | "pid_steps" | "pid_decoder" | "gemma2_encoder" | "tile_width" | "tile_height" | "tile_overlap" | "tile_controlnet" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "t5_encoder" | "t5_encoder_model" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "mistral_encoder_model" | "mistral_source" | "qwen3_encoder" | "qwen3_encoder_model" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "qwen3_vl_vision_tower" | "qwen_vl_encoder" | "glm_encoder" | "anima_inpaint_adapter" | "anima_inpaint_adapter_weight" | "flux3_caption" | "flux3_prompt_upsampler" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_guidance_scale" | "ideogram4_mu" | "ideogram4_sampler_preset" | "ideogram4_steps" | "ideogram4_unconditional_model" | "krea2_rebalance_enabled" | "krea2_rebalance_multiplier" | "krea2_rebalance_weights" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "krea2_seed_variance_randomize_percent" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_component_source" | "ltx2_conditioning_role" | "ltx2_context_frames" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_schedule" | "ltx2_stg_scale" | "ltx2_text_encoder_model" | "ltx2_two_stage" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_hybrid_start_block" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "moss_image_layout_prompt" | "moss_image_uncond_skip_layers" | "qwen_image_2_1_prefix_kv_cache" | "qwen_image_component_source" | "qwen_image_quantization" | "qwen_image_qwen_vl_encoder" | "qwen_image_shift" | "qwen_image_vae" | "wan_component_source" | "wan_guidance_scale_low_noise" | "wan_t5_encoder_model" | "wan_transformer_low_noise" | "z_image_seed_variance_enabled" | "z_image_seed_variance_randomize_percent" | "z_image_seed_variance_strength" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -40028,7 +40050,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "qwen_image_2_1_prefix_kv_cache" | "z_image_seed_variance_enabled";
+            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "color_compensation" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "qwen_image_2_1_prefix_kv_cache" | "z_image_seed_variance_enabled";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -40081,7 +40103,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "qwen_image_2_1_prefix_kv_cache" | "z_image_seed_variance_enabled";
+            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "color_compensation" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_auto_ratios" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "qwen_image_2_1_prefix_kv_cache" | "z_image_seed_variance_enabled";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -40823,7 +40845,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "init_image" | "dype_preset" | "hrf_method" | "pid_mode" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "vae_precision" | "init_image" | "dype_preset" | "hrf_method" | "pid_mode" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -40876,7 +40898,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "init_image" | "dype_preset" | "hrf_method" | "pid_mode" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "vae_precision" | "init_image" | "dype_preset" | "hrf_method" | "pid_mode" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item

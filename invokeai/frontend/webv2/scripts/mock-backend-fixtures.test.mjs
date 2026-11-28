@@ -987,6 +987,31 @@ test('the image map serves videos only on request and keeps its two endpoints co
   });
 });
 
+test('image metadata is empty until the test seam seeds it, and a reset clears it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const name = 'fixture-image-0001.png';
+    const metadata = { model: { key: 'm', name: 'Seeded model' }, steps: 12 };
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    const served = (imageName) => getJson(backend, `/api/v1/images/i/${imageName}/metadata`);
+
+    assert.deepEqual(await served(name), {});
+    assert.equal((await post('/__image-metadata', { image_name: 'missing.png', metadata })).status, 404);
+    assert.equal((await post('/__image-metadata', { image_name: name, metadata: [] })).status, 400);
+    assert.equal((await post('/__image-metadata', { image_name: name, metadata })).status, 200);
+
+    assert.deepEqual(await served(name), metadata);
+    assert.deepEqual(await served('fixture-image-0002.png'), {});
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.deepEqual(await served(name), {});
+  });
+});
+
 test('board_id=all lists unboarded items and those on active readable boards, alike in items, names and location', async () => {
   await withRepresentativeBackend(async (backend) => {
     const query = 'categories=general&is_intermediate=false';

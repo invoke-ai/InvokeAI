@@ -17,6 +17,7 @@ const galleryApi = vi.hoisted(() => ({
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),
+    workflow: vi.fn(),
   },
 }));
 
@@ -129,6 +130,7 @@ describe('executeImageRecall', () => {
     accountLifecycle.activate('test-account');
     galleryApi.galleryImages.metadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
+    galleryApi.galleryImages.workflow.mockReset();
   });
 
   it('recalls remix settings into Generate values', async () => {
@@ -847,6 +849,80 @@ describe('executeImageRecall', () => {
     expect(galleryApi.galleryImages.metadata).not.toHaveBeenCalled();
     expect(oldCommands.setSettings).not.toHaveBeenCalled();
     expect(oldCommands.add).not.toHaveBeenCalled();
+  });
+
+  describe('a record that names no VAE, beside a panel that holds one', () => {
+    const vae = { base: 'sdxl', format: 'checkpoint', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' } as ModelConfig;
+    // What webv2's Generate graph writes for an SDXL run that used the main model's own VAE.
+    const record = {
+      generation_mode: 'sdxl_txt2img',
+      model: { base: 'sdxl', hash: 'hash', key: model.key, name: model.name, type: 'main' },
+      positive_prompt: 'p',
+      rand_device: 'cpu',
+    };
+    const recallVae = async () => {
+      const { commands, setSettings } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue(record);
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key, vae }),
+        image,
+        kind: 'remix',
+        models: [model, vae],
+        projectId: 'project-1',
+      });
+
+      return (setSettings.mock.calls[0]![0] as GenerateWidgetValues).vae;
+    };
+
+    it('clears the panel VAE for a graph run, which names every VAE it loaded', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+
+      await expect(recallVae()).resolves.toBeNull();
+    });
+
+    it('keeps the panel VAE for a run that embeds a workflow, whose loader may have used it unrecorded', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: '{"nodes":[]}' });
+
+      expect((await recallVae())?.key).toBe(vae.key);
+    });
+
+    it('reads the embedded workflow once per image, whatever the number of recalls', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+
+      await recallVae();
+      await recallVae();
+
+      expect(galleryApi.galleryImages.workflow).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no workflow for a record that cannot vouch for its components', async () => {
+      queryClient.clear();
+      const { commands } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue({ positive_prompt: 'p' });
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key }),
+        image,
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-1',
+      });
+
+      expect(galleryApi.galleryImages.workflow).not.toHaveBeenCalled();
+    });
+
+    it('keeps the panel VAE when the workflow cannot be read', async () => {
+      galleryApi.galleryImages.workflow.mockRejectedValue(new ApiError('Internal Server Error', 500));
+
+      expect((await recallVae())?.key).toBe(vae.key);
+    });
   });
 
   describe('in a fresh project whose model stores default components', () => {

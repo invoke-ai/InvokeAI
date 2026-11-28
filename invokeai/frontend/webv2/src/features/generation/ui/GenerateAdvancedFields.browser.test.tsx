@@ -16,7 +16,9 @@ import { userEvent } from 'vitest/browser';
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 
 vi.mock('./GenerationUiContext', () => ({
-  GenerationModelSelect: () => null,
+  GenerationModelSelect: ({ emptyLabel, placeholder }: { emptyLabel?: string; placeholder?: string }) => (
+    <span data-select-empty-label={emptyLabel} data-select-placeholder={placeholder} />
+  ),
   useGenerationUi: () => ({
     models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     sectionPreferences: { sectionsOpen: { advanced: true }, setSectionsOpen: vi.fn() },
@@ -104,6 +106,22 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('GenerateAdvancedFields VAE picker', () => {
+  // Only the served capabilities show the picker.
+  seedArchitectureCapabilities();
+
+  it('names the main model whose bundled VAE an empty override leaves in use', async () => {
+    await render(sd1Model, false);
+
+    expect(host?.querySelector('[data-select-placeholder]')?.getAttribute('data-select-placeholder')).toBe(
+      'From SD 1.5'
+    );
+    expect(host?.querySelector('[data-select-placeholder]')?.getAttribute('data-select-empty-label')).toBe(
+      'From SD 1.5'
+    );
+  });
 });
 
 describe('GenerateAdvancedFields HiDiffusion controls', () => {

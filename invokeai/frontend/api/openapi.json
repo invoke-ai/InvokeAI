@@ -32700,6 +32700,41 @@
             "orig_default": null,
             "orig_required": false
           },
+          "vae_precision": {
+            "anyOf": [
+              {
+                "enum": ["fp16", "fp32"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The VAE precision requested for decoding and encoding (SD 1.x, SD 2.x, SDXL); the backend may run the VAE in fp32 regardless, e.g. on CPU",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Vae Precision"
+          },
+          "color_compensation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether the SDXL image encode applied VAE color compensation",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Color Compensation"
+          },
           "qwen3_encoder": {
             "anyOf": [
               {
@@ -32727,6 +32762,38 @@
             ],
             "default": null,
             "description": "The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "mistral_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "tile_controlnet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The Tile or Union ControlNet an upscale held the tiles to the source image with",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -33297,7 +33364,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.10.0",
+        "version": "2.11.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -92754,6 +92821,7 @@
               "clip_skip",
               "model",
               "vae",
+              "vae_precision",
               "seamless_x",
               "seamless_y",
               "guidance",
@@ -92764,6 +92832,7 @@
               "strength",
               "init_image",
               "add_noise",
+              "color_compensation",
               "shift",
               "dype_preset",
               "dype_scale",
@@ -92795,6 +92864,7 @@
               "tile_width",
               "tile_height",
               "tile_overlap",
+              "tile_controlnet",
               "num_frames",
               "fps",
               "source_video_start_frame",
@@ -92806,6 +92876,7 @@
               "clip_g_model",
               "mistral_encoder",
               "mistral_encoder_model",
+              "mistral_source",
               "qwen3_encoder",
               "qwen3_encoder_model",
               "qwen3_source",
@@ -93022,6 +93093,7 @@
               "seamless_x",
               "seamless_y",
               "add_noise",
+              "color_compensation",
               "hidiffusion",
               "hidiffusion_raunet",
               "hidiffusion_window_attn",
@@ -93149,6 +93221,7 @@
               "seamless_x",
               "seamless_y",
               "add_noise",
+              "color_compensation",
               "hidiffusion",
               "hidiffusion_raunet",
               "hidiffusion_window_attn",
@@ -94815,6 +94888,7 @@
               "negative_prompts",
               "negative_style_prompt",
               "rand_device",
+              "vae_precision",
               "init_image",
               "dype_preset",
               "hrf_method",
@@ -94951,6 +95025,7 @@
               "negative_prompts",
               "negative_style_prompt",
               "rand_device",
+              "vae_precision",
               "init_image",
               "dype_preset",
               "hrf_method",

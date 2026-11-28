@@ -369,13 +369,6 @@
         "seamless_y": false,
         "steps": 35,
         "type": "core_metadata",
-        "vae": {
-          "base": "qwen-image",
-          "key": "qwen-vae",
-          "name": "Qwen VAE",
-          "type": "vae",
-          "hash": "blake3:vae"
-        },
         "width": 768,
         "qwen3_encoder": {
           "base": "any",
@@ -384,6 +377,13 @@
           "type": "qwen3_encoder",
           "variant": "qwen3_06b",
           "hash": "blake3:qwen3"
+        },
+        "vae": {
+          "base": "qwen-image",
+          "key": "qwen-vae",
+          "name": "Qwen VAE",
+          "type": "vae",
+          "hash": "blake3:vae"
         },
         "clip_skip": 0,
         "ref_images": [],
@@ -415,7 +415,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"
@@ -864,13 +863,6 @@
         "seamless_y": false,
         "steps": 35,
         "type": "core_metadata",
-        "vae": {
-          "base": "qwen-image",
-          "key": "qwen-vae",
-          "name": "Qwen VAE",
-          "type": "vae",
-          "hash": "blake3:vae"
-        },
         "width": 768,
         "qwen3_encoder": {
           "base": "any",
@@ -879,6 +871,13 @@
           "type": "qwen3_encoder",
           "variant": "qwen3_06b",
           "hash": "blake3:qwen3"
+        },
+        "vae": {
+          "base": "qwen-image",
+          "key": "qwen-vae",
+          "name": "Qwen VAE",
+          "type": "vae",
+          "hash": "blake3:vae"
         },
         "clip_skip": 0,
         "ref_images": [],
@@ -974,7 +973,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"
@@ -1501,13 +1499,6 @@
         "seamless_y": false,
         "steps": 35,
         "type": "core_metadata",
-        "vae": {
-          "base": "qwen-image",
-          "key": "qwen-vae",
-          "name": "Qwen VAE",
-          "type": "vae",
-          "hash": "blake3:vae"
-        },
         "width": 768,
         "qwen3_encoder": {
           "base": "any",
@@ -1516,6 +1507,13 @@
           "type": "qwen3_encoder",
           "variant": "qwen3_06b",
           "hash": "blake3:qwen3"
+        },
+        "vae": {
+          "base": "qwen-image",
+          "key": "qwen-vae",
+          "name": "Qwen VAE",
+          "type": "vae",
+          "hash": "blake3:vae"
         },
         "clip_skip": 0,
         "ref_images": [],
@@ -1596,7 +1594,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"

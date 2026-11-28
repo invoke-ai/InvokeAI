@@ -54,6 +54,8 @@ export {
   coerceSchedulerForGraph,
   createReferenceImageId,
   getCompatibleReferenceImages,
+  getComponentSlotsSuppliedByRecord,
+  getSourceSuppliableSlots,
   getDefaultGenerateSettings,
   getDenoisingStartClipping,
   type StepClipping,

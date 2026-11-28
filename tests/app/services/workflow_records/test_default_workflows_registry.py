@@ -118,3 +118,46 @@ def test_every_exposed_field_has_a_value_instance_on_its_node(workflow_path: Pat
             f"{workflow_path.name}: exposes '{field_name}' on node {node_id}, which stores no value "
             f"instance for it — the control is dropped on load and the field never reaches the graph"
         )
+
+
+# Found by content, so a bundled workflow of any family that embeds the node is covered.
+CORE_METADATA_WORKFLOWS = sorted(
+    (
+        path
+        for path in WORKFLOW_DIR.glob("*.json")
+        if any(node["data"].get("type") == "core_metadata" for node in json.loads(path.read_text("utf-8"))["nodes"])
+    ),
+    key=lambda p: p.name,
+)
+
+
+def test_core_metadata_workflows_are_found() -> None:
+    assert CORE_METADATA_WORKFLOWS, f"no bundled workflow under {WORKFLOW_DIR} embeds core_metadata"
+
+
+@pytest.mark.parametrize("workflow_path", CORE_METADATA_WORKFLOWS, ids=lambda p: p.stem)
+def test_bundled_core_metadata_lists_every_field_the_invocation_declares(workflow_path: Path) -> None:
+    """An embed at the current version skips the editor's node migration, so a declared field it lists no input for
+    has no value instance and renders as a "Missing field" row. A field an edge feeds is exempt only because bundled
+    workflows already leave such fields unlisted (the six MiniMax H3 ones); the legacy editor does not look at edges."""
+    cls = InvocationRegistry.get_invocations_map()["core_metadata"]
+    declared = [
+        name
+        for name, field in cls.model_fields.items()
+        if (field.json_schema_extra or {}).get("field_kind") == "input" and (field.json_schema_extra or {}).get("input")
+    ]
+    assert declared, "core_metadata declares no input fields: the field metadata this test reads has changed"
+
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+
+    for node in workflow["nodes"]:
+        data = node["data"]
+        if data["type"] != "core_metadata":
+            continue
+        wired = {
+            edge["targetHandle"]
+            for edge in workflow["edges"]
+            if edge["target"] == data["id"] and "targetHandle" in edge
+        }
+        missing = [name for name in declared if name not in data["inputs"] and name not in wired]
+        assert not missing, f"{workflow_path.name}: core_metadata {data['version']} embeds no input for {missing}"

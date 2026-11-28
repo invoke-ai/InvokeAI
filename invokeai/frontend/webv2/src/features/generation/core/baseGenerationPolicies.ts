@@ -981,6 +981,7 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     modelTypes: TYPE_PID_DECODER,
     valueKind: 'component',
     helpText: 'Required while PiD is on. Must match the main model’s base.',
+    placeholder: 'None',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
     required: isPidOn,
@@ -995,6 +996,7 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     modelTypes: TYPE_GEMMA2,
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
+    placeholder: 'None',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
     required: isPidOn,
     inUse: isPidOn,
@@ -1133,9 +1135,138 @@ export const getFlux2ComponentSource = (
   return isFlux2EncoderSourceForModel(model)(source) ? source : undefined;
 };
 
+/** Slots a bundled main fills while they are empty, by base. FLUX.2 and the sourced bases have their own rules below. */
+const BUNDLED_MAIN_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]>> = {
+  'ernie-image': ['mistralEncoderModel', 'vae'],
+  flux: ['t5EncoderModel', 'clipEmbedModel', 'vae'],
+  flux3: ['qwen3VLEncoderModel', 'vae'],
+  'ideogram-4': ['ideogram4UnconditionalModel', 'qwen3VLEncoderModel', 'vae'],
+  'krea-2': ['qwen3VLEncoderModel', 'vae'],
+  'moss-image': ['qwen35EncoderModel', 'vae'],
+  'qwen-image-2-1': ['qwen3VLEncoderModel', 'vae'],
+};
+
+/** Slots a compatible Diffusers component source can fill while they are empty; which wins is `SOURCE_FIRST_BASES`. */
+const SOURCED_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]>> = {
+  'qwen-image': ['qwenVLEncoderModel', 'vae'],
+  wan: ['wanT5EncoderModel', 'vae'],
+  'z-image': ['qwen3EncoderModel', 'vae'],
+};
+
+/**
+ * Where the loader looks first, after a standalone model, per base (invokeai/app/invocations):
+ * - Z-Image (`z_image_model_loader.py`): the component source, then the main when it is a self-contained pipeline.
+ * - Qwen-Image (`qwen_image/qwen_image_model_loader.py`), Wan (`wan/wan_model_loader.py`) and both FLUX.2 loaders
+ *   (`flux2/flux2_dev_model_loader.py`, `flux2/flux2_klein_model_loader.py`): the main when it bundles its components,
+ *   the component source only otherwise.
+ */
+const SOURCE_FIRST_BASES: ReadonlySet<string> = new Set(['z-image']);
+
+/** The slots a component source can fill for a `base` model while they are empty. */
+export const getSourceSuppliableSlots = (base: string): readonly GenerateComponentValueKey[] =>
+  SOURCED_SLOTS[base] ?? [];
+
+/** SD 3's loader takes any component left out from the main model itself, when that is a Diffusers pipeline. */
+const SD3_MAIN_SLOTS: readonly GenerateComponentValueKey[] = [
+  'clipGEmbedModel',
+  'clipLEmbedModel',
+  't5EncoderModel',
+  'vae',
+];
+
+/**
+ * The model the loader takes component `key` from while its slot is empty, or null where that is not one model for
+ * certain (a slot that means "none", a PiD component, a component the family cannot do without). It repeats no
+ * compatibility rule: each case asks the predicate the graph builder uses to pick its source. Which of main and source wins follows the Python
+ * loader per base (`SOURCE_FIRST_BASES`, FLUX.2: the bundled main first).
+ */
+export const getEmptyComponentSupplier = (
+  model: GenerateModelConfig | undefined,
+  components: Partial<Pick<GenerateSettings, 'componentSourceModel' | 'mistralEncoderModel' | 'qwen3EncoderModel'>>,
+  key: GenerateComponentValueKey
+): MainModelConfig | null => {
+  if (!model || model.type === 'external_image_generator') {
+    return null;
+  }
+
+  if (key === 'vae' && getGenerationUiPolicy(model).sdVaeVisible) {
+    return model;
+  }
+
+  if (model.base === 'flux2') {
+    const encoderKey = model.variant === 'dev' ? 'mistralEncoderModel' : 'qwen3EncoderModel';
+
+    if (key !== encoderKey && key !== 'vae') {
+      return null;
+    }
+
+    if (isBundledFlux2Main(model)) {
+      return model;
+    }
+
+    // A selection of this very slot is not empty, so the source is judged without it.
+    return (
+      getFlux2ComponentSource(model, {
+        componentSourceModel: components.componentSourceModel ?? null,
+        mistralEncoderModel: components.mistralEncoderModel ?? null,
+        qwen3EncoderModel: components.qwen3EncoderModel ?? null,
+        ...(key === 'vae' ? {} : { [key]: null }),
+      }) ?? null
+    );
+  }
+
+  if (model.base === 'sd-3') {
+    return SD3_MAIN_SLOTS.includes(key) && isBundledMainForBase(model.base)(model) ? model : null;
+  }
+
+  if (SOURCED_SLOTS[model.base]?.includes(key)) {
+    const compatibleSource = getCompatibleDiffusersComponentSource(model, components.componentSourceModel);
+    // The Wan loader rejects a source whose VAE is not the width the main decodes with (`doesWanSourceSupplyVae`), so
+    // such a source can still supply the encoder but never the VAE.
+    const source =
+      compatibleSource && key === 'vae' && model.base === 'wan' && !doesWanSourceSupplyVae(model, compatibleSource)
+        ? null
+        : compatibleSource;
+    const main = isBundledMainForBase(model.base)(model) ? model : null;
+
+    return SOURCE_FIRST_BASES.has(model.base) ? (source ?? main) : (main ?? source ?? null);
+  }
+
+  if (BUNDLED_MAIN_SLOTS[model.base]?.includes(key)) {
+    // A Diffusers FLUX.1 install still needs its encoders and VAE: only the self-contained SDNQ pipeline holds them.
+    const bundles =
+      model.base === 'flux' ? isSelfContainedSDNQFlux1Pipeline(model) : isBundledMainForBase(model.base)(model);
+
+    return bundles ? model : null;
+  }
+
+  return null;
+};
+
+/**
+ * The slots a record left out because the loader filled them itself while they were empty: from the main, or from the
+ * recorded `source` (null when the record names none), in the loader's order (`getEmptyComponentSupplier`). A graph
+ * run's record names a slot's standalone pick whenever the graph loaded one, so these are what an absent key means;
+ * records written by older UIs never named a standalone SD 3 T5 or CLIP encoder. For a source recall could not
+ * resolve, only the slots the main fills ahead of any source are certain. `components` holds the standalone encoders
+ * that stay after recall, which decide what a FLUX.2 source supplies.
+ */
+export const getComponentSlotsSuppliedByRecord = (
+  model: GenerateModelConfig,
+  source: MainModelConfig | null | 'unresolved',
+  components: Partial<Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel'>>
+): GenerateComponentValueKey[] =>
+  GENERATE_COMPONENT_VALUE_KEYS.filter((key) =>
+    source === 'unresolved'
+      ? !SOURCE_FIRST_BASES.has(model.base) &&
+        getEmptyComponentSupplier(model, { ...components, componentSourceModel: null }, key)?.key === model.key
+      : getEmptyComponentSupplier(model, { ...components, componentSourceModel: source }, key) !== null
+  );
+
 export const getAutoFlux2ComponentSourceModel = (
   model: GenerateModelConfig | undefined,
-  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel' | 'vae'>,
+  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel' | 'vae'> &
+    Partial<Pick<GenerateSettings, 'componentSourceModel'>>,
   models: readonly ComponentSourceCandidate[]
 ): MainModelConfig | null | undefined => {
   if (!model || model.type === 'external_image_generator' || model.base !== 'flux2') {
@@ -1151,6 +1282,13 @@ export const getAutoFlux2ComponentSourceModel = (
   // A registered pipeline whose files are gone is listed but cannot be loaded.
   const pipelines = models.filter((candidate) => !candidate.is_missing).filter(isFlux2SourceFor(model));
   const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
+  // A stored source stays while it is installed and still supplies what the model lacks: the encoder where no
+  // standalone one is set, otherwise the VAE any FLUX.2 pipeline gives.
+  const stored = pipelines.find(({ key }) => key === settings.componentSourceModel?.key);
+
+  if (stored && (encoderModel || isFlux2EncoderSourceForModel(model)(stored))) {
+    return stored;
+  }
 
   if (!encoderModel && settings.vae) {
     return encoderSource ?? null;

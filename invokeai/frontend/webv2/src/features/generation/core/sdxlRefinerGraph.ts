@@ -87,9 +87,8 @@ export const addSDXLRefinerStage = ({
   return refinerDenoise;
 };
 
-export const getRefinerMetadata = (settings: GenerateSettings, model: MainModelConfig, refiner: MainModelConfig) => ({
+export const getRefinerMetadata = (settings: GenerateSettings, model: MainModelConfig) => ({
   refiner_cfg_scale: settings.refinerCfgScale,
-  refiner_model: toModelIdentifier(refiner),
   refiner_negative_aesthetic_score: settings.refinerNegativeAestheticScore,
   refiner_positive_aesthetic_score: settings.refinerPositiveAestheticScore,
   refiner_scheduler: coerceSchedulerForGraph(model, settings.refinerScheduler),

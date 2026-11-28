@@ -7,6 +7,7 @@ import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from
 
 import {
   getDenoisingStartClipping,
+  getGenerationUiPolicy,
   getGenerationValidationReasons,
   hasEnabledKrea2EditReferences,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -19,6 +20,7 @@ import {
   addEdge,
   addNode,
   addOutputPostprocessors,
+  getRecordedVaePrecision,
   renameNode,
   replaceCanvasOutput,
   toGraphContract,
@@ -102,7 +104,8 @@ const getCanvasPidValidationReasons = (input: CompileCanvasGraphInput, processin
   return reasons;
 };
 
-const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
+/** Canvas-specific validation reasons layered on top of the shared generate ones. */
+export const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
   const { bbox, compositeImageName, maskImageName, mode, model, settings, strength } = input;
   const reasons: string[] = [];
 
@@ -369,19 +372,41 @@ const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: nu
   }
 };
 
+/**
+ * Adds the family's image-to-latents encode node fed by `imageName`. Colour compensation reaches the encode, and the
+ * record, only where the panel shows the switch, so a setting left over from another model does not.
+ */
 const addEncodeNode = (
   graph: BackendGraphContract,
   latents: FamilyLatentSpace,
+  model: GenerateModelConfig,
   settings: GenerateSettings,
   imageName: string | null
-): BackendInvocationContract =>
-  addNode(graph, {
+): BackendInvocationContract => {
+  const hasColorCompensation = latents.encodeType === 'i2l' && getGenerationUiPolicy(model).colorCompensationVisible;
+  const metadata = findMetadataNode(graph);
+
+  if (hasColorCompensation && metadata) {
+    metadata.color_compensation = settings.colorCompensation;
+  }
+
+  const encode = addNode(graph, {
     id: 'canvas_i2l',
     ...(imageName ? { image: { image_name: imageName } } : {}),
     type: latents.encodeType,
     ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
-    ...(latents.encodeType === 'i2l' ? { color_compensation: settings.colorCompensation ? 'SDXL' : 'None' } : {}),
+    ...(latents.encodeType === 'i2l'
+      ? { color_compensation: hasColorCompensation && settings.colorCompensation ? 'SDXL' : 'None' }
+      : {}),
   });
+
+  // The encode takes the precision even where the decode (PiD) does not.
+  if (metadata) {
+    Object.assign(metadata, getRecordedVaePrecision(graph));
+  }
+
+  return encode;
+};
 
 const connectEncode = (family: FamilyGraph, latents: FamilyLatentSpace, encode: BackendInvocationContract): void => {
   addEdge(family.graph, latents.vae.node, latents.vae.field, encode, 'vae');
@@ -423,7 +448,7 @@ const graftImageToImage = (
   // Native PiD denoises at a quarter of the processing size (legacy `addPidImageToImageNative`).
   const encodeSize = family.denoiseSize;
   const needsResize = !sizesMatch(bbox, encodeSize);
-  const encode = addEncodeNode(graph, latents, settings, needsResize ? null : compositeImageName);
+  const encode = addEncodeNode(graph, latents, model, settings, needsResize ? null : compositeImageName);
 
   if (needsResize) {
     const resize = addInputResizeNode(graph, 'canvas_resize_initial_to_processing', compositeImageName, encodeSize);
@@ -617,7 +642,7 @@ const graftMaskTail = (
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
     edge_radius: compositing.coherenceEdgeSize,
-    fp32: latents.fp32 ?? false,
+    ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
     id: 'create_gradient_mask',
     ...(args.gradientImageEdge ? {} : { image: { image_name: initialImageName } }),
     minimum_denoise: compositing.coherenceMinDenoise,
@@ -802,7 +827,7 @@ const graftInpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, latents, input.settings, null);
+  const encode = addEncodeNode(graph, latents, input.model, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(
     graph,
     initialImageName,
@@ -881,7 +906,7 @@ const graftOutpaint = (
       ? addInputResizeNode(graph, 'canvas_resize_noise_mask_to_processing', input.noiseMaskImageName, processingSize)
       : null;
 
-  const encode = addEncodeNode(graph, latents, input.settings, null);
+  const encode = addEncodeNode(graph, latents, input.model, input.settings, null);
   const noiseResult = addNoiseBeforeEncode(graph, initialImageName, input.noiseMaskImageName, infill, noiseMaskResize);
   if (noiseResult.edgeFrom) {
     addEdge(graph, noiseResult.edgeFrom, 'image', encode, 'image');
