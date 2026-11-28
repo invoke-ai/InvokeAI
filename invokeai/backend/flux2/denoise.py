@@ -115,9 +115,8 @@ def denoise(
     use_scheduler = scheduler is not None
     if use_scheduler:
         # Every scheduler runs InvokeAI's schedule: the model-evaluation sigmas plus the requested
-        # terminal sigma, which is not 0 when denoising_end < 1. Unlike FLUX.1, LCM gets it too: the
-        # FLUX.2 schedule is shifted from mu and these schedulers do not shift, so a schedule LCM built
-        # itself would be the unshifted linear one.
+        # terminal sigma, which is not 0 when denoising_end < 1. The FLUX.2 schedule is shifted from mu and
+        # these schedulers do not shift, so a schedule LCM built itself would be the unshifted linear one.
         is_heun = isinstance(scheduler, FlowMatchHeunDiscreteScheduler)
         if is_heun:
             set_heun_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)

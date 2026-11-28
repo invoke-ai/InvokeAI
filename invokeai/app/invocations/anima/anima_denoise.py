@@ -782,11 +782,9 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                 # Noise the init latents using the first sigma from the clipped
                 # InvokeAI schedule.
                 #
-                # Known limitation: if the selected scheduler later starts from a
-                # different first effective sigma/timestep than sigmas[0], the
-                # img2img preblend below may not match that scheduler exactly.
-                # This is an existing pipeline limitation and affects both
-                # internally generated noise and externally supplied noise.
+                # Known limitation: DPM++ builds its own schedule, so its first sigma may differ
+                # from sigmas[0] and the preblend below may not match it exactly. This affects
+                # both internally generated and externally supplied noise.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -1066,7 +1064,8 @@ class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
                             step_callback(
                                 PipelineIntermediateState(
                                     step=user_step,
-                                    order=it.order,
+                                    # Progress over completed user steps, not the solver's order.
+                                    order=1,
                                     total_steps=total_steps,
                                     timestep=int(it.sigma_curr * 1000),
                                     latents=latents_preview.squeeze(2),

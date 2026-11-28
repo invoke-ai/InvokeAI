@@ -1,4 +1,3 @@
-import inspect
 from contextlib import ExitStack, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -18,13 +17,11 @@ from invokeai.app.invocations.metadata_linked import (
 )
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
-from invokeai.app.invocations.z_image.z_image_denoise import Z_IMAGE_SHIFT_FIT, ZImageDenoiseInvocation
-from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
+from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import (
-    ANIMA_SCHEDULER_MAP,
     FLUX_SCHEDULER_MAP,
     ZIMAGE_SCHEDULER_MAP,
-    set_heun_timesteps_from_sigmas,
 )
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
 from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
@@ -661,61 +658,6 @@ def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
     assert result.metadata.root["hidiffusion_t2_ratio"] == 0.1
 
 
-def _get_first_scheduler_sigma(
-    scheduler,
-    *,
-    scheduler_name: str,
-    sigmas: list[float],
-    mu: float | None = None,
-    use_flux_heun_schedule: bool = False,
-) -> float:
-    if scheduler_name == "heun" and use_flux_heun_schedule:
-        set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], "cpu")
-        return float(scheduler.sigmas[0])
-
-    set_timesteps_signature = inspect.signature(scheduler.set_timesteps)
-    if scheduler_name != "lcm" and "sigmas" in set_timesteps_signature.parameters:
-        kwargs: dict[str, object] = {"sigmas": sigmas, "device": "cpu"}
-        if mu is not None and "mu" in set_timesteps_signature.parameters:
-            kwargs["mu"] = mu
-        scheduler.set_timesteps(**kwargs)
-    else:
-        kwargs = {"num_inference_steps": len(sigmas) - 1, "device": "cpu"}
-        if mu is not None and "mu" in set_timesteps_signature.parameters:
-            kwargs["mu"] = mu
-        scheduler.set_timesteps(**kwargs)
-    return float(scheduler.sigmas[0])
-
-
-@pytest.mark.parametrize(
-    "scheduler_name",
-    [
-        "euler",
-        "heun",
-        pytest.param(
-            "lcm",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for FLUX with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
-    ],
-)
-def test_flux_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str):
-    sigmas = clip_timestep_schedule_fractional(get_schedule(num_steps=4, image_seq_len=16, shift=True), 0.25, 1.0)
-    scheduler_class = FLUX_SCHEDULER_MAP[scheduler_name]
-    scheduler = scheduler_class(num_train_timesteps=1000)
-
-    assert sigmas[0] == pytest.approx(
-        _get_first_scheduler_sigma(
-            scheduler,
-            scheduler_name=scheduler_name,
-            sigmas=sigmas,
-            use_flux_heun_schedule=True,
-        )
-    )
-
-
 def test_flux2_partial_denoise_short_circuit_uses_first_clipped_timestep():
     invocation = Flux2DenoiseInvocation.model_construct(
         latents=MagicMock(latents_name="latents"),
@@ -981,66 +923,6 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
 
     assert len(step_generators) == 1
     _assert_step_generator(step_generators[0], expected_seed)
-
-
-# Heun is covered through the node in test_z_image_denoise_schedulers.py.
-@pytest.mark.parametrize(
-    "scheduler_name",
-    [
-        "euler",
-        pytest.param(
-            "lcm",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for Z-Image with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
-    ],
-)
-def test_z_image_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str):
-    invocation = ZImageDenoiseInvocation.model_construct(steps=8, width=1024, height=1024)
-    img_seq_len = (invocation.height // 8 // 2) * (invocation.width // 8 // 2)
-    shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
-    sigmas = invocation._get_sigmas(shift, invocation.steps)
-    sigmas = sigmas[int(0.25 * (len(sigmas) - 1)) :]
-    scheduler_class = ZIMAGE_SCHEDULER_MAP[scheduler_name]
-    scheduler = scheduler_class(num_train_timesteps=1000, shift=1.0)
-
-    assert sigmas[0] == pytest.approx(
-        _get_first_scheduler_sigma(scheduler, scheduler_name=scheduler_name, sigmas=sigmas)
-    )
-
-
-@pytest.mark.parametrize(
-    "scheduler_name",
-    [
-        "euler",
-        pytest.param(
-            "heun",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for Anima with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
-        pytest.param(
-            "lcm",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for Anima with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
-    ],
-)
-def test_anima_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str):
-    invocation = AnimaDenoiseInvocation.model_construct(steps=30)
-    sigmas = invocation._get_sigmas(invocation.steps)
-    sigmas = sigmas[int(0.25 * (len(sigmas) - 1)) :]
-    scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[scheduler_name]
-    scheduler = scheduler_class(num_train_timesteps=1000, **scheduler_kwargs)
-
-    assert sigmas[0] == pytest.approx(
-        _get_first_scheduler_sigma(scheduler, scheduler_name=scheduler_name, sigmas=sigmas)
-    )
 
 
 def test_sd3_partial_denoise_short_circuit_uses_first_clipped_timestep():

@@ -37,6 +37,7 @@ from invokeai.backend.flux.schedulers import (
     ZIMAGE_SCHEDULER_MAP,
     ZIMAGE_SCHEDULER_NAME_VALUES,
     set_heun_timesteps_from_sigmas,
+    set_timesteps_from_sigmas,
 )
 from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
 from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
@@ -417,8 +418,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             if self.add_noise:
                 assert noise is not None
                 # Noise the init latents using the first sigma from the clipped
-                # InvokeAI schedule. Euler and Heun start from this sigma; LCM
-                # creates its own schedule, whose first sigma can differ.
+                # InvokeAI schedule, which every scheduler starts from.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -463,9 +463,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
                 # preblend used and stops at the requested end.
                 set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], device)
             else:
-                # LCM owns its schedule: clipping only sets its step count. Its first sigma can
-                # differ from sigmas[0] used in the img2img preblend above.
-                scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
+                set_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], device)
 
             # For Heun scheduler, the number of actual steps may differ
             num_scheduler_steps = len(scheduler.timesteps)
