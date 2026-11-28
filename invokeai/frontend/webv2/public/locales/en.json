@@ -4064,6 +4064,17 @@
       "metadataMore": "{{count}} more (see raw JSON)",
       "metadataLayerCount_one": "{{count}} layer",
       "metadataLayerCount_other": "{{count}} layers",
+      "metadataLayerTypeCount": "{{count}} {{type}}",
+      "metadataShowAll": "Show all {{count}}",
+      "metadataShowLess": "Show less",
+      "metadataCopyAll": "Copy all",
+      "layerTypes": {
+        "control": "control",
+        "inpaint_mask": "inpaint mask",
+        "raster": "raster",
+        "regional_guidance": "regional guidance",
+        "vector": "vector"
+      },
       "metadataLabels": {
         "app_version": "Created by",
         "generation_mode": "Generation mode",
