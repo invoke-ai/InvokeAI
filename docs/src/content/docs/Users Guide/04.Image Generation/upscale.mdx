@@ -142,7 +142,7 @@ Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores
     - **CFG scale**: set when you pick the model: 3.
     - **Steps**: kept as you set it, 30 by default, not the 50 the model uses for a full image. MOSS-Image runs all of **Steps** in the detail pass, so 30 steps really run 30 times, each at the enlarged size and, above CFG 1, as two network passes. Lower it if the pass is slow.
     - **Components**: a **Qwen3.5 Encoder** (9B, not the 4B Anima-3.8B uses) and a FLUX.2 **VAE**. A Diffusers install brings its own.
-    - **Not supported**: LoRAs, which MOSS-Image has no loader for.
+    - **LoRAs**: MOSS-Image LoRAs apply to the detail pass, on the transformer only.
   </TabItem>
 </Tabs>
 
@@ -162,17 +162,15 @@ FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen Image and MOSS-Image need sizes that are a
 | Family | Schedulers | Steps the pass runs |
 | --- | --- | --- |
 | SD1.5, SDXL | All of the family's | The part of **Steps** after the start: about half at **Balanced** |
-| FLUX.1 | Euler, Heun | The part of **Steps** after the start: **Balanced** at 30 steps runs about the last 8 from 1024 px up |
+| FLUX.1 | Euler, Heun, LCM | The part of **Steps** after the start: **Balanced** at 30 steps runs about the last 8 from 1024 px up |
 | FLUX.2 | Euler only | Starts where FLUX.1 does, then spreads all of **Steps** over the rest of the pass, so 30 steps really run 30 times |
-| Z-Image | Euler, Heun | Starts at FLUX.1's noise level; **Balanced** at 30 steps on a 2048 px result runs the last 7 |
-| Anima | Euler, DPM++ 2M, DPM++ 2M SDE, ER-SDE | As Z-Image; the last 8 |
+| Z-Image | Euler, Heun; LCM on Z-Image Turbo only | Starts at FLUX.1's noise level; **Balanced** at 30 steps on a 2048 px result runs the last 7 |
+| Anima | Euler, Heun, DPM++ 2M, DPM++ 2M SDE, ER-SDE, LCM | As Z-Image; the last 8 |
 | Krea-2 | Euler only | As Z-Image; the last 7. Turbo and Raw both keep your **Steps**: Turbo, distilled for 8 steps, runs the end of a 30-step schedule |
 | Qwen Image | Euler only | As Z-Image; the last 9 |
 | MOSS-Image | Euler only | Starts where FLUX.1 does, then spreads all of **Steps** over the rest of the pass, as FLUX.2 does |
 
 Z-Image, Anima, Krea-2 and Qwen Image count the start in steps rather than in noise level, so the panel translates Creativity for them: it starts on the step whose noise level is closest to where FLUX.1 would start. A preset therefore means the same on every family. These families need at least 2 steps.
-
-LCM builds its own noise schedule, so it would treat the enlarged image as pure noise. Anima's Heun starts below Creativity's point and leaves noise in the image.
 
 </details>
 
@@ -197,7 +195,7 @@ Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only m
 | 4× | Runs 2× 2 times | Runs 4× once |
 | 8× | Runs 2× 3 times | Runs 4× 2 times, then resizes to 8× |
 
-When **Scale** equals the native scale the note is left out. A 1× model (a restoration model) keeps the input size, so **Scale** has no effect. In Refine mode the panel shows no native scale. FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 and Qwen Image resize the upscaler's result to **Scale** before the detail pass; SD1.5 and SDXL keep the upscaler's size, so with a 1× model their result stays at the source size.
+When **Scale** equals the native scale the note is left out. In Model only mode a 1× model (a restoration model) keeps the input size, so **Scale** has no effect. In Refine mode the panel shows no native scale: every main model (SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2, Qwen Image and MOSS-Image) resizes the upscaler's result to **Scale** before the detail pass, so a 1× model's result still comes out at **Scale**.
 
 A Model only result's metadata is the source image's metadata plus the upscaler and the **Scale**, so **Recall** on it restores how the source was made.
 

@@ -2,7 +2,6 @@ import copy
 
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
@@ -18,6 +17,7 @@ from invokeai.backend.quantization.fp8_scaled import (
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.util.cast_to_device import cast_to_device
 
 
 def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight: float) -> torch.Tensor:
@@ -55,6 +55,12 @@ def autocast_linear_forward_sidecar_patches(
         # Shallow copy the patch so that we can cast it to the target device without modifying the original patch.
         patch = copy.copy(patch)
         patch.to(input.device)
+
+        if isinstance(patch, LoRALayer):
+            # The patcher casts patches to the model's compute dtype, but an fp32 module in a bf16 model (e.g. MiniMax
+            # H3's patch projections) still receives fp32 input, and F.linear refuses mixed dtypes. Other patches are
+            # aggregated in their own dtype below and cast afterwards.
+            patch.to(dtype=input.dtype)
 
         if isinstance(patch, FluxControlLoRALayer):
             # Note that we use the original input here, not the sliced input.

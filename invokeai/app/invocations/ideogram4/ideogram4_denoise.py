@@ -599,13 +599,13 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         load can slip into a paced lock's gap. Without this the guarantee would be approximate; with
         it the reservation saves the transfer and this only ever trims what is left over.
 
-        `keep_required_weights_in_vram` leaves behind the tensors a streamed forward cannot fetch
-        per layer, such as quantization scales.
+        `hold_resident_bytes` leaves behind the tensors a streamed forward cannot fetch per layer,
+        such as quantization scales, and keeps the VRAM that streaming the rest in needs (see
+        `async_weight_streaming`) within `target`.
         """
-        excess = second_branch.resident_weight_bytes - target
-        if excess <= 0:
+        freed = second_branch.hold_resident_bytes(target)
+        if freed <= 0:
             return
-        freed = second_branch.unload_from_vram(excess, keep_required_weights_in_vram=True)
         # The cache moves the weights to RAM but does not return the blocks to the driver, so
         # without this the bytes stay in torch's reserve -- invisible to the display, which is who
         # the room was made for.

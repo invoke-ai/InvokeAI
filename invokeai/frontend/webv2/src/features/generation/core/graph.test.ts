@@ -13,7 +13,14 @@ import type {
 } from './types';
 
 import { getDefaultGenerateSettings, type SupportedGenerateBase } from './baseGenerationPolicies';
-import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
+import {
+  buildImageToImagePipeline,
+  compileGenerateGraph,
+  getFamilyGraphBuilder,
+  GRAPH_BUILDERS,
+  type ImageToImagePipelineBase,
+  resolveGenerateSeed,
+} from './graph';
 import {
   fullyFilledSettingsFor,
   generateGraphCases,
@@ -765,6 +772,73 @@ describe('getFamilyGraphBuilder', () => {
   });
 });
 
+describe('buildImageToImagePipeline', () => {
+  // What only another feature asks for: a partial pass, its own output node, tiled VAE ends and SD's tiled denoise.
+  it.each([
+    ['sd-1', 'tiled_multi_diffusion_denoise_latents', true],
+    ['sdxl', 'tiled_multi_diffusion_denoise_latents', true],
+    ['flux', 'flux_denoise', true],
+    ['flux2', 'flux2_denoise', true],
+    ['z-image', 'z_image_denoise', true],
+    // `anima_l2i` has no tiling switch: it tiles on its own.
+    ['anima', 'anima_denoise', false],
+    ['krea-2', 'krea2_denoise', true],
+    ['qwen-image', 'qwen_image_denoise', true],
+    ['moss-image', 'moss_image_denoise', true],
+  ] as const satisfies readonly (readonly [ImageToImagePipelineBase, string, boolean])[])(
+    'builds the %s pass the input asks for',
+    (base, denoiseType, decodeTiles) => {
+      const { shape } = generateGraphCases.find((testCase) => testCase.base === base)!;
+      const { model, settings } = satisfiedSettingsFor(base, shape);
+      const sd = base === 'sd-1' || base === 'sdxl';
+      const pipeline = buildImageToImagePipeline({
+        denoiseSize: { height: 768, width: 1024 },
+        denoisingStart: 0.4,
+        model,
+        multiDiffusion: sd ? { tileOverlap: 64, tileSize: 512 } : null,
+        output: { id: 'pass_output', isIntermediate: true },
+        settings,
+        useCpuNoise: true,
+        vaeTileSize: 640,
+      });
+      const { nodes } = pipeline.graph;
+
+      expect(pipeline.output).toBe(nodes.pass_output);
+      expect(nodes.canvas_output).toBeUndefined();
+      expect(nodes.pass_output).toMatchObject({ is_intermediate: true, use_cache: false });
+      expect(pipeline.denoise).toMatchObject({ denoising_end: 1, denoising_start: 0.4, type: denoiseType });
+      if (decodeTiles) {
+        expect(nodes.pass_output).toMatchObject({ tile_size: 640, tiled: true });
+      } else {
+        expect(nodes.pass_output).not.toHaveProperty('tiled');
+      }
+      if (sd) {
+        expect(pipeline.denoise).toMatchObject({ tile_height: 512, tile_overlap: 64, tile_width: 512 });
+        // The tiled denoise takes one conditioning per side, so there are no collectors to graft onto.
+        expect(pipeline.conditioning).toBeNull();
+      }
+    }
+  );
+
+  it('refuses a family without an image-to-image pipeline', () => {
+    const { shape } = generateGraphCases.find((testCase) => testCase.base === 'wan')!;
+    const { model, settings } = satisfiedSettingsFor('wan', shape);
+
+    expect(() =>
+      buildImageToImagePipeline({
+        denoiseSize: { height: 768, width: 1024 },
+        denoisingStart: 0,
+        model,
+        multiDiffusion: null,
+        output: { id: 'pass_output', isIntermediate: false },
+        settings,
+        useCpuNoise: false,
+        vaeTileSize: null,
+      })
+    ).toThrow(/no image-to-image pipeline/);
+  });
+});
+
 describe('family graph facts', () => {
   const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
   const build = (model: MainModelConfig, settings: GenerateSettings) =>
@@ -923,12 +997,91 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
   });
 
+  it.each([
+    ['V4_QUALITY_48', 48],
+    ['V4_DEFAULT_20', 20],
+    ['V4_TURBO_12', 12],
+  ] as const)('records Ideogram 4 preset %s without sending unset overrides', (preset, steps) => {
+    const graph = compile(ideogram4Model, { cfgScale: 0, ideogram4SamplerPreset: preset, steps: 99 });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ sampler_preset: preset });
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('steps');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('guidance_scale');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('mu');
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 7,
+      ideogram4_guidance_scale: null,
+      ideogram4_sampler_preset: preset,
+      ideogram4_steps: null,
+      steps,
+    });
+  });
+
+  it('sends and records explicit Ideogram 4 overrides', () => {
+    const graph = compile(ideogram4Model, {
+      ideogram4GuidanceScale: 6,
+      ideogram4Mu: 1.5,
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 18,
+    });
+
+    expect(graph.nodes.denoise_latents).toMatchObject({
+      guidance_scale: 6,
+      mu: 1.5,
+      sampler_preset: 'V4_TURBO_12',
+      steps: 18,
+    });
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      cfg_scale: 6,
+      ideogram4_guidance_scale: 6,
+      ideogram4_mu: 1.5,
+      ideogram4_steps: 18,
+      steps: 18,
+    });
+  });
+
   it('emits a single-frame image output for Wan, not a video', () => {
     const graph = compile(wanDiffusers);
 
     expect(graph.nodes.model_loader?.type).toBe('wan_model_loader');
     expect(graph.nodes.canvas_output?.type).toBe('wan_l2i');
     expect(getNodeByType(graph, 'wan_l2v')).toBeUndefined();
+  });
+
+  it('passes the optional Wan low-noise expert to a single-file A14B model, and to no other', () => {
+    const wanHigh: MainModelConfig = {
+      base: 'wan',
+      format: 'gguf_quantized',
+      key: 'wan-high',
+      name: 'Wan high noise',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wanLow: MainModelConfig = { ...wanHigh, key: 'wan-low-gguf', name: 'Wan low noise' };
+    // The loader takes the VAE of a component source only beside the same variant family.
+    const source = {
+      componentSourceModel: { ...wanDiffusers, key: 'wan-a14b-diffusers', variant: 't2v_a14b' } as const,
+    };
+
+    // Omit undefined optional fields instead of serializing null.
+    expect(compile(wanHigh, source).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanHigh, { ...source, wanLowNoiseModel: wanLow }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLow,
+    });
+    // The loader ignores it for a Diffusers or TI2V-5B model, so a stale pick never reaches the graph.
+    const wanLowNoise: MainModelConfig = {
+      ...wanDiffusers,
+      key: 'wan-low',
+      name: 'Wan low noise',
+      variant: 'i2v_a14b',
+    };
+    const stale = compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise });
+
+    expect(stale.nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    // A project saved before the picker listed single-file experts only can hold a Diffusers pipeline for an A14B
+    // model: Generate names it instead of sending what the loader rejects.
+    expect(() => compile(wanHigh, { ...source, wanLowNoiseModel: wanLowNoise })).toThrow(/low-noise expert/);
+    expect(JSON.stringify(stale)).not.toContain('wan_transformer_low_noise');
   });
 
   it('routes Wan LoRAs through the transformer only, leaving the text encoder unpatched', () => {

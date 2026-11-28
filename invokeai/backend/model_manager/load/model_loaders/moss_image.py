@@ -29,7 +29,6 @@ from typing import Any, Mapping, Optional
 import accelerate
 import torch
 from safetensors import safe_open
-from safetensors.torch import load_file
 
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
@@ -50,11 +49,12 @@ from invokeai.backend.quantization.fp8_scaled import (
     TORCHAO_QDATA_SUFFIX,
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     dequantize_fp8_scaled,
     extract_fp8_scaled_layers,
     is_scale_metadata_key,
+    load_safetensors_checkpoint,
     reject_quantized_side_channel,
+    safetensors_backend,
     split_fp8_scaled_layers,
     translate_torchao_fp8_layers,
     warn_on_unattached_scales,
@@ -166,9 +166,9 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
     sd: dict[str, torch.Tensor] = {}
     for path, keys in moss_image_component_shards(directory).items():
         if keys is None:
-            sd.update(load_file(path))
+            sd.update(load_safetensors_checkpoint(path))
             continue
-        with safe_open(path, framework="pt", device="cpu") as f:
+        with safe_open(path, framework="pt", device="cpu", backend=safetensors_backend(path)) as f:
             for key in keys:
                 sd[key] = f.get_tensor(key)
     return sd
@@ -201,6 +201,8 @@ def _reject_other_quantization_beside_torchao(sd: Mapping[str, Any], what: str) 
 class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
+    _bfloat16_safe = True
+
     def _load_transformer(
         self,
         config: AnyModelConfig,
@@ -216,7 +218,7 @@ class _MossImageTransformerLoading(ModelLoader):
         markers = extract_int8_convrot_markers(sd)
         # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.
         reject_unmarked_int8_weights(sd, markers, "MOSS-Image")
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, SubModelType.Transformer).dtype
 
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**geometry)
@@ -264,19 +266,12 @@ class _MossImageTransformerLoading(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
             )
-            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, dtype)
                 fp8_layers = {}
             # Folds the layers a skip pattern holds dense (`.proj.q` among them) with their scale applied.
             fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
             cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-            if mapped is not None:
-                # Dense tensors the fold and cast left as they were are slices of the file mapping and would pin it,
-                # uncounted. The kept path skips this step altogether: copying its fp8 codes costs ~4.4 GB at load, and
-                # the mapping plus the copies are alive together for a moment.
-                clone_unreplaced_tensors(sd, mapped)
-                mapped.clear()
         model.load_state_dict(sd, strict=True, assign=True)
         # `assign=True` aliases every parameter to its state dict tensor; the dict would keep the whole model alive
         # through the cast below.
@@ -292,11 +287,8 @@ class _MossImageTransformerLoading(ModelLoader):
             # unscaled fp8 zeroes most of `time_embedding.2` and changed the image in a 4090 A/B. FP8 Storage on an
             # fp8 file keeps the file's fp8 layers packed, nothing more (as Qwen-Image-2.1 and FLUX.3 do).
             #
-            # Memory: the clone step above is skipped on this path. The kept codes and their scales, and every dense
-            # tensor already at the compute dtype, are views of the file mapping. On a bf16 device the folded `.proj.q`
-            # codes (~396 MB) leave `sd` but stay mapped and uncounted, because those views pin the mapping; on fp16
-            # the dense remainder is cast to new tensors and its bf16 bytes stay pinned and uncounted too. On Windows
-            # that is committed memory while the model is cached.
+            # Memory: the file is read with pread (an fp8 file always is), so every tensor here owns its storage and
+            # nothing pins the file. The folded `.proj.q` codes (~396 MB) leave `sd` once folded and are freed.
             return model.eval()
         return self._apply_fp8_layerwise_casting(model.eval(), config, SubModelType.Transformer)
 
@@ -304,6 +296,15 @@ class _MossImageTransformerLoading(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.MossImage, type=ModelType.Main, format=ModelFormat.Diffusers)
 class MossImageDiffusersModel(_MossImageTransformerLoading):
     """Loads MOSS-Image submodels from a diffusers pipeline folder (MOSS-Image Base or SFT)."""
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Diffusers_MossImage_Config):
@@ -329,7 +330,7 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
 
                 # The FLUX.2 VAE loaders' dtype: never float16, in which the FLUX autoencoders break.
                 return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                    model_path / "vae", torch_dtype=self._decision(config, submodel_type).dtype, local_files_only=True
                 )
 
         raise ValueError(
@@ -347,14 +348,16 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
         shards = list(moss_image_component_shards(text_encoder_dir))
         # No FP8 Storage cast follows: text encoders never take it (`_FP8_EXCLUDED_SUBMODEL_TYPES`). `keep_fp8` only
         # keeps a raw-fp8 checkpoint packed for the fp8 matmul.
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
         return load_qwen3_5_text_encoder(
             self,
             shards,
             text_config,
             # MOSS-Image reads the last hidden state, after the final norm.
             final_norm=True,
-            keep_fp8=self._keep_fp8_weights(config, SubModelType.TextEncoder),
+            keep_fp8=keep_fp8,
             what=f"MOSS-Image text encoder in {Path(config.path).name}",
+            model_dtype=model_dtype,
         )
 
 
@@ -366,6 +369,9 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
     models, chosen on the loader node.
     """
 
+    _default_submodel_type = SubModelType.Transformer
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_MossImage_Config):
             raise ValueError(f"Expected Main_Checkpoint_MossImage_Config, got {type(config).__name__}.")
@@ -375,7 +381,7 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
                 "Select a standalone Qwen3.5 9B encoder and FLUX.2 VAE on the MOSS-Image model loader."
             )
         model_path = Path(config.path)
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # unsloth's torchao fp8 build, renamed to the scaled-fp8 form. Before the split and the geometry read, which
         # look for `.weight`.

@@ -397,9 +397,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata):
                 # Noise the orig_latents by the appropriate amount for the first
                 # timestep in InvokeAI's clipped schedule.
                 #
-                # Euler and Heun consume this InvokeAI schedule. LCM intentionally
-                # creates its own discrete schedule: clipping limits its step count,
-                # but its exact start and terminal sigmas can differ from this schedule.
+                # Every scheduler consumes this InvokeAI schedule, so each starts at t_0.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:

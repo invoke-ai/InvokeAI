@@ -205,6 +205,160 @@ const metadata = {
 seedArchitectureCapabilities();
 
 describe('image recall', () => {
+  it.each(['positivePrompt', 'negativePrompt'] as const)(
+    'recalls only the %s without replacing the other prompt',
+    (kind) => {
+      const currentValues = createValues({
+        positivePrompt: 'keep positive',
+        negativePrompt: 'keep negative',
+        negativePromptEnabled: false,
+      });
+      const result = buildImageRecallSettings({
+        currentValues,
+        image,
+        kind,
+        metadata: { positive_prompt: 'saved positive', negative_prompt: 'saved negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: kind === 'positivePrompt' ? 'saved positive' : 'keep positive',
+        negativePrompt: kind === 'negativePrompt' ? 'saved negative' : 'keep negative',
+        negativePromptEnabled: kind === 'negativePrompt',
+      });
+    }
+  );
+
+  it.each(['positivePrompt', 'negativePrompt'] as const)(
+    'preserves the other effective prompt when recalling %s clears a shared template',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'keep negative',
+          negativePromptEnabled: false,
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            positivePrompt: 'cinematic {prompt}, 35mm',
+            negativePrompt: 'avoid {prompt}, blurry',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { positive_prompt: 'saved positive', negative_prompt: 'saved negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: kind === 'positivePrompt' ? 'saved positive' : 'cinematic keep positive, 35mm',
+        negativePrompt: kind === 'negativePrompt' ? 'saved negative' : 'avoid keep negative, blurry',
+        negativePromptEnabled: kind === 'negativePrompt',
+        promptTemplate: null,
+        promptTemplateViewMode: false,
+      });
+    }
+  );
+
+  it.each(['prompts', 'all', 'remix'] as const)(
+    'enables the recorded negative and preserves the unrecalled effective positive for %s',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'old negative',
+          negativePromptEnabled: false,
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            positivePrompt: '{prompt}, detailed',
+            negativePrompt: 'lowres',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { negative_prompt: 'recorded negative' },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        positivePrompt: 'keep positive, detailed',
+        negativePrompt: 'recorded negative',
+        negativePromptEnabled: true,
+        promptTemplate: null,
+        promptTemplateViewMode: false,
+      });
+    }
+  );
+
+  it.each([
+    {
+      kind: 'positivePrompt',
+      metadata: { positive_prompt: '' },
+      negativePromptEnabled: false,
+      expected: { positivePrompt: '', negativePrompt: 'keep negative lowres', negativePromptEnabled: false },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: '' },
+      negativePromptEnabled: true,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: true },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: '' },
+      negativePromptEnabled: false,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: false },
+    },
+    {
+      kind: 'negativePrompt',
+      metadata: { negative_prompt: null },
+      negativePromptEnabled: true,
+      expected: { positivePrompt: 'keep positive, detailed', negativePrompt: '', negativePromptEnabled: false },
+    },
+    { kind: 'positivePrompt', metadata: { negative_prompt: 'recorded' }, negativePromptEnabled: false, expected: null },
+    { kind: 'negativePrompt', metadata: { positive_prompt: 'recorded' }, negativePromptEnabled: false, expected: null },
+    { kind: 'positivePrompt', metadata: { positive_prompt: null }, negativePromptEnabled: false, expected: null },
+  ] as const)(
+    'handles empty or absent $kind metadata without changing the other effective prompt',
+    ({ kind, metadata, negativePromptEnabled, expected }) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          positivePrompt: 'keep positive',
+          negativePrompt: 'keep negative',
+          negativePromptEnabled,
+          promptTemplate: {
+            id: 'template',
+            name: 'Template',
+            negativePrompt: 'lowres',
+            positivePrompt: '{prompt}, detailed',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata,
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      if (expected === null) {
+        expect(result).toBeNull();
+      } else {
+        expect(result?.values).toMatchObject({ ...expected, promptTemplate: null, promptTemplateViewMode: false });
+      }
+    }
+  );
+
   it('recalls supported image metadata into generate settings', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues(),
@@ -1495,6 +1649,167 @@ describe('legacy records', () => {
       expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
     });
 
+    describe("the recalled model's default components", () => {
+      const defaultT5: ComponentModelConfig = {
+        base: 'any',
+        key: 't5-default',
+        name: 'Default T5',
+        type: 't5_encoder',
+      };
+      const recordedT5: ComponentModelConfig = {
+        base: 'any',
+        hash: 'blake3:recorded',
+        key: 't5-recorded',
+        name: 'Recorded T5',
+        type: 't5_encoder',
+      };
+      const defaultClip: ComponentModelConfig = {
+        base: 'any',
+        key: 'clip-default',
+        name: 'Default CLIP',
+        type: 'clip_embed',
+        variant: 'large',
+      };
+      const withDefaults: MainModelConfig = {
+        ...fluxModel,
+        default_settings: { components: { clip_embed_model: defaultClip.key, t5_encoder: defaultT5.key } },
+        key: 'flux-with-defaults',
+      };
+      const installed = [withDefaults, defaultT5, recordedT5, defaultClip];
+
+      it('fills the slots the image recorded nothing for, and lets a recorded component win', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: { ...recordedT5 } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(recordedT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      it('replaces a current selection that fits when the image recorded nothing for the slot, like Reset', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: withDefaults, modelKey: withDefaults.key, t5EncoderModel: recordedT5 },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+      });
+
+      it('lets a component the image recorded as empty clear the default', () => {
+        const result = recall(
+          { model: { key: withDefaults.key }, t5_encoder: null },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel).toBeNull();
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+
+      describe('on a generation record, which records what ran', () => {
+        const q21: MainModelConfig = {
+          base: 'qwen-image-2-1',
+          default_settings: { components: { qwen3_vl_encoder: 'q21-gguf-encoder' }, vae: 'q21-vae' },
+          format: 'diffusers',
+          key: 'q21-main',
+          name: 'Qwen-Image-2.1',
+          type: 'main',
+          variant: 'qwen_image_21_base',
+        };
+        const ggufEncoder: ComponentModelConfig = {
+          base: 'any',
+          format: 'gguf_quantized',
+          key: 'q21-gguf-encoder',
+          name: 'GGUF encoder',
+          type: 'qwen3_vl_encoder',
+          variant: 'qwen3_vl_8b',
+        };
+        const otherEncoder: ComponentModelConfig = {
+          ...ggufEncoder,
+          format: 'checkpoint',
+          key: 'q21-other-encoder',
+          name: 'Other encoder',
+        };
+        const vae: VaeModelConfig = { base: 'qwen-image-2-1', key: 'q21-vae', name: 'Q21 VAE', type: 'vae' };
+        const recallQ21 = (metadata: Record<string, unknown>, overrides: Partial<GenerateWidgetValues> = {}) =>
+          recall(
+            { model: { key: q21.key }, ...metadata },
+            { model: sdxlModel, modelKey: sdxlModel.key, ...overrides },
+            [sdxlModel, q21],
+            [q21, ggufEncoder, otherEncoder],
+            [vae]
+          );
+
+        it('applies no saved default component, and an unnamed slot keeps the current pick', () => {
+          const result = recallQ21({ generation_mode: 'txt2img' }, { qwen3VLEncoderModel: otherEncoder });
+          const empty = recallQ21({ generation_mode: 'txt2img' });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(otherEncoder.key);
+          expect(empty?.values.qwen3VLEncoderModel).toBeNull();
+        });
+
+        it('still restores what the record names', () => {
+          const result = recallQ21({ generation_mode: 'txt2img', qwen3_vl_encoder: { ...ggufEncoder } });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+        });
+
+        it('fills the defaults for a record that is no generation record, which says nothing of components', () => {
+          const result = recallQ21({});
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+          expect(result?.values.vae?.key).toBe(vae.key);
+        });
+      });
+
+      it('keeps the current VAE when the image clears the component source whose bundled VAE the default took', () => {
+        const pipeline: MainModelConfig = {
+          base: 'z-image',
+          format: 'diffusers',
+          key: 'z-pipeline',
+          name: 'Z-Image pipeline',
+          type: 'main',
+        };
+        const zGguf: MainModelConfig = {
+          base: 'z-image',
+          default_settings: { components: { component_source: pipeline.key }, vae: 'default' },
+          format: 'gguf_quantized',
+          key: 'z-gguf',
+          name: 'Z-Image GGUF',
+          type: 'main',
+        };
+        const vae: VaeModelConfig = { base: 'flux', key: 'z-vae', name: 'FLUX VAE', type: 'vae' };
+        const result = recall(
+          { model: { key: zGguf.key }, qwen3_source: null },
+          { model: sdxlModel, modelKey: sdxlModel.key, vae },
+          [sdxlModel, zGguf],
+          [zGguf, pipeline],
+          [vae]
+        );
+
+        expect(result?.values.componentSourceModel).toBeNull();
+        expect(result?.values.vae).toEqual(vae);
+      });
+
+      it('fills every slot of an image that recorded none', () => {
+        const result = recall(
+          { model: { key: withDefaults.key } },
+          { model: sdxlModel, modelKey: sdxlModel.key },
+          [sdxlModel, withDefaults],
+          installed
+        );
+
+        expect(result?.values.t5EncoderModel?.key).toBe(defaultT5.key);
+        expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
+      });
+    });
+
     describe('reference-image adapters', () => {
       const adapter: ComponentModelConfig = {
         base: 'sdxl',
@@ -1557,7 +1872,13 @@ describe('legacy family metadata parity', () => {
     };
     const recall = (metadata: unknown) =>
       buildImageRecallSettings({
-        currentValues: createValues({ model, modelKey: model.key, ideogram4Steps: 70, ideogram4Mu: 3 }),
+        currentValues: createValues({
+          model,
+          modelKey: model.key,
+          ideogram4Steps: 70,
+          ideogram4GuidanceScale: 6,
+          ideogram4Mu: 3,
+        }),
         image,
         kind: 'all',
         metadata,
@@ -1583,7 +1904,9 @@ describe('legacy family metadata parity', () => {
     expect(
       recall({ model, ideogram4_steps: null, ideogram4_guidance_scale: null, ideogram4_mu: null })?.values
     ).toMatchObject({ ideogram4Steps: null, ideogram4GuidanceScale: null, ideogram4Mu: null });
-    expect(recall({ model, generation_mode: 'ideogram4_txt2img' })?.values).toMatchObject({
+    expect(recall({ model, generation_mode: 'ideogram4_txt2img', steps: 49, cfg_scale: 1.5 })?.values).toMatchObject({
+      steps: 49,
+      cfgScale: 1.5,
       ideogram4Steps: null,
       ideogram4GuidanceScale: null,
       ideogram4Mu: null,

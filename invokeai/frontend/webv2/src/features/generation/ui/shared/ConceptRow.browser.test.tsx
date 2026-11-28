@@ -214,6 +214,13 @@ describe('ConceptRow', () => {
     expect(onRemove).toHaveBeenCalledWith('lora-1');
   });
 
+  it("spans the weight track over the concept's saved slider bounds", async () => {
+    const row = await render(makeLora({ default_settings: { weight: 0, weight_max: 3, weight_min: -2 } }));
+    const slider = row.querySelector<HTMLElement>('[role="slider"]')!;
+
+    expect([slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]).toEqual(['-2', '3']);
+  });
+
   it('offers model, weight, toggle, and removal actions from the row context menu', async () => {
     const onUpdate = vi.fn();
     const onRemove = vi.fn();

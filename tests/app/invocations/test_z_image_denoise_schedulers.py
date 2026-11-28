@@ -1,12 +1,12 @@
-"""Z-Image's Heun scheduler runs the node's shifted, clipped schedule.
+"""Z-Image's Heun and LCM schedulers run the node's shifted, clipped schedule.
 
-Heun used to rebuild its own schedule from the step count with a shift of 1.0: it ran linear sigmas
+Heun and LCM used to rebuild their own schedule from the step count with a shift of 1.0: they ran linear sigmas
 instead of the shifted ones, started img2img at sigma 1.0 whatever the img2img blend used, ignored
-`denoising_end`, and its progress stopped one step short of the end.
+`denoising_end`, and Heun's progress stopped one step short of the end.
 
 These tests drive the real `_run_diffusion` through the denoising loop with a stand-in transformer.
 The node's own manual Euler path is the reference for the schedule: it steps the clipped sigmas
-directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout. An interval of zero length,
+directly, so Heun has to evaluate the same sigmas in Diffusers' Heun layout and LCM the same sigmas as Euler. An interval of zero length,
 which an explicit shift of 0 leaves at sigma 0, is the exception: Heun would divide by zero there.
 """
 
@@ -147,13 +147,50 @@ def test_a_pass_ending_at_denoising_end_stops_where_the_continuing_pass_starts(s
 
 
 @pytest.mark.skipif("lcm" not in ZIMAGE_SCHEDULER_MAP, reason="FlowMatchLCMScheduler unavailable")
-def test_lcm_keeps_its_own_schedule():
-    """LCM builds its schedule from the step count; only Heun is handed the node's sigmas."""
-    lcm, _, callbacks = _drive("lcm")
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end"),
+    [
+        pytest.param(0.0, 1.0, id="txt2img"),
+        pytest.param(0.5, 1.0, id="img2img"),
+        pytest.param(0.3, 1.0, id="img2img-low-strength"),
+        pytest.param(0.0, 0.5, id="partial"),
+    ],
+)
+def test_lcm_evaluates_the_sigmas_euler_steps(denoising_start: float, denoising_end: float):
+    euler, _, _ = _drive("euler", denoising_start, denoising_end)
+    lcm, _, callbacks = _drive("lcm", denoising_start, denoising_end)
 
-    assert len(lcm.sigmas) == STEPS
-    assert lcm.sigmas[0] == pytest.approx(1.0)
-    assert [callback.step for callback in callbacks] == list(range(1, STEPS + 1))
+    assert lcm.sigmas == pytest.approx(euler.sigmas, abs=1e-6)
+    assert [callback.step for callback in callbacks] == list(range(1, len(euler.sigmas) + 1))
+
+
+@pytest.mark.skipif("lcm" not in ZIMAGE_SCHEDULER_MAP, reason="FlowMatchLCMScheduler unavailable")
+@pytest.mark.parametrize("denoising_end", [1.0, 0.5])
+def test_lcm_ends_at_the_clipped_schedules_terminal_sigma(denoising_end: float):
+    real = ZIMAGE_SCHEDULER_MAP["lcm"]
+    made = []
+
+    class _Recording(real):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            made.append(self)
+
+    with patch.dict(ZIMAGE_SCHEDULER_MAP, {"lcm": _Recording}):
+        _drive("lcm", denoising_end=denoising_end)
+
+    # A pass ending at denoising_end stops where the continuing pass starts; a full pass ends at 0.
+    expected = _drive("euler", denoising_start=denoising_end)[0].sample_levels[0] if denoising_end < 1.0 else 0.0
+    (scheduler,) = made
+    assert scheduler.sigmas[-1].item() == pytest.approx(expected, abs=1e-6)
+
+
+@pytest.mark.skipif("lcm" not in ZIMAGE_SCHEDULER_MAP, reason="FlowMatchLCMScheduler unavailable")
+def test_lcm_img2img_starts_at_the_sigma_the_blend_used():
+    lcm, _, _ = _drive("lcm", denoising_start=0.5)
+
+    # Zero init latents and unit noise: the blended sample's value is the sigma it was blended at.
+    assert lcm.sigmas[0] == pytest.approx(lcm.sample_levels[0], abs=1e-6)
+    assert lcm.sigmas[0] < 1.0
 
 
 def test_heun_progress_reaches_every_step():

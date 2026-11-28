@@ -188,6 +188,7 @@ beforeEach(async () => {
 
   api.getAuthStatus.mockResolvedValue({
     admin_email: 'admin@example.com',
+    has_single_user_work: false,
     multiuser_enabled: true,
     setup_required: false,
     strict_password_checking: true,

@@ -22,6 +22,8 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  advanceMaskFillColors,
+  getDocumentLeaves,
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
@@ -33,6 +35,7 @@ import {
   isNodeHidden,
   isOverlayStack,
   lookupDocumentNodeState,
+  nextMaskFillColor,
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
@@ -50,6 +53,7 @@ import {
 import {
   describeNamedRefusal,
   reportLayerOperation,
+  reportFlipLayer,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -58,6 +62,7 @@ import {
   ArrowUpDownIcon,
   ChevronRightIcon,
   CopyIcon,
+  TrianglesCenterlineDashedVerticalIcon,
   MergeIcon,
   MoreVerticalIcon,
   PaletteIcon,
@@ -79,6 +84,7 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
+import { clearLayerChildSelection } from './layerChildSelection';
 import {
   deleteLayers,
   duplicateLayers,
@@ -131,7 +137,7 @@ import {
   needsBakedControlPixels,
 } from './layerOps';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
-import { useRevealLayerProperties } from './revealLayerProperties';
+import { revealLayerSection, useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -463,9 +469,15 @@ const LayerMenu = ({
         layer.type === 'raster' && targetType === 'control'
           ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
-            ? convertRasterToInpaintMask(layer)
+            ? convertRasterToInpaintMask(
+                layer,
+                nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document))
+              )
             : layer.type === 'raster' && targetType === 'regional_guidance'
-              ? convertRasterToRegionalGuidance(layer)
+              ? convertRasterToRegionalGuidance(
+                  layer,
+                  nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document))
+                )
               : targetType === 'raster'
                 ? convertRasterControlLayer(layer, 'raster')
                 : null;
@@ -477,8 +489,11 @@ const LayerMenu = ({
       if (!engine?.layers.commitLayerConversion(label, layer, converted)) {
         throw makeStatusError('not-ready');
       }
+      if (converted.type === 'inpaint_mask' || converted.type === 'regional_guidance') {
+        advanceMaskFillColors(converted.type);
+      }
     },
-    [base, engine, layer, makeStatusError]
+    [base, canvas.document, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -608,6 +623,20 @@ const LayerMenu = ({
     patchBase(getActionLabel('fit-to-bbox'), { transform });
   }, [bbox, documentRect, getActionLabel, layer, makeStatusError, patchBase]);
 
+  const handleFlip = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      if (!engine) {
+        throw makeStatusError('not-ready');
+      }
+      reportFlipLayer(
+        engine.layers.flipLayer(layer.id, direction, getActionLabel(`flip-${direction}`)),
+        notify.error,
+        t
+      );
+    },
+    [engine, getActionLabel, layer.id, makeStatusError, notify, t]
+  );
+
   const handleSaveToBoard = useCallback(
     async (board: LayerContextBoardChoice) => {
       if (!engine) {
@@ -689,8 +718,11 @@ const LayerMenu = ({
 
   const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
+    // A selected child row (reference image, mask modifier, adjustment) would keep its own editor in the pane.
+    clearLayerChildSelection();
     revealProperties(layer.id);
     focusRegion('right', 'layers');
+    revealLayerSection();
   }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
@@ -742,29 +774,37 @@ const LayerMenu = ({
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('inpaint_mask', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
-        ? copyRasterToInpaintMask(layer, id)
+        ? copyRasterToInpaintMask(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToInpaintMask(layer, id)
+          ? copyControlToInpaintMask(layer, id, color)
           : layer.type === 'regional_guidance'
             ? copyRegionalGuidanceToInpaintMask(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-inpaint-mask'));
-  }, [addCopy, getActionLabel, layer]);
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('inpaint_mask');
+    }
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyToRegionalGuidance = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('regional_guidance', 0, getDocumentLeaves(canvas.document));
     const copied =
       layer.type === 'raster'
-        ? copyRasterToRegionalGuidance(layer, id)
+        ? copyRasterToRegionalGuidance(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToRegionalGuidance(layer, id)
+          ? copyControlToRegionalGuidance(layer, id, color)
           : layer.type === 'inpaint_mask'
             ? copyMaskToRegionalGuidance(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-regional-guidance'));
-  }, [addCopy, getActionLabel, layer]);
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('regional_guidance');
+    }
+  }, [addCopy, canvas.document, getActionLabel, layer]);
 
   const handleCopyTo = useCallback(
     (target: LayerType): void | Promise<void> => {
@@ -909,6 +949,7 @@ const LayerMenu = ({
       extractMaskedArea: handleExtractMaskedArea,
       group: handleGroup,
       fitToBbox: handleFitToBbox,
+      flip: handleFlip,
       mergeDown: handleMerge,
       mergeMasks: handleMergeMasks,
       mergeSelected: handleMergeSelected,
@@ -944,6 +985,7 @@ const LayerMenu = ({
       handleDuplicate,
       handleExtractMaskedArea,
       handleFitToBbox,
+      handleFlip,
       handleGroup,
       handleMergeMasks,
       handleMergeSelected,
@@ -1177,6 +1219,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
   'color-label': { defaultLabel: 'Color label', icon: PaletteIcon, labelKey: 'widgets.layers.menu.colorLabel' },
   'convert-to': { defaultLabel: 'Convert to', icon: ArrowRightLeftIcon, labelKey: 'widgets.layers.menu.convertTo' },
   'copy-to': { defaultLabel: 'Copy to', icon: CopyIcon, labelKey: 'widgets.layers.menu.copyTo' },
+  flip: { defaultLabel: 'Flip', icon: TrianglesCenterlineDashedVerticalIcon, labelKey: 'widgets.layers.menu.flip' },
 };
 
 /** Runs a layer action, reporting its failure; a `picker: 'board'` action runs with the board picked for it. */

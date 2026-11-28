@@ -296,9 +296,7 @@ class _ExpertSwapper:
                     )
                     self._warned_partial_loading_unavailable = True
             else:
-                vram_bytes_to_free = max(0, info.resident_weight_bytes - self._max_resident_model_bytes)
-                if vram_bytes_to_free > 0:
-                    info.unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                if info.hold_resident_bytes(self._max_resident_model_bytes) > 0:
                     TorchDevice.empty_cache()
 
         # Apply LoRA patches for this expert. Quantized transformers (GGUF, or an int8 checkpoint whose Linears

@@ -93,6 +93,7 @@ from invokeai.backend.quantization.int8_convrot import (
     int8_weights_without_a_decodable_marker,
     read_comfy_quant_markers,
 )
+from invokeai.backend.quantization.nvfp4 import WEIGHT_SCALE_2_SUFFIX
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.sd3.checkpoint_layout import is_sd3_mmdit, sd3_transformer_config
@@ -639,6 +640,30 @@ def _get_flux_variant(state_dict: dict[str | int, Any]) -> FluxVariantType | Non
         return FluxVariantType.Schnell
 
 
+def _raise_for_flux_nvfp4_transformer(state_dict: dict[str | int, Any]) -> None:
+    prefix = CheckpointPrefix.detect(state_dict).prefix
+    # Bundled encoders and VAEs sit outside the wrapped transformer or have their own namespaces.
+    sidecar_prefixes = (
+        "text_encoders.",
+        "text_encoder.",
+        "text_encoder_2.",
+        "cond_stage_model.",
+        "first_stage_model.",
+        "vae.",
+    )
+    if any(
+        isinstance(key, str)
+        and key.endswith(WEIGHT_SCALE_2_SUFFIX)
+        and key.startswith(prefix)
+        and not key.startswith(sidecar_prefixes)
+        for key in state_dict
+    ):
+        raise InvalidMatchError(
+            "FLUX transformer checkpoints with NVFP4 are not supported. "
+            "Choose a supported FLUX.1 or FLUX.2 checkpoint from the Model Manager."
+        )
+
+
 class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for main checkpoint models."""
 
@@ -660,6 +685,8 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
         cls._validate_does_not_look_like_bnb_quantized(mod)
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        _raise_for_flux_nvfp4_transformer(mod.load_state_dict())
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
@@ -738,6 +765,8 @@ class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         cls._validate_does_not_look_like_bnb_quantized(mod)
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        _raise_for_flux_nvfp4_transformer(mod.load_state_dict())
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
@@ -2078,12 +2107,26 @@ class Main_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Main_Config_Base,
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("GGUF-quantized MiniMax H3 checkpoints are not supported yet")
 
-        variant = override_fields.pop("variant", None) or (
-            MiniMaxH3VariantType.REF2VA if "ref2va" in mod.path.name.lower() else MiniMaxH3VariantType.FL2VA
-        )
+        variant = MiniMaxH3VariantType(override_fields.pop("variant", None) or cls._get_variant(mod))
         pruned = "adaln_t_table" in state_dict
 
         return cls(**override_fields, variant=variant, pruned=pruned)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> MiniMaxH3VariantType:
+        """Determine the task variant from the file name, the only signal these files carry.
+
+        A community hybrid merge (``minimax_h3_hybrid_fl2va_ref2va_b25-49``) keeps FL2VA's body
+        but takes the AdaLN projections of blocks X..49 - the ones that route reference modality -
+        from Ref2VA, so it needs Ref2VA's reference rows and identifies as REF2VA. Under FL2VA the
+        reference workflow it exists for stays locked away.
+        """
+        name = mod.path.name.lower()
+        return (
+            MiniMaxH3VariantType.REF2VA
+            if any(marker in name for marker in ("ref2va", "hybrid"))
+            else MiniMaxH3VariantType.FL2VA
+        )
 
 
 # ---------------------------------------------------------------------------------------------

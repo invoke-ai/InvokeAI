@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-11-10
+lastUpdated: 2026-11-18
 sidebar:
   order: 3
 ---
@@ -36,8 +36,8 @@ reader's error; if the file is incomplete or corrupt, download it again.
 |---|---|---|---|---|---|---|---|---|---|---|
 | [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | R | ✗ | ✗ |
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ (transformer only: T5, CLIP-L, CLIP-G and VAE installed separately) | ✗ | ✗ |
-| [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | ✓ |
-| [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
+| [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | L | R | ✓ | ✓ | ✓ | ✓ |
+| [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | L | R | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
 | [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | – | ✓ | – | – |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✓ | ✓ | ✗ |
@@ -105,8 +105,8 @@ weights packed; only its dequantized embeddings and the per-layer dequantization
 
 Single-file Qwen3 and Qwen2.5-VL (`qwen_2.5_vl_7b_fp8_scaled`) encoders in ComfyUI's scaled fp8 layout also keep their
 Linear layers in fp8, with the file's own scales, on a GPU that can hold fp8: about 4.4 GB instead of about 8.0 GB for
-Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about the size of the file (9.4 GB) instead of about
-16.6 GB for Qwen2.5-VL. They are dequantized layer by layer on each forward and never multiplied in fp8, whatever
+Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about 8.3 GB (the file less its unused LM head) instead
+of about 15.5 GB for Qwen2.5-VL. They are dequantized layer by layer on each forward and never multiplied in fp8, whatever
 `fp8_compute` says. Token embeddings are always widened to the compute dtype. On a CPU, and for a Qwen3 encoder set to
 run on the CPU, everything is widened to the dtype the encoder computes in. An MXFP8 encoder file that names its layers
 in its markers or header loads too, decoded to bf16; MX scales that nothing names are refused, as is any scaled fp8 file
@@ -246,7 +246,7 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR, and for Qwen-Image LoHA, where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR, and for Qwen-Image LoHA, where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | Krea-2 Control LoRA |
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
@@ -267,15 +267,52 @@ timestep, text and guidance embedders, `norm_out` and the final `proj_out`; thes
 A kohya file holding only such layers, with no transformer block or text-encoder layer, is not recognized as FLUX,
 because Qwen-Image and SD 3 name some of them alike. On FLUX.2 the guidance embedder exists in FLUX.2 [dev] only.
 
+SimpleTuner's LyCORIS training writes its layers with the model's own module names flattened behind a `lycoris_`
+prefix (for example `lycoris_single_transformer_blocks_0_attn_to_k.lokr_w1`). Files in this layout are recognized
+on FLUX.1 (both `lycoris_` and `lycoris__` spellings), FLUX.2, SDXL, Z-Image and Wan, as they already were on
+SD 3 / 3.5; FLUX.3's own flattened names are a different layout and are still not recognized, as noted on its
+family page.
+
+The layout is read from module names alone, which leaves three cases unsettled:
+
+- **SD 1.x and SD 2.x.** Their UNets hold a single transformer block inside every attention, flattened at the same
+  index as SDXL's, so no name tells the two families apart. Such a file is not identified, and setting its base to
+  SD 1.x or SD 2.x does not make it load: those bases keep the flattened `lycoris_` names, while SD denoising only
+  applies `lora_unet_` keys, so none of its layers would apply.
+- **Chroma in diffusers naming.** Chroma shares FLUX.1's `single_transformer_blocks.N.attn.to_q` and `proj_mlp`
+  names, so an attention-only Chroma file in that naming installs as FLUX.1 and patches FLUX.1 layers of the same
+  shape. Any Chroma-only name, such as `distilled_guidance_layer`, keeps the file out; Chroma files in Black Forest
+  Labs' naming stay unrecognized.
+- **Wan image-to-video cross-attention.** `attn2.add_k_proj` and `attn2.add_v_proj` are outside the module sets that
+  both this layout and the kohya one cover, so a file that trains them is not identified.
+
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
+
+FLUX.2 BFL and kohya DoRA adapters on fused image/text QKV projections support input-axis and output-axis
+magnitudes. Output-axis DoRA also works on supported FLUX.2 int8 checkpoints. Input-axis
+normalization uses all Q, K and V rows together and requires ordinary floating-point weights, including
+native FP8 storage; on packed modules and GGUF/SDNQ tensor subclasses, the fused group is skipped with a
+warning while the adapter's other supported layers apply. See the
+[FLUX.2 LoRA notes](/users-guide/models/local-models/flux-2/#lora).
 
 Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` key layout, as raw PEFT adapters
 (`base_model.model.`), and in the LyCORIS `lycoris_transformer_blocks_…` and ai-toolkit
 `lora_transformer_transformer_blocks_…` layouts, when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
+Krea-2 LoRAs also load in ComfyUI's `diffusion_model.` layout, including full (`diff`) layers and `diff_b` bias
+deltas, and in the fal trainer's PEFT layout (`base_model.model.` followed by the native module names); see the
+[family page](/users-guide/models/local-models/krea-2/#lora).
+
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
+
+A Krea-2 Control LoRA is one `.safetensors` file in the layout of
+[Krea-2-controlnet](https://github.com/Tanmaypatil123/Krea-2-controlnet): native block LoRAs written as
+`blocks.N.<module>.A` / `.B` on the attention and MLP Linears, plus a `first.weight` / `first.bias` input projection
+that takes 128 features, twice Krea-2's latent width, into Krea-2's 6144-wide hidden state. It installs as a **Control
+LoRA** for Krea-2; a file with any other key, an unpaired `.A` or `.B`, or a missing or differently shaped
+projection is not recognized as one. See the [family page](/users-guide/models/local-models/krea-2/#control-lora).
 
 On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not

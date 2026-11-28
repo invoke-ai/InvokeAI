@@ -24,10 +24,10 @@ from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tow
 from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     split_fp8_scaled_layers,
@@ -76,13 +76,22 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
     cached encoder while they encode. The language model's weights are cached once for both.
     """
 
+    _bfloat16_safe = True
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        if submodel_type is SubModelType.VAE:
+            return TorchDevice.dtype_avoiding_float16(self._torch_dtype, device)
+        return super()._select_model_dtype(config, submodel_type, device)
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         if submodel_type is SubModelType.VisionEncoder:
             # A few hundred tensors of the encoder's folder, not the folder: reserving its ~17 GB for the tower
             # would evict models for nothing. Sized at the dtype they load in, whatever the file stores.
-            element_size = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()).itemsize
+            element_size = self._decision(config, submodel_type).dtype.itemsize
             return sum(
                 math.prod(shape) * element_size
                 for _shard, _key, shape in _vision_tower_tensors(model_path / SubModelType.TextEncoder.value)
@@ -105,12 +114,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
 
             return AutoProcessor.from_pretrained(model_path / "processor", local_files_only=True)
 
-        if submodel_type is SubModelType.VAE:
-            # The configured precision, except float16, which is unstable on this autoencoder: bfloat16 where the
-            # device has it, float32 otherwise.
-            dtype = self._torch_dtype_avoiding_float16()
-        else:
-            dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._decision(config, submodel_type).dtype
 
         if submodel_type is SubModelType.VisionEncoder:
             tower = _load_vision_tower(model_path / SubModelType.TextEncoder.value, dtype)
@@ -177,7 +181,6 @@ def _vision_tower_tensors(folder: Path) -> list[tuple[Path, str, list[int]]]:
 
 def _load_vision_tower(folder: Path, dtype: torch.dtype) -> torch.nn.Module:
     """The encoder's vision tower alone, as `Qwen3VLModel.visual` would hold it, without reading the language model."""
-    from safetensors import safe_open
     from transformers import AutoConfig
     from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
 
@@ -185,13 +188,21 @@ def _load_vision_tower(folder: Path, dtype: torch.dtype) -> torch.nn.Module:
     with accelerate.init_empty_weights():
         tower = Qwen3VLVisionModel._from_config(vision_config, torch_dtype=dtype)
 
+    keys_by_shard: dict[Path, dict[str, str]] = {}
+    for shard, key, _shape in _vision_tower_tensors(folder):
+        prefix = next(p for p in _VISION_TOWER_PREFIXES if key.startswith(p))
+        keys_by_shard.setdefault(shard, {})[key] = key[len(prefix) :]
     state_dict: dict[str, torch.Tensor] = {}
-    tensors = _vision_tower_tensors(folder)
-    for shard in sorted({shard for shard, *_ in tensors}):
-        with safe_open(shard, framework="pt", device="cpu") as f:
-            for _shard, key, _shape in (t for t in tensors if t[0] == shard):
-                prefix = next(p for p in _VISION_TOWER_PREFIXES if key.startswith(p))
-                state_dict[key[len(prefix) :]] = f.get_tensor(key).to(dtype)
+    for shard, names in keys_by_shard.items():
+        # Owned storage whatever the shard holds: a bf16 tower's cast to bf16 returns the tensor itself, and a view of a
+        # text-encoder shard keeps all of it mapped for as long as the tower is cached.
+        tensors = load_safetensors_checkpoint(
+            shard, select=lambda keys, wanted=names: {k: k for k in keys if k in wanted}, owned=True
+        )
+        # Popped as it is cast, so a shard's raw tensors and their casts do not coexist.
+        for key in list(tensors):
+            state_dict[names[key]] = tensors.pop(key).to(dtype)
+        del tensors
     load_state_dict_ignoring_extras(tower, state_dict, source=f"Qwen3-VL vision tower in {folder}", assign=True)
     reject_incomplete_load(tower, what="Qwen3-VL vision tower")
     return tower.eval()
@@ -206,18 +217,18 @@ class QwenImage21CheckpointModel(ModelLoader):
     split before any quantization side channel is read, so every quantized layer names a diffusers Linear.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_QwenImage21_Config):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage21_Config, got {type(config).__name__}.")
         if submodel_type is not SubModelType.Transformer:
             raise ValueError(f"Only the transformer is in a single file. Received: {submodel_type}")
 
-        from safetensors.torch import load_file
-
         model_path = Path(config.path)
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # unsloth's torchao FP8 build, renamed to the ComfyUI scaled-fp8 form everything below reads.
         translate_torchao_fp8_layers(sd)
@@ -272,17 +283,11 @@ class QwenImage21CheckpointModel(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
             )
-            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
                 fp8_layers = {}
             fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
             kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-            if mapped is not None:
-                # Parameters the fold and cast left as they were are slices of the file mapping and would pin it,
-                # uncounted. Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
-                clone_unreplaced_tensors(sd, mapped)
-                mapped.clear()
 
         load_state_dict_ignoring_extras(
             model, sd, source="Qwen-Image-2.1 single-file checkpoint", assign=True, allow_missing=True

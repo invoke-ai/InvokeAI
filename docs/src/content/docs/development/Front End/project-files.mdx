@@ -46,7 +46,7 @@ clarity, texture or dehaze adjustment, enabled or not, on any layer or group at 
 reader would drop the
 whole adjustment stack holding it. Schema 6 marks a control layer carrying any derivation field
 (`controlType`, `detection`, `original` or `originalTransform`), which an older reader would strip,
-losing the kept original. The live document and each saved canvas snapshot are versioned
+losing the kept original. Schema 7 marks the presence of a vector stack, even when empty. Schema 8 marks a raster regenerate region with a Diagonal Left (`diagonal_left`) fill, which an older reader would silently drop. The live document and each saved canvas snapshot are versioned
 this way, and the canvas state takes the newest of them. Adoption is sticky: removing the feature
 does not lower the version, as the server floor cannot be lowered either. A canvas with none of
 these stays at 3, so older builds keep opening it. A build refuses a canvas that declares a schema above

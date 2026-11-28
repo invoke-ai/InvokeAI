@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 
 krea2_turbo = StarterModel(
+    source_urls=["https://huggingface.co/krea/Krea-2-Turbo"],
     name="Krea-2 Turbo",
     base=BaseModelType.Krea2,
     source="krea/Krea-2-Turbo",
@@ -21,6 +22,7 @@ krea2_turbo = StarterModel(
 )
 
 krea2_raw = StarterModel(
+    source_urls=["https://huggingface.co/krea/Krea-2-Raw"],
     name="Krea-2 Raw",
     base=BaseModelType.Krea2,
     source="krea/Krea-2-Raw",
@@ -32,6 +34,7 @@ krea2_raw = StarterModel(
 )
 
 krea2_turbo_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF"],
     name="Krea-2 Turbo (Q4_K_M GGUF)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q4_K_M.gguf",
@@ -45,6 +48,7 @@ krea2_turbo_gguf_q4_k_m = StarterModel(
 )
 
 krea2_turbo_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Krea-2 Turbo (NVFP4)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_nvfp4.safetensors",
@@ -58,6 +62,7 @@ krea2_turbo_nvfp4 = StarterModel(
 )
 
 krea2_turbo_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Krea-2 Turbo (fp8)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/diffusion_models/krea2_turbo_fp8_scaled.safetensors",
@@ -70,6 +75,7 @@ krea2_turbo_fp8 = StarterModel(
 )
 
 krea2_turbo_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Krea-2 Turbo (int8)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/diffusion_models/krea2_turbo_int8_convrot.safetensors",
@@ -82,6 +88,7 @@ krea2_turbo_int8 = StarterModel(
 )
 
 krea2_turbo_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF"],
     name="Krea-2 Turbo (Q8_0 GGUF)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF/resolve/main/krea2_turbo-Q8_0.gguf",
@@ -107,6 +114,7 @@ _KREA2_RAW_NOTE = (
 )
 
 krea2_raw_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Krea-2 Raw (fp8)",
     base=BaseModelType.Krea2,
     source=f"{_KREA2_COMFY_RAW}/krea2_raw_fp8_scaled.safetensors",
@@ -118,6 +126,7 @@ krea2_raw_fp8 = StarterModel(
 )
 
 krea2_raw_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Krea-2 Raw (int8)",
     base=BaseModelType.Krea2,
     source=f"{_KREA2_COMFY_RAW}/krea2_raw_int8_convrot.safetensors",
@@ -128,6 +137,7 @@ krea2_raw_int8 = StarterModel(
 )
 
 krea2_raw_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/Krea-2-Raw-GGUF"],
     name="Krea-2 Raw (Q4_K_M GGUF)",
     base=BaseModelType.Krea2,
     source=f"{_KREA2_RAW_GGUF}/krea2_raw-Q4_K_M.gguf",
@@ -140,6 +150,7 @@ krea2_raw_gguf_q4_k_m = StarterModel(
 )
 
 krea2_raw_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/vantagewithai/Krea-2-Raw-GGUF"],
     name="Krea-2 Raw (Q8_0 GGUF)",
     base=BaseModelType.Krea2,
     source=f"{_KREA2_RAW_GGUF}/krea2_raw-Q8_0.gguf",
@@ -152,6 +163,7 @@ krea2_raw_gguf_q8_0 = StarterModel(
 )
 
 krea2_raw_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/rockerBOO/krea2-raw-nvfp4"],
     name="Krea-2 Raw (NVFP4)",
     base=BaseModelType.Krea2,
     source="https://huggingface.co/rockerBOO/krea2-raw-nvfp4/resolve/fd87108933d85b0870cfc44ad3bca474eabdd0da/"

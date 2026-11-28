@@ -51,7 +51,7 @@ const makeLayer = (type: CanvasLayerContract['type']): CanvasLayerContract => {
     case 'inpaint_mask':
       return createInpaintMaskLayer('Mask', 'mask');
     case 'regional_guidance':
-      return createRegionalGuidanceLayer('Region', 0, 'region');
+      return createRegionalGuidanceLayer('Region', undefined, 'region');
     case 'vector':
       return createVectorLayer({ id: 'vector', name: 'Vector' });
   }
@@ -108,6 +108,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   duplicate: vi.fn(),
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
+  flip: vi.fn(),
   group: vi.fn(),
   mergeDown: vi.fn(() => Promise.resolve()),
   mergeMasks: vi.fn(() => Promise.resolve()),
@@ -246,7 +247,7 @@ describe('getLayerContextActions', () => {
       },
     });
     const inpaint = createInpaintMaskLayer('Interaction mask', 'interaction-mask');
-    const regional = createRegionalGuidanceLayer('Interaction region', 0, 'interaction-region');
+    const regional = createRegionalGuidanceLayer('Interaction region', undefined, 'interaction-region');
     const contexts = [
       makeState(raster, { document: rasterDocument, operationLocked: true }),
       makeState(raster, {
@@ -271,9 +272,12 @@ describe('getLayerContextActions', () => {
       'duplicate',
       'group',
       'remove-from-group',
+      'open-properties',
       'rename',
       'transform',
       'fit-to-bbox',
+      'flip-horizontal',
+      'flip-vertical',
       'add-brightness-contrast',
       'add-exposure',
       'add-levels',
@@ -525,6 +529,21 @@ describe('getLayerContextActions', () => {
   });
 });
 
+describe('open-properties', () => {
+  it('offers Layer properties on every layer type and opens the Properties pane through its effect', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const action = byId(getLayerContextActions(makeState(makeLayer(type))), 'open-properties');
+      expect(action.isDisabled, type).toBe(false);
+    }
+    expect(getEnglishTranslation('widgets.layers.actions.properties')).toBe('Layer properties');
+
+    const effects = makeEffects();
+    getLayerContextActionDefinition('open-properties').handler(makeRuntimeContext(rasterLayer, { effects }));
+
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openProperties]);
+  });
+});
+
 describe('toggle-visibility', () => {
   const labelOf = (layer: CanvasLayerContract, overrides: Partial<LayerContextActionState> = {}) =>
     getEnglishTranslation(byId(getLayerContextActions(makeState(layer, overrides)), 'toggle-visibility').labelKey);
@@ -585,7 +604,7 @@ describe('remove-from-group', () => {
 describe('merge-masks', () => {
   const m1 = createInpaintMaskLayer('Mask 1', 'm1');
   const m2 = createInpaintMaskLayer('Mask 2', 'm2');
-  const region = createRegionalGuidanceLayer('Region', 0, 'region');
+  const region = createRegionalGuidanceLayer('Region', undefined, 'region');
   const layers = [m1, groupContract('G', [m2]), region];
 
   it('replaces raster merge for a selection of inpaint masks only', () => {

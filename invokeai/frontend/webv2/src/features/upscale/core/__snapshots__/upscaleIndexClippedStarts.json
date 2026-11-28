@@ -1517,9 +1517,11 @@
   "schedulers": {
     "anima": [
       "euler",
+      "heun",
       "dpmpp_2m",
       "dpmpp_2m_sde",
-      "er_sde"
+      "er_sde",
+      "lcm"
     ],
     "krea-2": [
       "euler"
@@ -1529,7 +1531,8 @@
     ],
     "z-image": [
       "euler",
-      "heun"
+      "heun",
+      "lcm"
     ]
   }
 }

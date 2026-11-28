@@ -1703,6 +1703,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/gone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Gone Images
+         * @description Returns the requested names whose image records are positively absent.
+         *
+         *     Lets a client whose delete response was lost learn which deletions committed, so it can drop
+         *     its references to them. A name is listed only when the record is confirmed missing: a name
+         *     that exists (readable by the caller or not) or that storage could not check is left out, so
+         *     an unavailable database prunes nothing. Revealing absence matches the 404 the per-image
+         *     routes already answer for a gone image (see `_assert_image_record_exists`).
+         */
+        post: operations["get_gone_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/uncategorized": {
         parameters: {
             query?: never;
@@ -3530,7 +3556,10 @@ export type paths = {
          * @description Retries the given queue items. Users can only retry their own items unless they are an admin.
          *
          *     A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
-         *     the request retries nothing, also its items that are no calibration's (503); retry again once it can.
+         *     the request retries nothing, also its items that are no calibration's (503); retry again once it can. A calibration
+         *     item whose retry would measure between another calibration attempt's steps, or after another calibration cut its
+         *     own attempt off, refuses the whole request too, generations included (409 with a code). The web UI retries one
+         *     item per request; an API client that retries several at once should retry its calibration items on their own.
          */
         put: operations["retry_items_by_id"];
         post?: never;
@@ -5987,7 +6016,7 @@ export type components = {
          * @enum {string}
          */
         AnimaVariantType: "anima_qwen3" | "anima_qwen35";
-        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
         /**
          * AppVersion
          * @description App Version Response
@@ -6989,6 +7018,14 @@ export type components = {
              */
             prepend?: boolean;
         };
+        /** Body_get_gone_images */
+        Body_get_gone_images: {
+            /**
+             * Image Names
+             * @description The names of images to check
+             */
+            image_names: string[];
+        };
         /** Body_get_images_by_names */
         Body_get_images_by_names: {
             /**
@@ -7659,9 +7696,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7753,9 +7795,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7847,9 +7894,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7938,9 +7990,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -8125,9 +8182,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10108,9 +10170,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10128,6 +10195,95 @@ export type components = {
              * @constant
              */
             base: "flux";
+            /**
+             * Type
+             * @default control_lora
+             * @constant
+             */
+            type: "control_lora";
+            /**
+             * Format
+             * @default lycoris
+             * @constant
+             */
+            format: "lycoris";
+            /** Trigger Phrases */
+            trigger_phrases: string[] | null;
+        };
+        /**
+         * ControlLoRA_LyCORIS_Krea2_Config
+         * @description Model config for Krea-2 Control LoRAs: native block LoRAs (`.A`/`.B`) and a widened `first` projection.
+         */
+        ControlLoRA_LyCORIS_Krea2_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description User-editable URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Base
+             * @default krea-2
+             * @constant
+             */
+            base: "krea-2";
             /**
              * Type
              * @default control_lora
@@ -10348,9 +10504,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10437,9 +10598,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10531,9 +10697,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10627,9 +10798,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10718,9 +10894,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10802,9 +10983,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10886,9 +11072,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -10980,9 +11171,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -11064,9 +11260,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -11145,9 +11346,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -11226,9 +11432,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -11307,9 +11518,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -13891,9 +14107,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -14366,9 +14587,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19147,9 +19373,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19241,9 +19472,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19327,9 +19563,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19418,9 +19659,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19587,7 +19833,7 @@ export type components = {
              * @description The nodes in this graph
              */
             nodes?: {
-                [key: string]: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+                [key: string]: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2ControlLoRAInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             };
             /**
              * Edges
@@ -19624,7 +19870,7 @@ export type components = {
              * @description The results of node executions
              */
             results: {
-                [key: string]: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaIPAdapterOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCartesianInvocationOutput"] | components["schemas"]["CollectionConcatInvocationOutput"] | components["schemas"]["CollectionZipInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageLoRACollectionLoaderOutput"] | components["schemas"]["ErnieImageLoRALoaderOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2ControlOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["Flux3ConditioningOutput"] | components["schemas"]["Flux3LoRALoaderOutput"] | components["schemas"]["Flux3ModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["ForInvocationOutput"] | components["schemas"]["ForReturnInvocationOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4LoRACollectionLoaderOutput"] | components["schemas"]["Ideogram4LoRALoaderOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["Krea2StyleReferenceOutput"] | components["schemas"]["LTX2AudioConditioningOutput"] | components["schemas"]["LTX2DenoiseOutput"] | components["schemas"]["LTX2DurationOutput"] | components["schemas"]["LTX2ExtendConditioningOutput"] | components["schemas"]["LTX2IdealDimensionsOutput"] | components["schemas"]["LTX2ImageConditioningOutput"] | components["schemas"]["LTX2LatentUpsampleOutput"] | components["schemas"]["LTX2LoRACollectionLoaderOutput"] | components["schemas"]["LTX2LoRALoaderOutput"] | components["schemas"]["LTX2ModelLoaderOutput"] | components["schemas"]["LTX2TextEncoderOutput"] | components["schemas"]["LTX2VideoConditioningOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoopStateOutput"] | components["schemas"]["LoopStateValueOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3HybridOverlayOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["MiniMaxH3ReferenceConditioningOutput"] | components["schemas"]["MiniMaxH3ReferenceMediaOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["MossImageConditioningOutput"] | components["schemas"]["MossImageLoRALoaderOutput"] | components["schemas"]["MossImageModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImage21ConditioningOutput"] | components["schemas"]["QwenImage21LoRALoaderOutput"] | components["schemas"]["QwenImage21ModelLoaderOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageControlOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SD3LoRACollectionLoaderOutput"] | components["schemas"]["SD3LoRALoaderOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+                [key: string]: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaIPAdapterOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCartesianInvocationOutput"] | components["schemas"]["CollectionConcatInvocationOutput"] | components["schemas"]["CollectionZipInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageLoRACollectionLoaderOutput"] | components["schemas"]["ErnieImageLoRALoaderOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2ControlOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["Flux3ConditioningOutput"] | components["schemas"]["Flux3LoRALoaderOutput"] | components["schemas"]["Flux3ModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["ForInvocationOutput"] | components["schemas"]["ForReturnInvocationOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4LoRACollectionLoaderOutput"] | components["schemas"]["Ideogram4LoRALoaderOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2ControlLoRAOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["Krea2StyleReferenceOutput"] | components["schemas"]["LTX2AudioConditioningOutput"] | components["schemas"]["LTX2DenoiseOutput"] | components["schemas"]["LTX2DurationOutput"] | components["schemas"]["LTX2ExtendConditioningOutput"] | components["schemas"]["LTX2IdealDimensionsOutput"] | components["schemas"]["LTX2ImageConditioningOutput"] | components["schemas"]["LTX2LatentUpsampleOutput"] | components["schemas"]["LTX2LoRACollectionLoaderOutput"] | components["schemas"]["LTX2LoRALoaderOutput"] | components["schemas"]["LTX2ModelLoaderOutput"] | components["schemas"]["LTX2TextEncoderOutput"] | components["schemas"]["LTX2VideoConditioningOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoopStateOutput"] | components["schemas"]["LoopStateValueOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3HybridOverlayOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["MiniMaxH3ReferenceConditioningOutput"] | components["schemas"]["MiniMaxH3ReferenceMediaOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["MossImageConditioningOutput"] | components["schemas"]["MossImageLoRALoaderOutput"] | components["schemas"]["MossImageModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImage21ConditioningOutput"] | components["schemas"]["QwenImage21LoRALoaderOutput"] | components["schemas"]["QwenImage21ModelLoaderOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageControlOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SD3LoRACollectionLoaderOutput"] | components["schemas"]["SD3LoRALoaderOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
             };
             /**
              * Errors
@@ -20204,9 +20450,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20282,9 +20533,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20360,9 +20616,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20438,9 +20699,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20516,9 +20782,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20594,9 +20865,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20674,9 +20950,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20754,9 +21035,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -24701,7 +24987,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2ControlLoRAInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -24729,7 +25015,7 @@ export type components = {
              * Result
              * @description The result of the invocation
              */
-            result: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaIPAdapterOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCartesianInvocationOutput"] | components["schemas"]["CollectionConcatInvocationOutput"] | components["schemas"]["CollectionZipInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageLoRACollectionLoaderOutput"] | components["schemas"]["ErnieImageLoRALoaderOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2ControlOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["Flux3ConditioningOutput"] | components["schemas"]["Flux3LoRALoaderOutput"] | components["schemas"]["Flux3ModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["ForInvocationOutput"] | components["schemas"]["ForReturnInvocationOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4LoRACollectionLoaderOutput"] | components["schemas"]["Ideogram4LoRALoaderOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["Krea2StyleReferenceOutput"] | components["schemas"]["LTX2AudioConditioningOutput"] | components["schemas"]["LTX2DenoiseOutput"] | components["schemas"]["LTX2DurationOutput"] | components["schemas"]["LTX2ExtendConditioningOutput"] | components["schemas"]["LTX2IdealDimensionsOutput"] | components["schemas"]["LTX2ImageConditioningOutput"] | components["schemas"]["LTX2LatentUpsampleOutput"] | components["schemas"]["LTX2LoRACollectionLoaderOutput"] | components["schemas"]["LTX2LoRALoaderOutput"] | components["schemas"]["LTX2ModelLoaderOutput"] | components["schemas"]["LTX2TextEncoderOutput"] | components["schemas"]["LTX2VideoConditioningOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoopStateOutput"] | components["schemas"]["LoopStateValueOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3HybridOverlayOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["MiniMaxH3ReferenceConditioningOutput"] | components["schemas"]["MiniMaxH3ReferenceMediaOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["MossImageConditioningOutput"] | components["schemas"]["MossImageLoRALoaderOutput"] | components["schemas"]["MossImageModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImage21ConditioningOutput"] | components["schemas"]["QwenImage21LoRALoaderOutput"] | components["schemas"]["QwenImage21ModelLoaderOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageControlOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SD3LoRACollectionLoaderOutput"] | components["schemas"]["SD3LoRALoaderOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+            result: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaIPAdapterOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCartesianInvocationOutput"] | components["schemas"]["CollectionConcatInvocationOutput"] | components["schemas"]["CollectionZipInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageLoRACollectionLoaderOutput"] | components["schemas"]["ErnieImageLoRALoaderOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2ControlOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["Flux3ConditioningOutput"] | components["schemas"]["Flux3LoRALoaderOutput"] | components["schemas"]["Flux3ModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["ForInvocationOutput"] | components["schemas"]["ForReturnInvocationOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4LoRACollectionLoaderOutput"] | components["schemas"]["Ideogram4LoRALoaderOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2ControlLoRAOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["Krea2StyleReferenceOutput"] | components["schemas"]["LTX2AudioConditioningOutput"] | components["schemas"]["LTX2DenoiseOutput"] | components["schemas"]["LTX2DurationOutput"] | components["schemas"]["LTX2ExtendConditioningOutput"] | components["schemas"]["LTX2IdealDimensionsOutput"] | components["schemas"]["LTX2ImageConditioningOutput"] | components["schemas"]["LTX2LatentUpsampleOutput"] | components["schemas"]["LTX2LoRACollectionLoaderOutput"] | components["schemas"]["LTX2LoRALoaderOutput"] | components["schemas"]["LTX2ModelLoaderOutput"] | components["schemas"]["LTX2TextEncoderOutput"] | components["schemas"]["LTX2VideoConditioningOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoopStateOutput"] | components["schemas"]["LoopStateValueOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3HybridOverlayOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["MiniMaxH3ReferenceConditioningOutput"] | components["schemas"]["MiniMaxH3ReferenceMediaOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["MossImageConditioningOutput"] | components["schemas"]["MossImageLoRALoaderOutput"] | components["schemas"]["MossImageModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImage21ConditioningOutput"] | components["schemas"]["QwenImage21LoRALoaderOutput"] | components["schemas"]["QwenImage21ModelLoaderOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageControlOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SD3LoRACollectionLoaderOutput"] | components["schemas"]["SD3LoRALoaderOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
         };
         /**
          * InvocationErrorEvent
@@ -24783,7 +25069,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2ControlLoRAInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -25006,6 +25292,7 @@ export type components = {
             ip_adapter: components["schemas"]["IPAdapterOutput"];
             iterate: components["schemas"]["IterateInvocationOutput"];
             krea2_conditioning_rebalance: components["schemas"]["Krea2ConditioningOutput"];
+            krea2_control_lora: components["schemas"]["Krea2ControlLoRAOutput"];
             krea2_denoise: components["schemas"]["LatentsMetaOutput"];
             krea2_lora_collection_loader: components["schemas"]["Krea2LoRALoaderOutput"];
             krea2_lora_loader: components["schemas"]["Krea2LoRALoaderOutput"];
@@ -25256,7 +25543,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2ControlLoRAInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -25361,7 +25648,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlibabaCloudImageGenerationInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnimaDenoiseInvocation"] | components["schemas"]["AnimaDenoiseMetaInvocation"] | components["schemas"]["AnimaIPAdapterInvocation"] | components["schemas"]["AnimaImageToLatentsInvocation"] | components["schemas"]["AnimaLLLiteInvocation"] | components["schemas"]["AnimaLatentsToImageInvocation"] | components["schemas"]["AnimaLoRACollectionLoader"] | components["schemas"]["AnimaLoRALoaderInvocation"] | components["schemas"]["AnimaModelLoaderInvocation"] | components["schemas"]["AnimaTextEncoderInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AtlasCloudImageGenerationInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanLogicInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CallSavedWorkflowInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasOutputInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ClarityInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCartesianInvocation"] | components["schemas"]["CollectionConcatInvocation"] | components["schemas"]["CollectionZipInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ContrastDehazeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ErnieImageDenoiseInvocation"] | components["schemas"]["ErnieImageLoRACollectionLoader"] | components["schemas"]["ErnieImageLoRALoaderInvocation"] | components["schemas"]["ErnieImageModelLoaderInvocation"] | components["schemas"]["ErnieImagePromptEnhancerInvocation"] | components["schemas"]["ErnieImageTextEncoderInvocation"] | components["schemas"]["ErnieImageVaeDecodeInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractVideoRangeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2ControlInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2DevLoRACollectionLoader"] | components["schemas"]["Flux2DevLoRALoaderInvocation"] | components["schemas"]["Flux2DevModelLoaderInvocation"] | components["schemas"]["Flux2DevTextEncoderInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2PiDDecodeInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["Flux3DenoiseInvocation"] | components["schemas"]["Flux3LayoutPromptInvocation"] | components["schemas"]["Flux3LoRACollectionLoader"] | components["schemas"]["Flux3LoRALoaderInvocation"] | components["schemas"]["Flux3ModelLoaderInvocation"] | components["schemas"]["Flux3PromptUpsamplerInvocation"] | components["schemas"]["Flux3TextEncoderInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxPiDDecodeInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["ForInvocation"] | components["schemas"]["ForReturnInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GeminiImageGenerationInvocation"] | components["schemas"]["Gemma2EncoderLoaderInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["Ideogram4CaptionBuilderInvocation"] | components["schemas"]["Ideogram4DenoiseInvocation"] | components["schemas"]["Ideogram4LatentsToImageInvocation"] | components["schemas"]["Ideogram4LoRACollectionLoader"] | components["schemas"]["Ideogram4LoRALoaderInvocation"] | components["schemas"]["Ideogram4ModelLoaderInvocation"] | components["schemas"]["Ideogram4TextEncoderInvocation"] | components["schemas"]["IfInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["Krea2ConditioningRebalanceInvocation"] | components["schemas"]["Krea2ControlLoRAInvocation"] | components["schemas"]["Krea2DenoiseInvocation"] | components["schemas"]["Krea2LoRACollectionLoader"] | components["schemas"]["Krea2LoRALoaderInvocation"] | components["schemas"]["Krea2ModelLoaderInvocation"] | components["schemas"]["Krea2SeedVarianceInvocation"] | components["schemas"]["Krea2StyleReferenceInvocation"] | components["schemas"]["Krea2TextEncoderInvocation"] | components["schemas"]["LTX2AudioConditioningInvocation"] | components["schemas"]["LTX2DenoiseInvocation"] | components["schemas"]["LTX2DurationInvocation"] | components["schemas"]["LTX2ExtendConditioningInvocation"] | components["schemas"]["LTX2IdealDimensionsInvocation"] | components["schemas"]["LTX2ImageConditioningInvocation"] | components["schemas"]["LTX2LatentUpsampleInvocation"] | components["schemas"]["LTX2LatentsToVideoInvocation"] | components["schemas"]["LTX2LoRACollectionLoader"] | components["schemas"]["LTX2LoRALoaderInvocation"] | components["schemas"]["LTX2ModelLoaderInvocation"] | components["schemas"]["LTX2TextEncoderInvocation"] | components["schemas"]["LTX2VideoConditioningInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MetadataToWanLorasInvocation"] | components["schemas"]["MiniMaxH3DenoiseInvocation"] | components["schemas"]["MiniMaxH3FrameConditioningInvocation"] | components["schemas"]["MiniMaxH3HybridOverlayInvocation"] | components["schemas"]["MiniMaxH3IdealDimensionsInvocation"] | components["schemas"]["MiniMaxH3ImageReferenceInvocation"] | components["schemas"]["MiniMaxH3LatentsToImageInvocation"] | components["schemas"]["MiniMaxH3LatentsToVideoInvocation"] | components["schemas"]["MiniMaxH3LoRACollectionLoader"] | components["schemas"]["MiniMaxH3LoRALoaderInvocation"] | components["schemas"]["MiniMaxH3ModelLoaderInvocation"] | components["schemas"]["MiniMaxH3ReferenceConditioningInvocation"] | components["schemas"]["MiniMaxH3TextEncoderInvocation"] | components["schemas"]["MiniMaxH3VideoReferenceInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MossImageDenoiseInvocation"] | components["schemas"]["MossImageLayoutPromptInvocation"] | components["schemas"]["MossImageLoRACollectionLoader"] | components["schemas"]["MossImageLoRALoaderInvocation"] | components["schemas"]["MossImageModelLoaderInvocation"] | components["schemas"]["MossImageTextEncoderInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OklabUnsharpMaskInvocation"] | components["schemas"]["OklchImageHueAdjustmentInvocation"] | components["schemas"]["OpenAIImageGenerationInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDDecoderLoaderInvocation"] | components["schemas"]["PiDUpscaleInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["QwenImage21DenoiseInvocation"] | components["schemas"]["QwenImage21ImageToLatentsInvocation"] | components["schemas"]["QwenImage21LatentsToImageInvocation"] | components["schemas"]["QwenImage21LoRACollectionLoader"] | components["schemas"]["QwenImage21LoRALoaderInvocation"] | components["schemas"]["QwenImage21ModelLoaderInvocation"] | components["schemas"]["QwenImage21TextEncoderInvocation"] | components["schemas"]["QwenImageControlInvocation"] | components["schemas"]["QwenImageDenoiseInvocation"] | components["schemas"]["QwenImageImageToLatentsInvocation"] | components["schemas"]["QwenImageLatentsToImageInvocation"] | components["schemas"]["QwenImageLoRACollectionLoader"] | components["schemas"]["QwenImageLoRALoaderInvocation"] | components["schemas"]["QwenImageModelLoaderInvocation"] | components["schemas"]["QwenImagePiDDecodeInvocation"] | components["schemas"]["QwenImageTextEncoderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3LoRACollectionLoader"] | components["schemas"]["SD3LoRALoaderInvocation"] | components["schemas"]["SD3PiDDecodeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLPiDDecodeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SaveImageToFileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SeedreamImageGenerationInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StateEmptyInvocation"] | components["schemas"]["StateGetInvocation"] | components["schemas"]["StateMergeInvocation"] | components["schemas"]["StateSetInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TextLLMInvocation"] | components["schemas"]["TextLLMWithPresetInvocation"] | components["schemas"]["TextureInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["VideoConcatInvocation"] | components["schemas"]["VideoFrameExtractInvocation"] | components["schemas"]["VideoInvocation"] | components["schemas"]["WanDenoiseInvocation"] | components["schemas"]["WanI2VIdealDimensionsInvocation"] | components["schemas"]["WanImageToLatentsInvocation"] | components["schemas"]["WanLatentsToImageInvocation"] | components["schemas"]["WanLatentsToVideoInvocation"] | components["schemas"]["WanLoRACollectionLoader"] | components["schemas"]["WanLoRALoaderInvocation"] | components["schemas"]["WanModelLoaderInvocation"] | components["schemas"]["WanRefImageEncoderInvocation"] | components["schemas"]["WanTI2VIdealDimensionsInvocation"] | components["schemas"]["WanTextEncoderInvocation"] | components["schemas"]["WanVideoDenoiseInvocation"] | components["schemas"]["WorkflowReturnGetInvocation"] | components["schemas"]["WorkflowReturnInvocation"] | components["schemas"]["WorkflowReturnValueInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImagePiDDecodeInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -25440,6 +25727,7 @@ export type components = {
          *         fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).
          *         fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.
          *         int8_compute: Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.
+         *         async_weight_streaming: When a model is only partially loaded into VRAM, copy the weights it streams from RAM to the GPU asynchronously from page-locked RAM on a separate stream, overlapping with the computation, instead of one blocking copy per layer. Speeds up partially loaded models; images stay identical. Requires an NVIDIA or AMD (ROCm) GPU and keep_ram_copy_of_weights; falls back to the blocking copy automatically otherwise (Apple and Intel GPUs, the CPU, and GGUF or other specially quantized weights, which gain nothing from it). Copies in flight take up to about 384MB of VRAM; the model cache keeps that much free for them, so slightly less of such a model stays in VRAM. The RAM copy of the streamed weights is page-locked and stays locked while the model is in the cache, so models taking turns in VRAM lock it once (not swappable; at most 40% of physical RAM, where the weights of models not running are unlocked first); weights loaded from a file mapping are read into RAM when they are first locked. Has no effect on models that fit fully in VRAM.
          *         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
          *         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
          *         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
@@ -25472,7 +25760,7 @@ export type components = {
          *         download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
-         *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+         *         multiuser: Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
          *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
          *         image_index_enabled: Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.
          *         image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.
@@ -25858,6 +26146,12 @@ export type components = {
              */
             int8_compute?: boolean;
             /**
+             * Async Weight Streaming
+             * @description When a model is only partially loaded into VRAM, copy the weights it streams from RAM to the GPU asynchronously from page-locked RAM on a separate stream, overlapping with the computation, instead of one blocking copy per layer. Speeds up partially loaded models; images stay identical. Requires an NVIDIA or AMD (ROCm) GPU and keep_ram_copy_of_weights; falls back to the blocking copy automatically otherwise (Apple and Intel GPUs, the CPU, and GGUF or other specially quantized weights, which gain nothing from it). Copies in flight take up to about 384MB of VRAM; the model cache keeps that much free for them, so slightly less of such a model stays in VRAM. The RAM copy of the streamed weights is page-locked and stays locked while the model is in the cache, so models taking turns in VRAM lock it once (not swappable; at most 40% of physical RAM, where the weights of models not running are unlocked first); weights loaded from a file mapping are read into RAM when they are first locked. Has no effect on models that fit fully in VRAM.
+             * @default false
+             */
+            async_weight_streaming?: boolean;
+            /**
              * Ram
              * @description DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
              */
@@ -26063,8 +26357,8 @@ export type components = {
             allow_unknown_models?: boolean;
             /**
              * Multiuser
-             * @description Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
-             * @default false
+             * @description Enable multiuser support (the default). Requires user authentication and authorization; the first visitor creates the administrator account. Set to false for single-user mode, which uses a default system account with administrator privileges and no sign-in: anyone who can reach the server then has full control of it. Single-user mode is deprecated.
+             * @default true
              */
             multiuser?: boolean;
             /**
@@ -26895,6 +27189,88 @@ export type components = {
             type: "krea2_conditioning_rebalance";
         };
         /**
+         * Krea2ControlLoRAField
+         * @description A Krea-2 Control LoRA, its block-LoRA weight and the control latents it conditions on.
+         */
+        Krea2ControlLoRAField: {
+            /** @description Info to load lora model */
+            lora: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Weight
+             * @description Weight to apply to lora model
+             */
+            weight: number;
+            /** @description The control image (e.g. a depth map) encoded by 'Image to Latents - Qwen Image' at the generation width and height. */
+            control_latents: components["schemas"]["LatentsField"];
+        };
+        /**
+         * Control LoRA - Krea-2
+         * @description Condition a Krea-2 generation on a control image through a Krea-2 Control LoRA.
+         *
+         *     A Control LoRA is trained for one control type (the public one is depth, near = white). The control image's
+         *     latents are concatenated to the latent tokens at the transformer input. Works on Krea-2 Raw and Turbo.
+         */
+        Krea2ControlLoRAInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Control LoRA
+             * @description Control LoRA model to load
+             * @default null
+             */
+            lora?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Control Latents
+             * @description The control image (e.g. a depth map) encoded by 'Image to Latents - Qwen Image' at the generation width and height.
+             * @default null
+             */
+            control_latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Weight
+             * @description Scales the LoRA's block weights; 0 disables the control LoRA. The trained input projection is always applied whole.
+             * @default 1
+             */
+            weight?: number;
+            /**
+             * type
+             * @default krea2_control_lora
+             * @constant
+             */
+            type: "krea2_control_lora";
+        };
+        /**
+         * Krea2ControlLoRAOutput
+         * @description Krea-2 Control LoRA output.
+         */
+        Krea2ControlLoRAOutput: {
+            /**
+             * Control LoRA
+             * @description Krea-2 Control LoRA
+             */
+            control_lora: components["schemas"]["Krea2ControlLoRAField"];
+            /**
+             * type
+             * @default krea2_control_lora_output
+             * @constant
+             */
+            type: "krea2_control_lora_output";
+        };
+        /**
          * Denoise - Krea-2
          * @description Run the denoising process with a Krea-2 model.
          */
@@ -27021,6 +27397,12 @@ export type components = {
              * @default false
              */
             reference_kv_cache?: boolean;
+            /**
+             * Control LoRA
+             * @description A Krea-2 Control LoRA and its control latents. The control image's latents are concatenated to the latent tokens in both CFG passes; a weight of 0 is ignored entirely.
+             * @default null
+             */
+            control_lora?: components["schemas"]["Krea2ControlLoRAField"] | null;
             /**
              * type
              * @default krea2_denoise
@@ -28129,9 +28511,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -29815,9 +30202,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30140,9 +30532,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30228,9 +30625,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30319,9 +30721,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30409,9 +30816,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30499,9 +30911,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30584,9 +31001,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30669,9 +31091,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30759,9 +31186,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30845,9 +31277,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30933,9 +31370,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31022,9 +31464,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31115,9 +31562,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31200,9 +31652,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31288,9 +31745,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31382,9 +31844,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31475,9 +31942,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31563,9 +32035,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31660,9 +32137,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31757,9 +32239,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31851,9 +32338,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -31940,9 +32432,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32028,9 +32525,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32113,9 +32615,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32198,9 +32705,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32290,9 +32802,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32376,9 +32893,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32472,9 +32994,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32567,9 +33094,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32653,9 +33185,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -32738,9 +33275,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33057,6 +33599,13 @@ export type components = {
              * @description Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.
              */
             fp8_storage?: boolean | null;
+            /**
+             * Components
+             * @description Default component models for this main model, keyed by the component slot name Generate reads, e.g. `t5_encoder`, `qwen3_encoder` or `component_source` (the component source of Qwen Image, Wan and similar families, which graphs record under their own metadata names); values are model keys. The default VAE lives in `vae`.
+             */
+            components?: {
+                [key: string]: string;
+            } | null;
         };
         /**
          * Main Model - SD1.5, SD2
@@ -33141,9 +33690,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33238,9 +33792,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33337,9 +33896,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33430,9 +33994,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33524,9 +34093,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33623,9 +34197,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33726,9 +34305,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33825,9 +34409,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -33925,9 +34514,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34036,9 +34630,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34141,9 +34740,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34234,9 +34838,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34334,9 +34943,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34425,9 +35039,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34517,9 +35136,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34609,9 +35233,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34701,9 +35330,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34808,9 +35442,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -34909,9 +35548,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35000,9 +35644,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35090,9 +35739,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35180,9 +35834,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35271,9 +35930,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35366,9 +36030,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35462,9 +36131,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35552,9 +36226,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35656,9 +36335,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35765,9 +36449,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35865,9 +36554,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -35955,9 +36649,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36046,9 +36745,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36134,9 +36838,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36223,9 +36932,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36312,9 +37026,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36407,9 +37126,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36496,9 +37220,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36592,9 +37321,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36694,9 +37428,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36790,9 +37529,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36890,9 +37634,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -36983,9 +37732,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37077,9 +37831,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37171,9 +37930,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37270,9 +38034,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37369,9 +38138,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37470,9 +38244,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37574,9 +38353,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37667,9 +38451,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37761,9 +38550,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37862,9 +38656,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -37960,9 +38759,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38061,9 +38865,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38155,9 +38964,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38254,9 +39068,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38352,9 +39171,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38450,9 +39274,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38544,9 +39373,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -38638,9 +39472,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -40859,7 +41698,8 @@ export type components = {
          *     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
          *     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
          *     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
-         *     is below the model's training resolution. Both presets round each axis to the
+         *     is below the model's training resolution. "480p" and "544p" target shorter edges
+         *     under the native area cap (16:9 gives 864x480 and 960x544). All presets round each axis to the
          *     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
          *     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
          *     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
@@ -40897,11 +41737,11 @@ export type components = {
             height?: number;
             /**
              * Target Resolution
-             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.
+             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity. 480p and 544p target a shorter edge under the same area cap for draft renders.
              * @default 768 highres
              * @enum {string}
              */
-            target_resolution?: "768 highres" | "768 lowres";
+            target_resolution?: "768 highres" | "768 lowres" | "480p" | "544p";
             /**
              * type
              * @default minimax_h3_ideal_dimensions
@@ -41821,9 +42661,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -41929,9 +42774,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -42020,9 +42870,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -42212,7 +43067,7 @@ export type components = {
              * Config
              * @description The installed model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
         };
         /**
          * ModelInstallDownloadProgressEvent
@@ -42378,7 +43233,7 @@ export type components = {
              * Config Out
              * @description After successful installation, this will hold the configuration object.
              */
-            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"]) | null;
+            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"]) | null;
             /**
              * Inplace
              * @description Leave model in its current location; otherwise install under models directory
@@ -42485,7 +43340,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -42512,7 +43367,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -42571,9 +43426,14 @@ export type components = {
             source_api_response?: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page)
+             * @description User-editable URL for the model (e.g. download page or model page)
              */
             source_url?: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls?: string[] | null;
             /**
              * Name
              * @description Name of the model.
@@ -42748,7 +43608,7 @@ export type components = {
          */
         ModelsList: {
             /** Models */
-            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"])[];
+            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"])[];
         };
         /**
          * MossImageConditioningField
@@ -44185,9 +45045,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44273,9 +45138,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44365,9 +45235,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44453,9 +45328,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -44541,9 +45421,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -45645,9 +46530,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -45763,9 +46653,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -45856,9 +46751,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -45952,9 +46852,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46040,9 +46945,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46136,9 +47046,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46250,9 +47165,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46357,9 +47277,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46460,9 +47385,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46558,9 +47488,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -46663,9 +47598,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -48128,9 +49068,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -48229,9 +49174,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -48319,9 +49269,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51174,6 +52129,12 @@ export type components = {
              * @description Email of the first active admin user, if any
              */
             admin_email?: string | null;
+            /**
+             * Has Single User Work
+             * @description Whether work made in single-user mode exists that new accounts will not see; only during setup
+             * @default false
+             */
+            has_single_user_work?: boolean;
         };
         /**
          * Show Image
@@ -51258,9 +52219,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51470,9 +52436,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -51549,6 +52520,11 @@ export type components = {
             description: string;
             /** Source */
             source: string;
+            /**
+             * Source Urls
+             * @description Web pages about the model, copied to installed configs.
+             */
+            source_urls?: string[];
             /** Name */
             name: string;
             base: components["schemas"]["BaseModelType"];
@@ -51605,6 +52581,11 @@ export type components = {
             description: string;
             /** Source */
             source: string;
+            /**
+             * Source Urls
+             * @description Web pages about the model, copied to installed configs.
+             */
+            source_urls?: string[];
             /** Name */
             name: string;
             base: components["schemas"]["BaseModelType"];
@@ -52650,9 +53631,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52731,9 +53717,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52827,9 +53818,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -52916,9 +53912,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53011,9 +54012,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53114,9 +54120,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53201,9 +54212,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53295,9 +54311,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53373,9 +54394,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53451,9 +54477,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53529,9 +54560,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53607,9 +54643,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53685,9 +54726,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -53909,9 +54955,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54007,9 +55058,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54386,9 +55442,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54479,9 +55540,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54572,9 +55638,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54665,9 +55736,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54758,9 +55834,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54851,9 +55932,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -54944,9 +56030,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55040,9 +56131,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55312,9 +56408,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55677,9 +56778,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55765,9 +56871,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55856,9 +56967,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -55947,9 +57063,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56038,9 +57159,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56126,9 +57252,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56214,9 +57345,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56302,9 +57438,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56390,9 +57531,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56484,9 +57630,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56578,9 +57729,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56666,9 +57822,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56754,9 +57915,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56839,9 +58005,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -56924,9 +58095,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -57009,9 +58185,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -57097,9 +58278,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -58954,9 +60140,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -59051,9 +60242,14 @@ export type components = {
             source_api_response: string | null;
             /**
              * Source Url
-             * @description Optional URL for the model (e.g. download page or model page).
+             * @description User-editable URL for the model (e.g. download page or model page).
              */
             source_url: string | null;
+            /**
+             * Source Urls
+             * @description Web pages about the model, set by starters and installs. Users edit source_url instead.
+             */
+            source_urls: string[];
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -62680,7 +63876,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Validation Error */
@@ -62712,7 +63908,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Validation Error */
@@ -62763,7 +63959,7 @@ export interface operations {
                      *       "repo_variant": "fp16"
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -62876,7 +64072,7 @@ export interface operations {
                      *       "repo_variant": "fp16"
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -62948,7 +64144,7 @@ export interface operations {
                      *       "repo_variant": "fp16"
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -63741,7 +64937,7 @@ export interface operations {
                      *       "repo_variant": "fp16"
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_QwenImage21_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Diffusers_Flux3_Config"] | components["schemas"]["Main_Diffusers_MiniMaxH3_Config"] | components["schemas"]["Main_Diffusers_LTX2_Config"] | components["schemas"]["Main_Diffusers_MossImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_QwenImage21_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_ErnieImage_Config"] | components["schemas"]["Main_Checkpoint_Ideogram4_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Flux3_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Main_Checkpoint_LTX2_Config"] | components["schemas"]["Main_Checkpoint_MossImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_QwenImage21_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_GGUF_Flux3_Config"] | components["schemas"]["Main_GGUF_Ideogram4_Config"] | components["schemas"]["Main_GGUF_ErnieImage_Config"] | components["schemas"]["Main_GGUF_LTX2_Config"] | components["schemas"]["Main_GGUF_MossImage_Config"] | components["schemas"]["Main_GGUF_Anima_Config"] | components["schemas"]["Main_GGUF_SD3_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_SD3_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage21_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_FLUX_Config"] | components["schemas"]["VAE_Diffusers_SD3_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["VAE_Diffusers_QwenImage21_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD1_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SDXL_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_SD3_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_FLUX_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Flux2_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_QwenImage21_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_Wan_Config"] | components["schemas"]["TinyAutoencoder_Checkpoint_LTX2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Flux2_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage21_Config"] | components["schemas"]["LoRA_LyCORIS_Flux3_Config"] | components["schemas"]["LoRA_LyCORIS_LTX2_Config"] | components["schemas"]["LoRA_LyCORIS_MiniMaxH3_Config"] | components["schemas"]["LoRA_LyCORIS_MossImage_Config"] | components["schemas"]["LoRA_LyCORIS_ErnieImage_Config"] | components["schemas"]["LoRA_LyCORIS_Ideogram4_Config"] | components["schemas"]["LoRA_LyCORIS_SD3_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_SD3_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_Flux3_Config"] | components["schemas"]["LoRA_Diffusers_MossImage_Config"] | components["schemas"]["LoRA_Diffusers_Ideogram4_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["ControlLoRA_LyCORIS_Krea2_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["T5Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3VLVisionTower_GGUF_Config"] | components["schemas"]["Qwen35Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma4Encoder_Gemma4Encoder_LTX2_Config"] | components["schemas"]["Gemma4Encoder_GGUF_LTX2_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["QwenVLEncoder_GGUF_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["WanT5Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["IPAdapter_Checkpoint_Anima_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_G_Config"] | components["schemas"]["CLIPEmbed_Checkpoint_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LTX2DurationHead_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["TextLLM_Checkpoint_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -65033,6 +66229,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteImagesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gone_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_gone_images"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */
@@ -68677,6 +69906,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RetryItemsResult"];
                 };
+            };
+            /** @description The items include a working-memory calibration's whose retry would break attempt exclusivity on its GPU: no item is retried, the request's other items included. Carries a code, as `{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on that GPU or is between its steps (also for an item of a calibration without an attempt); `calibration_interleaved`, another calibration ran on that GPU since the item's attempt began */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

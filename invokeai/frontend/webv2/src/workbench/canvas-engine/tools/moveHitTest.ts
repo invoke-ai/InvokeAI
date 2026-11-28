@@ -20,7 +20,7 @@ type LayerTransform = CanvasLayerBaseContract['transform'];
 /** Off-origin-aware local content bounds via {@link getSourceContentRect}; null for empty or unsupported layers. */
 export const hittableLayerRect = (
   layer: CanvasLayerContract,
-  doc: CanvasDocumentContractV3,
+  doc: Pick<CanvasDocumentContractV3, 'width' | 'height'>,
   liveRect?: Rect
 ): Rect | null => {
   if (layer.type === 'vector') {

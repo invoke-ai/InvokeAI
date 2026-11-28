@@ -27,7 +27,6 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
 from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
-    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
     resolve_submodel_path,
 )
@@ -55,10 +54,10 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
-    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     split_qkv_sidechannel,
     strip_layer_path_prefix,
@@ -242,6 +241,14 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
 class ZImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Z-Image main models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit)."""
 
+    _bfloat16_safe = True
+
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        # Pipeline weights use the session dtype even when its text encoder is placed on CPU.
+        return super()._select_model_dtype(config, submodel_type, self._torch_device)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -255,21 +262,19 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         model_path = Path(config.path)
         submodel_path = resolve_submodel_path(config, submodel_type, model_path / submodel_type.value)
+        dtype = self._decision(config, submodel_type).dtype
 
         # Check if submodel folder has SDNQ quantization - if so, use SDNQ loader
         if self._is_sdnq_folder(submodel_path):
             if submodel_type == SubModelType.TextEncoder:
-                return self._load_sdnq_text_encoder(submodel_path)
+                return self._load_sdnq_text_encoder(submodel_path, dtype)
             elif submodel_type == SubModelType.Transformer:
-                return self._load_sdnq_transformer(submodel_path)
+                return self._load_sdnq_transformer(submodel_path, dtype)
 
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
 
-        # Z-Image prefers bfloat16, but use safe dtype based on target device capabilities.
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
         try:
             result: AnyModel = load_class.from_pretrained(
                 submodel_path,
@@ -294,7 +299,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         """
         return is_sdnq_folder(folder_path)
 
-    def _load_sdnq_text_encoder(self, text_encoder_path: Path) -> AnyModel:
+    def _load_sdnq_text_encoder(self, text_encoder_path: Path, compute_dtype: torch.dtype) -> AnyModel:
         """Load SDNQ-quantized text encoder from folder."""
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
@@ -303,9 +308,6 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         logger.info(f"Loading SDNQ-quantized text encoder from {text_encoder_path}")
-
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the SDNQ state dict
         sd = sdnq_sd_loader(text_encoder_path, compute_dtype=compute_dtype)
@@ -380,7 +382,12 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             "SDNQ Z-Image Qwen3 text encoder", missing, unexpected, allowed_missing={"lm_head.weight"}
         )
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights
@@ -414,7 +421,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         return model
 
-    def _load_sdnq_transformer(self, transformer_path: Path) -> AnyModel:
+    def _load_sdnq_transformer(self, transformer_path: Path, compute_dtype: torch.dtype) -> AnyModel:
         """Load SDNQ-quantized transformer from folder."""
         from diffusers import ZImageTransformer2DModel
 
@@ -423,9 +430,6 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         logger.info(f"Loading SDNQ-quantized transformer from {transformer_path}")
-
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the SDNQ state dict
         sd = sdnq_sd_loader(transformer_path, compute_dtype=compute_dtype)
@@ -463,6 +467,8 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 class ZImageCheckpointModel(ModelLoader):
     """Class to load Z-Image transformer models from single-file checkpoints (safetensors, etc)."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -484,7 +490,6 @@ class ZImageCheckpointModel(ModelLoader):
         config: AnyModelConfig,
     ) -> AnyModel:
         from diffusers import ZImageTransformer2DModel
-        from safetensors.torch import load_file
 
         if not isinstance(config, Main_Checkpoint_ZImage_Config):
             raise TypeError(
@@ -494,15 +499,14 @@ class ZImageCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         # Load the state dict from safetensors/checkpoint file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
 
         # Some Z-Image checkpoint files have keys prefixed with "diffusion_model." or
         # "model.diffusion_model." (ComfyUI-style format). Check if we need to strip this prefix.
         sd = CheckpointPrefix.detect(sd).strip(sd)
 
-        # Determine safe dtype based on target device capabilities
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        # Use the same dtype snapshot that selected the shared-weight cache key.
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         # Per-layer hints from the safetensors header and/or the per-tensor `.comfy_quant` markers:
         # `full_precision_matrix_mult` for scaled fp8, and for nvfp4 the evidence that a layer follows
@@ -726,10 +730,10 @@ class ZImageCheckpointModel(ModelLoader):
 
         # FP8 *storage* on top. When nothing was kept quantized above, every param is uniform
         # `model_dtype` here, so the layerwise cast has one unambiguous compute dtype to restore to.
-        # When weights *were* kept fp8, `_apply_fp8_layerwise_casting` bails out on its own (and
-        # says so in the log): its hooks would restore the compute dtype before every forward, which
-        # disables the fp8 matmul where there is one and drops the `weight_scale` where there is
-        # not -- and saves no VRAM either way.
+        # When weights *were* kept fp8, or an int8 layer was kept, `_apply_fp8_layerwise_casting` bails out on its
+        # own (and says so in the log). For fp8 its hooks would restore the compute dtype before every forward,
+        # which disables the fp8 matmul where there is one and drops the `weight_scale` where there is not -- and
+        # saves no VRAM either way. An nvfp4 build is cast: its dense layers go to fp8, its nvfp4 buffers stay.
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
@@ -1059,28 +1063,8 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
     compute dtype. Embeddings are always folded; nvfp4 and int8 convrot layers stay packed.
     """
 
-    def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
-        """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
-
-        Decided once per loader (a fresh one serves each load): the cache key and the built weights must agree, and the
-        capability probes can flip between the key computation and the build under the load lock. Float8 follows the
-        execution device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
-        """
-        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
-        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
-        if device not in decisions:
-            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
-            decisions[device] = (keep_fp8, TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
-        return decisions[device]
-
-    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        # Device caches share one canonical CPU copy per key: a device must not adopt float8 it cannot hold, nor folded
-        # weights that throw away a capable device's saving. Keyed by the device's decision, not the file's contents,
-        # which would take a header read on every cache lookup.
-        if submodel_type == SubModelType.TextEncoder:
-            keep_fp8, dtype = self._storage_format(config)
-            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
-        return ""
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+    _encoder_fp8_storage = True
 
     def _load_model(
         self,
@@ -1115,7 +1099,6 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         self,
         config: AnyModelConfig,
     ) -> AnyModel:
-        from safetensors.torch import load_file
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
         from invokeai.backend.util.logging import InvokeAILogger
@@ -1129,10 +1112,10 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             )
         model_path = Path(config.path)
 
-        device_keeps_fp8, model_dtype = self._storage_format(config)
+        device_keeps_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
         # Load the state dict from safetensors file
-        sd = load_file(model_path)
+        sd = load_safetensors_checkpoint(model_path)
         original_key_count = len(sd)
 
         # Three ComfyUI side channels reach this loader and a file carries one of them. int8 is
@@ -1553,7 +1536,12 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         # GGMLTensor wrappers will be dequantized on-the-fly during inference
         load_state_dict_ignoring_extras(model, sd, source="Qwen3 GGUF text encoder", assign=True, allow_missing=True)
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights - llama.cpp GGUF doesn't include lm_head.weight when embeddings are tied
@@ -1740,7 +1728,12 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load("SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"})
 
-        if materialize_quantized_embedding(model.model.embed_tokens, ram_cache=self._ram_cache):
+        if materialize_quantized_embedding(
+            model.model.embed_tokens,
+            ram_cache=self._ram_cache,
+            model=model,
+            state_dict=sd,
+        ):
             logger.info("Dequantized embed_tokens weight for embedding lookups")
 
         # Handle tied weights

@@ -78,3 +78,34 @@ def test_every_dtype_safetensors_writes_reads_back_from_the_header(tmp_path: Pat
     meta = safetensors_meta_state_dict(path)["tensor"]
 
     assert meta.dtype is dtype and meta.shape == (2, 3) and meta.is_meta
+
+
+@pytest.mark.parametrize(
+    ("header", "reason"),
+    [
+        (b"not json", "not valid JSON"),
+        (b"\xff\xfe", "not valid JSON"),
+        (b"[1, 2]", "not a JSON object"),
+        (b'{"a": 1}', "header entry 'a'"),
+        (b'{"a": {"dtype": "F32", "shape": [1]}}', "header entry 'a'"),
+        (b'{"a": {"dtype": "F32", "shape": [1], "data_offsets": [0]}}', "header entry 'a'"),
+    ],
+    ids=["text", "bytes", "array", "bare number", "no offsets", "short offsets"],
+)
+def test_a_file_that_is_not_safetensors_is_refused_with_one_error_naming_it(
+    tmp_path: Path, header: bytes, reason: str
+) -> None:
+    """A header that parses as JSON but is not a tensor table used to fail later as a bare `TypeError`."""
+    path = tmp_path / "not_a_model.safetensors"
+    path.write_bytes(len(header).to_bytes(8, "little") + header)
+
+    with pytest.raises(ValueError, match=rf"not_a_model\.safetensors is not a safetensors file: .*{reason}"):
+        read_safetensors_header(path)
+
+
+def test_a_file_shorter_than_a_header_length_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "short.safetensors"
+    path.write_bytes(b"\x01\x02")
+
+    with pytest.raises(ValueError, match="is not a safetensors file"):
+        read_safetensors_header(path)

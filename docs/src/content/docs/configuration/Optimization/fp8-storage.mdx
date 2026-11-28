@@ -1,7 +1,7 @@
 ---
 title: FP8 Storage
 description: Halve a full-precision model's VRAM by keeping its weights in FP8 on the GPU, per model, from the Model Manager.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-15
 sidebar:
   order: 3
 ---
@@ -28,8 +28,9 @@ the setting only stores the layers that shipped without a scale as fp8, as it do
 
 ## What it applies to
 
-The Model Manager shows the **FP8 storage** setting only for models where it changes something. A model installed
-before this rule may still have it stored as on; it then does nothing, and the log says so once when the model loads:
+The Model Manager shows the **FP8 storage** setting only for models where it changes something, with the exceptions
+under [By file format](#by-file-format) and [When installing](#when-installing). A model installed before this rule may still have it stored as on; it then does
+nothing, and the log says so once when the model loads:
 `FP8 Storage is set for '<model>' but does nothing here: <reason>`.
 
 ### By file format
@@ -39,25 +40,43 @@ before this rule may still have it stored as on; it then does nothing, and the l
 | Full precision (FP16, BF16, FP32) | **Yes**: what it is for. |
 | fp8 or scaled fp8 checkpoint | **On after install.** The weights stay in fp8 with their own scale; without the setting they would be unpacked to BF16 at twice the size. See [Checkpoints that are already FP8](#checkpoints-that-are-already-fp8). |
 | MXFP8 checkpoint | **Turn it off.** It stores one scale per block of 32 weights, which InvokeAI does not keep on any GPU: the layers are unpacked at load, and FP8 Storage then re-encodes them as fp8 *without* a scale: blocks whose scale is far below 1 lose their weights to underflow. If the file also has per-tensor fp8 layers, those stay fp8 and FP8 Storage changes nothing. Wan 2.2 does not re-encode the unpacked layers, so turning it off is not needed there. |
-| int8 and nvfp4 single files | **Partly.** Their quantized layers stay as they are; only the layers the build ships in full precision are stored in FP8. On an Ideogram 4, Qwen-Image-2.1 or FLUX.3 int8 file, and on a FLUX.3 nvfp4 file, nothing at all. |
+| int8 and int4 single files | **No.** Their quantized layers stay as stored and their other layers stay in the precision the build ships. Those are the layers the build leaves dense (timestep, input and output layers, modulations, text paths), and FP8 Storage would re-encode them without a scale. Measured on the published files, that zeroes 43% of the weights of Krea-2 Turbo's output layer and 95% of MOSS-Image int8's timestep layer, for a saving of 0–7% of the model's size. The setting can still show for these files, since they are the same kind of file as a full-precision one, but it does nothing there. |
+| nvfp4 single files | **Off after install; your choice.** Their nvfp4 layers stay as stored. Turned on, FP8 Storage stores the layers the build ships in full precision in FP8, which saves 4–16% of the model's size (about 4% on Krea-2, 16% on Z-Image). Small weights there can round to zero, but in InvokeAI's measurements the nvfp4 images did not visibly change. FLUX.3 and LTX-2 nvfp4 files ignore the setting. |
+| nvfp4 file with scaled fp8 layers (Qwen-Image's nvfp4 build) | **On after install; keep it on.** Its fp8 layers stay in fp8 with their own scale; unpacked to BF16 they would add about 10.5 GiB. As on Qwen-Image's other scaled fp8 files, its remaining full-precision layers are stored in FP8 too. |
 | GGUF, NF4 and [SDNQ](/configuration/optimization/sdnq-quantization/) | **No**: already quantized. The setting is not shown. |
 
 If your model is quantized, its full-precision variant gets the full effect of FP8 Storage.
 
+<details>
+<summary>What the log shows for quantized single files</summary>
+
+On a GPU that passes the FP8 test, Anima, Krea-2, Qwen-Image, Z-Image, Wan and MOSS-Image log once per load for an
+int8 or int4 build,
+`FP8 Storage skipped for <model> - this quantized build keeps its quantized layers as stored and its other layers in the precision the build chose.`
+FLUX.1, FLUX.2 and FLUX.3 log their own line
+(`FLUX: the model's fp8_storage setting was skipped - …`, `FLUX.2: …`,
+`FLUX.3: FP8 Storage skipped - this int8 or nvfp4 build …`) whenever the setting is on, also on the CPU. LTX-2,
+Qwen-Image-2.1 and Ideogram 4 log nothing for their quantized builds. A Krea-2, Qwen-Image or Z-Image nvfp4 build logs
+`FP8 layerwise casting enabled for <model> …`, like a full-precision file.
+
+</details>
+
 ### By model
+
+The rows describe full-precision files, unless a row says otherwise. Quantized single files follow [By file format](#by-file-format).
 
 | Model | FP8 Storage |
 | --- | --- |
 | Main models: SD1, SD2, SDXL, SDXL Refiner, SD3, CogView4 | Yes |
 | FLUX.1, FLUX.2 (all variants) | Yes |
-| FLUX.3 | Yes — except int8 and nvfp4 single files, where it does nothing. The toggle can still show as on for an nvfp4 build, since installing switches it on for its fp8 block scales |
+| FLUX.3 | Yes |
 | Z-Image, Anima, Krea-2, Qwen-Image, Qwen-Image-2.1, ERNIE-Image, MOSS-Image | Yes |
 | Ideogram 4, single-file safetensors | Yes, for each transformer branch's file |
 | LTX-2 | Yes |
 | Wan (checkpoint and Diffusers) | Yes |
 | ControlNet (SD1, SD2, SDXL), T2I-Adapter | Yes |
 | VAE | No: visible decode-quality regression |
-| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. Scaled fp8 single-file encoders (T5-XXL, Qwen3, Qwen3-VL, Qwen2.5-VL, and the FLUX.2 Mistral encoder) keep their fp8 Linear weights packed, with their scales, on any GPU that passes the FP8 test, with no setting. |
+| Text encoders, tokenizers | No: small models, and FP8 rounding costs text quality. Scaled fp8 single-file encoders (T5-XXL, Qwen3, Qwen3-VL, Qwen2.5-VL, and the FLUX.2 Mistral encoder) keep their fp8 Linear weights packed, with their scales, on a GPU that passes the FP8 test, with no setting. CPU-only loads unpack them using the CPU's dtype policy (see [Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders)). |
 | Anima ControlNet-LLLite | No: the adapter is only tens of MB |
 | FLUX.1, FLUX.2, Z-Image and Qwen-Image ControlNets | No: not implemented yet |
 | MiniMax H3 | No: not implemented yet |
@@ -122,16 +141,27 @@ without FP8 and the log warns once: `FP8 storage probe failed on <device> (…);
 </TabItem>
 <TabItem label="CPU and Apple silicon">
 Not used. PyTorch can hold FP8 on the CPU, but casting is emulated in software and costs more than the memory saves.
-With the setting on, the loader returns the model unchanged, without a log line. Checkpoints that store FP8 weights are
-unpacked to BF16 here.
+With the setting on, the loader returns the model unchanged, without a log line (FLUX.1 and FLUX.2 still log their skip line
+for int8 builds, FLUX.3 for int8 and nvfp4 builds). Checkpoints that store FP8 weights are unpacked using the device's dtype policy: BF16 where supported, otherwise FP32. See
+[Sharing across devices and CPU encoders](#sharing-across-devices-and-cpu-encoders).
 </TabItem>
 </Tabs>
+
+## Sharing across devices and CPU encoders
+
+For the FP8-aware checkpoint and encoder loaders, device caches distinguish policies that retain FP8 weights from those that unpack them, and distinguish their compute dtypes. The ERNIE-Image and SD3 GGUF transformer loaders also distinguish compute dtypes. When PyTorch rejects BF16, loaders using the BF16-safe policy fall back to FP16 on CUDA and FP32 on other devices. Matching policies can reuse the same CPU allocation without another checkpoint read.
+
+For int8 and int4 builds that decline FP8 Storage, mixed-capability devices can also retain separate CPU copies even though the resulting weights are identical.
+
+This choice is made before reading the checkpoint. With `fp8_compute` enabled (off by default), a mixed-capability setup can therefore retain two CPU copies and read a checkpoint twice even when that file contains only BF16 weights. FP8 Storage can likewise separate device caches when its device support differs. This conservative policy avoids reading large files just to decide whether their cached weights can be shared. A transient FP8 probe failure uses the unpacked policy for that load; a later successful probe can leave both copies resident until normal eviction.
+
+**CPU-only Mistral and Qwen3-VL encoders unpack FP8 weights using the CPU's dtype policy**, even on a machine with an FP8-capable GPU. This saves VRAM but increases system RAM compared with retaining the packed weights: approximately 16.8 to 32.3 GiB for the scaled-FP8 Mistral 24B encoder, and 4.4 to 8.9 GiB for Qwen3-VL 4B when unpacked to BF16. Allow more RAM where BF16 is unsupported and FP32 is required. The CPU-only encoder can share its unpacked CPU copy with another load using the same policy; the GPU's packed copy stays separate.
 
 ## Turning it on
 
 <Steps>
 1. Open the **Model Manager**.
-2. Select a model (Main, ControlNet or T2I-Adapter). The setting only appears where it has an effect.
+2. Select a model (Main, ControlNet or T2I-Adapter). The setting only appears where it has an effect, with a few exceptions ([By file format](#by-file-format)).
 3. Under **Default Settings**, turn on **FP8 storage**.
 4. Click **Save Defaults**.
 </Steps>
@@ -148,8 +178,9 @@ adapters. For small SD1 and SD2 models the savings are negligible and not worth 
 | --- | --- |
 | A checkpoint whose transformer or UNet stores FP8 weights | **On automatically.** InvokeAI reads the weight types from the file, not its name, so a full-precision file with "fp8" in its name is not affected. Only the denoiser counts: an all-in-one checkpoint with an FP8 text encoder beside a full-precision UNet or transformer is left alone. The log says `denoiser weights are stored in float8, enabling FP8 Storage by default`. |
 | A scaled fp8 checkpoint | **On automatically**, and it costs no precision: the weights stay exactly as published, with their scale. |
+| An nvfp4 checkpoint | **Off unless the denoiser also stores float8 weights**, as Qwen-Image's nvfp4 file with scaled fp8 layers does. The fp8 block scales of the nvfp4 format alone do not switch it on; turn it on yourself to store the full-precision layers in FP8 (FLUX.3 and LTX-2 ignore it). If it is already on for an nvfp4 model, it stores those layers in FP8 until you turn it off. |
 | An MXFP8 checkpoint | **On automatically, but turn it off**: it costs quality (see [By file format](#by-file-format)). Wan 2.2 is the exception, see above. |
-| Anything else, from a file path, URL or Hugging Face repo, or from folder scan results | **Tick FP8 storage** next to the install source. It applies to the models from there that support it; for the others the request is dropped, so no model is recorded with a setting that does nothing. Starter models don't offer it. |
+| Anything else, from a file path, URL or Hugging Face repo, or from folder scan results | **Tick FP8 storage** next to the install source. It applies to the models from there that support it; for the others the request is dropped, so no model is recorded with a setting that does nothing, except a quantized single file that ignores the setting ([By file format](#by-file-format)), which keeps the request recorded. Starter models don't offer it. |
 
 Either way the setting stays editable under **Default Settings**, and re-identifying a model keeps it.
 
@@ -172,7 +203,7 @@ The loader reports what it kept and which setting kept it, for example
 `Ideogram 4: kept 208 layer(s) in fp8 (scaled fp8 checkpoint, kept for FP8 Storage, dequantized per forward)`. On
 FLUX.1, FLUX.2, FLUX.3, Z-Image and Anima the model then goes to the layer cast, which declines it with
 `FP8 storage skipped for <model>: … weight(s) are already fp8, …`, so you see both lines for the same model. Both are
-the intended outcome, not a failure. Qwen-Image and Wan 2.2 keep their fp8 layers without the first line.
+the intended outcome, not a failure. Qwen-Image and Wan 2.2 keep their fp8 layers without the first line; they log `FP8 layerwise casting enabled for <model> …` with the number of scaled fp8 layers kept with their own scale instead.
 
 </details>
 
@@ -195,7 +226,7 @@ with partial loading also works, but costs speed and reproducibility.
 
 | Symptom | What to do |
 | --- | --- |
-| VRAM didn't drop after turning it on | A model in use is evicted only when its generation finishes: start a new generation. If it still hasn't dropped, look in the log for `FP8 layerwise casting enabled for <model>`. Without it, the model is one FP8 Storage skips ([What it applies to](#what-it-applies-to)), or already FP8 (`FP8 storage skipped … already fp8`: nothing needed re-encoding). |
+| VRAM didn't drop after turning it on | A model in use is evicted only when its generation finishes: start a new generation. If it still hasn't dropped, look in the log for `FP8 layerwise casting enabled for <model>`. Without it, the model is one FP8 Storage skips ([What it applies to](#what-it-applies-to)) already FP8 (`FP8 storage skipped … already fp8`: nothing needed re-encoding), or a quantized single file that ignores the setting ([By file format](#by-file-format)). |
 | `FP8 storage probe failed` in the log | Your GPU, driver or PyTorch build can't store FP8; the model loads without it. FP8 Storage is never used on the CPU or Apple silicon. |
 | Quality regression on one model | Turn FP8 Storage off for that model and reload. If quality comes back, the model has FP8-sensitive layers outside the skip list: please report it (below). |
 | `RuntimeError: … float8_e4m3fn …` | Your PyTorch predates FP8 support (added in 2.1). Reinstall with the official launcher, whose PyTorch supports it. |

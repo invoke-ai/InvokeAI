@@ -57,7 +57,7 @@ def test_driver_single_step_schedulers_complete_user_step_every_iteration(schedu
 
 def test_driver_heun_completes_user_step_on_second_order_and_terminal() -> None:
     """Heun yields one completion per user step: each pair's 2nd-order half plus
-    the unpaired terminal 1st-order step (sigma_prev==0)."""
+    the unpaired terminal 1st-order step."""
     num_steps = 4
     driver = AnimaSchedulerDriver(
         scheduler_name="heun",
@@ -117,40 +117,102 @@ def test_driver_dpmpp_clipped_schedule_starts_at_correct_sigma(denoising_start: 
     assert abs(first_iter.sigma_curr - expected_first_sigma) < 2e-3
 
 
-@pytest.mark.parametrize(
-    ("denoising_start", "denoising_end", "steps"),
-    [(0.2, 0.8, 30), (0.0, 0.8, 30), (0.2, 1.0, 30), (0.5, 0.75, 20)],
-)
-def test_driver_heun_clipped_schedule_iteration_count(denoising_start: float, denoising_end: float, steps: int) -> None:
-    """Heun clipped schedule: iteration count is 2*(k_end-k_start), clamped so
-    denoising_end=1.0 doesn't run past the 2N-1 array."""
+def _clipped_driver(scheduler_name: str, denoising_start: float, denoising_end: float, steps: int, seed: int = 0):
+    """Build the driver as `anima_denoise` does: it hands over the schedule already clipped by index."""
     full_sigmas = _anima_sigmas(steps)
-    k_start = int(denoising_start * steps)
-    k_end = int(denoising_end * steps)
-
+    clipped = full_sigmas[int(denoising_start * steps) : int(denoising_end * steps) + 1]
     driver = AnimaSchedulerDriver(
-        scheduler_name="heun",
-        sigmas=full_sigmas,
+        scheduler_name=scheduler_name,
+        sigmas=clipped,
         steps=steps,
         denoising_start=denoising_start,
         denoising_end=denoising_end,
         device=torch.device("cpu"),
-        seed=0,
+        seed=seed,
     )
+    return driver, clipped
 
-    # If Heun's set_timesteps accepts sigmas=, the driver will pass the full schedule directly
-    # and yield 2*steps-1 iterations regardless of clipping. The set_begin_index path applies
-    # only when sigmas= is unsupported.
-    accepts_sigmas = "sigmas" in inspect.signature(driver.scheduler.set_timesteps).parameters
-    if accepts_sigmas:
-        # Driver took the sigma-passing path; sigmas were not pre-clipped here, so the count
-        # reflects the full schedule.
-        assert driver.num_iterations == 2 * steps - 1
-        return
 
-    expected = min(2 * (k_end - k_start), len(driver.scheduler.timesteps) - driver.begin_index)
-    assert driver.num_iterations == expected
-    assert driver.begin_index == 2 * k_start
+@pytest.mark.parametrize("scheduler_name", ["er_sde", "lcm"])
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end"),
+    [(0.0, 1.0), (0.3, 1.0), (0.5, 1.0), (0.0, 0.8), (0.5, 0.75)],
+)
+def test_driver_starts_at_the_first_sigma_of_the_clipped_schedule(
+    scheduler_name: str, denoising_start: float, denoising_end: float
+) -> None:
+    """The img2img blend noises the latents to the clipped schedule's first sigma, so that is where every
+    scheduler that takes sigmas has to start (Heun and LCM used to start at their own 1.0 / unshifted plan)."""
+    driver, clipped = _clipped_driver(scheduler_name, denoising_start, denoising_end, steps=30)
+
+    first = next(driver.iterations())
+
+    assert first.sigma_curr == pytest.approx(clipped[0], abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end"),
+    [(0.0, 1.0), (0.3, 1.0), (0.5, 1.0), (0.0, 0.8), (0.5, 0.75)],
+)
+def test_driver_heun_runs_the_clipped_schedule_in_its_doubled_layout(
+    denoising_start: float, denoising_end: float
+) -> None:
+    driver, clipped = _clipped_driver("heun", denoising_start, denoising_end, steps=30)
+    user_steps = len(clipped) - 1
+
+    iterations = list(driver.iterations())
+
+    assert driver.num_iterations == len(iterations) == 2 * user_steps - 1
+    assert [it.sigma_curr for it in iterations] == pytest.approx(
+        [clipped[0]] + [s for s in clipped[1:-1] for _ in (0, 1)], abs=1e-6
+    )
+    # The last iteration ends at the requested terminal sigma, which is not 0 when denoising_end < 1.
+    assert iterations[-1].sigma_prev == pytest.approx(clipped[-1], abs=1e-6)
+
+
+@pytest.mark.parametrize("denoising_end", [1.0, 0.75])
+def test_driver_heun_progress_reaches_every_user_step(denoising_end: float) -> None:
+    """Fed through scheduler.step like production, Heun completes exactly one user step per interval,
+    including the terminal first-order step when the pass ends before sigma 0."""
+    driver, clipped = _clipped_driver("heun", 0.5, denoising_end, steps=20)
+    completions = 0
+    for it in driver.iterations():
+        completions += it.completes_user_step
+        driver.scheduler.step(
+            model_output=torch.zeros((1, 1, 1, 4, 4)),
+            timestep=it.sched_timestep,
+            sample=torch.zeros((1, 1, 1, 4, 4)),
+        )
+
+    assert completions == len(clipped) - 1
+
+
+@pytest.mark.parametrize(("denoising_start", "denoising_end"), [(0.0, 1.0), (0.5, 1.0), (0.5, 0.75)])
+def test_driver_lcm_runs_the_clipped_schedule_to_its_terminal_sigma(
+    denoising_start: float, denoising_end: float
+) -> None:
+    driver, clipped = _clipped_driver("lcm", denoising_start, denoising_end, steps=20)
+
+    iterations = list(driver.iterations())
+
+    assert [it.sigma_curr for it in iterations] == pytest.approx(clipped[:-1], abs=1e-6)
+    assert iterations[-1].sigma_prev == pytest.approx(clipped[-1], abs=1e-6)
+    assert all(it.completes_user_step for it in iterations)
+
+
+def test_driver_lcm_step_noise_follows_the_seed() -> None:
+    """LCM re-noises the sample on every step: it has to draw from the driver's seeded generator, not the global RNG."""
+
+    def run(seed: int) -> torch.Tensor:
+        torch.rand(64)  # advance the global RNG like a long-lived server does
+        driver, _ = _clipped_driver("lcm", 0.5, 1.0, steps=8, seed=seed)
+        sample = torch.zeros((1, 1, 1, 4, 4))
+        for it in driver.iterations():
+            sample = driver.step(torch.zeros_like(sample), it.sched_timestep, sample)
+        return sample
+
+    assert torch.equal(run(1234), run(1234))
+    assert not torch.equal(run(1), run(2))
 
 
 def test_driver_terminal_sigma_prev_is_zero() -> None:
