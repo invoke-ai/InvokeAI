@@ -1788,6 +1788,64 @@ describe('isModelFromRepo', () => {
   });
 });
 
+describe('a stored FLUX.2 component source', () => {
+  const qwen3Encoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3',
+    name: 'Qwen3 Encoder',
+    type: 'qwen3_encoder',
+    variant: 'qwen3_8b',
+  };
+  const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
+  const model = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+  const picked = createModel('flux2', { format: 'diffusers', key: 'flux2-picked-source', variant: 'klein_9b' });
+  const first = createModel('flux2', { format: 'diffusers', key: 'flux2-first-source', variant: 'klein_9b' });
+  const smaller = createModel('flux2', { format: 'diffusers', key: 'flux2-4b-source', variant: 'klein_4b' });
+  const settings = { ...createSettings(model), componentSourceModel: picked };
+
+  it('stays while it is installed and gives the encoder the model lacks', () => {
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [first, picked])?.key).toBe(picked.key);
+  });
+
+  it('stays beside a standalone encoder, which needs only the VAE from it', () => {
+    expect(
+      getAutoFlux2ComponentSourceModel(
+        model,
+        { ...settings, componentSourceModel: smaller, qwen3EncoderModel: qwen3Encoder },
+        [first, smaller]
+      )?.key
+    ).toBe(smaller.key);
+  });
+
+  it('is dropped once a standalone encoder and VAE need no source', () => {
+    expect(
+      getAutoFlux2ComponentSourceModel(model, { ...settings, qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }, [picked])
+    ).toBeNull();
+  });
+
+  it('is replaced when it is no longer installed', () => {
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [first])?.key).toBe(first.key);
+  });
+
+  it('is replaced when the standalone encoder is the wrong size and the source cannot give the encoder', () => {
+    const wrongSize: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+
+    expect(
+      getAutoFlux2ComponentSourceModel(
+        model,
+        { ...settings, componentSourceModel: smaller, qwen3EncoderModel: wrongSize },
+        [smaller, first]
+      )?.key
+    ).toBe(first.key);
+  });
+
+  it('is replaced when it cannot give the encoder the model needs', () => {
+    expect(
+      getAutoFlux2ComponentSourceModel(model, { ...settings, componentSourceModel: smaller }, [smaller, first])?.key
+    ).toBe(first.key);
+  });
+});
+
 describe("a main model's default components", () => {
   const withDefaults = (base: string, components: Record<string, string>, overrides: Partial<MainModelConfig> = {}) =>
     createModel(base, {
@@ -2207,6 +2265,28 @@ describe("a main model's default components", () => {
         switchTo(createModel('moss-image', { default_settings: { vae: sdxlVae.key }, format: 'checkpoint' }), [sdxlVae])
           .settings.vae
       ).toBeNull();
+    });
+
+    it('fills no VAE or Ministral default for a Diffusers ERNIE-Image, whose loader reads both from the pipeline', () => {
+      const ministral = {
+        base: 'any',
+        key: 'ministral',
+        name: 'Ministral 3B',
+        type: 'mistral_encoder',
+        variant: 'ministral3_3b',
+      } as ComponentModelConfig;
+      const ernie = (format: string) =>
+        createModel('ernie-image', {
+          default_settings: { components: { mistral_encoder: ministral.key }, vae: flux2Vae.key },
+          format,
+        });
+
+      const single = switchTo(ernie('checkpoint'), [flux2Vae, ministral]).settings;
+      const diffusers = switchTo(ernie('diffusers'), [flux2Vae, ministral]).settings;
+
+      expect(single).toMatchObject({ mistralEncoderModel: ministral, vae: flux2Vae });
+      expect(diffusers.mistralEncoderModel).toBeNull();
+      expect(diffusers.vae).toBeNull();
     });
 
     it('replaces a VAE of another family, as left behind by a fallback from an unsupported model', () => {

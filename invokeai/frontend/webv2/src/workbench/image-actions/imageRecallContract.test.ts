@@ -7,27 +7,10 @@
 
 import type { components } from '@api/schema';
 import type { GalleryImage } from '@features/gallery';
-import type {
-  ComponentModelConfig,
-  GenerateModelConfig,
-  GenerateSettings,
-  GenerateWidgetValues,
-  MainModelConfig,
-} from '@features/generation/contracts';
-import type { CanvasCompileMode } from '@features/generation/core/canvas/types';
+import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type { SpandrelModelConfig } from '@features/upscale/core/types';
 
-import { canvasModesFor, compile as compileCanvas } from '@features/generation/core/canvas/compileCanvasGraph.testing';
-import {
-  externalRecallCases,
-  fluxReduxRecallCase,
-  generateGraphCases,
-  krea2EditRecallCase,
-  recallCatalogFor,
-  recallTunedSettingsFor,
-  sdxlRefinerRecallCase,
-} from '@features/generation/core/graphCoverage.testing';
-import { compileGenerateGraph } from '@features/generation/graph';
+import { recallCatalogFor } from '@features/generation/core/graphCoverage.testing';
 import {
   deriveAspectRatioId,
   getDefaultGenerateSettings,
@@ -51,6 +34,15 @@ import {
   type ImageRecallKind,
   type ImageRecallResult,
 } from './imageRecall';
+import {
+  type CanvasRecordCase,
+  canvasRecordCases,
+  canvasSettingsOf,
+  compileCanvasRecordCase,
+  compileGenerateRecordCase,
+  type GenerateRecordCase,
+  generateRecordCases,
+} from './imageRecordCases.testing';
 import { isRuntimeValue, type KnownKeys, recordOf } from './recallContract.testing';
 
 type Written = Readonly<Record<string, unknown>>;
@@ -85,7 +77,10 @@ const VIDEO_PROFILE = 'Video profile: covered by videoRecallContract.test.ts.';
 const RUNTIME_VALUE = 'A node computes it from the prompt while the graph runs; recall restores the prompt itself.';
 const UPSCALE_SETTING = 'An Upscale panel setting; image recall restores the Generate panel only.';
 
-/** A Diffusers main records itself as its own component source; having no source slot, recall skips it. */
+/**
+ * A Diffusers main records itself as its own component source. Recall clears the slot: the builders then fall back
+ * to the main, where a source left in the panel would supply the components instead.
+ */
 const unlessMainModel = (key: string) => (model: GenerateModelConfig, written: Written) =>
   (written[key] as { key?: unknown } | null)?.key !== model.key;
 
@@ -159,6 +154,14 @@ const IMAGE_RECALL_CONTRACT = {
 
   // Components.
   vae: { restores: ['vae'] },
+  color_compensation: {
+    restores: ['colorCompensation'],
+    when: (model) => getGenerationUiPolicy(model).colorCompensationVisible,
+  },
+  vae_precision: {
+    restores: ['vaePrecision'],
+    when: (model) => getGenerationUiPolicy(model).vaePrecisionVisible,
+  },
   qwen_image_vae: { consumed: "Qwen-Image's VAE alias, read only from records without `vae`; the graph writes both." },
   clip_embed_model: { restores: ['clipEmbedModel'] },
   clip_g_model: { restores: ['clipGEmbedModel'] },
@@ -171,6 +174,7 @@ const IMAGE_RECALL_CONTRACT = {
   qwen3_vl_vision_tower: { restores: ['qwen3VLVisionTowerModel'] },
   qwen_image_qwen_vl_encoder: { restores: ['qwenVLEncoderModel'] },
   wan_t5_encoder_model: { restores: ['wanT5EncoderModel'] },
+  mistral_source: { restores: ['componentSourceModel'], when: unlessMainModel('mistral_source') },
   qwen3_source: { restores: ['componentSourceModel'], when: unlessMainModel('qwen3_source') },
   qwen_image_component_source: {
     restores: ['componentSourceModel'],
@@ -179,6 +183,7 @@ const IMAGE_RECALL_CONTRACT = {
   wan_component_source: { restores: ['componentSourceModel'], when: unlessMainModel('wan_component_source') },
   wan_transformer_low_noise: { restores: ['wanLowNoiseModel'] },
   ideogram4_unconditional_model: { restores: ['ideogram4UnconditionalModel'] },
+  flux3_prompt_upsampler: { restores: ['flux3PromptUpsamplerModel', 'flux3PromptUpsamplerEnabled'] },
   pid_decoder: { restores: ['pidDecoderModel'] },
   gemma2_encoder: { restores: ['gemma2EncoderModel'] },
   anima_inpaint_adapter: {
@@ -307,6 +312,7 @@ const IMAGE_RECALL_CONTRACT = {
   // Upscale.
   creativity: { ignored: UPSCALE_SETTING },
   structure: { ignored: UPSCALE_SETTING },
+  tile_controlnet: { ignored: UPSCALE_SETTING },
   tile_overlap: { ignored: UPSCALE_SETTING },
   tile_size: { ignored: UPSCALE_SETTING },
   upscale_initial_image: { ignored: UPSCALE_SETTING },
@@ -380,6 +386,7 @@ const RECALLED_FIELDS = {
   size: true,
   steps: true,
   vae: true,
+  vaeSettings: true,
 } satisfies Record<ImageRecallResult['fields'][number], true>;
 
 const DEFAULT_KINDS: readonly ImageRecallKind[] = ['all', 'remix'];
@@ -390,9 +397,11 @@ const MODEL_DEFAULT_SETTINGS: ReadonlySet<Setting> = new Set([
   'aspectRatioValue',
   'cfgRescaleMultiplier',
   'cfgScale',
+  'colorCompensation',
   'height',
   'scheduler',
   'steps',
+  'vaePrecision',
   'width',
 ]);
 
@@ -474,8 +483,6 @@ const imageOf = ({ height, width }: { height: number; width: number }): GalleryI
   width,
 });
 
-const PROJECT_SETTINGS = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
-
 type RecallInput = Parameters<typeof buildImageRecallSettings>[0];
 
 interface RecallCase {
@@ -492,12 +499,6 @@ interface RecallCase {
   isCanvasFrame?: true;
 }
 
-interface SettingsFixture {
-  label: string;
-  model: GenerateModelConfig;
-  settings: GenerateSettings;
-}
-
 /** Compiles the fixture, naming it when validation refuses it. */
 const compiled = <T>(label: string, compile: () => T): T => {
   try {
@@ -507,58 +508,48 @@ const compiled = <T>(label: string, compile: () => T): T => {
   }
 };
 
-const generateCase = ({ label, model, settings }: SettingsFixture, baseline: GenerateWidgetValues): RecallCase => ({
-  baseline,
-  catalog: recallCatalogFor(model, settings),
-  image: imageOf(settings),
-  label,
-  model,
-  record: recordOf(
-    compiled(label, () => compileGenerateGraph(settings, model, 'gallery', PROJECT_SETTINGS)),
-    settings
-  ),
-  tuned: { ...settings, model },
-});
-
-const canvasCase = (
-  { label, model, settings }: SettingsFixture,
-  mode: CanvasCompileMode,
-  baseline: GenerateWidgetValues,
-  extra: Omit<NonNullable<Parameters<typeof compileCanvas>[2]>, 'bbox' | 'settings'> & {
-    frame?: { height: number; width: number };
-    isCanvasFrame?: true;
-  } = {}
-): RecallCase => {
-  const { frame = settings, isCanvasFrame, ...overrides } = extra;
-  const caseLabel = `${label} / canvas ${mode}`;
-  // PiD decodes only the modes that keep the whole frame.
-  const canvasSettings = mode === 'txt2img' || mode === 'img2img' ? settings : { ...settings, pidMode: 'off' as const };
+const generateCase = (testCase: GenerateRecordCase, baseline: GenerateWidgetValues): RecallCase => {
+  const { label, model, otherModels = [], settings } = testCase;
+  const catalog = recallCatalogFor(model, settings);
 
   return {
     baseline,
-    catalog: recallCatalogFor(model, canvasSettings),
-    image: imageOf(frame),
-    ...(isCanvasFrame ? { isCanvasFrame } : {}),
-    label: caseLabel,
+    catalog: { ...catalog, models: [...otherModels, ...catalog.models] },
+    image: imageOf(settings),
+    label,
     model,
     record: recordOf(
-      compiled(caseLabel, () =>
-        compileCanvas(model, mode, {
-          ...overrides,
-          bbox: { height: frame.height, width: frame.width, x: 0, y: 0 },
-          settings: canvasSettings,
-        })
-      ),
+      compiled(label, () => compileGenerateRecordCase(testCase)),
+      settings
+    ),
+    tuned: { ...settings, model },
+  };
+};
+
+const canvasCase = (testCase: CanvasRecordCase, baseline: GenerateWidgetValues): RecallCase => {
+  const { frame, isCanvasFrame, label, model, panelOverrides, settings } = testCase;
+  const canvasSettings = canvasSettingsOf(testCase);
+  const { height, width } = frame ?? settings;
+
+  return {
+    baseline: { ...baseline, ...panelOverrides },
+    catalog: recallCatalogFor(model, canvasSettings),
+    image: imageOf({ height, width }),
+    ...(isCanvasFrame ? { isCanvasFrame } : {}),
+    label,
+    model,
+    record: recordOf(
+      compiled(label, () => compileCanvasRecordCase(testCase)),
       canvasSettings
     ),
     // The record names the frame's size.
     tuned: {
       ...canvasSettings,
-      aspectRatioId: deriveAspectRatioId(frame.width, frame.height),
-      aspectRatioValue: frame.width / frame.height,
-      height: frame.height,
+      aspectRatioId: deriveAspectRatioId(width, height),
+      aspectRatioValue: width / height,
+      height,
       model,
-      width: frame.width,
+      width,
     },
   };
 };
@@ -604,94 +595,13 @@ const modelOnlyUpscaleCase = (source: RecallCase): RecallCase => {
   };
 };
 
-const ANIMA_INPAINT_ADAPTER: ComponentModelConfig = {
-  base: 'anima',
-  cond_in_channels: 4,
-  key: 'anima-inpaint-adapter',
-  name: 'Anima LLLite Inpainting',
-  type: 'controlnet',
-};
-
-const CANVAS_REGION = {
-  autoNegative: false,
-  id: 'region',
-  maskBounds: { height: 256, width: 192, x: 64, y: 128 },
-  maskImageName: 'region-mask.png',
-  negativePrompt: null,
-  positivePrompt: 'a cat',
-  referenceImages: [],
-};
-
 const buildCases = (): RecallCase[] => {
   const baseline = baselineValues();
-  const tunedShapes = generateGraphCases.map(({ base, shape }) => recallTunedSettingsFor(base, shape));
-  const generate = [
-    ...tunedShapes,
-    sdxlRefinerRecallCase(),
-    fluxReduxRecallCase(),
-    krea2EditRecallCase(),
-    ...externalRecallCases(),
-  ].map((fixture) => generateCase(fixture, baseline));
-  // One shape per base: the Canvas adds the same keys to every shape's record.
-  const firstShapes = tunedShapes.filter(
-    (fixture, index) => tunedShapes.findIndex((other) => other.model.base === fixture.model.base) === index
-  );
-  const fixtureFor = (base: string) => firstShapes.find((fixture) => fixture.model.base === base)!;
-  const canvas = firstShapes.flatMap((fixture) =>
-    canvasModesFor(fixture.model, fixture.settings).map((mode) => canvasCase(fixture, mode, baseline))
-  );
-  const anima = fixtureFor('anima');
-  const sdxl = fixtureFor('sdxl');
-  const [, gemini] = externalRecallCases();
+  const generate = generateRecordCases().map((testCase) => generateCase(testCase, baseline));
 
   return [
     ...generate,
-    ...canvas,
-    // The adapter switch is on by default, so only a panel that has it off shows a record turning it on.
-    canvasCase(
-      {
-        ...anima,
-        label: `${anima.label} with inpaint adapter`,
-        settings: {
-          ...anima.settings,
-          animaInpaintAdapterEnabled: true,
-          animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
-          animaInpaintAdapterWeight: 0.7,
-        },
-      },
-      'inpaint',
-      { ...baseline, animaInpaintAdapterEnabled: false }
-    ),
-    canvasCase({ ...sdxl, label: `${sdxl.label} with layers` }, 'img2img', baseline, {
-      canvasMetadata: { version: 1 },
-      controlLayers: [
-        {
-          beginEndStepPct: [0.1, 0.85],
-          controlMode: 'more_control',
-          id: 'control',
-          imageName: 'control.png',
-          kind: 'controlnet',
-          model: { base: 'sdxl', key: 'sdxl-controlnet', name: 'SDXL ControlNet', type: 'controlnet' },
-          weight: 0.65,
-        },
-        {
-          beginEndStepPct: [0, 1],
-          controlMode: null,
-          id: 't2i',
-          imageName: 't2i.png',
-          kind: 't2i_adapter',
-          model: { base: 'sdxl', key: 'sdxl-t2i-adapter', name: 'SDXL T2I-Adapter', type: 't2i_adapter' },
-          weight: 0.8,
-        },
-      ],
-      regionalGuidance: [CANVAS_REGION],
-    }),
-    // A layout family places regions in its caption, which the record takes from the caption node.
-    canvasCase({ ...fixtureFor('flux3'), label: `${fixtureFor('flux3').label} with a region` }, 'txt2img', baseline, {
-      regionalGuidance: [CANVAS_REGION],
-    }),
-    // The provider was asked for its named size nearest the frame; a Canvas route keeps the frame.
-    canvasCase(gemini!, 'txt2img', baseline, { frame: { height: 800, width: 1000 }, isCanvasFrame: true }),
+    ...canvasRecordCases().map((testCase) => canvasCase(testCase, baseline)),
     ...UPSCALE_CASES.map((testCase) => upscaleCase(testCase, baseline)),
     modelOnlyUpscaleCase(generate.find(({ label }) => label === 'sdxl / diffusers')!),
   ];
@@ -711,6 +621,7 @@ const recall = (
   }: { currentValues?: GenerateWidgetValues; metadata?: Written } = {}
 ) =>
   buildImageRecallSettings({
+    mayBeWorkflowRun: false,
     ...testCase.catalog,
     currentValues,
     image: testCase.image,

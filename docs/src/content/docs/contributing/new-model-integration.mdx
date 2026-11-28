@@ -698,7 +698,7 @@ File: `invokeai/app/invocations/metadata.py`
 
 3. **Metadata fields (if needed).**
 
-   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation, or if a node output feeds it through an edge, as `ideogram4_caption` and `moss_image_layout_prompt` record the prompt assembled at run time. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
+   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation, or if a node output feeds it through an edge, as `ideogram4_caption` and `moss_image_layout_prompt` record the prompt assembled at run time. Adding one requires a `core_metadata` node version bump, an empty input for the field in every bundled workflow that embeds the node (a test fails for each that lacks one), and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/#evolving-the-record).
 </Steps>
 
 ---
@@ -831,9 +831,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
      addEdge(graph, seed, 'value', denoise, 'seed');
      addEdge(graph, denoise, 'latents', output, 'latents');
      addEdge(graph, modelLoader, 'vae', output, 'vae');
-     addMetadata(graph, output, settings, model, 'new_model_txt2img', projectSettings, {
-       vae: vaeModel ?? undefined,
-     });
+     // The loader node above already holds `vae_model`; `addMetadata` records it from there.
+     addMetadata(graph, output, settings, model, 'new_model_txt2img', projectSettings);
      return {
        // Mask-based regional guidance needs conditioning collectors, which this record then names.
        conditioning: null,
@@ -867,6 +866,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 4. **Component pickers** (encoder, VAE, Diffusers component source)
 
    - Add a `case` to `getBaseComponentSectionPolicy` in `baseGenerationPolicies.ts`. Its `default` returns an empty policy silently.
+   - Give every component field of the builder's loader node an entry in `RECORDED_COMPONENT_FIELDS` (`src/features/generation/core/graphBuilder.ts`): node type, loader field, metadata key. `addMetadata` reads the record's components from the graph's loader nodes through that table, so a builder adds its loaders before it calls `addMetadata` and never stamps components by hand, and a field missing from the table is not recorded. `src/workbench/image-actions/recordedComponents.test.ts` fails for a model-valued node field that is neither in the table nor in its named exclusions.
    - Add encoder filters in `componentCompatibility.ts`. If a main model can bring its own components, update `isBundledMainForBase`. VAE acceptance comes from the backend.
    - A slot that only one variant needs goes into the policy conditionally: `getBaseComponentSectionPolicy` receives the model, so branch on `model.variant`, as FLUX.2 dev and Anima-3.8B do.
    - A **new** settings key must be added in all of these places:
@@ -874,7 +874,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
      - `GenerateComponentValueKey`, `COMPONENT_SETTING_LABELS`, `getComponentPolicyContext` and `getDefaultGenerateSettings` (`baseGenerationPolicies.ts`)
      - the second `getComponentPolicyContext` in `src/features/generation/ui/GenerateComponentsSection.tsx`
      - `normalizeGenerateSettings`, `cloneGenerateWidgetValues` and `syncGenerateWidgetValuesWithModels` (`settings.ts`)
-     - `RecalledComponentSetting` and `RECALLED_COMPONENTS` (`src/workbench/image-actions/imageRecall.ts`), under the metadata key the builder writes
+     - `RecalledComponentSetting` and `RECALLED_COMPONENTS` (`src/workbench/image-actions/imageRecall.ts`), under the metadata key the record holds it as
      - the test fixtures that build a complete `GenerateWidgetValues` literal (`imageRecall.test.ts`, `workbenchState.test.ts`, `importGalleryImages.test.ts`). Vitest does not type-check them; `lint:tsc` does.
 
 5. **Canvas**
@@ -885,11 +885,13 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 6. **Recall** (`src/workbench/image-actions/`)
 
-   - In `imageRecall.ts`, add one `RECALLED_COMPONENTS` entry per component key the builder writes into metadata (step 4). `hasComponentModels` and the component patch are derived from that table.
+   - In `imageRecall.ts`, add one `RECALLED_COMPONENTS` entry per metadata key `RECORDED_COMPONENT_FIELDS` gives the loader's components (step 4), except `vae`, `qwen_image_vae` and `refiner_model`, which have their own readers. List a component source after the encoders: each entry is judged beside the ones before it, and the model selection keeps a stored FLUX.2 source only beside the encoder it leaves to a standalone pick. `hasComponentModels` and the component patch are derived from that table.
    - A per-family setting that is not a model, such as Krea-2's rebalance or MOSS-Image's skip layers, needs its own metadata reader, a `RecalledField` member, its flag in `getImageRecallCapabilities` and its patch in `buildImageRecallSettings`.
    - Add the base to `GUIDANCE_BASES` in `recallParameters.ts` if it takes the shared guidance slider.
 
-   Every metadata key the builder writes needs an entry in `IMAGE_RECALL_CONTRACT` (`imageRecallContract.test.ts`; video graphs have theirs in `videoRecallContract.test.ts`): `restores` with the settings it sets, or `consumed` or `ignored` with the reason. The contract compiles every shape of `generateGraphCases` with each recalled setting off its default (`recallTunedSettingsFor` in `graphCoverage.testing.ts`), fails for a written key without an entry, and checks that recall restores every `restores` entry and that an `ignored` key changes nothing. It sees only keys those graphs write: if the builder writes a key only under some setting, set that setting off its default in `recallTunedSettingsFor`, or add a dedicated case.
+   Every metadata key the builder writes, component keys included, needs an entry in `IMAGE_RECALL_CONTRACT` (`imageRecallContract.test.ts`; video graphs have theirs in `videoRecallContract.test.ts`): `restores` with the settings it sets, or `consumed` or `ignored` with the reason. The contract compiles every shape of `generateGraphCases` with each recalled setting off its default (`recallTunedSettingsFor` in `graphCoverage.testing.ts`), fails for a written key without an entry, and checks that recall restores every `restores` entry and that an `ignored` key changes nothing. It sees only keys those graphs write: if the builder writes a key only under some setting, set that setting off its default in `recallTunedSettingsFor`, or add a dedicated case.
+
+   The write side has its own gate, `src/workbench/image-actions/imageRecordWriteGate.test.ts`: it varies each `GenerateSettings` key one at a time, in Generate graphs and in every Canvas mode (txt2img, img2img and inpaint, one shape per base), and when the compiled graph changes but the record does not, it fails. Settings the queue batch carries, such as the prompts and the seed, are invisible to it. Fix that by recording the setting (a builder extra, or a `RECORDED_COMPONENT_FIELDS` entry for a component). A new `GenerateSettings` key needs an entry in the gate's `VARIATIONS` table, and that entry must reach some fixture graph.
 
 7. **Model registry and labels**
 
@@ -927,7 +929,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 - [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
 - [ ] `FamilyGraph` facts checked through `generateGraphCases`, with `latents` and Canvas `BASE_CASES`
 - [ ] Non-null `conditioning` naming the global prompt nodes and collectors for mask-based regional guidance
-- [ ] Recall, with an `IMAGE_RECALL_CONTRACT` entry for every metadata key the builder writes
+- [ ] Loader component fields in `RECORDED_COMPONENT_FIELDS`, recall with an `IMAGE_RECALL_CONTRACT` entry for every metadata key the builder writes, and the write gate green
 - [ ] Model registry, labels, `en.json`
 - [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
 - [ ] Graph snapshot regenerated, `SUPPORTED_BASE_COUNTS` raised
@@ -999,6 +1001,8 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
 | `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs; a non-default value in `recallTunedSettingsFor` for a new recalled setting |
 | `src/workbench/image-actions/imageRecallContract.test.ts` (webv2) | An `IMAGE_RECALL_CONTRACT` entry for every metadata key the builder writes |
+| `src/features/generation/core/graphBuilder.ts` (webv2) | A `RECORDED_COMPONENT_FIELDS` entry for every component field of the loader node |
+| `src/workbench/image-actions/imageRecordWriteGate.test.ts` (webv2) | A `VARIATIONS` entry for a new `GenerateSettings` key |
 
 Beyond those tables, test what can silently go wrong:
 - detection of every format, including negative cases against similar architectures

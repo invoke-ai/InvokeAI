@@ -16,6 +16,8 @@ export {
   createId,
   getActiveCompatibleLoras,
   getLoadedLoras,
+  getRecordedComponents,
+  getRecordedVaePrecision,
   hasDistinctWanLowNoiseWeight,
   toGraphContract,
   toMetadataLora,

@@ -53,6 +53,8 @@ const MODELS_UI_ADAPTER = {
 };
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];
+const CONTROLNET_TYPES = ['controlnet'] as const;
+
 describe('ModelSelect loading states', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -86,6 +88,37 @@ describe('ModelSelect loading states', () => {
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
 
     await expect.poll(() => document.querySelector('[role="option"]')?.textContent).toContain('SDXL Main');
+  });
+
+  it('shows the label of a slot whose empty value is meaningful, and still opens to say why nothing is offered', async () => {
+    setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+            <ModelSelect
+              emptyLabel="From Some pipeline"
+              modelTypes={CONTROLNET_TYPES}
+              showManagerButton={false}
+              value={null}
+              onChange={vi.fn()}
+            />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    expect(trigger.disabled).toBe(false);
+    expect(trigger.textContent).toContain('From Some pipeline');
+    expect(trigger.textContent).not.toContain('scopeNoCompatibleInstalled');
+
+    await act(() => trigger.click());
+
+    await expect
+      .poll(() => document.querySelector('[data-scope="popover"][data-part="content"]')?.textContent)
+      .toContain('scopeNoCompatibleInstalled');
   });
 
   const renderPicker = async (props: Partial<Parameters<typeof ModelSelect>[0]> = {}) => {

@@ -423,7 +423,7 @@
       "type": "invocation",
       "data": {
         "id": "core_metadata",
-        "version": "2.10.0",
+        "version": "2.11.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count, steps, CFG and frame rate arrive over edges from the nodes that set them. They are the requested values: on the Distilled checkpoint the run itself takes 8 unguided steps whatever Steps and CFG say.",
@@ -755,6 +755,42 @@
           },
           "refiner_start": {
             "name": "refiner_start",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "vae_precision": {
+            "name": "vae_precision",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "color_compensation": {
+            "name": "color_compensation",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "mistral_source": {
+            "name": "mistral_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "moss_image_layout_prompt": {
+            "name": "moss_image_layout_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "flux3_caption": {
+            "name": "flux3_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "tile_controlnet": {
+            "name": "tile_controlnet",
             "label": "",
             "description": "",
             "value": null

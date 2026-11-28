@@ -201,6 +201,113 @@ export const getLoadedLoras = (graph: BackendGraphContract) => {
   return [...selectorLoras, ...wanLoaderLoras];
 };
 
+/**
+ * The component-model fields of the loader nodes a graph can hold, and the metadata key recall reads each from. A
+ * loader field missing here reaches inference unrecorded, so a builder that adds one extends this table.
+ * The main loaders' own `model` is the main model, which the record holds as `model`.
+ */
+export const RECORDED_COMPONENT_FIELDS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  anima_model_loader: {
+    qwen3_5_encoder_model: ['qwen3_5_encoder'],
+    qwen3_encoder_model: ['qwen3_encoder'],
+    vae_model: ['vae'],
+  },
+  ernie_image_model_loader: { text_encoder_model: ['mistral_encoder'], vae_model: ['vae'] },
+  flux2_dev_model_loader: {
+    mistral_encoder_model: ['mistral_encoder'],
+    mistral_source_model: ['mistral_source'],
+    vae_model: ['vae'],
+  },
+  flux2_klein_model_loader: {
+    qwen3_encoder_model: ['qwen3_encoder'],
+    qwen3_source_model: ['qwen3_source'],
+    vae_model: ['vae'],
+  },
+  flux3_model_loader: { qwen3_vl_encoder_model: ['qwen3_vl_encoder'], vae_model: ['vae'] },
+  flux3_prompt_upsampler: { upsampler_model: ['flux3_prompt_upsampler'] },
+  flux_model_loader: {
+    clip_embed_model: ['clip_embed_model'],
+    t5_encoder_model: ['t5_encoder'],
+    vae_model: ['vae'],
+  },
+  gemma2_encoder_loader: { gemma2_model: ['gemma2_encoder'] },
+  ideogram4_model_loader: {
+    qwen3_vl_encoder_model: ['qwen3_vl_encoder'],
+    unconditional_model: ['ideogram4_unconditional_model'],
+    vae_model: ['vae'],
+  },
+  krea2_model_loader: {
+    qwen3_vl_encoder_model: ['qwen3_vl_encoder'],
+    qwen3_vl_vision_tower_model: ['qwen3_vl_vision_tower'],
+    vae_model: ['vae'],
+  },
+  moss_image_model_loader: { qwen3_5_encoder_model: ['qwen3_5_encoder'], vae_model: ['vae'] },
+  pid_decoder_loader: { pid_decoder_model: ['pid_decoder'] },
+  qwen_image_2_1_model_loader: {
+    qwen3_vl_encoder_model: ['qwen3_vl_encoder'],
+    qwen3_vl_vision_tower_model: ['qwen3_vl_vision_tower'],
+    vae_model: ['vae'],
+  },
+  qwen_image_model_loader: {
+    component_source: ['qwen_image_component_source'],
+    qwen_vl_encoder_model: ['qwen_image_qwen_vl_encoder'],
+    // Older recall reads the VAE of a Qwen-Image record from the alias.
+    vae_model: ['vae', 'qwen_image_vae'],
+  },
+  sd3_model_loader: {
+    clip_g_model: ['clip_g_model'],
+    clip_l_model: ['clip_l_model'],
+    t5_encoder_model: ['t5_encoder'],
+    vae_model: ['vae'],
+  },
+  sdxl_refiner_model_loader: { model: ['refiner_model'] },
+  vae_loader: { vae_model: ['vae'] },
+  wan_model_loader: {
+    component_source: ['wan_component_source'],
+    transformer_low_noise_model: ['wan_transformer_low_noise'],
+    vae_model: ['vae'],
+    wan_t5_encoder_model: ['wan_t5_encoder_model'],
+  },
+  z_image_model_loader: {
+    qwen3_encoder_model: ['qwen3_encoder'],
+    qwen3_source_model: ['qwen3_source'],
+    vae_model: ['vae'],
+  },
+};
+
+/**
+ * The component models a graph loads, under the metadata keys recall reads. Read from the graph rather than the
+ * settings, so a record names only what reached a loader; a loader field without a value records nothing.
+ */
+export const getRecordedComponents = (graph: BackendGraphContract): Record<string, unknown> => {
+  const components: Record<string, unknown> = {};
+
+  for (const node of Object.values(graph.nodes)) {
+    for (const [field, keys] of Object.entries(RECORDED_COMPONENT_FIELDS[node.type] ?? {})) {
+      const value = node[field];
+
+      if (value !== undefined && value !== null) {
+        for (const key of keys) {
+          components[key] = value;
+        }
+      }
+    }
+  }
+
+  return components;
+};
+
+/**
+ * The VAE precision the graph ran with, read from the nodes that take one: an encode, a decode, or an SD gradient mask
+ * carry an `fp32` switch, and no other family's node does. A graph with none, such as a PiD decode with no encode,
+ * used no precision and records none.
+ */
+export const getRecordedVaePrecision = (graph: BackendGraphContract): { vae_precision?: 'fp16' | 'fp32' } => {
+  const switches = Object.values(graph.nodes).flatMap((node) => (typeof node.fp32 === 'boolean' ? [node.fp32] : []));
+
+  return switches.length > 0 ? { vae_precision: switches.includes(true) ? 'fp32' : 'fp16' } : {};
+};
+
 export const addMetadata = (
   graph: BackendGraphContract,
   outputNode: BackendInvocationContract,
@@ -225,9 +332,10 @@ export const addMetadata = (
     seamless_y: settings.seamlessYAxis,
     steps: settings.steps,
     type: 'core_metadata',
-    vae: settings.vae ?? undefined,
     width: settings.width,
     ...extras,
+    ...getRecordedComponents(graph),
+    ...getRecordedVaePrecision(graph),
     ...(loadedLoras.length ? { loras: loadedLoras } : {}),
     ...(model.base === 'sdxl' ? {} : { clip_skip: settings.clipSkip }),
   });

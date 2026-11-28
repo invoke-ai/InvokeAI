@@ -148,8 +148,6 @@ export const addPidDecode = ({
 };
 
 export const getPidMetadata = (settings: GenerateSettings): Record<string, unknown> & { pid_mode: PidMode } => ({
-  gemma2_encoder: settings.gemma2EncoderModel,
-  pid_decoder: settings.pidDecoderModel,
   pid_mode: settings.pidMode,
   pid_steps: settings.pidSteps,
 });

@@ -43,6 +43,7 @@ import {
   type GalleryItemNames,
   fetchImageIndexAvailability,
   getGalleryImageMetadata,
+  getGalleryImageWorkflow,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
   hydrateGalleryDateBoardItemPage,
@@ -240,6 +241,8 @@ export const galleryKeys = {
     [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
   imageHasWorkflow: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  imageWorkflow: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-workflow', getAccountKey(owner), imageName] as const,
   videoMetadata: (owner: AccountScope, videoName: string) =>
     [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
   videoHasWorkflow: (owner: AccountScope, videoName: string) =>
@@ -298,6 +301,18 @@ export const fetchGalleryImageMetadata = (
   imageName: string
 ): Promise<GalleryImageMetadata | null> =>
   fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageMetadataOptions(owner, imageName)));
+
+/** The workflow, graph and resolved inputs an image embeds. An image's embedded record never changes. */
+export const galleryImageWorkflowOptions = (owner: AccountScope, imageName: string) =>
+  queryOptions({
+    queryFn: ({ signal }) => getGalleryImageWorkflow(imageName, AbortSignal.any([signal, owner.signal])),
+    queryKey: galleryKeys.imageWorkflow(owner, imageName),
+    retry: false,
+    staleTime: Infinity,
+  });
+
+export const fetchGalleryImageWorkflow = (client: QueryClient, owner: AccountScope, imageName: string) =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageWorkflowOptions(owner, imageName)));
 
 export const galleryVideoMetadataOptions = (owner: AccountScope, videoName: string) =>
   mediaMetadataOptions(owner, galleryKeys.videoMetadata(owner, videoName), (signal) =>

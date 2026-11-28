@@ -1,9 +1,13 @@
 import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } from '@features/gallery';
 
 import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { galleryImages, galleryVideos } from '@features/gallery';
+import { galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
-import { galleryImageMetadataOptions, galleryVideoMetadataOptions } from '@features/gallery/queries';
+import {
+  galleryImageMetadataOptions,
+  galleryImageWorkflowOptions,
+  galleryVideoMetadataOptions,
+} from '@features/gallery/queries';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
@@ -94,7 +98,7 @@ const PreviewDetailsQuery = ({
   item.kind === 'video' ? (
     <VideoDetailsQuery accountEpoch={accountEpoch} itemKey={itemKey} videoName={item.name} />
   ) : image ? (
-    <ImageDetailsQuery accountEpoch={accountEpoch} actions={actions} image={image} itemKey={itemKey} />
+    <ImageDetailsQuery actions={actions} image={image} />
   ) : (
     <DetailsTabs graph={null} metadata={null} workflow={null}>
       <ImageDetails
@@ -161,24 +165,10 @@ const VideoDetails = ({ entries }: { entries: readonly PreviewMetadataEntry[] })
   </Scrollable>
 );
 
-/** Metadata from the gallery's shared entry; workflow and graph are Details' own read, failing separately. */
-const ImageDetailsQuery = ({
-  accountEpoch,
-  actions,
-  image,
-  itemKey,
-}: {
-  accountEpoch: number;
-  actions: ImageActions;
-  image: GalleryImage;
-  itemKey: GalleryItemKey;
-}) => {
+/** Metadata and workflow from the gallery's shared entries (recall reads the workflow too), failing separately. */
+const ImageDetailsQuery = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
   const metadataQuery = useQuery(galleryImageMetadataOptions(captureAccountScope(), image.imageName));
-  const workflowQuery = useQuery({
-    queryFn: ({ signal }) => galleryImages.workflow(image.imageName, signal),
-    queryKey: ['preview', 'details', accountEpoch, itemKey, 'workflow'],
-    retry: false,
-  });
+  const workflowQuery = useQuery(galleryImageWorkflowOptions(captureAccountScope(), image.imageName));
   // Show complete raw metadata alongside parsed fields because workflows may add arbitrary entries.
   const metadata = metadataQuery.data ?? null;
   const capabilities = metadataQuery.isPending

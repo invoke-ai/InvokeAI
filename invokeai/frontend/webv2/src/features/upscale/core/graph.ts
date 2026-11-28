@@ -14,6 +14,8 @@ import {
   addNode,
   buildImageToImagePipeline,
   getLoadedLoras,
+  getRecordedComponents,
+  getRecordedVaePrecision,
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
@@ -99,13 +101,10 @@ const addUpscaleMetadata = (
   {
     frame,
     output,
-    vaeModel,
   }: {
     /** The image the pass encoded, which the result matches in size, so Recall restores the real one. */
     frame: BackendInvocationContract;
     output: BackendInvocationContract;
-    /** The VAE the pipeline loaded; the widget's pick is dropped where it is incompatible or the family ignores it. */
-    vaeModel: UpscaleWidgetValues['vae'];
   },
   settings: UpscaleWidgetValues,
   randDevice: string
@@ -114,24 +113,18 @@ const addUpscaleMetadata = (
     return;
   }
 
-  const components = activeUpscaleComponents(settings);
-  // FLUX calls this guidance, not CFG, and the encoders have to be recalled with the rest.
+  const tileControlKind = upscaleArchitectureFor(settings.model)?.tileControlNet?.kind;
+  const tileControlModel = Object.values(graph.nodes).find((node) => node.type === tileControlKind)?.control_model;
+  // FLUX calls this guidance, not CFG.
   const guidanceField =
     upscaleNegativePromptUsage(settings.model) === 'never'
       ? { guidance: settings.cfgScale }
       : { cfg_scale: settings.cfgScale };
   const metadata = addNode(graph, {
     ...guidanceField,
-    ...(components.t5EncoderModel ? { t5_encoder: toModelIdentifier(components.t5EncoderModel) } : {}),
-    ...(components.clipEmbedModel ? { clip_embed_model: toModelIdentifier(components.clipEmbedModel) } : {}),
-    ...(components.qwen3EncoderModel ? { qwen3_encoder: toModelIdentifier(components.qwen3EncoderModel) } : {}),
-    ...(components.qwen35EncoderModel ? { qwen3_5_encoder: toModelIdentifier(components.qwen35EncoderModel) } : {}),
-    ...(components.qwen3VlEncoderModel ? { qwen3_vl_encoder: toModelIdentifier(components.qwen3VlEncoderModel) } : {}),
-    ...(components.mistralEncoderModel ? { mistral_encoder: toModelIdentifier(components.mistralEncoderModel) } : {}),
-    // Generate records Qwen Image's encoder under its own key, and Remix reads it back from there.
-    ...(components.qwenVlEncoderModel
-      ? { qwen_image_qwen_vl_encoder: toModelIdentifier(components.qwenVlEncoderModel) }
-      : {}),
+    // The loaders hold the encoders and the VAE, under the keys Generate records them with.
+    ...getRecordedComponents(graph),
+    ...getRecordedVaePrecision(graph),
     creativity: settings.creativity,
     id: 'core_metadata',
     // Runs after the pipeline, so the graph already holds the LoRAs this architecture loads.
@@ -141,6 +134,8 @@ const addUpscaleMetadata = (
     scheduler: coerceUpscaleScheduler(settings.model, settings.scheduler),
     steps: settings.steps,
     structure: settings.structure,
+    // The model of the tile ControlNet node this architecture's path added, when it takes one.
+    ...(tileControlModel ? { tile_controlnet: tileControlModel } : {}),
     tile_overlap: settings.tileOverlap,
     tile_size: settings.tileSize,
     type: 'core_metadata',
@@ -151,7 +146,6 @@ const addUpscaleMetadata = (
     },
     upscale_model: toModelIdentifier(settings.upscaleModel),
     upscale_scale: settings.scale,
-    vae: vaeModel ? toModelIdentifier(vaeModel) : undefined,
   });
 
   addEdge(graph, graph.nodes.positive_prompt, 'value', metadata, 'positive_prompt');
@@ -304,8 +298,12 @@ export const compileModelOnlyUpscaleGraph = ({
   addNode(graph, { id: 'seed', type: 'integer' });
 
   const upscaleScale = scale === 'native' ? getSpandrelNativeScale(upscaleModel) : scale;
-  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one.
+  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one. Nor does
+  // `rand_device`, the mark of a record whose writer named every loader selection: the copy embeds no workflow, so
+  // it cannot tell a workflow run (whose loader took picks the record never names) from the plain graph run that
+  // mark vouches for, and recall would clear picks the source used.
   const {
+    rand_device: _randDevice,
     upscale_initial_image: _initialImage,
     upscale_model: _model,
     upscale_scale: _scale,
@@ -382,7 +380,7 @@ export const compileUpscaleGraph = (
     height: upscaleDenoiseDimension(inputImage.height, settings.scale, grid),
     width: upscaleDenoiseDimension(inputImage.width, settings.scale, grid),
   };
-  const { denoise, graph, latents, output, vaeModel } = buildImageToImagePipeline({
+  const { denoise, graph, latents, output } = buildImageToImagePipeline({
     denoiseSize,
     denoisingStart: getUpscaleEntry(model, denoiseSize, settings),
     model,
@@ -427,7 +425,7 @@ export const compileUpscaleGraph = (
   if (architecture.tileControlNet) {
     addTileControl(graph, settings, architecture.tileControlNet.kind, { denoise, frame });
   }
-  addUpscaleMetadata(graph, { frame, output, vaeModel }, settings, randDevice);
+  addUpscaleMetadata(graph, { frame, output }, settings, randDevice);
 
   return {
     backendGraph: graph,

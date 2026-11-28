@@ -168,6 +168,7 @@ describe('model-only upscale graph', () => {
     metadata_version: 1,
     model: { key: 'legacy-main', model_name: 'old shape' },
     positive_prompt: 'a lighthouse',
+    rand_device: 'cpu',
     seed: 42,
     upscale_initial_image: { height: 1, image_name: 'older.png', width: 1 },
     upscale_model: { key: 'older-upscaler' },
@@ -235,7 +236,7 @@ describe('model-only upscale graph', () => {
     });
   });
 
-  it("copies the source image's metadata verbatim, replacing only what it says about an earlier upscale", () => {
+  it("copies the source image's metadata, replacing what it says about an earlier upscale and leaving out `rand_device`", () => {
     const metadata = compileModelOnlyUpscaleGraph({
       destination: 'gallery',
       image,

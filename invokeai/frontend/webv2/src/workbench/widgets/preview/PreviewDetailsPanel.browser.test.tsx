@@ -33,10 +33,6 @@ vi.mock('@features/gallery', async (importOriginal) => {
 
   return {
     ...actual,
-    galleryImages: {
-      ...actual.galleryImages,
-      workflow: () => Promise.resolve({ graph: null, workflow: '{"name":"image workflow"}' }),
-    },
     galleryVideos: {
       ...actual.galleryVideos,
       workflow: () => Promise.resolve({ graph: null, workflow: null }),
@@ -46,6 +42,7 @@ vi.mock('@features/gallery', async (importOriginal) => {
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryImageMetadata: () => Promise.resolve({ ...TALL_RECORD, positive_prompt: 'a tall prompt', seed: 7 }),
+  getGalleryImageWorkflow: () => Promise.resolve({ graph: null, workflow: '{"name":"image workflow"}' }),
   getGalleryVideoMetadata: () => Promise.resolve(TALL_RECORD),
 }));
 const mocks = vi.hoisted(() => ({

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from typing import get_args
 from unittest.mock import MagicMock
 
+import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from invokeai.app.invocations.fields import ImageField, MetadataField, VideoField
@@ -60,6 +61,23 @@ def test_core_metadata_records_the_video_profile_fields_by_their_canonical_names
     assert record["source_video"] == {"video_name": "clip.mp4"}
     assert (record["source_video_start_frame"], record["source_video_end_frame"]) == (0, 40)
     assert record["minimax_h3_hybrid_start_block"] == 12
+
+
+def test_core_metadata_records_the_image_profile_fields_by_their_canonical_names() -> None:
+    source = ModelIdentifierField(key="s", hash="h", name="FLUX.2 dev", base="flux2", type="main")
+    output = CoreMetadataInvocation(
+        id="m", mistral_source=source, vae_precision="fp16", color_compensation=True
+    ).invoke(MagicMock())
+
+    record = output.metadata.root
+    assert record["mistral_source"] == {"key": "s", "hash": "h", "name": "FLUX.2 dev", "base": "flux2", "type": "main"}
+    assert record["vae_precision"] == "fp16"
+    assert record["color_compensation"] is True
+    # Recall reads an explicit off as "the encode ran without it"; it must survive the record's None filter.
+    off = CoreMetadataInvocation(id="m", color_compensation=False).invoke(MagicMock()).metadata.root
+    assert off["color_compensation"] is False
+    with pytest.raises(ValidationError):
+        CoreMetadataInvocation(id="m", vae_precision="bf16")
 
 
 def test_core_metadata_registry_uniqueness_and_enum_validation() -> None:
@@ -418,7 +436,7 @@ def test_core_metadata_cfg_scale_schedule_and_hidiffusion_auto_ratios_parity() -
         MetadataToFloatInvocation,
     )
 
-    assert CORE_METADATA_VERSION == "1.3.0"
+    assert CORE_METADATA_VERSION == "1.4.0"
     assert "hidiffusion_auto_ratios" in get_args(CORE_LABELS_BOOL)
     assert "hidiffusion_auto_ratios" in CORE_BOOL_LABELS
 

@@ -17,17 +17,19 @@ const galleryApi = vi.hoisted(() => ({
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),
+    workflow: vi.fn(),
   },
 }));
 
 vi.mock('@features/gallery', () => galleryApi);
-// The transport under the gallery's shared metadata query.
+// The transports under the gallery's shared metadata and workflow queries.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryImageMetadata: galleryApi.galleryImages.metadata,
+  getGalleryImageWorkflow: galleryApi.galleryImages.workflow,
 }));
 
-import { galleryImageMetadataOptions, galleryKeys } from '@features/gallery/queries';
+import { galleryImageMetadataOptions, galleryImageWorkflowOptions, galleryKeys } from '@features/gallery/queries';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
@@ -129,6 +131,7 @@ describe('executeImageRecall', () => {
     accountLifecycle.activate('test-account');
     galleryApi.galleryImages.metadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
+    galleryApi.galleryImages.workflow.mockReset();
   });
 
   it('recalls remix settings into Generate values', async () => {
@@ -849,6 +852,171 @@ describe('executeImageRecall', () => {
     expect(oldCommands.add).not.toHaveBeenCalled();
   });
 
+  describe('a record that names no VAE, beside a panel that holds one', () => {
+    const vae = { base: 'sdxl', format: 'checkpoint', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' } as ModelConfig;
+    // What webv2's Generate graph writes for an SDXL run that used the main model's own VAE.
+    const record = {
+      generation_mode: 'sdxl_txt2img',
+      model: { base: 'sdxl', hash: 'hash', key: model.key, name: model.name, type: 'main' },
+      positive_prompt: 'p',
+      rand_device: 'cpu',
+    };
+    const recallVae = async () => {
+      const { commands, setSettings } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue(record);
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key, vae }),
+        image,
+        kind: 'remix',
+        models: [model, vae],
+        projectId: 'project-1',
+      });
+
+      return (setSettings.mock.calls[0]![0] as GenerateWidgetValues).vae;
+    };
+
+    it('clears the panel VAE for a graph run, which names every VAE it loaded', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+
+      await expect(recallVae()).resolves.toBeNull();
+    });
+
+    it('keeps the panel VAE for a run that embeds a workflow, whose loader may have used it unrecorded', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: '{"nodes":[]}' });
+
+      expect((await recallVae())?.key).toBe(vae.key);
+    });
+
+    it('names the picks it cleared, since the panel may show them nowhere', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+      const { add, commands } = createCommands();
+      const english = await createRecallTranslator('en');
+
+      galleryApi.galleryImages.metadata.mockResolvedValue(record);
+      await executeImageRecall({
+        queryClient,
+        t: english,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key, vae }),
+        image,
+        kind: 'remix',
+        models: [model, vae],
+        projectId: 'project-1',
+      });
+
+      expect(add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'info',
+          message: "The image used its model's own components, so these picks were cleared: VAE.",
+        })
+      );
+    });
+
+    it('reads the workflow Image Details already read, and reads it once per image', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+      await queryClient.fetchQuery(galleryImageWorkflowOptions(accountLifecycle.capture(), image.imageName));
+
+      await recallVae();
+      await recallVae();
+
+      expect(galleryApi.galleryImages.workflow).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no workflow while the recorded model is not installed, since nothing could be cleared', async () => {
+      const { commands } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue({
+        ...record,
+        model: { base: 'sdxl', key: 'gone', name: 'Gone', type: 'main' },
+      });
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key, vae }),
+        image,
+        kind: 'remix',
+        models: [model, vae],
+        projectId: 'project-1',
+      });
+
+      expect(galleryApi.galleryImages.workflow).not.toHaveBeenCalled();
+    });
+
+    describe('the decode settings of a record with no loader selections', () => {
+      // A migrated workflow stamps the first precision option whatever its decode did.
+      const recallPrecision = async (workflow: string | null) => {
+        const { commands, setSettings } = createCommands();
+
+        galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow });
+        galleryApi.galleryImages.metadata.mockResolvedValue({
+          ...record,
+          rand_device: undefined,
+          vae_precision: 'fp16',
+        });
+        await executeImageRecall({
+          queryClient,
+          t,
+          commands,
+          getGenerateValues: () => ({ modelKey: model.key }),
+          image,
+          kind: 'remix',
+          models: [model],
+          projectId: 'project-1',
+        });
+
+        return (setSettings.mock.calls[0]![0] as GenerateWidgetValues).vaePrecision;
+      };
+
+      it('restores the VAE precision of an image that embeds no workflow', async () => {
+        await expect(recallPrecision(null)).resolves.toBe('fp16');
+      });
+
+      it('leaves the VAE precision alone for a run of an embedded workflow, whose editor writes defaults', async () => {
+        // SDXL's model default, which the model selection falls back on.
+        await expect(recallPrecision('{"nodes":[]}')).resolves.toBe('fp32');
+      });
+    });
+
+    it('reads the embedded workflow once per image, whatever the number of recalls', async () => {
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+
+      await recallVae();
+      await recallVae();
+
+      expect(galleryApi.galleryImages.workflow).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads no workflow for a record that cannot vouch for its components', async () => {
+      queryClient.clear();
+      const { commands } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue({ positive_prompt: 'p' });
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        getGenerateValues: () => ({ modelKey: model.key }),
+        image,
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-1',
+      });
+
+      expect(galleryApi.galleryImages.workflow).not.toHaveBeenCalled();
+    });
+
+    it('keeps the panel VAE when the workflow cannot be read', async () => {
+      galleryApi.galleryImages.workflow.mockRejectedValue(new ApiError('Internal Server Error', 500));
+
+      expect((await recallVae())?.key).toBe(vae.key);
+    });
+  });
+
   describe('in a fresh project whose model stores default components', () => {
     const q21 = {
       base: 'qwen-image-2-1',
@@ -894,6 +1062,17 @@ describe('executeImageRecall', () => {
     };
     const recallInto = async (kind: 'prompts' | 'remix', metadata: Record<string, unknown>) =>
       (await recallValues(kind, metadata)).qwen3VLEncoderModel;
+
+    it('fills the default VAE of the fallback model beside decode settings, which are no VAE pick', async () => {
+      const vae = { base: 'sdxl', format: 'checkpoint', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' } as ModelConfig;
+      const withDefaultVae = { ...model, default_settings: { vae: vae.key } } as ModelConfig;
+
+      galleryApi.galleryImages.workflow.mockResolvedValue({ graph: '{}', workflow: null });
+      const values = await recallValues('remix', { vae_precision: 'fp16' }, withDefaultVae, [withDefaultVae, vae]);
+
+      expect(values.vaePrecision).toBe('fp16');
+      expect(values.vae?.key).toBe(vae.key);
+    });
 
     it('lets a remix of an image made with the bundled encoder keep the bundled one', async () => {
       await expect(
