@@ -114052,7 +114052,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.4.0",
+        "version": "1.4.1",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }

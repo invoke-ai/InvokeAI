@@ -32,7 +32,7 @@ def test_a_gguf_transformer_reserves_its_dequant_transient(monkeypatch: pytest.M
         requires_grad=False,
     )
     transformer = torch.nn.Sequential(linear)
-    transformer.config = SimpleNamespace(joint_attention_dim=64, in_channels=16)
+    transformer.config = SimpleNamespace(joint_attention_dim=64, in_channels=16, patch_size=2)
     transformer_info = MagicMock(model=transformer, model_on_device=MagicMock(side_effect=_StopBeforeLoad))
     context = MagicMock()
     context.models.load.return_value = transformer_info
