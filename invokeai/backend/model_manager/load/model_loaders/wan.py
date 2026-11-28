@@ -12,7 +12,9 @@ Currently covers:
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
+import json
 from itertools import chain
+from math import prod
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
 
@@ -31,7 +33,7 @@ from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_G
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
-from invokeai.backend.model_manager.model_on_disk import safetensors_meta_state_dict
+from invokeai.backend.model_manager.model_on_disk import read_safetensors_header, safetensors_meta_state_dict
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -784,15 +786,86 @@ class WanCheckpointModel(ModelLoader):
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder)
 class WanT5EncoderLoader(ModelLoader):
-    """Loader for the standalone Wan UMT5-XXL encoder.
+    """Load the standalone UMT5 encoder from a flat or nested Diffusers folder."""
 
-    Accepts two on-disk layouts:
-    1. Parent dir with ``text_encoder/`` (and typically ``tokenizer/``) subdirs —
-       what ``Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer`` produces.
-    2. A flat ``text_encoder/`` folder with ``config.json`` declaring
-       ``model_type: umt5`` directly at the root. In this case the tokenizer
-       is loaded from the same folder.
-    """
+    def _encoder_dtype(self, config: AnyModelConfig) -> torch.dtype:
+        device = self._get_execution_device(config, SubModelType.TextEncoder) or self.ram_cache.execution_device
+        decisions: dict[torch.device, torch.dtype] = self.__dict__.setdefault("_wan_dtype_decisions", {})
+        if device not in decisions:
+            decisions[device] = torch.float32 if device.type == "cpu" else _umt5_compute_dtype(device)
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type == SubModelType.TextEncoder:
+            device = self._get_execution_device(config, submodel_type) or self.ram_cache.execution_device
+            dtype = str(self._encoder_dtype(config)).removeprefix("torch.")
+            return f"cpu_{dtype}" if device.type == "cpu" else dtype
+        return ""
+
+    @staticmethod
+    def _encoder_folder(root: Path) -> Path:
+        nested = root / "text_encoder"
+        return nested if nested.exists() else root
+
+    @staticmethod
+    def _encoder_config(folder: Path) -> dict | None:
+        path = folder / "config.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+    @staticmethod
+    def _has_quantization_or_fusion(model_config: dict) -> bool:
+        return any(model_config.get(key) is not None for key in ("quantization_config", "fusion_config"))
+
+    @staticmethod
+    def _uses_adapter(folder: Path) -> bool:
+        if not (folder / "adapter_config.json").is_file():
+            return False
+        from transformers.utils import is_peft_available
+
+        return is_peft_available()
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type != SubModelType.TextEncoder:
+            return super().get_size_fs(config, model_path, submodel_type)
+
+        folder = self._encoder_folder(model_path)
+        model_config = self._encoder_config(folder)
+        if model_config is None or self._has_quantization_or_fusion(model_config) or self._uses_adapter(folder):
+            return super().get_size_fs(config, model_path, submodel_type)
+        explicit = model_config.get("transformers_weights")
+        names = (
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "pytorch_model.bin",
+            "pytorch_model.bin.index.json",
+        )
+        source = (
+            folder / explicit
+            if explicit
+            else next((folder / name for name in names if (folder / name).is_file()), None)
+        )
+        if source is None:
+            return super().get_size_fs(config, model_path, submodel_type)
+        if source.name.endswith(".index.json"):
+            index = json.loads(source.read_text(encoding="utf-8"))
+            files = [folder / name for name in sorted(set(index["weight_map"].values()))]
+        else:
+            files = [source]
+        dtype = self._encoder_dtype(config)
+        device = self._get_execution_device(config, submodel_type) or self.ram_cache.execution_device
+        # Transformers opens every shard as safetensors when the first is safe;
+        # otherwise it dispatches each shard separately by its filename.
+        all_safe = bool(files) and files[0].name.endswith(".safetensors")
+        total = 0
+        for file in files:
+            if all_safe or file.name.endswith(".safetensors"):
+                total += sum(prod(info["shape"]) for info in read_safetensors_header(file).values()) * dtype.itemsize
+            else:
+                # For a bf16 binary, a float32 CPU load doubles the file-size estimate.
+                total += file.stat().st_size * (2 if device.type == "cpu" else 1)
+        return total
 
     def _load_model(
         self,
@@ -809,12 +882,15 @@ class WanT5EncoderLoader(ModelLoader):
         if submodel_type == SubModelType.TextEncoder:
             from transformers import UMT5EncoderModel
 
-            target = nested_text_encoder if nested_text_encoder.exists() else root
-            return UMT5EncoderModel.from_pretrained(
-                str(target),
-                torch_dtype=torch.bfloat16,
-                local_files_only=True,
+            target = self._encoder_folder(root)
+            model_config = self._encoder_config(target)
+            # Preserve the existing path for quantized/fused and adapter-only folders.
+            dtype = (
+                torch.bfloat16
+                if model_config is None or self._has_quantization_or_fusion(model_config) or self._uses_adapter(target)
+                else self._encoder_dtype(config)
             )
+            return UMT5EncoderModel.from_pretrained(str(target), dtype=dtype, local_files_only=True)
         if submodel_type == SubModelType.Tokenizer:
             from invokeai.backend.wan.tokenizer import load_wan_tokenizer
 
@@ -833,7 +909,7 @@ class WanT5EncoderLoader(ModelLoader):
 
 
 def _umt5_compute_dtype(device: torch.device) -> torch.dtype:
-    """bfloat16, as the folder loader always uses, or float32 where the device lacks it -- never float16.
+    """bfloat16, or float32 where the device lacks it -- never float16.
 
     UMT5's feed-forward activations overflow float16; transformers guards a float16 load by keeping
     ``wo`` in float32, which a packed ``wo`` cannot be.

@@ -103,6 +103,10 @@ slowly where the CPU has no native bf16 support. That takes about 19 GB of RAM f
 if the RAM cache (`max_cache_ram_gb`) is smaller than that, raise it or use a GGUF T5. A GGUF T5 keeps its quantized
 weights packed; only its dequantized embeddings and the per-layer dequantization transients are float32.
 
+An unquantized standalone Wan UMT5-XXL base folder without a PEFT adapter also runs in float32 on the CPU. A bf16 folder then needs about 22.7 GB of RAM
+for the encoder instead of 11.4 GB; if it exceeds `max_cache_ram_gb`, other cached models may be evicted and the
+encoder reloaded for each prompt. Raise the RAM cache limit or use a quantized UMT5 GGUF to reduce memory use.
+
 Single-file Qwen3 and Qwen2.5-VL (`qwen_2.5_vl_7b_fp8_scaled`) encoders in ComfyUI's scaled fp8 layout also keep their
 Linear layers in fp8, with the file's own scales, on a GPU that can hold fp8: about 4.4 GB instead of about 8.0 GB for
 Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about 8.3 GB (the file less its unused LM head) instead
