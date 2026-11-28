@@ -317,6 +317,11 @@ def _expanded_call_choice(query: torch.Tensor, attention_mask: torch.Tensor | No
     return sdpa_backend_choice(probe, probe, probe, mask)
 
 
+def block_receives_regional_mask(block_index: int) -> bool:
+    """Regional masks go to alternating main blocks only, the even ones."""
+    return block_index % 2 == 0
+
+
 class _Krea2AttentionProcessorContainer(Protocol):
     @property
     def attn_processors(self) -> dict[str, object]: ...
@@ -355,7 +360,9 @@ def build_krea2_attention_processors(
     for name in transformer.attn_processors:
         match = re.fullmatch(r"transformer_blocks\.(\d+)\.attn\.processor", name)
         block_index = int(match.group(1)) if match is not None else None
-        regional = regional_prompting_state if block_index is not None and block_index % 2 == 0 else None
+        regional = (
+            regional_prompting_state if block_index is not None and block_receives_regional_mask(block_index) else None
+        )
         style = (
             style_reference_state
             if style_reference_state is not None and block_index is not None and block_index in style_blocks

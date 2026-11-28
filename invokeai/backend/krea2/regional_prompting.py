@@ -42,11 +42,15 @@ class Krea2RegionalPromptingExtension:
         return any(mask is not None for mask in self.regional_text_conditioning.image_masks)
 
     @property
-    def attention_mask_numel(self) -> int:
+    def attention_mask_rows(self) -> int:
+        """The mask's row count, the whole sequence (caption plus image tokens); 0 without regional masks."""
         if not self.has_regional_masks:
             return 0
-        total_seq_len = self.regional_text_conditioning.prompt_embeds.shape[1] + self.image_seq_len
-        return total_seq_len**2
+        return self.regional_text_conditioning.prompt_embeds.shape[1] + self.image_seq_len
+
+    @property
+    def attention_mask_numel(self) -> int:
+        return self.attention_mask_rows**2
 
     @property
     def attention_mask_build_scratch_numel(self) -> int:

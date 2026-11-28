@@ -113,11 +113,13 @@ The analytic terms:
 - Where SDPA has no fused kernel for these shapes it materializes the score matrices (`sdpa_score_matrix_bytes`), for
   the query heads of the transformer's config: the K/V heads are expanded before the call unless a fused kernel takes
   them grouped (`krea2/attention.py`). In K/V-cache mode each step's queries see the cached keys too, and the precompute
-  is a square of the references' tokens; the larger area is priced as the smallest square that holds it. The probe
-  answers for the process-wide policy, so a kernel forced through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is
-  not priced. Known gap: a styled block's queries also see the reference's keys, a larger score matrix than priced.
+  is a square of the references' tokens; a styled block's queries also see the style reference's appended keys. The
+  largest area is priced as the smallest square that holds it. The probe answers for the process-wide policy, so a
+  kernel forced through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
 - Regional prompting's masks, their construction scratch and SDPA's additive bias, as the node sizes them
-  (`Krea2DenoiseInvocation._regional_attention_mask_bytes`). Not measured.
+  (`Krea2DenoiseInvocation._regional_attention_mask_bytes`); where a styled block also receives a regional mask (the
+  even main blocks), also the masks padded to the appended keys (`pad_attention_mask`) and a bias that wide. Not
+  measured.
 - The reference K/V cache, an exact size (`reference_edit.reference_kv_cache_bytes`): one key and one value per block at
   the K/V heads, plus one block's references expanded to the query heads. On the RTX 4090 the real model's K/V-cache
   denoises (1152x1536 with one and three references) followed that structure: the larger of the step's and the
@@ -353,7 +355,8 @@ def estimate_krea2_denoise_working_memory(
     per-step sequence or, with `cache_references`, once alone into a K/V cache. `cfg` is whether a negative pass runs.
     `loras` are the patches applied under the lock, each with its file's size. `regional_mask_bytes` is regional
     prompting's masks and bias (a mask is then passed to the attention), `style_kv_bytes` a style reference's captured
-    K/V (0 without one). `weights_resident` is True only where the caller knows every weight stays on the device;
+    K/V (0 without one), whose reference is encoded at the target's size: its `image_seq_len` tokens join every injected
+    block's keys. `weights_resident` is True only where the caller knows every weight stays on the device;
     otherwise the largest layer is reserved for streaming, and every patched layer may be a sidecar.
     """
     dtype_name = _DTYPE_NAMES.get(dtype)
@@ -367,10 +370,17 @@ def estimate_krea2_denoise_working_memory(
     cached_references = reference_seq_len if cache_references else 0
     step_tokens = image_seq_len + text_seq_len + joint_references
     style_tokens = image_seq_len + style_text_seq_len if style_text_seq_len else 0
-    score_side = max(step_tokens, style_tokens)
-    if cached_references:
-        area = max(step_tokens * (step_tokens + cached_references), cached_references**2)
-        score_side = math.isqrt(area - 1) + 1
+    style_reference_seq_len = image_seq_len if style_kv_bytes else 0
+    # The largest score matrix any pass materializes, in elements: the step's queries over every key they see (the
+    # cached references' and, in an injected block, the style reference's appended ones), the style reference's own
+    # pass and the K/V-cache precompute. `sdpa_score_matrix_bytes` takes a square, so the area is priced as the
+    # smallest square that holds it.
+    area = max(
+        step_tokens * (step_tokens + cached_references + style_reference_seq_len),
+        style_tokens**2,
+        cached_references**2,
+    )
+    score_side = math.isqrt(area - 1) + 1 if area > 0 else 0
     has_attention_mask = regional_mask_bytes > 0
     blocks = cast(torch.nn.ModuleList, transformer.transformer_blocks)
     patches = [patch for patch, _ in loras]

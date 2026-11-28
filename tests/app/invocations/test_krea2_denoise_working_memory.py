@@ -80,9 +80,18 @@ def _fp8(out_features: int) -> torch.nn.Module:
 
 
 def _estimate(
-    transformer=None, *, image=4096, text=512, refs=0, cached=False, resident=True, dtype=torch.bfloat16, **kw
+    transformer=None,
+    *,
+    image=4096,
+    text=512,
+    refs=0,
+    cached=False,
+    resident=True,
+    dtype=torch.bfloat16,
+    backend="cuda",
+    **kw,
 ):
-    with ATTENTION["cuda"].answers():
+    with ATTENTION[backend].answers():
         return estimate_krea2_denoise_working_memory(
             transformer if transformer is not None else _transformer(),
             image_seq_len=image,
@@ -90,7 +99,7 @@ def _estimate(
             reference_seq_len=refs,
             cache_references=cached,
             weights_resident=resident,
-            device=ATTENTION["cuda"].device,
+            device=ATTENTION[backend].device,
             dtype=dtype,
             **kw,
         )
@@ -162,6 +171,33 @@ class TestEstimate:
 
         assert [call["seq_len"] for call in asked] == [5 * 4096]
         assert _terms(features)["attention_scores"] == 7 * MB
+
+    def test_a_styled_block_prices_its_queries_over_the_reference_keys_where_scores_materialize(self) -> None:
+        """A 1024px step attends 4096 image + 512 caption tokens; an injected block appends the reference's 4096 image
+        tokens to the keys, so its score matrix is 4608 x 8704, not 4608 x 4608."""
+        step, reference = 4096 + 512, 4096
+        per_element = 48 * 17  # query heads x SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        plain = _terms(_features(backend="mps"))["attention_scores"]
+        styled = _terms(_features(backend="mps", style_kv_bytes=MB))["attention_scores"]
+
+        assert plain == per_element * step**2
+        # The square that holds the area: at least the area, less than one more row and column of it.
+        area = step * (step + reference)
+        assert per_element * area <= styled < per_element * (area + 2 * math.isqrt(area) + 1)
+
+    def test_the_style_pass_square_is_the_largest_area_when_its_caption_outgrows_the_step(self, monkeypatch) -> None:
+        """A 256-token image with a 77-token caption and a 512-token style caption: the step's area is 333 x 589, the
+        style pass's square 768 x 768, whose side the helper is asked for."""
+        asked: list[int] = []
+
+        def score_matrix_bytes(**kwargs) -> int:
+            asked.append(kwargs["seq_len"])
+            return 0
+
+        monkeypatch.setattr(denoise_working_memory, "sdpa_score_matrix_bytes", score_matrix_bytes)
+        _features(image=256, text=77, style_text_seq_len=512, style_kv_bytes=MB)
+
+        assert asked == [256 + 512]
 
     @pytest.mark.parametrize("lora_bytes", [30 * MB, 210 * MB, 2 * GB])
     def test_plain_loras_add_their_file_size(self, lora_bytes) -> None:
@@ -393,7 +429,9 @@ def _legacy(attention, shape, cfg, loras, regional, style, transformer, dtype) -
     sequence (for cached references the side of the larger area), and the whole model's largest dequantization."""
     image, text, refs, cached = shape
     step = image + text
-    side = math.isqrt(max(step * (step + refs), refs**2) - 1) + 1 if cached else step + refs
+    # An injected block's keys carry the style reference's image tokens beside the step's.
+    styled_area = step * (step + image) if style else 0
+    side = math.isqrt(max(step * (step + refs), refs**2, styled_area) - 1) + 1 if cached or style else step + refs
     kv = 0
     if cached:
         kv = reference_kv_cache_bytes(

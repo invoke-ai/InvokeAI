@@ -365,7 +365,15 @@ class _Transformer:
         processor = self.installed_processors["transformer_blocks.0.attn.processor"]
         attention_mask = processor.regional_prompting_state.attention_mask
         self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
-        style_state = processor.style_reference_state
+        # Whichever block is styled: the stub's two main blocks are 0 (masked) and 1 (not).
+        style_state = next(
+            (
+                block_processor.style_reference_state
+                for name, block_processor in self.installed_processors.items()
+                if name.startswith("transformer_blocks.") and block_processor.style_reference_state is not None
+            ),
+            None,
+        )
         self.style_modes.append(style_state.mode if style_state is not None else None)
         if style_state is not None and style_state.mode is Krea2StyleReferenceMode.CAPTURE:
             # Stand in for the styled block: the real processor stashes the reference's image-token K/V
@@ -459,7 +467,8 @@ def _runtime_context(
         "negative-region": torch.zeros(1, 16, 16),
         # width=height=16 -> a 2x2 latent; the Qwen-Image VAE emits a frame dim.
         "style-ref": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 2, 2),
-        "style-ref-wrong-size": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 4, 4),
+        # A 4x4 latent: wrong for the 16 px (2x2 latent) targets, the right size for a 32 px one.
+        "style-ref-4x4": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 4, 4),
     }
     config = SimpleNamespace(format=model_format, variant=Krea2VariantType.Turbo)
     return SimpleNamespace(
@@ -1181,8 +1190,7 @@ def _style_reference_field(
         reference_latents_name=latents_name,
         width=width,
         height=height,
-        blocks="0-1",
-        **overrides,
+        **{"blocks": "0-1", **overrides},
     )
 
 
@@ -1289,7 +1297,7 @@ def test_run_diffusion_rejects_style_reference_latents_of_the_wrong_shape(monkey
     # The recorded dims agree but the tensor itself does not -- catch it before it reaches attention.
     _patch_runtime(monkeypatch)
     invocation = _runtime_invocation(cfg_scale=1.0)
-    invocation.style_reference = _style_reference_field(latents_name="style-ref-wrong-size")
+    invocation.style_reference = _style_reference_field(latents_name="style-ref-4x4")
 
     with pytest.raises(ValueError, match=r"latents are \(4, 4\) but denoise expects \(2, 2\)"):
         invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
@@ -1378,12 +1386,65 @@ def test_the_lock_prices_the_style_references_captured_kv(monkeypatch, tmp_path)
 
 
 def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:
-    positive = SimpleNamespace(attention_mask_numel=120, attention_mask_build_scratch_numel=40)
-    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
+    positive = SimpleNamespace(attention_mask_numel=144, attention_mask_rows=12, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_rows=10, attention_mask_build_scratch_numel=40)
 
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 500
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 740
-    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 400
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 572
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 860
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 472
+
+
+def test_a_style_reference_widens_the_padded_regional_masks_and_the_attention_bias_to_the_reference_keys() -> None:
+    """A 12-token sequence (mask 144) with 5 reference tokens: each mask is cached padded to 12 x 17 = 204 booleans,
+    and the bf16 bias is 204 elements. Without a reference nothing is padded."""
+    positive = SimpleNamespace(attention_mask_numel=144, attention_mask_rows=12, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_rows=10, attention_mask_build_scratch_numel=40)
+    no_mask = SimpleNamespace(attention_mask_numel=0, attention_mask_rows=0, attention_mask_build_scratch_numel=0)
+    padded_positive, padded_negative = 12 * 17, 10 * 15
+
+    both = Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16, 5)
+    assert both == (144 + 100) + (padded_positive + padded_negative) + 40 + padded_positive * 2
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.float32, 5) == (
+        144 + 12 * 17 + 0 + 40 + 12 * 17 * 4
+    )
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(no_mask, None, torch.bfloat16, 5) == 0
+    unstyled = Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16)
+    assert unstyled == (144 + 100) + 40 + 144 * 2
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16, 0) == unstyled
+
+
+@pytest.mark.parametrize(
+    ("style_blocks", "expected"),
+    [
+        # Masks of 6 x 6 and 7 x 7 booleans (4 image tokens, a 2- and a 3-token caption), 4 B bias elements (fp32),
+        # build scratch 4 x 4. Styled: the reference's 4 tokens widen each row, so the cached copies are 6 x 10 and
+        # 7 x 11 and the bias is the larger, 77 elements.
+        pytest.param("0-1", (36 + 49) + (60 + 77) + 16 + 77 * 4, id="styled"),
+        pytest.param(None, (36 + 49) + 16 + 49 * 4, id="plain"),
+        # Regional masks reach only even blocks, so a reference injected into odd blocks alone pads nothing.
+        pytest.param("1", (36 + 49) + 16 + 49 * 4, id="styled-odd-blocks-only"),
+    ],
+)
+def test_the_lock_prices_the_padded_regional_masks_and_their_bias_only_where_a_styled_block_gets_a_mask(
+    monkeypatch, tmp_path, style_blocks, expected
+) -> None:
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.width = invocation.height = 32
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+    if style_blocks is not None:
+        invocation.style_reference = _style_reference_field(
+            latents_name="style-ref-4x4", width=32, height=32, blocks=style_blocks
+        )
+    context = _runtime_context(tmp_path, _Transformer(), negative_text_seq_len=3)
+
+    estimate = _working_memory(monkeypatch, tmp_path, invocation, context=context)
+
+    assert estimate.features["regional_mask_bytes"] == expected
 
 
 class TestRequiresSidecarPatching:
@@ -1474,6 +1535,21 @@ class TestTheAttentionScoreMatrixReachesTheReservation:
         assert (asked[0]["num_heads"], asked[0]["head_dim"]) == (48, 128)
         assert asked[0]["seq_len"] == transformer.combined_sequence_lengths[0]
         assert asked[0]["has_attn_mask"] is False
+
+    def test_a_style_reference_adds_its_tokens_to_the_keys_of_the_priced_score_matrix(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        """A 32 px target has 4 image tokens and the 2-token caption: its step attends 6 tokens. The reference is
+        encoded at the target's size, so its 4 image tokens (not its 2-token caption, not the whole step) join the
+        keys of every injected block: 6 x 10 = 60 scores, priced as the 8 x 8 square that holds them. The capture pass
+        (6 x 6) is smaller."""
+        invocation = _runtime_invocation(cfg_scale=1.0)
+        invocation.width = invocation.height = 32
+        invocation.style_reference = _style_reference_field(latents_name="style-ref-4x4", width=32, height=32)
+
+        _, asked, _ = self._reservation_for(monkeypatch, tmp_path, score_bytes=1, invocation=invocation)
+
+        assert [call["seq_len"] for call in asked] == [8]
 
     def test_the_longer_of_the_cfg_passes_and_the_regional_mask_are_priced(self, monkeypatch, tmp_path) -> None:
         invocation = _runtime_invocation(cfg_scale=2.0)
