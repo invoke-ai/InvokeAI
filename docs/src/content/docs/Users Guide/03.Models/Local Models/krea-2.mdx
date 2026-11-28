@@ -86,7 +86,9 @@ the bundled components.
 Single-file Qwen3-VL encoders bundle only the weights. Their tokenizer and architecture config ship
 with InvokeAI, so these encoders load without network access. A single-file fp8 encoder is kept
 resident in fp8 (roughly half the VRAM of the bf16 encoder), and an nvfp4 encoder keeps its layers packed
-at 4 bits.
+at 4 bits. A single-file 4B encoder is the whole Qwen3-VL Instruct model, so Expand Prompt and the Text LLM nodes can
+use it for text as well, as they can an 8B file that carries its LM head
+([details](/users-guide/models/model-format-support/#text-llms)).
 :::
 
 ### Qwen3-VL GGUF encoders

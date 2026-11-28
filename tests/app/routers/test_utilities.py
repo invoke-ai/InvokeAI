@@ -9,6 +9,7 @@ Covers:
 """
 
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -394,17 +395,26 @@ def test_expand_prompt_image_forbidden_for_non_owner(
     mock_invoker.services.model_manager.store.get_model.assert_not_called()
 
 
-def test_expand_prompt_image_with_text_only_model_is_rejected_before_loading(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
+def _text_only_llm() -> Any:
     from invokeai.backend.model_manager.taxonomy import ModelType
 
+    return MagicMock(type=ModelType.TextLLM, supports_images=False)
+
+
+def _qwen3_vl_encoder_serving_as_text_llm() -> Any:
+    from tests.fixtures.model_roles import qwen3_vl_encoder_file
+
+    return qwen3_vl_encoder_file("vl")
+
+
+@pytest.mark.parametrize("record", [_text_only_llm, _qwen3_vl_encoder_serving_as_text_llm])
+def test_expand_prompt_image_with_text_only_model_is_rejected_before_loading(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, record: Callable[[], Any]
+):
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     _save_image(mock_invoker, "frame.png", user1.user_id)
-    mock_invoker.services.model_manager.store.get_model = MagicMock(
-        return_value=MagicMock(type=ModelType.TextLLM, supports_images=False)
-    )
+    mock_invoker.services.model_manager.store.get_model = MagicMock(return_value=record())
     mock_invoker.services.model_manager.load.load_model = MagicMock()
 
     r = client.post(
