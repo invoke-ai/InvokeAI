@@ -45,25 +45,26 @@ class _HeaderTolerantGGUFReader(gguf.GGUFReader):
         return super()._push_field(field, *args, **kwargs)
 
 
-def _open_gguf_reader(path: Path) -> gguf.GGUFReader:
+def _open_gguf_reader(path: Path) -> tuple[gguf.GGUFReader, str | None]:
     """gguf-py's own reader; for a file that repeats the header as metadata, which it refuses, the tolerant one.
 
     The retry is narrow on purpose: every other file never meets the subclass, so a gguf-py release that
     changes the private method it overrides can break only the files gguf-py itself cannot read.
     """
     try:
-        return gguf.GGUFReader(path)
+        return gguf.GGUFReader(path), None
     except KeyError as e:
         if not (e.args and isinstance(e.args[0], str) and _REPEATED_HEADER_FIELD.match(e.args[0])):
             raise
-    return _HeaderTolerantGGUFReader(path)
+        duplicate_header_error = str(e)
+    return _HeaderTolerantGGUFReader(path), duplicate_header_error
 
 
 class WrappedGGUFReader:
     """Wrapper around GGUFReader that adds a close() method."""
 
     def __init__(self, path: Path):
-        self.reader = _open_gguf_reader(path)
+        self.reader, self.duplicate_header_error = _open_gguf_reader(path)
 
     def __enter__(self):
         return self.reader
@@ -94,10 +95,11 @@ def gguf_tensor_bytes(path: Path) -> dict[str, int]:
     """The stored size of each of a GGUF file's tensors, by name, from its header alone; no tensor data is read.
 
     For a loader that decides from the names which tensors to read, and sizes what it will read. The reader is
-    referenced by this expression only, so the memory map is released as soon as the sizes are read (measured on
-    Windows, where a file still mapped cannot be deleted: it deletes at once with the collector disabled).
+    local to this call, so the memory map is released on return. On Windows, the file can be deleted immediately
+    even with the garbage collector disabled.
     """
-    return {tensor.name: int(tensor.n_bytes) for tensor in _open_gguf_reader(path).tensors}
+    reader, _ = _open_gguf_reader(path)
+    return {tensor.name: int(tensor.n_bytes) for tensor in reader.tensors}
 
 
 ORIG_SHAPE_KEY_PREFIX = "comfy.gguf.orig_shape."
@@ -271,19 +273,24 @@ def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, 
     from the metadata. The reader maps the file but touches only the header.
     """
     with WrappedGGUFReader(path) as reader:
-        orig_shapes = _read_comfy_orig_shapes(reader)
-        sd: dict[str, torch.Tensor] = {}
-        for tensor in reader.tensors:
-            shape = _logical_shape(tensor, orig_shapes)
-            stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
-            stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
-            sd[tensor.name] = GGMLTensor(
-                torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
-                ggml_quantization_type=tensor.tensor_type,
-                tensor_shape=shape,
-                compute_dtype=compute_dtype,
-            )
-        return sd
+        return gguf_reader_state_dict(reader, compute_dtype)
+
+
+def gguf_reader_state_dict(reader: gguf.GGUFReader, compute_dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """Build the header state dict from an already-open reader without retaining any mapped data."""
+    orig_shapes = _read_comfy_orig_shapes(reader)
+    sd: dict[str, torch.Tensor] = {}
+    for tensor in reader.tensors:
+        shape = _logical_shape(tensor, orig_shapes)
+        stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
+        stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
+        sd[tensor.name] = GGMLTensor(
+            torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
+            ggml_quantization_type=tensor.tensor_type,
+            tensor_shape=shape,
+            compute_dtype=compute_dtype,
+        )
+    return sd
 
 
 def gguf_sd_loader(
@@ -311,7 +318,7 @@ def gguf_sd_loader(
       ``nn.Linear`` and the load fails on a dtype error that names neither the file nor the format.
       Identification refuses such files at install already, so this guards records made before it did.
 
-    Model identification does not come here: it reads the header (`gguf_header_state_dict`).
+    Model identification builds meta tensors from the header with `gguf_reader_state_dict`.
     """
     with WrappedGGUFReader(path) as reader:
         sd: dict[str, torch.Tensor] = {}
