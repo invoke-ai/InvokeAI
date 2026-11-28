@@ -79,6 +79,15 @@ QwenImageControlModel: TypeAlias = QwenImageFunControlBranch | QwenImageControlN
 ControlNet run beside it."""
 
 
+def _explicit_shift(shift: float | None) -> float | None:
+    """The fixed shift the user set, or None when the node runs the default schedule.
+
+    Only a positive shift counts as set: the workflow editor sends 0 for an optional float field the user left alone,
+    and log(0) is undefined. Both the schedule and the recorded metadata read the shift through here.
+    """
+    return shift if shift is not None and shift > 0 else None
+
+
 @invocation(
     "qwen_image_denoise",
     title="Denoise - Qwen Image",
@@ -154,7 +163,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
             "denoising_end": self.denoising_end,
             "seed": self.seed,
             "model": self.transformer.transformer,
-            "qwen_image_shift": self.shift if self.shift is not None else "auto",
+            "qwen_image_shift": _explicit_shift(self.shift) or "auto",
         }
         if self.vae is not None:
             updates["vae"] = self.vae.vae
@@ -190,10 +199,9 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
         resolution-dependent fit over the target image's tokens, held at its end.
         """
         scheduler = load_scheduler(model_path, QWEN_IMAGE_SCHEDULER_CONFIG)
-        # Only a positive shift counts as set: the workflow editor sends 0 for an optional float field the user left
-        # alone, and log(0) is undefined.
-        if shift is not None and shift > 0:
-            return scheduler, math.log(shift)
+        explicit_shift = _explicit_shift(shift)
+        if explicit_shift is not None:
+            return scheduler, math.log(explicit_shift)
         image_seq_len = (height // LATENT_SCALE_FACTOR) * (width // LATENT_SCALE_FACTOR) // patch_size**2
         return scheduler, ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 

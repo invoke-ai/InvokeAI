@@ -71,6 +71,15 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
 Z_IMAGE_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 
 
+def _explicit_shift(shift: float | None) -> float | None:
+    """The shift the user set, or None when the node auto-calculates it from the image size.
+
+    Only a positive shift counts as set: the workflow editor sends 0 for an optional float field the user left alone,
+    and a shift of 0 is no schedule. Both the schedule and the recorded metadata read the shift through here.
+    """
+    return shift if shift is not None and shift > 0 else None
+
+
 @invocation(
     "z_image_denoise",
     title="Denoise - Z-Image",
@@ -164,7 +173,7 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             "steps": self.steps,
             "cfg_scale": self.guidance_scale,
             "guidance": self.guidance_scale,
-            "z_image_shift": self.shift if self.shift is not None else "auto",
+            "z_image_shift": _explicit_shift(self.shift) or "auto",
             "scheduler": self.scheduler,
             "denoising_start": self.denoising_start,
             "denoising_end": self.denoising_end,
@@ -369,12 +378,8 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             )
             neg_prompt_embeds = negative_regional_extension.regional_text_conditioning.prompt_embeds
 
-        # Calculate shift based on image sequence length, or use override. Only a positive shift counts as set: the
-        # workflow editor sends 0 for an optional float field the user left alone, and a shift of 0 is no schedule.
-        if self.shift is not None and self.shift > 0:
-            shift = self.shift
-        else:
-            shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
+        # Calculate shift based on image sequence length, or use override
+        shift = _explicit_shift(self.shift) or Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(shift, self.steps)

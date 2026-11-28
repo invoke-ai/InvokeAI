@@ -136604,7 +136604,7 @@
         "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Z-Image + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
