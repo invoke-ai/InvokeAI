@@ -1,4 +1,4 @@
-"""Which reference encode `encode_reference_image` runs: tiled always (FLUX.2), or untiled where it can (FLUX.3).
+"""Which reference encode `encode_reference_image` runs: tiled always, or untiled where it can (FLUX.2 and FLUX.3).
 
 A tiled encode is a different encode, not a cheaper copy of the untiled one: each tile's mid-block attention
 sees only that tile. These tests pin which one each mode produces, on a tiny real FLUX.2 VAE, and that the
@@ -6,6 +6,7 @@ shared VAE's tiling settings survive the call.
 """
 
 from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -16,6 +17,8 @@ from PIL import Image
 
 import invokeai.backend.flux2.ref_image_extension as ref_image_extension
 from invokeai.backend.flux2.ref_image_extension import REF_ENCODE_TILE_SIZE, encode_reference_image
+from invokeai.backend.flux2.sampling_utils import pack_flux2
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 
 # Larger than one 512 px tile, so the tiled and untiled encodes differ.
@@ -27,10 +30,12 @@ class _LoadedVae:
 
     def __init__(self, vae: AutoencoderKLFlux2):
         self.model = vae
+        self.working_memory: WorkingMemoryEstimate | None = None
         self.compute_device = torch.device("cpu")
 
     @contextmanager
     def model_on_device(self, *, working_memory: WorkingMemoryEstimate):
+        self.working_memory = working_memory
         yield None, self.model
 
 
@@ -77,8 +82,29 @@ def _encode(vae: AutoencoderKLFlux2, image: Image.Image, **kwargs) -> torch.Tens
         return encode_reference_image(_LoadedVae(vae), image, **kwargs)
 
 
-def test_flux2_keeps_its_tiled_encode(vae, image, expected) -> None:
+def test_the_default_tiles(vae, image, expected) -> None:
     assert torch.allclose(_encode(vae, image), expected["tiled"], atol=1e-5)
+
+
+@pytest.mark.parametrize(("materializes", "kind"), [(False, "untiled"), (True, "tiled")])
+def test_flux2_reference_images_are_encoded_untiled_unless_attention_materializes(
+    vae, image, expected, monkeypatch: pytest.MonkeyPatch, materializes: bool, kind: str
+) -> None:
+    """FLUX.2's own caller, not just the shared encode: CUDA encodes untiled, ROCm/MPS keep the 512 px tiles."""
+    monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", lambda *_: materializes)
+    context = SimpleNamespace(
+        models=SimpleNamespace(load=lambda _field: _LoadedVae(vae)),
+        images=SimpleNamespace(get_pil=lambda _name: image),
+    )
+    reference = SimpleNamespace(image=SimpleNamespace(image_name="ref"))
+    vae_field = SimpleNamespace(vae=None)
+
+    with torch.no_grad():
+        extension = ref_image_extension.Flux2RefImageExtension(
+            [reference], context, vae_field, torch.device("cpu"), torch.float32
+        )
+
+    assert torch.allclose(extension.ref_image_latents, pack_flux2(expected[kind]), atol=1e-5)
 
 
 @pytest.mark.parametrize(("materializes", "kind"), [(False, "untiled"), (True, "tiled")])
@@ -90,6 +116,23 @@ def test_the_conditional_mode_tiles_only_where_attention_would_materialize(
     latents = _encode(vae, image, tiling="if_attention_materializes")
 
     assert torch.allclose(latents, expected[kind], atol=1e-5)
+
+
+@pytest.mark.parametrize(("materializes", "tile_size"), [(False, None), (True, REF_ENCODE_TILE_SIZE)])
+def test_the_cache_is_told_the_working_memory_of_the_encode_that_runs(
+    vae, image, monkeypatch: pytest.MonkeyPatch, materializes: bool, tile_size: int | None
+) -> None:
+    monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", lambda *_: materializes)
+    loaded = _LoadedVae(vae)
+
+    with torch.no_grad():
+        encode_reference_image(loaded, image, tiling="if_attention_materializes")
+
+    pixels = (T.ToTensor()(image) * 2.0 - 1.0).unsqueeze(0)
+    expected = estimate_vae_working_memory_flux2(
+        operation="encode", image_tensor=pixels, vae=vae, tile_size=tile_size, device=torch.device("cpu")
+    )
+    assert loaded.working_memory == expected
 
 
 def test_the_shared_vae_keeps_its_own_tiling_settings(vae, image, monkeypatch: pytest.MonkeyPatch) -> None:
