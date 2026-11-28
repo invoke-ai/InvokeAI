@@ -22,6 +22,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -46,7 +47,7 @@ KLEIN_MAX_SEQ_LEN = 512
     title="Prompt - Flux2 Klein",
     tags=["prompt", "conditioning", "flux", "klein", "qwen3"],
     category="prompt",
-    version="1.1.1",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -93,8 +94,15 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             # The models are still locked while we save the data
             conditioning_name = context.conditioning.save(conditioning_data)
+            loras = extract_loras_metadata(getattr(self.qwen3_encoder, "loras", None))
             return FluxConditioningOutput(
-                conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+                conditioning=FluxConditioningField(
+                    conditioning_name=conditioning_name,
+                    mask=self.mask,
+                    prompt=self.prompt,
+                    qwen3_encoder=extract_encoder_model(self.qwen3_encoder),
+                    loras=loras,
+                )
             )
 
     def _encode_prompt(self, context: InvocationContext, exit_stack: ExitStack) -> Tuple[torch.Tensor, torch.Tensor]:

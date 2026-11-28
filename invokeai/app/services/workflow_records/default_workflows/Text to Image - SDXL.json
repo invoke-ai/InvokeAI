@@ -39,7 +39,7 @@
       "type": "invocation",
       "data": {
         "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "type": "vae_loader",
@@ -63,7 +63,7 @@
       "type": "invocation",
       "data": {
         "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -115,7 +115,7 @@
       "type": "invocation",
       "data": {
         "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "SDXL Positive Compel Prompt",
         "notes": "",
@@ -188,7 +188,7 @@
       "type": "invocation",
       "data": {
         "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -213,7 +213,7 @@
       "type": "invocation",
       "data": {
         "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "SDXL Negative Compel Prompt",
         "notes": "",
@@ -341,7 +341,7 @@
       "type": "invocation",
       "data": {
         "id": "55705012-79b9-4aac-9f26-c0b10309785b",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -413,7 +413,7 @@
       "type": "invocation",
       "data": {
         "id": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

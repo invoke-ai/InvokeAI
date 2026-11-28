@@ -10,9 +10,11 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    Krea2ConditioningField,
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen3VLEncoderField
 from invokeai.app.invocations.primitives import Krea2ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -60,7 +62,7 @@ _NO_VISION_TOWER = (
     title="Prompt - Krea-2",
     tags=["prompt", "conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -108,7 +110,16 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return Krea2ConditioningOutput.build(conditioning_name, mask=self.mask)
+        loras = extract_loras_metadata(getattr(self.qwen3_vl_encoder, "loras", None))
+        return Krea2ConditioningOutput(
+            conditioning=Krea2ConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_vl_encoder=extract_encoder_model(self.qwen3_vl_encoder),
+                loras=loras,
+            )
+        )
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         images = [prepare_vlm_reference(context.images.get_pil(field.image_name)) for field in self.reference_images]

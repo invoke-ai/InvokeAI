@@ -212,7 +212,7 @@
       "type": "invocation",
       "data": {
         "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "Prompt",
         "notes": "H3 is guidance-distilled: there is no negative prompt. The prompt and canvas arrive over edges so they always match the denoise node.",
@@ -323,7 +323,7 @@
       "type": "invocation",
       "data": {
         "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

@@ -47,7 +47,7 @@
       "type": "invocation",
       "data": {
         "id": "9db25398-c869-4a63-8815-c6559341ef12",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -205,7 +205,7 @@
       "type": "invocation",
       "data": {
         "id": "d204d184-f209-4fae-a0a1-d152800844e1",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -259,7 +259,7 @@
       "type": "invocation",
       "data": {
         "id": "7ce68934-3419-42d4-ac70-82cfc9397306",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -293,7 +293,7 @@
       "type": "invocation",
       "data": {
         "id": "54486974-835b-4d81-8f82-05f9f32ce9e9",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -318,7 +318,7 @@
       "type": "invocation",
       "data": {
         "id": "273e3f96-49ea-4dc5-9d5b-9660390f14e1",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -352,7 +352,7 @@
       "type": "invocation",
       "data": {
         "id": "a33199c2-8340-401e-b8a2-42ffa875fc1c",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -456,7 +456,7 @@
       "type": "invocation",
       "data": {
         "id": "ca4d5059-8bfb-447f-b415-da0faba5a143",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "ControlNet Collection",
         "notes": "",
         "type": "collect",
@@ -480,7 +480,7 @@
       "type": "invocation",
       "data": {
         "id": "ac481b7f-08bf-4a9d-9e0c-3a82ea5243ce",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -567,7 +567,7 @@
       "type": "invocation",
       "data": {
         "id": "2e77a0a1-db6a-47a2-a8bf-1e003be6423b",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "type": "noise",

@@ -332,7 +332,7 @@
       "data": {
         "id": "f936ebb3-6902-4df9-a775-6a68bac2da70",
         "type": "model_identifier",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -636,7 +636,7 @@
       "data": {
         "id": "6636a27a-f130-4a13-b3e5-50b44e4a566f",
         "type": "collect",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -660,7 +660,7 @@
       "data": {
         "id": "b78f53b6-2eae-4956-97b4-7e73768d1491",
         "type": "controlnet",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "label": "Initial Control (Use Tile)",
         "notes": "",
         "isOpen": true,
@@ -713,7 +713,7 @@
       "data": {
         "id": "27215391-b20e-412a-b854-7fa5927f5437",
         "type": "sdxl_compel_prompt",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "isOpen": false,
@@ -785,7 +785,7 @@
       "data": {
         "id": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
         "type": "vae_loader",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -809,7 +809,7 @@
       "data": {
         "id": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
         "type": "sdxl_model_loader",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -833,7 +833,7 @@
       "data": {
         "id": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
         "type": "sdxl_compel_prompt",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "isOpen": false,
@@ -947,7 +947,7 @@
       "data": {
         "id": "117f982a-03da-49b1-bf9f-29711160ac02",
         "type": "i2l",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "isOpen": false,
@@ -990,7 +990,7 @@
       "data": {
         "id": "c3b60a50-8039-4924-90e3-8c608e1fecb5",
         "type": "l2i",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -1041,7 +1041,7 @@
       "data": {
         "id": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
         "type": "tiled_multi_diffusion_denoise_latents",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -1130,7 +1130,7 @@
       "data": {
         "id": "be4082d6-e238-40ea-a9df-fc0d725e8895",
         "type": "controlnet",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "label": "Second Phase Control (Use Tile)",
         "notes": "",
         "isOpen": true,
@@ -1183,7 +1183,7 @@
       "data": {
         "id": "8923451b-5a27-4395-b7f2-dce875fca6f5",
         "type": "noise",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,

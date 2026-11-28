@@ -13,6 +13,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -32,7 +33,7 @@ from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
     title="Prompt - FLUX",
     tags=["prompt", "conditioning", "flux"],
     category="prompt",
-    version="1.1.2",
+    version="1.2.0",
     idle_gpu_offloadable=True,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
@@ -73,8 +74,17 @@ class FluxTextEncoderInvocation(BaseInvocation):
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
+        all_loras = list(getattr(self.clip, "loras", []) or []) + list(getattr(self.t5_encoder, "loras", []) or [])
+        loras = extract_loras_metadata(all_loras)
         return FluxConditioningOutput(
-            conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=FluxConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                t5_encoder=extract_encoder_model(self.t5_encoder),
+                clip_embed_model=extract_encoder_model(self.clip),
+                loras=loras,
+            )
         )
 
     def _t5_encode(self, context: InvocationContext) -> torch.Tensor:

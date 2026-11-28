@@ -47,7 +47,7 @@
       "type": "invocation",
       "data": {
         "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "type": "main_model_loader",
@@ -124,7 +124,7 @@
       "type": "invocation",
       "data": {
         "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -178,7 +178,7 @@
       "type": "invocation",
       "data": {
         "id": "22b750db-b85e-486b-b278-ac983e329813",
-        "version": "1.4.1",
+        "version": "1.5.1",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -236,7 +236,7 @@
       "type": "invocation",
       "data": {
         "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -270,7 +270,7 @@
       "type": "invocation",
       "data": {
         "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -322,7 +322,7 @@
       "type": "invocation",
       "data": {
         "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -366,7 +366,7 @@
       "type": "invocation",
       "data": {
         "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -580,7 +580,7 @@
       "type": "invocation",
       "data": {
         "id": "bd06261d-a74a-4d1f-8374-745ed6194bc2",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -667,7 +667,7 @@
       "type": "invocation",
       "data": {
         "id": "35623411-ba3a-4eaa-91fd-1e0fda0a5b42",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

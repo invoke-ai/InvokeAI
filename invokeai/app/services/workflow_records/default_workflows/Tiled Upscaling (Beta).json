@@ -51,7 +51,7 @@
       "type": "invocation",
       "data": {
         "id": "2ff466b8-5e2a-4d8f-923a-a3884c7ecbc5",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "label": "",
         "notes": "",
         "type": "main_model_loader",
@@ -75,7 +75,7 @@
       "type": "invocation",
       "data": {
         "id": "287f134f-da8d-41d1-884e-5940e8f7b816",
-        "version": "1.4.1",
+        "version": "1.5.1",
         "label": "",
         "notes": "",
         "type": "ip_adapter",
@@ -132,7 +132,7 @@
       "type": "invocation",
       "data": {
         "id": "b76fe66f-7884-43ad-b72c-fadc81d7a73c",
-        "version": "1.3.0",
+        "version": "1.3.2",
         "label": "",
         "notes": "",
         "type": "l2i",
@@ -183,7 +183,7 @@
       "type": "invocation",
       "data": {
         "id": "d334f2da-016a-4524-9911-bdab85546888",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "label": "",
         "notes": "",
         "type": "controlnet",
@@ -236,7 +236,7 @@
       "type": "invocation",
       "data": {
         "id": "338b883c-3728-4f18-b3a6-6e7190c2f850",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "type": "i2l",
@@ -279,7 +279,7 @@
       "type": "invocation",
       "data": {
         "id": "947c3f88-0305-4695-8355-df4abac64b1c",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "type": "compel",
@@ -312,7 +312,7 @@
       "type": "invocation",
       "data": {
         "id": "9b2d8c58-ce8f-4162-a5a1-48de854040d6",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "label": "",
         "notes": "",
         "type": "compel",
@@ -481,7 +481,7 @@
       "type": "invocation",
       "data": {
         "id": "b3513fed-ed42-408d-b382-128fdb0de523",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "type": "noise",
@@ -621,7 +621,7 @@
       "type": "invocation",
       "data": {
         "id": "1011539e-85de-4e02-a003-0b22358491b8",
-        "version": "1.5.3",
+        "version": "1.10.0",
         "label": "",
         "notes": "",
         "type": "denoise_latents",
@@ -735,7 +735,7 @@
       "type": "invocation",
       "data": {
         "id": "ca0d20d1-918f-44e0-8fc3-4704dc41f4da",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "type": "collect",
