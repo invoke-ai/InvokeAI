@@ -24,7 +24,7 @@ import torch
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, OffloadLedger
 from invokeai.backend.util import devices
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.working_memory import counters, measurement, probe
@@ -193,7 +193,13 @@ class FakeCache:
                 record.cached_model.resident = 0
         return freed
 
-    def lock(self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None) -> bool:
+    def lock(
+        self,
+        record: CacheRecord,
+        working_mem_bytes: Optional[int],
+        max_move_bytes: Optional[int] = None,
+        offload_ledger: Optional[OffloadLedger] = None,
+    ) -> bool:
         self.reserved.append(working_mem_bytes)
         self.in_use_at_lock.append(self.device.allocated)
         for victim in self.offloads.get(record.key, []):
@@ -284,7 +290,11 @@ class CacheOnFakeDevice:
         assert self.cache.drop_model(key) == 1
 
     def _lock(
-        self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None
+        self,
+        record: CacheRecord,
+        working_mem_bytes: Optional[int],
+        max_move_bytes: Optional[int] = None,
+        offload_ledger: Optional[OffloadLedger] = None,
     ) -> bool:
         for key in self.offloads.get(record.key, []):
             self.offload(key)
@@ -1043,7 +1053,7 @@ def test_a_lock_another_thread_holds_when_the_window_opens_voids_it(device: Fake
 
     thread = threading.Thread(target=hold)
     thread.start()
-    holding.wait()
+    assert holding.wait(timeout=30), "the other thread's lock never settled"
     try:
         with _scope() as scope:
             with vae.model_on_device(working_memory=_estimate()):
@@ -1090,13 +1100,19 @@ class GatedCache(FakeCache):
         self.gated = gated
         self.waiting, self.go, self.moved, self.settle = (threading.Event() for _ in range(4))
 
-    def lock(self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None) -> bool:
+    def lock(
+        self,
+        record: CacheRecord,
+        working_mem_bytes: Optional[int],
+        max_move_bytes: Optional[int] = None,
+        offload_ledger: Optional[OffloadLedger] = None,
+    ) -> bool:
         if record.key != self.gated:
-            return super().lock(record, working_mem_bytes, max_move_bytes)
+            return super().lock(record, working_mem_bytes, max_move_bytes, offload_ledger)
         self.waiting.set()
         if not self.go.wait(timeout=30):
             raise TimeoutError("the test never let the lock go on")
-        settled = super().lock(record, working_mem_bytes, max_move_bytes)
+        settled = super().lock(record, working_mem_bytes, max_move_bytes, offload_ledger)
         self.moved.set()
         if not self.settle.wait(timeout=30):
             raise TimeoutError("the test never let the lock settle")
@@ -1228,7 +1244,7 @@ def test_after_an_unlock_a_lock_another_thread_holds_still_voids_the_next_window
         with vae.model_on_device(working_memory=_estimate()):
             pass
         thread.start()
-        holding.wait()
+        assert holding.wait(timeout=30), "the other thread's lock never settled"
         try:
             with vae.model_on_device(working_memory=_estimate()):
                 pass

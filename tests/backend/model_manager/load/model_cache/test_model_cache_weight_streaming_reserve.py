@@ -53,7 +53,7 @@ class _FakeVram:
         cache._offload_unlocked_models = lambda *args, **kwargs: 0  # type: ignore
         cache._move_model_to_vram = self._move_to_vram  # type: ignore
         cache._move_model_to_ram = self._move_to_ram  # type: ignore
-        cache._release_allocator_blocks_for_reserve = lambda working_mem_bytes: None  # type: ignore
+        cache._release_allocator_blocks_for_reserve = lambda working_mem_bytes, ledger=None: None  # type: ignore
 
     def _move_to_vram(self, cache_entry, vram_available, max_move_bytes=None):
         self.loads.append(vram_available)

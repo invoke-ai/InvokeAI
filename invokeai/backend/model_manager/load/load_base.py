@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
+    OffloadLedger,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
@@ -160,10 +161,19 @@ class LoadedModelWithoutConfig:
         working-memory reservation) — exactly what a fresh lock() would compute at that instant.
         Pre-pacing behavior made the interleaver wait instead. Residency recovers at the next
         invocation's re-lock, once the interleaver unlocks.
+
+        Every pass gets the lock's one `OffloadLedger`: what earlier passes offloaded while a busy device deferred its
+        release stays credited, and the lock runs at most one trim past a busy peer.
         """
         stream_started_at = time.time()
+        offload_ledger = OffloadLedger()
         with MODEL_LOAD_LOCK.read_lock():
-            settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
+            settled = self._cache.lock(
+                self._cache_record,
+                working_mem_bytes,
+                max_move_bytes=VRAM_MOVE_PASS_BYTES,
+                offload_ledger=offload_ledger,
+            )
         # Termination backstop: pathological interleavings (another thread's budget disagreeing
         # with ours can unload what a pass just loaded) could in principle re-truncate forever.
         # After comfortably more passes than the model's size can honestly require, run one final
@@ -177,6 +187,7 @@ class LoadedModelWithoutConfig:
                     working_mem_bytes,
                     max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
                     stream_started_at=stream_started_at,
+                    offload_ledger=offload_ledger,
                 )
             if remaining_capped_passes <= 0:
                 # The uncapped pass settles by construction; guard against a regression in that
@@ -194,9 +205,10 @@ class LoadedModelWithoutConfig:
         opens on this cache meanwhile is void even if this read missed the scope arming.
 
         `offload_others`: first move every other unlocked model on the device to RAM whole, within that interval. A
-        calibration lock asks for it (`model_on_device`): the lock itself offloads only the shortfall it predicts and
-        splits the last model it moves, and a split can free a little less than predicted, so the measured model would
-        run partly resident and its window fit no line. Locked models, a window's co-locks among them, stay.
+        calibration lock asks for it (`model_on_device`): the lock itself offloads only its shortfall and splits the
+        last model it moves, and a split returns less than its believed size by an amount that varies from run to run.
+        The lock follows that up, but a measured window must not depend on how a split came out, or it fits no line.
+        Locked models, a window's co-locks among them, stay.
         """
         observed = locked = False
         probe.locking.append(self._cache)

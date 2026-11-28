@@ -188,12 +188,14 @@ def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu
     vram = _FakeVram(available=0)
 
     def move_model_to_ram(cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
-        # Believed size is freed, but the driver does not see it yet.
+        # Believed size is freed, once: the model has nothing left on the device afterwards. The driver does not see
+        # it yet.
+        freed = 0 if vram.moved else cache_entry.cached_model.total_bytes()
         vram.moved.append((cache_entry.key, vram_bytes_to_free))
-        return cache_entry.cached_model.total_bytes()
+        return freed
 
-    def empty_cache():
-        vram.available += 30 * MB  # now the driver sees (some of) it
+    def empty_cache(force=False):
+        vram.available = 30 * MB  # now the driver sees (some of) it; a repeated trim shows nothing more
         return EmptyCacheOutcome.RAN
 
     with (
@@ -267,3 +269,116 @@ def test_gpu_make_room_in_vram_actually_moves_weights_off_the_device(partial: bo
         assert "idle" in cache._cached_models
     finally:
         cache.shutdown()
+
+
+class _SteppedOffload:
+    """One model's offload as a series of steps, each (bytes it believes it freed, bytes the driver gets back).
+
+    A step the series does not offer fails the test, so a loop that does not end cannot hang it.
+    """
+
+    def __init__(self, steps: list[tuple[int, int]], on_device: int):
+        self.steps = iter(steps)
+        self.on_device = on_device
+        self.available = 0
+        self.asked: list[int] = []
+
+    def get_physical_vram_available(self, working_mem_bytes=None):
+        return self.available
+
+    def cur_vram_bytes(self) -> int:
+        return self.on_device
+
+    def move_model_to_ram(self, cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
+        self.asked.append(vram_bytes_to_free)
+        believed, returned = next(self.steps)
+        self.on_device -= believed
+        self.available += returned
+        return believed
+
+    def make_room(self, cache: ModelCache, vram_bytes_needed: int) -> int:
+        with (
+            patch.object(cache, "_get_physical_vram_available", side_effect=self.get_physical_vram_available),
+            patch.object(cache, "_move_model_to_ram", side_effect=self.move_model_to_ram),
+            patch.object(cache._cached_models["big"].cached_model, "cur_vram_bytes", side_effect=self.cur_vram_bytes),
+        ):
+            return cache.make_room_in_vram(vram_bytes_needed)
+
+
+def test_an_offload_that_returns_less_than_believed_continues_with_the_same_model(gpu_accounting_cache: ModelCache):
+    """A partial unload frees believed sizes, and the driver gets back less (granularity, late unmapping). The last,
+    largest model must not end the loop with the shortfall unmet while it still has weights on the device. A follow-up
+    asks for double the multiple of the remaining shortfall the previous one did, and at least 64 MB, so a model that
+    keeps returning little takes logarithmically many steps."""
+    cache = gpu_accounting_cache
+    _put(cache, "big", 100 * MB)
+    offload = _SteppedOffload([(40 * MB, 30 * MB), (40 * MB, 30 * MB), (20 * MB, 20 * MB)], on_device=100 * MB)
+
+    available = offload.make_room(cache, 80 * MB)
+
+    # 30 MB came back for the 80 MB asked; 50 MB missing -> ask twice that, 100; 30 MB more came back; 20 MB missing ->
+    # four times that, 80.
+    assert offload.asked == [80 * MB, 100 * MB, 80 * MB]
+    assert available == 80 * MB
+
+
+class _ChunkedOffload(_SteppedOffload):
+    """A model whose offload frees what is asked, and whose memory the driver gets back in whole `chunk`s only."""
+
+    def __init__(self, chunk: int, on_device: int):
+        super().__init__([], on_device)
+        self.chunk = chunk
+        self.freed = 0
+
+    def move_model_to_ram(self, cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
+        self.asked.append(vram_bytes_to_free)
+        believed = min(vram_bytes_to_free, self.on_device)
+        self.on_device -= believed
+        self.freed += believed
+        self.available = self.freed // self.chunk * self.chunk
+        return believed
+
+
+def test_a_sliver_left_by_a_partial_offload_takes_one_follow_up(gpu_accounting_cache: ModelCache):
+    """2 MB short after the first step, with the driver getting memory back in 32 MB chunks: asking for twice the
+    sliver, then twice that, would take four more steps (4, 8, 16, 32 MB) to reach the next chunk."""
+    cache = gpu_accounting_cache
+    _put(cache, "big", 100 * MB)
+    offload = _ChunkedOffload(32 * MB, on_device=100 * MB)
+
+    available = offload.make_room(cache, 66 * MB)
+
+    assert offload.asked == [66 * MB, 64 * MB]
+    assert available == 96 * MB
+
+
+@pytest.mark.parametrize(
+    ("second_step", "on_device_after"),
+    [((0, 0), 36 * MB), ((36 * MB, 0), 0)],
+    ids=["a-step-frees-nothing", "nothing-left-on-the-device"],
+)
+def test_the_follow_up_ends_when_the_model_cannot_give_more(
+    gpu_accounting_cache: ModelCache, second_step: tuple[int, int], on_device_after: int
+):
+    cache = gpu_accounting_cache
+    _put(cache, "big", 100 * MB)
+    offload = _SteppedOffload([(64 * MB, 20 * MB), second_step], on_device=100 * MB)
+
+    available = offload.make_room(cache, 60 * MB)
+
+    assert offload.asked == [60 * MB, 80 * MB]
+    assert offload.on_device == on_device_after
+    assert available == 20 * MB
+
+
+def test_a_device_with_shared_memory_does_not_follow_up_on_a_model(gpu_accounting_cache: ModelCache):
+    """Moving weights off a device whose memory is the system's frees nothing net: re-measuring after each step would
+    unload every unlocked model whole."""
+    cache = gpu_accounting_cache
+    cache._execution_device = torch.device("mps")
+    _put(cache, "big", 100 * MB)
+    offload = _SteppedOffload([(64 * MB, 0)], on_device=100 * MB)
+
+    offload.make_room(cache, 60 * MB)
+
+    assert offload.asked == [60 * MB]
