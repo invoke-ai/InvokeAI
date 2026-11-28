@@ -205,4 +205,10 @@ same key names from an external process, with models given by name.
    record, so a setting that reaches inference unrecorded fails before recall can miss it.
 4. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
    type change, and add the old spelling to the readers' alias table.
-5. Update the tables on this page.
+5. A field `CoreMetadataInvocation` declares is a new input, so bump the `core_metadata` node's own version in its
+   `@invocation` decorator too, and add an empty input for the field to every bundled workflow under
+   `invokeai/app/services/workflow_records/default_workflows` that embeds the node, at the new version.
+   An embed at the current version skips the editor's node migration, so a declared field it lists no input for
+   renders as a "Missing field" row. `test_bundled_core_metadata_lists_every_field_the_invocation_declares`
+   (`tests/app/services/workflow_records/test_default_workflows_registry.py`) fails for each workflow that lacks one.
+6. Update the tables on this page.

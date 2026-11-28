@@ -214,7 +214,10 @@ export const GenerateAdvancedFields = ({
     </GenerateFieldContextMenu>
   );
 
-  const bundledVaeSupplier = getEmptyComponentSupplier(selectedModel, {}, 'vae');
+  // The picker shows only where the VAE override is visible, and there the selected model is its own supplier.
+  const bundledVaeLabel = t('widgets.generate.componentFrom', {
+    name: getEmptyComponentSupplier(selectedModel, {}, 'vae')?.name,
+  });
 
   // The VAE the model's defaults name is no change from them, as Apply model defaults sets it.
   const isVaeAtDefault = !settings.vae || isModelDefaultVae(selectedModel, settings.vae);
@@ -281,18 +284,10 @@ export const GenerateAdvancedFields = ({
                 {/* Clearable: at the model's default VAE the reset is off, and clearing is how to reach the bundled one. */}
                 <ModelSelect
                   isClearable
-                  emptyLabel={
-                    bundledVaeSupplier
-                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
-                      : undefined
-                  }
+                  emptyLabel={bundledVaeLabel}
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  placeholder={
-                    bundledVaeSupplier
-                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
-                      : t('widgets.generate.bundledVae')
-                  }
+                  placeholder={bundledVaeLabel}
                   relatedTo={selectedModel?.key ?? null}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}

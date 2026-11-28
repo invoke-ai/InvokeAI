@@ -1162,6 +1162,10 @@ const SOURCED_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]
  */
 const SOURCE_FIRST_BASES: ReadonlySet<string> = new Set(['z-image']);
 
+/** The slots a component source can fill for a `base` model while they are empty. */
+export const getSourceSuppliableSlots = (base: string): readonly GenerateComponentValueKey[] =>
+  SOURCED_SLOTS[base] ?? [];
+
 /** SD 3's loader takes any component left out from the main model itself, when that is a Diffusers pipeline. */
 const SD3_MAIN_SLOTS: readonly GenerateComponentValueKey[] = [
   'clipGEmbedModel',

@@ -55,6 +55,7 @@ export {
   createReferenceImageId,
   getCompatibleReferenceImages,
   getComponentSlotsSuppliedByRecord,
+  getSourceSuppliableSlots,
   getDefaultGenerateSettings,
   getDenoisingStartClipping,
   type StepClipping,

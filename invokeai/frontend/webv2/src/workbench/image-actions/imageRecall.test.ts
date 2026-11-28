@@ -232,6 +232,7 @@ describe('image recall', () => {
         negativePromptEnabled: false,
       });
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues,
         image,
         kind,
@@ -253,6 +254,7 @@ describe('image recall', () => {
     'preserves the other effective prompt when recalling %s clears a shared template',
     (kind) => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({
           positivePrompt: 'keep positive',
           negativePrompt: 'keep negative',
@@ -287,6 +289,7 @@ describe('image recall', () => {
     'enables the recorded negative and preserves the unrecalled effective positive for %s',
     (kind) => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({
           positivePrompt: 'keep positive',
           negativePrompt: 'old negative',
@@ -349,6 +352,7 @@ describe('image recall', () => {
     'handles empty or absent $kind metadata without changing the other effective prompt',
     ({ kind, metadata, negativePromptEnabled, expected }) => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({
           positivePrompt: 'keep positive',
           negativePrompt: 'keep negative',
@@ -379,6 +383,7 @@ describe('image recall', () => {
 
   it('recalls supported image metadata into generate settings', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'all',
@@ -414,6 +419,7 @@ describe('image recall', () => {
     const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
     const recall = (current: GenerateWidgetValues, model: MainModelConfig, vaeModels: VaeModelConfig[]) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: current,
         image,
         kind: 'all',
@@ -438,6 +444,7 @@ describe('image recall', () => {
   it('recalls reference images from metadata, re-targeting configs to the effective model', () => {
     // The metadata model is not installed: the SDXL model stays and the Qwen reference config is rebuilt for SDXL.
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'all',
@@ -484,6 +491,7 @@ describe('image recall', () => {
       ratio: null,
     };
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'all',
@@ -521,6 +529,7 @@ describe('image recall', () => {
 
   it('falls back to pre-v6 canvas ipAdapter metadata when ref_images has no valid entries', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'all',
@@ -571,6 +580,7 @@ describe('image recall', () => {
 
   it.each(['all', 'remix'] as const)('recalls valid HiDiffusion metadata for supported models with %s', (kind) => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind,
@@ -599,6 +609,7 @@ describe('image recall', () => {
 
   it('uses actual image dimensions for Use Size', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'dimensions',
@@ -627,6 +638,7 @@ describe('image recall', () => {
       const metadata = { height: 768, model: { key: sdxlModel.key }, positive_prompt: 'a cat', seed: 7, width: 512 };
       const recall = (kind: ImageRecallKind) =>
         buildImageRecallSettings({
+          mayBeWorkflowRun: false,
           currentValues: createValues(),
           image,
           kind,
@@ -656,6 +668,7 @@ describe('image recall', () => {
 
   it('recalls required component models for component-based families', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
       image,
       kind: 'all',
@@ -680,6 +693,7 @@ describe('image recall', () => {
   it('keeps a fitting pick when the recorded component does not fit the current model', () => {
     // The image's Ideogram model is gone, so Remix stays on the current Krea-2 model and its 4B encoder.
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, qwen3VLEncoderModel: krea2Qwen3VL }),
       image,
       kind: 'remix',
@@ -711,6 +725,7 @@ describe('image recall', () => {
       models: ComponentModelConfig[] = [sdxlModel, inkLora, grainLora, staleLora, sd1Lora]
     ) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], ...overrides }),
         image,
         kind,
@@ -851,6 +866,7 @@ describe('image recall', () => {
         useWatermark: false,
       }).backendGraph;
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], model: sd1Model }),
         image,
         kind: 'all',
@@ -897,6 +913,7 @@ describe('image recall', () => {
     };
     const recall = (model: GenerateWidgetValues['model'], metadata: Record<string, unknown>, kind: 'all' | 'remix') =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(),
         image,
         kind,
@@ -927,6 +944,7 @@ describe('image recall', () => {
 
     it('skips provider metadata when the image was made with a local model', () => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(),
         image,
         kind: 'all',
@@ -962,6 +980,7 @@ describe('model-family tuning recall', () => {
     current: Partial<GenerateWidgetValues> = {}
   ) =>
     buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(current),
       image,
       kind,
@@ -1006,6 +1025,7 @@ describe('model-family tuning recall', () => {
     } as const;
     const recallOverChanged = (metadata: Record<string, unknown>, model: MainModelConfig) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(changedTuning),
         image,
         kind: 'all',
@@ -1050,6 +1070,7 @@ describe('model-family tuning recall', () => {
       },
     ]);
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, referenceImages: styleReference }),
       image,
       kind: 'all',
@@ -1196,6 +1217,7 @@ describe('Anima IP-Adapter recall', () => {
       { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
     ).backendGraph;
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model }),
       image,
       kind: 'all',
@@ -1239,6 +1261,7 @@ describe('anima inpaint adapter', () => {
     'restores the adapter and its weight from a canvas inpaint image on %s',
     (kind) => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(),
         image,
         kind,
@@ -1264,6 +1287,7 @@ describe('anima inpaint adapter', () => {
     } = canvasInpaintMetadata;
     const recall = (metadata: Record<string, unknown>, supportedModels = [animaModel]) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues,
         image,
         kind: 'all',
@@ -1318,6 +1342,7 @@ describe('FLUX.3 prompt upsampler recall', () => {
     supportedModels = [flux3Model, sd1Model]
   ) =>
     buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues,
       image,
       kind: 'all',
@@ -1382,6 +1407,7 @@ describe('SDXL Refiner recall', () => {
     currentValues = createValues()
   ) =>
     buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues,
       image,
       kind,
@@ -1414,6 +1440,7 @@ describe('SDXL Refiner recall', () => {
     }).backendGraph;
     const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
       image,
       kind: 'remix',
@@ -1449,6 +1476,7 @@ describe('legacy records', () => {
     vaeModels: VaeModelConfig[] = []
   ) =>
     buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(overrides),
       image,
       kind: 'all',
@@ -1890,6 +1918,7 @@ describe('legacy family metadata parity', () => {
     };
     const recall = (metadata: unknown) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({
           model,
           modelKey: model.key,
@@ -1954,6 +1983,7 @@ it.each(['array', 'entities'] as const)(
       },
     };
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(),
       image,
       kind: 'all',
@@ -2005,11 +2035,16 @@ it.each([false, true])('keeps modern references authoritative over v4 aliases (e
     vaeModels: [],
   };
   const result = buildImageRecallSettings({
+    mayBeWorkflowRun: false,
     ...input,
     metadata: { ref_images: empty ? [] : [modern], ipAdapters: [legacy] },
   });
   expect(result?.values.referenceImages.map(({ id }) => id)).toEqual(empty ? [] : ['modern']);
-  const legacyResult = buildImageRecallSettings({ ...input, metadata: { ipAdapters: [legacy] } });
+  const legacyResult = buildImageRecallSettings({
+    mayBeWorkflowRun: false,
+    ...input,
+    metadata: { ipAdapters: [legacy] },
+  });
   expect(legacyResult?.values.referenceImages).toEqual([
     expect.objectContaining({
       config: expect.objectContaining({
@@ -2027,6 +2062,7 @@ it.each([false, true])('keeps modern references authoritative over v4 aliases (e
 describe('CFG scale schedule recall', () => {
   it('recalls the initial step value from a valid CFG schedule array', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ cfgScale: 7 }),
       image,
       kind: 'all',
@@ -2043,6 +2079,7 @@ describe('CFG scale schedule recall', () => {
   it('recalls the initial step value from a valid guidance schedule array for distilled-guidance models', () => {
     const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ cfgScale: 3.5, model: fluxModel, modelKey: fluxModel.key }),
       image,
       kind: 'all',
@@ -2060,6 +2097,7 @@ describe('CFG scale schedule recall', () => {
     'ignores invalid or below-minimum CFG schedule array %j without overwriting cfgScale',
     (cfgScale) => {
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ cfgScale: 7 }),
         image,
         kind: 'all',
@@ -2102,6 +2140,7 @@ describe('Wan LoRA expert target recall', () => {
 
   it('preserves target and low_noise_weight and folds dual high/low entries for the same LoRA', () => {
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
       image,
       kind: 'all',
@@ -2127,6 +2166,7 @@ describe('Wan LoRA expert target recall', () => {
     ]);
 
     const folded = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
       image,
       kind: 'all',
@@ -2166,7 +2206,9 @@ describe('a record of VAE settings only', () => {
     const capabilities = getImageRecallCapabilities(input);
 
     expect(capabilities).toMatchObject({ all: true, remix: true });
-    expect(buildImageRecallSettings({ ...input, kind: 'all' })?.values).toMatchObject(restored);
+    expect(buildImageRecallSettings({ mayBeWorkflowRun: false, ...input, kind: 'all' })?.values).toMatchObject(
+      restored
+    );
   });
 });
 
@@ -2193,6 +2235,7 @@ describe('Diffusers main that records itself as its component source', () => {
       );
       const other = { ...model, key: `other-${base}-source`, name: 'Other source' } as MainModelConfig;
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ ...settings, componentSourceModel: other }),
         image,
         kind: 'all',
@@ -2291,6 +2334,7 @@ describe('Diffusers main that supplied its own VAE', () => {
       const panel = { ...filled, componentSourceModel: null };
       const picks = cleared.filter((key) => panel[key]);
       const result = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(panel),
         image,
         kind: 'all',
@@ -2325,6 +2369,7 @@ describe('Diffusers main that supplied its own VAE', () => {
       latent_channels: latentChannels,
     } as VaeModelConfig;
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ ...settings, componentSourceModel: null, vae: panelVae }),
       image,
       kind: 'all',
@@ -2359,6 +2404,7 @@ describe('FLUX.2 dev record whose standalone encoder is no longer installed', ()
       (candidate) => candidate.key !== settings.mistralEncoderModel!.key
     );
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({
         ...recorded,
         componentSourceModel: null,
@@ -2398,6 +2444,7 @@ describe('FLUX.2 dev record recalled over a panel encoder of another family', ()
       (candidate) => candidate.key !== settings.mistralEncoderModel!.key
     );
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({
         ...recorded,
         componentSourceModel: null,
@@ -2430,6 +2477,7 @@ describe('FLUX.2 dev record whose source supplies only the VAE', () => {
     }).backendGraph.nodes;
     const catalog = recallCatalogFor(model, recorded);
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ ...recorded, componentSourceModel: null, mistralEncoderModel: null }),
       image,
       kind: 'all',
@@ -2462,6 +2510,7 @@ describe('FLUX.2 dev record whose source supplies the encoder and the VAE', () =
     const metadata = Object.values(record).find((node) => node.type === 'core_metadata');
     const catalog = recallCatalogFor(model, recorded);
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({
         ...recorded,
         mistralEncoderModel: settings.mistralEncoderModel,
@@ -2506,6 +2555,7 @@ describe('FLUX.2 dev record naming a source and a standalone component that is n
     const { installed, metadata, model, recorded, settings } = setup(null);
     const panelEncoder = { ...settings.mistralEncoderModel!, key: 'panel-mistral', name: 'Panel Mistral' };
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ ...recorded, mistralEncoderModel: panelEncoder }),
       image,
       kind: 'all',
@@ -2525,6 +2575,7 @@ describe('FLUX.2 dev record naming a source and a standalone component that is n
     const panelVae: VaeModelConfig = { base: 'flux2', key: 'panel-vae', name: 'Panel VAE', type: 'vae' };
     const { installed, metadata, model, recorded } = setup(recordedVae);
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ ...recorded, vae: panelVae }),
       image,
       kind: 'all',
@@ -2542,6 +2593,7 @@ describe('FLUX.2 dev record naming a source and a standalone component that is n
 describe('a record that names no model', () => {
   const recall = (panel: Partial<GenerateWidgetValues>, models: ComponentModelConfig[], vaeModels: VaeModelConfig[]) =>
     buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues(panel),
       image,
       kind: 'all',
@@ -2600,10 +2652,15 @@ describe('recall onto a panel holding unused standalone components', () => {
     const original = compileGenerateGraph(recorded, model, 'gallery', PROJECT_SETTINGS).backendGraph;
     const catalogs = [recallCatalogFor(model, recorded), recallCatalogFor(model, panel)];
     const result = buildImageRecallSettings({
+      mayBeWorkflowRun: false,
       currentValues: createValues({ ...panel, model, modelKey: model.key }),
       image,
       kind: 'all',
-      metadata: Object.values(original.nodes).find((node) => node.type === 'core_metadata'),
+      // The server stamps the version of every record it stores.
+      metadata: {
+        ...Object.values(original.nodes).find((node) => node.type === 'core_metadata'),
+        app_version: '7.0.0',
+      },
       models: [...otherModels, ...catalogs.flatMap((catalog) => catalog.models)],
       supportedModels: [model],
       vaeModels: catalogs.flatMap((catalog) => catalog.vaeModels),
@@ -2748,7 +2805,7 @@ describe('recall onto a panel holding unused standalone components', () => {
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
         kind: options.kind ?? 'all',
-        mayBeWorkflowRun: options.mayBeWorkflowRun,
+        mayBeWorkflowRun: options.mayBeWorkflowRun ?? false,
         metadata,
         models: catalogs.flatMap((catalog) => catalog.models),
         supportedModels: [model],
@@ -2790,6 +2847,7 @@ describe('recall onto a panel holding unused standalone components', () => {
         width: 512,
       };
       const values = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
         kind: 'all',
@@ -2812,6 +2870,8 @@ describe('recall onto a panel holding unused standalone components', () => {
 
     // The legacy SD 3 builder passed standalone encoders to the loader and recorded none of them.
     it.each([
+      ['', true],
+      ['unreleased', true],
       ['6.14.4', true],
       ['7.0.0-alpha.4', true],
       ['7.0.0-beta.1', true],
@@ -2879,6 +2939,7 @@ describe('recall onto a panel holding unused standalone components', () => {
         ).find((node) => node.type === 'core_metadata');
         const panel = recallCatalogFor(model, settings);
         const values = buildImageRecallSettings({
+          mayBeWorkflowRun: false,
           currentValues: createValues({ ...settings, model, modelKey: model.key }),
           image,
           kind: 'all',
@@ -2932,6 +2993,7 @@ describe('recall onto a panel holding unused standalone components', () => {
       const panel = { ...filled, componentSourceModel: null, model, modelKey: model.key };
       const encoderKey = base === 'z-image' ? 'qwen3EncoderModel' : 'qwenVLEncoderModel';
       const values = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues(panel),
         image,
         kind: 'all',
@@ -2961,6 +3023,62 @@ describe('recall onto a panel holding unused standalone components', () => {
     });
   });
 
+  describe('a record naming a standalone encoder and VAE beside a panel running on a component source', () => {
+    const recall = (base: 'qwen-image' | 'wan' | 'z-image', installed: boolean) => {
+      const { model, settings } = satisfiedSettingsFor(base, {
+        label: 'gguf',
+        overrides: { format: 'gguf_quantized' },
+      });
+      const source = { ...model, format: 'diffusers', key: `${base}-source`, name: 'Source' } as MainModelConfig;
+      const encoder = (
+        { 'qwen-image': 'qwenVLEncoderModel', wan: 'wanT5EncoderModel', 'z-image': 'qwen3EncoderModel' } as const
+      )[base];
+      const panel = { ...settings, componentSourceModel: source, [encoder]: null, vae: null };
+      const metadata = Object.values(
+        compileGenerateGraph(settings, model, 'gallery', PROJECT_SETTINGS).backendGraph.nodes
+      ).find((node) => node.type === 'core_metadata');
+      const catalog = recallCatalogFor(model, settings);
+      const values = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
+        currentValues: createValues({ ...panel, model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata,
+        models: installed ? [...catalog.models, source] : [model, source],
+        supportedModels: [model],
+        vaeModels: installed ? catalog.vaeModels : [],
+      })!.values;
+
+      return { metadata, model, panel, recorded: settings, source, values, encoder };
+    };
+
+    it.each(['qwen-image', 'wan', 'z-image'] as const)(
+      'keeps the source of a %s panel while the recorded encoder and VAE are not installed',
+      (base) => {
+        const { encoder, metadata, model, panel, recorded, source, values } = recall(base, false);
+
+        expect(recorded[encoder]).toBeTruthy();
+        expect(recorded.vae).toBeTruthy();
+        expect(metadata).toMatchObject({ vae: { key: recorded.vae!.key } });
+        // The panel compiled on the source before recall, and still does.
+        expect(() => compileGenerateGraph(panel, model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
+        expect(values.componentSourceModel?.key).toBe(source.key);
+        expect(() => compileGenerateGraph(values, values.model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
+      }
+    );
+
+    it.each(['qwen-image', 'wan', 'z-image'] as const)(
+      'still clears the source of a %s panel once the recorded encoder and VAE are restored',
+      (base) => {
+        const { encoder, recorded, values } = recall(base, true);
+
+        expect(values[encoder]?.key).toBe(recorded[encoder]!.key);
+        expect(values.vae?.key).toBe(recorded.vae!.key);
+        expect(values.componentSourceModel).toBeNull();
+      }
+    );
+  });
+
   describe('a record that names no components', () => {
     const wan = satisfiedSettingsFor('wan', { label: 'gguf', overrides: { format: 'gguf_quantized' } });
     const qwenImage = satisfiedSettingsFor('qwen-image', { label: 'diffusers', overrides: { format: 'diffusers' } });
@@ -2968,6 +3086,7 @@ describe('recall onto a panel holding unused standalone components', () => {
 
     const recallOnto = (model: GenerateModelConfig, panel: GenerateSettings, metadata: Record<string, unknown>) =>
       buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
         kind: 'all',
@@ -3023,6 +3142,7 @@ describe('recall onto a panel holding unused standalone components', () => {
       const model = testCase.main as MainModelConfig;
       const panel = withStandaloneComponents(model, qwenImage.settings);
       const values = buildImageRecallSettings({
+        mayBeWorkflowRun: false,
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
         kind: 'all',

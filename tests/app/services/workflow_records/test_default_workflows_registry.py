@@ -131,10 +131,15 @@ CORE_METADATA_WORKFLOWS = sorted(
 )
 
 
+def test_core_metadata_workflows_are_found() -> None:
+    assert CORE_METADATA_WORKFLOWS, f"no bundled workflow under {WORKFLOW_DIR} embeds core_metadata"
+
+
 @pytest.mark.parametrize("workflow_path", CORE_METADATA_WORKFLOWS, ids=lambda p: p.stem)
 def test_bundled_core_metadata_lists_every_field_the_invocation_declares(workflow_path: Path) -> None:
-    """An embed at the current version skips the editor's node migration, so a declared field it neither lists nor
-    receives over an edge has no value instance and renders as a "Missing field" row."""
+    """An embed at the current version skips the editor's node migration, so a declared field it lists no input for
+    has no value instance and renders as a "Missing field" row. A field an edge feeds is exempt only because bundled
+    workflows already leave such fields unlisted (the six MiniMax H3 ones); the legacy editor does not look at edges."""
     cls = InvocationRegistry.get_invocations_map()["core_metadata"]
     declared = [
         name
@@ -149,6 +154,10 @@ def test_bundled_core_metadata_lists_every_field_the_invocation_declares(workflo
         data = node["data"]
         if data["type"] != "core_metadata":
             continue
-        wired = {edge["targetHandle"] for edge in workflow["edges"] if edge["target"] == data["id"]}
+        wired = {
+            edge["targetHandle"]
+            for edge in workflow["edges"]
+            if edge["target"] == data["id"] and "targetHandle" in edge
+        }
         missing = [name for name in declared if name not in data["inputs"] and name not in wired]
         assert not missing, f"{workflow_path.name}: core_metadata {data['version']} embeds no input for {missing}"

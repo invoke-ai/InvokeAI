@@ -620,6 +620,7 @@ const recall = (
   }: { currentValues?: GenerateWidgetValues; metadata?: Written } = {}
 ) =>
   buildImageRecallSettings({
+    mayBeWorkflowRun: false,
     ...testCase.catalog,
     currentValues,
     image: testCase.image,

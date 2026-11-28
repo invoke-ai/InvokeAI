@@ -21,6 +21,7 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getComponentSlotsSuppliedByRecord,
+  getSourceSuppliableSlots,
   getDimensionGrid,
   getEffectivePrompts,
   getExternalProviderOptionKeys,
@@ -998,7 +999,8 @@ const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledCom
 
 /**
  * webv2 releases that passed a component to their loader without recording it, so its absence from their records
- * proves nothing. The server stamps `app_version`; a record without one is the current writer's.
+ * proves nothing. The server stamps `app_version`; a record whose version is missing or unreadable (`7.0.0-rc1` was
+ * one) may come from any writer, so it proves nothing either.
  */
 const UNRECORDING_WRITERS: readonly {
   base: string;
@@ -1028,9 +1030,14 @@ const parseAppVersion = (version: string | null): number[] | null => {
 const isWriterBefore = (metadata: unknown, version: string): boolean => {
   const written = parseAppVersion(getString(metadata, 'app_version'));
   const first = parseAppVersion(version)!;
-  const differing = written?.findIndex((part, index) => part !== first[index]) ?? -1;
 
-  return differing >= 0 && written![differing]! < first[differing]!;
+  if (!written) {
+    return true;
+  }
+
+  const differing = written.findIndex((part, index) => part !== first[index]);
+
+  return differing >= 0 && written[differing]! < first[differing]!;
 };
 
 /** Whether a record's writer may have used `setting` of a `base` model without recording it. */
@@ -1597,7 +1604,7 @@ export const buildImageRecallSettings = ({
   image,
   isCanvasFrame = false,
   kind,
-  mayBeWorkflowRun = false,
+  mayBeWorkflowRun,
   metadata,
   referenceAssets,
   supportedModels,
@@ -1614,7 +1621,7 @@ export const buildImageRecallSettings = ({
    * The image embeds the workflow it ran from, or that could not be read. A workflow's loader takes components its
    * metadata node never names, so an absent key then says nothing about what the run used and the panel keeps its picks.
    */
-  mayBeWorkflowRun?: boolean;
+  mayBeWorkflowRun: boolean;
   referenceAssets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>;
   supportedModels: GenerateModelConfig[];
   models: ComponentModelConfig[];
@@ -1685,11 +1692,8 @@ export const buildImageRecallSettings = ({
     // leaves the panel's, and with it the question whether the source still supplies the VAE.
     const judgedModel = model && !mayBeWorkflowRun && recordsLoaderSelections(metadata) ? model : undefined;
     const { componentSourceModel } = componentPatch;
-    // A writer that may have used a source without recording it leaves the question open, like an unresolved one.
     const recordedSource = !recordsComponent('componentSourceModel')
-      ? judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, 'componentSourceModel')
-        ? ('unresolved' as const)
-        : null
+      ? null
       : !fittingSettings.includes('componentSourceModel')
         ? ('unresolved' as const)
         : isMainModelConfig(componentSourceModel)
@@ -1712,7 +1716,19 @@ export const buildImageRecallSettings = ({
       !recordsComponent(setting) && !(judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, setting));
     // A slot that hangs on another (the vision tower follows a GGUF encoder) says nothing while the record names that
     // one and recall did not restore it: the panel's encoder stays, and so must what belongs to it.
+    const isRecordedButUnrestored = (slot: string): boolean =>
+      slot === 'vae'
+        ? getRecordedVaeKey(metadata, effectiveModel) !== null &&
+          getMetadataVae(metadata, effectiveModel, vaeModels) === undefined
+        : recordsComponent(slot as RecalledComponentSetting) &&
+          !fittingSettings.includes(slot as RecalledComponentSetting);
     const hangsOnUnrestored = (setting: RecalledComponentSetting): boolean => {
+      // A component source stands in for the encoders and the VAE it could supply: while the record names one of them
+      // and recall did not restore it, the source in the panel is all that supplies it.
+      if (setting === 'componentSourceModel') {
+        return getSourceSuppliableSlots(effectiveModel.base).some(isRecordedButUnrestored);
+      }
+
       const parent = DEFAULT_COMPONENT_SLOTS.find(
         (slot) => slot.persistenceKey === DEFAULT_COMPONENT_SLOTS.find((entry) => entry.setting === setting)?.dependsOn
       )?.setting;

@@ -953,7 +953,6 @@ const buildFluxPipeline = (input: FamilyPipelineInput, extras: PipelineExtras = 
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { clipEmbedModel, t5EncoderModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1095,7 +1094,6 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { mistralEncoderModel, qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1323,7 +1321,6 @@ const buildQwenImagePipeline = (input: FamilyPipelineInput, extras: QwenImagePip
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { sourceModel },
     conditioning: null,
     denoise,
     denoiseSize: input.denoiseSize,
@@ -1482,7 +1479,6 @@ const buildZImagePipeline = (input: FamilyPipelineInput, extras: ConditionedPipe
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1612,7 +1608,6 @@ const buildAnimaPipeline = (input: FamilyPipelineInput) => {
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return {
-    components: { qwen35EncoderModel, qwen3EncoderModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1773,7 +1768,7 @@ const buildKrea2Pipeline = (input: FamilyPipelineInput, extras: Krea2PipelineExt
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return {
-    components: { loadsLoras: activeLoras.length > 0, qwen3VlEncoderModel, qwen3VlVisionTowerModel },
+    components: { loadsLoras: activeLoras.length > 0 },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -2067,7 +2062,6 @@ const buildMossImagePipeline = (input: FamilyPipelineInput, extras: MossImagePip
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { qwen35EncoderModel },
     conditioning: null,
     denoise,
     denoiseSize: input.denoiseSize,
