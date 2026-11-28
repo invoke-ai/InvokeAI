@@ -124,6 +124,11 @@ from invokeai.backend.model_manager.starter_models.external import (
     seedream_4_5,
     seedream_5_0,
     seedream_5_0_lite,
+    worldrouter_gpt_image_2,
+    worldrouter_gpt_image_2_5_flare,
+    worldrouter_gpt_image_2_5_sunburst,
+    worldrouter_gpt_image_2_6_flare,
+    worldrouter_gpt_image_2_6_sunburst,
 )
 from invokeai.backend.model_manager.starter_models.flux import (
     flux_canny_control_lora,
@@ -713,6 +718,11 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_qwen_image_max,
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
+    worldrouter_gpt_image_2,
+    worldrouter_gpt_image_2_6_flare,
+    worldrouter_gpt_image_2_6_sunburst,
+    worldrouter_gpt_image_2_5_flare,
+    worldrouter_gpt_image_2_5_sunburst,
     anima_base,
     anima_base_int8,
     anima_base_fp8,

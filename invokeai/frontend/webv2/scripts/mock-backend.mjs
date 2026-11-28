@@ -382,7 +382,7 @@ const getStarterModelsResponse = (state) => {
 };
 
 /** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
-const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream', 'worldrouter'];
 
 /** The backend removes a provider's records with its key, so providers the hosted records route to have one. */
 const createExternalProviderConfigs = (models) => {

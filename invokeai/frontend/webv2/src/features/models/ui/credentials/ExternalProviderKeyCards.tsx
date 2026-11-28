@@ -19,7 +19,7 @@ import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/ac
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
 import { AlibabaCloudIcon, ByteDanceIcon, GoogleGeminiIcon } from '@platform/ui/VendoredIcon';
-import { BotIcon, CloudIcon, HexagonIcon } from 'lucide-react';
+import { BotIcon, CloudIcon, GlobeIcon, HexagonIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -37,6 +37,7 @@ const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
   gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
   seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
+  worldrouter: { icon: GlobeIcon, placeholder: 'sk-…', title: 'WorldRouter' },
 };
 
 /** One key card per provider the backend reports, from the shared store. */
