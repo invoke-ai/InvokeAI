@@ -23,6 +23,8 @@ import { GenerateIssueButton } from './shared/GenerateIssues';
 interface GenerateConceptsContentProps {
   loraModels: LoraModelConfig[];
   loras: GenerateLora[];
+  /** The effective positive prompt, for marking triggers it lacks. */
+  prompt: string;
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
@@ -44,6 +46,7 @@ export const GenerateConceptsContent = ({
   loras: draftLoras,
   onCommit,
   projectId,
+  prompt,
   selectedModel,
 }: GenerateConceptsContentProps) => {
   const { t } = useTranslation();
@@ -84,7 +87,7 @@ export const GenerateConceptsContent = ({
     loras.length > 0 ? (
       <Box mx={-1}>
         <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
-          {loras.map((lora) => (
+          {loras.map((lora, index) => (
             <ConceptRow
               key={lora.model.key}
               isCompatible={isCompatibleLora(lora, selectedModel)}
@@ -97,6 +100,8 @@ export const GenerateConceptsContent = ({
               }
               lora={lora}
               models={models}
+              prompt={prompt}
+              triggerColorIndex={index}
               onRemove={removeLora}
               onUpdate={updateLora}
             />

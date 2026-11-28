@@ -67,6 +67,7 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
               loraModels={LORA_MODELS}
               loras={settings.loras}
               projectId={projectId}
+              prompt=""
               selectedModel={selectedModel}
               onCommit={onCommit}
             />
@@ -245,6 +246,7 @@ describe('a concept that is not installed', () => {
                 loraModels={LORA_MODELS}
                 loras={[LORA, { isEnabled: true, model: missing, weight: 0.5 }]}
                 projectId="project-1"
+                prompt=""
                 selectedModel={MAIN_MODEL}
                 onCommit={vi.fn()}
               />

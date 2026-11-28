@@ -3,12 +3,14 @@ import type { ConceptUpdate } from '@features/generation/core/conceptList';
 import type { GenerateLora } from '@features/generation/core/types';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { Avatar, Badge, Box, chakra, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
+import { Avatar, Badge, Box, Flex, Icon, Menu, Portal, VisuallyHidden } from '@chakra-ui/react';
+import { findTriggerPhrase, normalizeTriggerPhrases } from '@features/generation/core/prompt/loraTriggers';
 import {
   DEFAULT_LORA_WEIGHT_CONFIG,
   getDefaultLoraWeight,
   getLoraWeightSliderRange,
 } from '@features/generation/core/settings';
+import { getLoraTriggerPalette } from '@features/generation/ui/promptFields/PromptHighlight';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
@@ -62,6 +64,10 @@ export interface ConceptRowProps {
   onRemove: (key: string) => void;
   /** Weight commits are debounced; toggles commit immediately. Apply updates to the latest settings. */
   onUpdate: (key: string, update: ConceptUpdate) => void;
+  /** The positive prompt its triggers belong in; absent skips marking the triggers it lacks. */
+  prompt?: string;
+  /** The row's place in the concept list, which colours its triggers in the prompt; absent leaves them uncoloured. */
+  triggerColorIndex?: number;
 }
 
 /** A removed row unmounts with keyboard focus inside it; the next (else previous) row's button takes it instead. */
@@ -274,10 +280,13 @@ const ConceptRowContent = ({
   models,
   onRemove,
   onUpdate,
+  prompt,
+  triggerColorIndex,
   weight,
 }: ConceptRowProps & { lowNoiseWeight?: number; weight: number }) => {
   const { t } = useTranslation();
-  const { key, name, trigger_phrases: triggerPhrases } = lora.model;
+  const { key, name } = lora.model;
+  const triggerPhrases = normalizeTriggerPhrases(lora.model.trigger_phrases);
   // A concept that is not installed cannot run either; the row says which of the two it is.
   const isCompatible = isCompatibleModel && isInstalled;
   const isActive = lora.isEnabled && isCompatible;
@@ -321,6 +330,10 @@ const ConceptRowContent = ({
   const copyWeight = useCallback(() => String(weight), [weight]);
   const copyLowNoiseWeight = useCallback(() => String(lowNoiseWeight ?? weight), [lowNoiseWeight, weight]);
   const { openInModelManager } = models;
+  const triggerPalette =
+    isActive && triggerPhrases.length > 0 && triggerColorIndex !== undefined
+      ? getLoraTriggerPalette(triggerColorIndex)
+      : undefined;
 
   return (
     <Box role="listitem">
@@ -375,11 +388,28 @@ const ConceptRowContent = ({
                   {t('widgets.generate.incompatible')}
                 </Badge>
               )}
-              {triggerPhrases?.length ? (
-                <chakra.span minW="0" truncate>
-                  {triggerPhrases.join(', ')}
-                </chakra.span>
-              ) : null}
+              {triggerPhrases.map((phrase) => {
+                const isMissing =
+                  triggerPalette !== undefined &&
+                  prompt !== undefined &&
+                  findTriggerPhrase(prompt, phrase).length === 0;
+
+                return (
+                  <Badge
+                    key={phrase}
+                    borderStyle={isMissing ? 'dashed' : undefined}
+                    color={isMissing ? 'fg.muted' : undefined}
+                    colorPalette={triggerPalette ?? 'gray'}
+                    maxW="full"
+                    variant={isMissing ? 'outline' : 'subtle'}
+                  >
+                    <Box as="span" truncate>
+                      {phrase}
+                    </Box>
+                    {isMissing ? <VisuallyHidden> {t('widgets.generate.triggerNotInPrompt')}</VisuallyHidden> : null}
+                  </Badge>
+                );
+              })}
             </Flex>
           }
           detail={
@@ -429,8 +459,10 @@ const ConceptRowContent = ({
           leading={
             <Avatar.Root
               bg="bg.muted"
-              borderColor="border"
-              borderWidth="1px"
+              // The LoRA's trigger colour, so its row matches its phrases in the prompt.
+              borderColor={triggerPalette ? 'colorPalette.solid' : 'border'}
+              borderWidth={triggerPalette ? '2px' : '1px'}
+              colorPalette={triggerPalette}
               color="fg.subtle"
               flexShrink={0}
               shape="rounded"

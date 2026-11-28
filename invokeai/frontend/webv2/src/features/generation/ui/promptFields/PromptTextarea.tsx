@@ -1,3 +1,4 @@
+import type { LoraTriggerPhrase } from '@features/generation/core/prompt/loraTriggers';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
@@ -40,6 +41,8 @@ interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
   highlightDynamicPrompts?: boolean;
   /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
   knownWildcards?: ReadonlySet<string>;
+  /** Enabled LoRAs' trigger phrases, coloured as their LoRAs even when the model reads no prompt syntax. */
+  loraTriggers?: readonly LoraTriggerPhrase[];
   showSyntaxHighlighting: boolean;
   /** Number logical lines in a leading gutter, the way an editor does. */
   showLineNumbers?: boolean;
@@ -68,6 +71,7 @@ export const PromptTextarea = ({
   highlightDynamicPrompts = false,
   knownWildcards,
   lineHeight,
+  loraTriggers,
   onScroll,
   showLineNumbers = false,
   showSyntaxHighlighting,
@@ -80,7 +84,8 @@ export const PromptTextarea = ({
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const [textareaWrapWidth, setTextareaWrapWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
-  const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
+  const highlightsSyntax =
+    showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts || Boolean(loraTriggers?.length));
   // Template chunk emphasis is independent of the syntax-highlighting preference.
   const shouldHighlight = (highlightsSyntax || templateChunks !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
@@ -90,8 +95,13 @@ export const PromptTextarea = ({
   const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
   const highlightOptions = useMemo(
-    () => ({ attentionSyntax: attentionSyntax !== 'none', dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
-    [attentionSyntax, highlightDynamicPrompts, knownWildcards]
+    () => ({
+      attentionSyntax: attentionSyntax !== 'none',
+      dynamicPrompts: highlightDynamicPrompts,
+      knownWildcards,
+      loraTriggers,
+    }),
+    [attentionSyntax, highlightDynamicPrompts, knownWildcards, loraTriggers]
   );
 
   const needsMirror = shouldHighlight || showLineNumbers;

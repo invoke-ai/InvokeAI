@@ -1,7 +1,9 @@
 import type { PromptAstNode, PromptRange, PromptToken } from './ast';
+import type { LoraTriggerPhrase } from './loraTriggers';
 
 import { parsePromptTokens, tokenizePrompt } from './ast';
 import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
+import { findTriggerPhrase } from './loraTriggers';
 
 export type PromptHighlightKind =
   | 'text'
@@ -9,6 +11,7 @@ export type PromptHighlightKind =
   | 'attentionNumeric'
   | 'group'
   | 'embedding'
+  | 'loraTrigger'
   | 'escapedParen'
   | 'promptFunctionMethod'
   | 'promptFunctionArg'
@@ -34,15 +37,20 @@ export interface PromptHighlightOptions {
   dynamicPrompts?: boolean;
   /** Resolvable wildcard names; omitted leaves every `__name__` neutral. */
   knownWildcards?: ReadonlySet<string>;
+  /** Enabled LoRAs' trigger phrases, each coloured as its LoRA. */
+  loraTriggers?: readonly LoraTriggerPhrase[];
 }
 
 export interface PromptHighlightSegment {
+  /** Set on `loraTrigger` segments. */
+  colorIndex?: number;
   kind: PromptHighlightKind;
   range: PromptRange;
   text: string;
 }
 
 interface HighlightAnnotation {
+  colorIndex?: number;
   kind: PromptHighlightKind;
   priority: number;
   range: PromptRange;
@@ -62,6 +70,8 @@ const ANNOTATION_PRIORITY = {
   variantSeparator: 41,
   embedding: 40,
   promptFunctionMethod: 35,
+  // Above plain words and brackets, below any syntax that changes what the words mean.
+  loraTrigger: 25,
   promptFunctionArg: 5,
 } as const;
 
@@ -73,6 +83,7 @@ const BASE_PRIORITY: Record<PromptHighlightKind, number> = {
   error: 100,
   escapedParen: 20,
   group: 20,
+  loraTrigger: 25,
   promptFunctionArg: 5,
   promptFunctionMethod: 35,
   promptVariable: 45,
@@ -242,7 +253,12 @@ const collectParenthesisErrors = (tokens: PromptToken[]): HighlightAnnotation[] 
 const appendSegment = (segments: PromptHighlightSegment[], segment: PromptHighlightSegment): void => {
   const previous = segments.at(-1);
 
-  if (previous && previous.kind === segment.kind && previous.range.end === segment.range.start) {
+  if (
+    previous &&
+    previous.kind === segment.kind &&
+    previous.colorIndex === segment.colorIndex &&
+    previous.range.end === segment.range.start
+  ) {
     previous.text += segment.text;
     previous.range.end = segment.range.end;
     return;
@@ -257,6 +273,16 @@ const collectDynamicPromptAnnotations = (prompt: string, knownWildcards?: Readon
     priority: ANNOTATION_PRIORITY[kind],
     range,
   }));
+
+const collectLoraTriggerAnnotations = (prompt: string, triggers: readonly LoraTriggerPhrase[]): HighlightAnnotation[] =>
+  triggers.flatMap(({ colorIndex, phrase }) =>
+    findTriggerPhrase(prompt, phrase).map((range) => ({
+      colorIndex,
+      kind: 'loraTrigger' as const,
+      priority: ANNOTATION_PRIORITY.loraTrigger,
+      range,
+    }))
+  );
 
 export const buildPromptHighlightSegments = (
   prompt: string,
@@ -275,15 +301,17 @@ export const buildPromptHighlightSegments = (
         ? [...collectAnnotations(prompt, parsePromptTokens(tokens)), ...collectParenthesisErrors(tokens)]
         : []),
       ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt, options.knownWildcards) : []),
+      ...(options.loraTriggers ? collectLoraTriggerAnnotations(prompt, options.loraTriggers) : []),
     ];
     const segments: PromptHighlightSegment[] = [];
 
     forEachTokenAnnotation(tokens, annotations, (token, annotation) => {
       const baseKind = attentionSyntax ? tokenKind(token) : 'text';
-      const kind = annotation && annotation.priority > BASE_PRIORITY[baseKind] ? annotation.kind : baseKind;
+      const winner = annotation && annotation.priority > BASE_PRIORITY[baseKind] ? annotation : undefined;
 
       appendSegment(segments, {
-        kind,
+        ...(winner?.colorIndex === undefined ? {} : { colorIndex: winner.colorIndex }),
+        kind: winner?.kind ?? baseKind,
         range: { ...token.range },
         text: prompt.slice(token.range.start, token.range.end),
       });

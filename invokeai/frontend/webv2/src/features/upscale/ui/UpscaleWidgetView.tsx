@@ -710,8 +710,9 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   // Model only keeps the Refine settings as they are, hidden, so switching back restores them.
   const isRefine = values.mode === 'refine';
   // Folded, Detail guidance still summarizes the shared prompt's template and expansion count.
+  const effectivePositivePrompt = getEffectivePrompts(promptDraft).positivePrompt;
   const promptExpansion = useDynamicPrompts(
-    getEffectivePrompts(promptDraft).positivePrompt,
+    effectivePositivePrompt,
     isRefine ? getDynamicPromptsConfig(promptDraft) : null
   );
   const templateName = promptDraft.promptTemplate?.name;
@@ -954,11 +955,13 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
             {values.loras.length > 0 ? (
               <Box mx={-1}>
                 <ConceptList label={t('widgets.upscale.concepts')} projectId={projectId}>
-                  {values.loras.map((lora) => (
+                  {values.loras.map((lora, index) => (
                     <ConceptRow
                       key={lora.model.key}
                       models={conceptModels}
                       lora={lora}
+                      prompt={effectivePositivePrompt}
+                      triggerColorIndex={index}
                       onRemove={removeLora}
                       onUpdate={updateLora}
                     />

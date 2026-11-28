@@ -5,8 +5,11 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
+import { getLoraTriggerPhrases } from '@features/generation/core/prompt/loraTriggers';
 import { getEffectivePositivePrompt, getPositivePromptTemplateChunks } from '@features/generation/core/promptTemplates';
+import { isLoraCompatibleWithModel, syncGenerateLorasWithModels } from '@features/generation/core/settings';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
+import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { useWildcards } from '@features/generation/ui/useWildcards';
@@ -103,6 +106,20 @@ export const PositivePromptField = ({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
   const readsAttentionSyntax = supportsPromptAttentionSyntax(selectedModel?.base);
+  const { catalog, status: catalogStatus } = useGenerationUi().models;
+  // Colour only what the concept rows show as running, with the catalog's current phrases.
+  const loraTriggers = useMemo(() => {
+    const installedKeys = new Set(catalog.map((model) => model.key));
+
+    return getLoraTriggerPhrases(syncGenerateLorasWithModels(loras, catalog), (lora) =>
+      lora.isEnabled &&
+      (catalogStatus !== 'loaded' || installedKeys.has(lora.model.key)) &&
+      selectedModel &&
+      isLoraCompatibleWithModel(lora.model, selectedModel)
+        ? lora.model.trigger_phrases
+        : null
+    );
+  }, [catalog, catalogStatus, loras, selectedModel]);
   const { commitDraftValue, draftValue, flushDraftValue, readDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
@@ -331,6 +348,7 @@ export const PositivePromptField = ({
           fontFamily="mono"
           highlightDynamicPrompts={dynamicPrompts?.enabled === true}
           knownWildcards={knownWildcards}
+          loraTriggers={loraTriggers}
           readOnly={isViewingMerged}
           showSyntaxHighlighting={showSyntaxHighlighting}
           templateChunks={templateChunks}
