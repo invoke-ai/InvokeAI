@@ -210,6 +210,10 @@ class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
 
         variant = _resolve_variant(context, self.transformer)
         _validate_spatial_dimensions(variant, self.width, self.height)
+        if variant == WanVariantType.I2V_A14B and self.ref_image is None:
+            # The I2V transformer's patch embedding takes 36 channels (16 noise + 20 reference
+            # condition); without a reference it would fail mid-denoise with a raw shape error.
+            raise ValueError("The Wan 2.2 I2V model needs a Reference Image. Connect one, or pick a T2V model.")
         spatial_scale = get_spatial_scale_factor(variant)
 
         # Reuse the image denoise's scheduler construction so we pick up whatever

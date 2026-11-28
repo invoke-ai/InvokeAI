@@ -880,18 +880,20 @@ class TestWanDenoiseRefImage:
         for h_shape, *_ in transformer.calls:
             assert h_shape == (1, 36, 1, 8, 8), f"expected 36-channel input, got {h_shape}"
 
-    def test_no_ref_image_keeps_16_channels(self, fake_model_root: Path) -> None:
-        """Without ref_image → transformer sees [B, 16, T, H/8, W/8] as before."""
+    @pytest.mark.parametrize("node", ["image", "video"])
+    def test_i2v_without_ref_image_raises_before_transformer(self, node: str, fake_model_root: Path) -> None:
+        """I2V_A14B with no ref_image must fail with an actionable message, not a 16-vs-36 channel error."""
         transformer = _ZeroTransformer()
         ctx = self._build_ctx_with_condition(
             transformer, WanVariantType.I2V_A14B, fake_model_root, condition_tensor=None
         )
 
-        inv = self._make_inv_with_ref(ref_field=None)
-        inv._run_diffusion(ctx)
+        inv = self._make_inv_with_ref(ref_field=None) if node == "image" else _make_video_invocation()
+        with pytest.raises(ValueError, match="needs a Reference Image"):
+            inv._run_diffusion(ctx)
 
-        for h_shape, *_ in transformer.calls:
-            assert h_shape == (1, 16, 1, 8, 8), f"expected unchanged 16-channel input, got {h_shape}"
+        assert transformer.calls == []
+        ctx.models.load.assert_not_called()
 
     def test_variant_gate_rejects_ref_image_on_t2v(self, fake_model_root: Path) -> None:
         """T2V_A14B + ref_image must raise — fast-fail before doing any work."""

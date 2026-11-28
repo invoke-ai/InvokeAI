@@ -3389,6 +3389,16 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
+  // The I2V-A14B transformer needs a reference-frame condition, which the Generate graph has no input for.
+  if (model.base === 'wan' && model.variant === 'i2v_a14b') {
+    issues.push(
+      createUntranslatedGenerationIssue(
+        'Wan 2.2 I2V models need a reference frame. Pick a T2V or TI2V model, or use the Video tab.',
+        MODEL_TARGET
+      )
+    );
+  }
+
   // A persisted list can name a block MOSS-Image lacks; without CFG it has no effect and its field cannot be fixed.
   if (
     model.base === 'moss-image' &&
