@@ -9,6 +9,7 @@ import {
   getProjectGraphUndoEntry,
   isFieldExposed,
   projectGraphReducer,
+  readPersistedProjectGraph,
   updateWorkflowNodes,
 } from './document';
 
@@ -453,5 +454,62 @@ describe('node updates', () => {
 
     expect(value('on-grid')).toBe('90');
     expect(value('off-grid')).toBe('124');
+  });
+
+  it('resizes current_image nodes within bounds and clamps saved project graphs', () => {
+    let doc = createProjectGraph('wf-resize');
+    doc = projectGraphReducer(doc, {
+      node: { data: { label: 'Preview' }, id: 'ci-1', position: { x: 0, y: 0 }, type: 'current_image' },
+      type: 'addNode',
+    });
+
+    const resized = projectGraphReducer(doc, {
+      height: 120,
+      nodeId: 'ci-1',
+      type: 'setCurrentImageNodeSize',
+      width: 2400,
+    });
+    expect(resized.nodes[0]).toEqual({
+      data: { height: 160, label: 'Preview', width: 1600 },
+      id: 'ci-1',
+      position: { x: 0, y: 0 },
+      type: 'current_image',
+    });
+    expect(
+      projectGraphReducer(resized, {
+        height: 160,
+        nodeId: 'ci-1',
+        type: 'setCurrentImageNodeSize',
+        width: 1600,
+      })
+    ).toBe(resized);
+
+    const reset = projectGraphReducer(resized, {
+      height: undefined,
+      nodeId: 'ci-1',
+      type: 'setCurrentImageNodeSize',
+      width: undefined,
+    });
+    expect(reset.nodes[0]).toEqual({
+      data: { label: 'Preview' },
+      id: 'ci-1',
+      position: { x: 0, y: 0 },
+      type: 'current_image',
+    });
+    expect(
+      getProjectGraphUndoEntry({ height: 360, nodeId: 'ci-1', type: 'setCurrentImageNodeSize', width: 480 })
+    ).toEqual({
+      label: 'Resize workflow current image node',
+      mergeKey: 'setCurrentImageNodeSize:ci-1',
+    });
+    // Resetting size earns its own undo step so it never folds into a resize made moments earlier.
+    expect(
+      getProjectGraphUndoEntry({ height: undefined, nodeId: 'ci-1', type: 'setCurrentImageNodeSize', width: undefined })
+    ).toEqual({
+      label: 'Resize workflow current image node',
+    });
+
+    // Persisted documents pass through without reallocating node arrays; sizes are validated on write and clamped on render.
+    expect(readPersistedProjectGraph(resized)).toBe(resized);
   });
 });

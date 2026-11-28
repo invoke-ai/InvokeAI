@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItemKey } from '@features/gallery';
+import type { VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameCopyKeys';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
@@ -11,12 +12,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import {
-  PreviewFrame,
-  type PreviewMediaSource,
-  type PreviewVideoFrameController,
-  type PreviewVideoFrameCopyResult,
-} from './PreviewFrame';
+import { PreviewFrame, type PreviewMediaSource, type PreviewVideoFrameController } from './PreviewFrame';
 import {
   clearVideoSpanPlaybackState,
   consumeVideoSpanPlaybackRequest,
@@ -46,7 +42,7 @@ await i18n.use(initReactI18next).init({
 
 // Preview loads the player with its first video. Loaded up front, it mounts in the render that asks for it, before the
 // element can load media the stubbed tests below stand in for.
-await import('@platform/ui/video-player/VideoPlayer');
+await Promise.all([import('./PreviewVideoFrame'), import('@platform/ui/video-player/VideoPlayer')]);
 
 const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 
@@ -691,9 +687,7 @@ const installSuccessfulCanvas = (): void => {
   });
 };
 
-const copyFrame = (controllerRef: {
-  current: PreviewVideoFrameController | null;
-}): Promise<PreviewVideoFrameCopyResult> => {
+const copyFrame = (controllerRef: { current: PreviewVideoFrameController | null }): Promise<VideoFrameCopyResult> => {
   const controller = controllerRef.current;
 
   expect(controller).not.toBeNull();

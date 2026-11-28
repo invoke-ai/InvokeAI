@@ -4983,6 +4983,8 @@
       "copiedNodes_other": "Copied {{count}} nodes",
       "currentImageEmpty": "No image yet — the latest generation will appear here.",
       "currentImageNode": "Current Image node",
+      "currentImageResetSize": "Reset to default size (currently {{width}} × {{height}} px)",
+      "currentImageResizeHandle": "Resize Current Image node",
       "declaredOutputs": "Declared outputs",
       "description": "Description",
       "details": "Details",

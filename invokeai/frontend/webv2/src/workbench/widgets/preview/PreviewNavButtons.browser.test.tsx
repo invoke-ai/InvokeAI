@@ -30,7 +30,7 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
 });
 // Preview loads the player with its first video; loaded up front, it mounts in the render that asks for it.
-await import('@platform/ui/video-player/VideoPlayer');
+await Promise.all([import('./PreviewVideoFrame'), import('@platform/ui/video-player/VideoPlayer')]);
 
 const neighbor: GalleryItem = {
   boardId: 'none',

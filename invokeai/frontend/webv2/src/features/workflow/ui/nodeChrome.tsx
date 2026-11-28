@@ -3,11 +3,12 @@ import type { FieldType } from '@features/workflow/contracts';
 import type { LucideIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 
-import { Box, Icon, IconButton, ProgressCircle, Spinner } from '@chakra-ui/react';
+import { Box, Icon, IconButton, ProgressCircle, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getFieldTypeColor, isModelFieldType } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { useUnavailableControl } from '@platform/ui/Button';
 import { CheckIcon, InfoIcon, OctagonXIcon, SquareArrowUpIcon, TriangleAlertIcon } from 'lucide-react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 const WorkflowImageExportContext = createContext(false);
 
@@ -278,14 +279,43 @@ export const WorkflowNodeHeaderButton = ({
   children,
   closeOnClick = true,
   content,
+  disabled,
+  unavailableReason,
   ...props
-}: Omit<IconButtonProps, 'content'> & { 'aria-label': string; closeOnClick?: boolean; content: ReactNode }) => (
-  <Tooltip closeOnClick={closeOnClick} content={content} positioning={PANEL_POSITIONING} showArrow>
-    <IconButton {...WORKFLOW_NODE_HEADER_BUTTON_PROPS} {...props}>
-      {children}
-    </IconButton>
-  </Tooltip>
-);
+}: Omit<IconButtonProps, 'content'> & {
+  'aria-label': string;
+  closeOnClick?: boolean;
+  content: ReactNode;
+  unavailableReason?: string;
+}) => {
+  const unavailable = useUnavailableControl(unavailableReason, props['aria-describedby']);
+  const tooltipContent = useMemo(
+    () =>
+      unavailableReason ? (
+        <Stack gap="0">
+          <Text as="div">{content}</Text>
+          <Text color="fg.muted">{unavailableReason}</Text>
+        </Stack>
+      ) : (
+        content
+      ),
+    [content, unavailableReason]
+  );
+
+  return (
+    <Tooltip closeOnClick={closeOnClick} content={tooltipContent} positioning={PANEL_POSITIONING} showArrow>
+      <IconButton
+        {...WORKFLOW_NODE_HEADER_BUTTON_PROPS}
+        {...props}
+        {...unavailable?.props}
+        disabled={unavailable ? undefined : disabled}
+      >
+        {children}
+        {unavailable?.description}
+      </IconButton>
+    </Tooltip>
+  );
+};
 
 export const WorkflowNodeInfoButton = ({
   content,

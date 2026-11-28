@@ -159,6 +159,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
             id: snapshot.activeProject.id,
             isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
             projectGraph: activeWorkflow.document,
+            queueItems: snapshot.activeProject.queue.items,
             workflowValues: getProjectWidgetValues(snapshot.activeProject, 'workflow'),
             workflows: snapshot.activeProject.workflows.entries,
           };

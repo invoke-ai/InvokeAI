@@ -1,9 +1,15 @@
-import type { ProjectGraphState, WorkflowNode } from '@features/workflow/core/types';
+import {
+  clampCurrentImageHeight,
+  clampCurrentImageWidth,
+  type ProjectGraphState,
+  type WorkflowNode,
+} from '@features/workflow/core/types';
 
 /**
- * A workflow's shape for a thumbnail well that has no image: one rect per node, in fractions of a 3:2 well. Node
- * documents carry positions but no measured sizes, so each node kind gets a nominal size (invocation height grows with
- * its inputs). Large graphs keep their full extent but draw an evenly spaced, deterministic subset of nodes.
+ * A workflow's shape for a thumbnail well that has no image: one rect per node, in fractions of a 3:2 well. Most node
+ * documents carry positions without measured sizes, so each node kind gets a nominal size (invocation height grows with
+ * its inputs; `current_image` honors any saved custom dimensions). Large graphs keep their full extent but draw an
+ * evenly spaced, deterministic subset of nodes.
  */
 
 export interface WorkflowSilhouetteRect {
@@ -39,7 +45,10 @@ const getNominalSize = (node: WorkflowNode): { width: number; height: number } =
     case 'notes':
       return { height: 160, width: NOMINAL_NODE_WIDTH };
     case 'current_image':
-      return { height: NOMINAL_NODE_WIDTH, width: NOMINAL_NODE_WIDTH };
+      return {
+        height: clampCurrentImageHeight(node.data.height),
+        width: clampCurrentImageWidth(node.data.width),
+      };
     case 'connector':
       return { height: 40, width: 40 };
   }

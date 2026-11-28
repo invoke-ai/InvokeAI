@@ -255,6 +255,8 @@ export interface QueueItemProgress {
   message: string;
   /** 0..1, or null while indeterminate. */
   percentage: number | null;
+  /** Pinned item's percentage per 1-based batch slot (including saved-workflow child runs). */
+  slotPercentages?: Readonly<Record<number, number | null>>;
   totalItemCount?: number;
 }
 

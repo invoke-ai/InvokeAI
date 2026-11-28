@@ -873,6 +873,7 @@
           "source:src/platform/ui/theme/themes.ts",
           "source:src/platform/ui/toaster.tsx",
           "source:src/platform/ui/useScrollAreaPhantomHeal.ts",
+          "source:src/platform/ui/video-player/videoFrameCopyKeys.ts",
           "source:src/platform/ui/wheelScrollsHorizontally.ts",
           "source:src/platform/ui/widgetOverlayRegistry.ts",
           "source:src/platform/ui/widgetOverlays.ts",

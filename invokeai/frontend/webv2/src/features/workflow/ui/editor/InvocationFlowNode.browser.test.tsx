@@ -14,6 +14,8 @@ import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext, type DragStartEvent } from '@dnd-kit/core';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { galleryImageUrls } from '@features/gallery/utility';
+import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
+import { progressImageStore } from '@features/queue/data/progressImageStore';
 import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
 import { flowThemeCss } from '@features/workflow/ui/graph-preview/flowTheme';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
@@ -29,7 +31,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { applyNodeChanges, ReactFlow, type NodeChange } from '@xyflow/react';
 import { createInstance } from 'i18next';
-import { act, createRef, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  act,
+  createRef,
+  Profiler,
+  startTransition,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, userEvent } from 'vitest/browser';
@@ -54,13 +65,11 @@ declare module 'vitest/browser' {
 }
 
 const exportMocks = vi.hoisted(() => ({
-  progressImage: null as null | { dataUrl: string; height: number; width: number },
   rasterize: vi.fn(),
   translate: ((key: string) => key) as (key: string, options?: Record<string, unknown>) => string,
 }));
 vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
-vi.mock('@features/queue/react', () => ({ useProgressImage: () => exportMocks.progressImage }));
 vi.mock('@features/generation/queries', () => ({
   promptTemplatesQueryOptions: () => ({
     queryFn: () => Promise.resolve([]),
@@ -232,13 +241,29 @@ const preferencesSnapshot = {
   workflowValidateConnections: true,
 };
 const PROJECT_ID = 'project-1';
-const projectSnapshotFor = (graph: ProjectGraphState, galleryValues: Record<string, unknown> = {}) => ({
+const makeTestQueueItem = (id: string, backendItemIds: number[]) => ({
+  backendItemIds,
+  id,
+  snapshot: {
+    destination: 'gallery' as const,
+    graph: { label: 'Workflow' },
+    sourceId: 'workflow' as const,
+    submittedAt: '2026-11-25T00:00:00Z',
+  },
+  status: 'running' as const,
+});
+const projectSnapshotFor = (
+  graph: ProjectGraphState,
+  galleryValues: Record<string, unknown> = {},
+  queueItems: readonly ReturnType<typeof makeTestQueueItem>[] = []
+) => ({
   activeWorkflow: { document: graph },
   activeWorkflowId: graph.id,
   galleryValues,
   id: PROJECT_ID,
   isWorkflowRunning: false,
   projectGraph: graph,
+  queueItems,
   workflowValues: {},
   workflows: [{ document: graph }],
 });
@@ -299,7 +324,8 @@ describe('InvocationFlowNode chrome and export', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     host.remove();
-    exportMocks.progressImage = null;
+    activeProgressTargetStore.clear();
+    progressImageStore.clear();
     await i18n.changeLanguage('en');
   });
 
@@ -1428,7 +1454,8 @@ describe('CurrentImageFlowNode', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     host.remove();
-    exportMocks.progressImage = null;
+    activeProgressTargetStore.clear();
+    progressImageStore.clear();
   });
 
   const image = (name: string) => ({
@@ -1454,15 +1481,19 @@ describe('CurrentImageFlowNode', () => {
           return () => listeners.delete(listener);
         },
       },
-      setGalleryValues: (next: Record<string, unknown>) => {
-        snapshot = projectSnapshotFor(currentImageGraph, next);
+      setGalleryValues: (
+        next: Record<string, unknown>,
+        queueItems: readonly ReturnType<typeof makeTestQueueItem>[] = []
+      ) => {
+        snapshot = projectSnapshotFor(currentImageGraph, next, queueItems);
         listeners.forEach((listener) => listener());
       },
     };
   };
   const render = (
     project: ReturnType<typeof createGalleryProject>,
-    onDragStart: (event: DragStartEvent) => void = () => {}
+    onDragStart: (event: DragStartEvent) => void = () => {},
+    onNodeContextMenu?: (event: React.MouseEvent, node: unknown) => void
   ) =>
     act(() =>
       root.render(
@@ -1475,7 +1506,12 @@ describe('CurrentImageFlowNode', () => {
             <GalleryUiProvider adapter={galleryAdapter}>
               {/* Stands in for the shell's drag context, where gallery items are dragged. */}
               <DndContext onDragStart={onDragStart}>
-                <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+                <ReactFlow
+                  edges={[]}
+                  nodes={currentImageNodes}
+                  nodeTypes={nodeTypes}
+                  onNodeContextMenu={onNodeContextMenu}
+                />
               </DndContext>
             </GalleryUiProvider>
           </WorkflowUiProvider>
@@ -1544,25 +1580,189 @@ describe('CurrentImageFlowNode', () => {
     await act(() => userEvent.click(menuButton()!));
     expect(openItemContextMenu.mock.lastCall![0]).toMatchObject({ x: button.left, y: button.bottom });
 
-    exportMocks.progressImage = { dataUrl: outputImage(1, 1), height: 1, width: 1 };
-    await act(() => project.setGalleryValues({ recentImages: [chosen] }));
+    // Right-clicking the displayed image opens the shared media menu at the pointer.
+    openItemContextMenu.mockClear();
+    const imageEl = host.querySelector<HTMLImageElement>('.react-flow__node img')!;
+    await act(() => {
+      imageEl.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 64, clientY: 72 })
+      );
+    });
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ ref: { kind: 'image', name: 'recent.png' }, x: 64, y: 72 })
+    );
+
+    openItemContextMenu.mockClear();
+    const liveRun = makeTestQueueItem('live-run', [901]);
+    await act(() => {
+      activeProgressTargetStore.markFramed({ itemIndex: 1, queueItemId: 'live-run' });
+      progressImageStore.set(
+        { dataUrl: outputImage(1, 1), height: 1, width: 1 },
+        { itemIndex: 1, queueItemId: 'live-run' }
+      );
+      project.setGalleryValues({ recentImages: [chosen] }, [liveRun]);
+    });
     expect(host.textContent).toContain('Generating');
     expect(menuButton()).toBeNull();
+    const liveImageEl = host.querySelector<HTMLImageElement>('.react-flow__node img')!;
+    await act(() => {
+      liveImageEl.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 64, clientY: 72 })
+      );
+    });
+    expect(openItemContextMenu).not.toHaveBeenCalled();
 
-    exportMocks.progressImage = null;
-    await act(() => project.setGalleryValues({}));
+    await act(() => {
+      activeProgressTargetStore.clear();
+      progressImageStore.clear();
+      project.setGalleryValues({});
+    });
     expect(menuButton()).toBeNull();
   });
 
+  it("opens a selected video's media menu from both the header button and right-click", async () => {
+    await import('@platform/ui/video-player/VideoPlayer');
+    const selectedVideo = {
+      boardId: 'none',
+      category: 'general',
+      createdAt: '2026-11-23T00:00:00Z',
+      durationSeconds: 4,
+      fps: 24,
+      fullUrl: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
+      height: 576,
+      isIntermediate: false,
+      kind: 'video' as const,
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: 'data:image/png;base64,c2F2ZWQ=',
+      width: 1024,
+    };
+    // Mirror WorkflowEditorView.onNodeContextMenu: it opens the node menu only when media did not preventDefault.
+    const nodeMenuOpened = vi.fn();
+    const onNodeContextMenu = vi.fn((event: React.MouseEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      nodeMenuOpened();
+    });
+    const project = createGalleryProject({ selectedImage: selectedVideo });
+    const menuButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Image actions"]');
+    await render(project, undefined, onNodeContextMenu);
+
+    await vi.waitFor(
+      async () => {
+        await act(() => Promise.resolve());
+        expect(host.querySelector('video')).not.toBeNull();
+      },
+      { timeout: 10_000 }
+    );
+
+    await act(() => userEvent.click(menuButton()!));
+    expect(openItemContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' } })
+    );
+
+    openItemContextMenu.mockClear();
+    const video = host.querySelector('video')!;
+    await act(() => {
+      video.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 90 }));
+    });
+    expect(openItemContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 80, y: 90 })
+    );
+
+    // Right-clicking the video drag grip opens the same media menu rather than falling through to workflow-node actions.
+    openItemContextMenu.mockClear();
+    nodeMenuOpened.mockClear();
+    const grip = host.querySelector<HTMLElement>('[data-testid="current-image-media-drag-grip"]')!;
+    const gripEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 95, clientY: 40 });
+    await act(() => {
+      grip.dispatchEvent(gripEvent);
+    });
+    expect(gripEvent.defaultPrevented).toBe(true);
+    expect(nodeMenuOpened).not.toHaveBeenCalled();
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ item: selectedVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 95, y: 40 })
+    );
+
+    // Metadata updates (starred, boardId) refresh the full item passed to the menu without a refetch.
+    openItemContextMenu.mockClear();
+    const starredVideo = { ...selectedVideo, boardId: 'board-2', hasWorkflow: true, starred: true };
+    await act(() => project.setGalleryValues({ selectedImage: starredVideo }));
+    await act(() => {
+      video.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 84, clientY: 92 }));
+    });
+    expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ item: starredVideo, ref: { kind: 'video', name: 'clip.mp4' }, x: 84, y: 92 })
+    );
+
+    // In fullscreen, right-clicking the video preserves the browser menu and stops ReactFlow's node menu from firing.
+    openItemContextMenu.mockClear();
+    onNodeContextMenu.mockClear();
+    nodeMenuOpened.mockClear();
+    const playerRoot = video.parentElement!;
+    const originalFullscreenDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => playerRoot });
+    try {
+      const fullscreenEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 120,
+        clientY: 130,
+      });
+      await act(() => {
+        video.dispatchEvent(fullscreenEvent);
+      });
+      expect(openItemContextMenu).not.toHaveBeenCalled();
+      expect(onNodeContextMenu).not.toHaveBeenCalled();
+      expect(nodeMenuOpened).not.toHaveBeenCalled();
+      expect(fullscreenEvent.defaultPrevented).toBe(false);
+    } finally {
+      if (originalFullscreenDescriptor) {
+        Object.defineProperty(document, 'fullscreenElement', originalFullscreenDescriptor);
+      } else {
+        delete (document as { fullscreenElement?: Element | null }).fullscreenElement;
+      }
+    }
+
+    // Outside the media surface (node resize handle), right-click still reaches workflow-node actions.
+    nodeMenuOpened.mockClear();
+    const resizeHandle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
+    await act(() => {
+      resizeHandle.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 140, clientY: 150 })
+      );
+    });
+    expect(nodeMenuOpened).toHaveBeenCalledOnce();
+  });
+
   it('does not render again for gallery changes that leave the shown image alone', async () => {
-    const renders = vi.spyOn(exportMocks, 'progressImage', 'get');
+    const onRender = vi.fn();
     const project = createGalleryProject({ recentImages: [recent], selectedBoardId: 'a' });
-    await render(project);
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider
+            adapter={
+              { ...createAdapter(createExecutionPort().port), project: project.port } as unknown as WorkflowUiAdapter
+            }
+          >
+            <GalleryUiProvider adapter={galleryAdapter}>
+              <DndContext>
+                <Profiler id="current-image-flow" onRender={onRender}>
+                  <ReactFlow edges={[]} nodes={currentImageNodes} nodeTypes={nodeTypes} />
+                </Profiler>
+              </DndContext>
+            </GalleryUiProvider>
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
     await vi.waitFor(() => expect(shownImage()).toBe(recent.imageUrl));
-    const settled = renders.mock.calls.length;
+    const settled = onRender.mock.calls.length;
 
     await act(() => project.setGalleryValues({ recentImages: [recent], selectedBoardId: 'b', galleryPage: 3 }));
-    expect(renders.mock.calls.length).toBe(settled);
-    renders.mockRestore();
+    expect(onRender.mock.calls.length).toBe(settled);
   });
 });

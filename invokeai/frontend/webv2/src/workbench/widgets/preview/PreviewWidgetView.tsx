@@ -48,6 +48,7 @@ import {
   type StreamingImageSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
+import { VIDEO_FRAME_COPY_FAILURE_KEYS, type VideoFrameCopyResult } from '@platform/ui/video-player/videoFrameCopyKeys';
 import { useQuery } from '@tanstack/react-query';
 import { releaseFocusOnRemoval, useWorkbenchFocus } from '@workbench/focusRegions';
 import {
@@ -82,12 +83,7 @@ import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewDropSurface } from './PreviewDropSurface';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
-import {
-  PreviewFrame,
-  type PreviewMediaSource,
-  type PreviewVideoFrameController,
-  type PreviewVideoFrameCopyResult,
-} from './PreviewFrame';
+import { PreviewFrame, type PreviewMediaSource, type PreviewVideoFrameController } from './PreviewFrame';
 import { previewHeaderStore, previewStageStore, type PreviewZoomCommands } from './previewHeaderStore';
 import { PREVIEW_NAV_STAGE_CSS, PreviewNavButtons } from './PreviewNavButtons';
 import {
@@ -100,18 +96,8 @@ import {
 import { getPreviewStagePadding } from './PreviewStage';
 import { usePreviewNavigation } from './usePreviewNavigation';
 
-/** For the live footer's Details slot, which renders disabled and never fires. */
-const VIDEO_FRAME_COPY_FAILURE_KEYS = {
-  'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
-  'draw-failed': 'widgets.preview.copyCurrentFrameDrawFailed',
-  'encode-failed': 'widgets.preview.copyCurrentFrameEncodeFailed',
-  'not-ready': 'widgets.preview.copyCurrentFrameNotReady',
-  stale: 'widgets.preview.copyCurrentFrameStale',
-  unsupported: 'widgets.preview.copyCurrentFrameUnsupported',
-} as const;
-
 export const getVideoFrameCopyNotice = (
-  result: PreviewVideoFrameCopyResult,
+  result: VideoFrameCopyResult,
   translate: (key: string) => string
 ): { kind: 'error' | 'success'; title: string } =>
   result.ok
@@ -392,7 +378,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const copyCurrentVideoFrame = useCallback(() => {
     const run = async (): Promise<void> => {
       const controller = videoControllerRef.current;
-      let result: PreviewVideoFrameCopyResult;
+      let result: VideoFrameCopyResult;
 
       if (
         contextMenuItem?.kind !== 'video' ||

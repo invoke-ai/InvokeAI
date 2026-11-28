@@ -69,7 +69,7 @@ const createImageItem = (name: string, createdAt: string): GalleryImageItem => (
 
 // Preview loads the player with its first video; loading it up front keeps a slow first transform out of these tests'
 // timing. PreviewFrameLazyPlayer covers the lazy path itself.
-await import('@platform/ui/video-player/VideoPlayer');
+await Promise.all([import('./PreviewVideoFrame'), import('@platform/ui/video-player/VideoPlayer')]);
 
 const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 

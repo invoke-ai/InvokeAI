@@ -487,4 +487,40 @@ describe('persisted collections', () => {
       }).entries[0]
     ).toEqual({ document: collection.entries[0]!.document });
   });
+
+  it('keeps resizing and immediately resetting a current_image node as separate undo steps', () => {
+    let project = session(createProjectGraph('wf-resize-undo'));
+    project = applyProjectWorkflowAction(
+      project,
+      'wf-resize-undo',
+      {
+        node: { data: { label: 'Preview' }, id: 'ci-1', position: { x: 0, y: 0 }, type: 'current_image' },
+        type: 'addNode',
+      },
+      '2026-11-24T00:00:01.000Z'
+    ).project;
+
+    // Resize to 640x480 and reset within the 1.5s undo merge window.
+    project = applyProjectWorkflowAction(
+      project,
+      'wf-resize-undo',
+      { height: 480, nodeId: 'ci-1', type: 'setCurrentImageNodeSize', width: 640 },
+      '2026-11-24T00:00:02.000Z'
+    ).project;
+    project = applyProjectWorkflowAction(
+      project,
+      'wf-resize-undo',
+      { height: undefined, nodeId: 'ci-1', type: 'setCurrentImageNodeSize', width: undefined },
+      '2026-11-24T00:00:02.500Z'
+    ).project;
+
+    expect(getActiveProjectGraph(project).nodes[0]).toMatchObject({ data: { label: 'Preview' }, id: 'ci-1' });
+    expect('width' in getActiveProjectGraph(project).nodes[0]!.data).toBe(false);
+
+    const undone = undoProjectWorkflow(project, 'wf-resize-undo');
+    expect(getActiveProjectGraph(undone).nodes[0]).toMatchObject({
+      data: { height: 480, label: 'Preview', width: 640 },
+      id: 'ci-1',
+    });
+  });
 });

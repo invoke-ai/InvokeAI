@@ -1,4 +1,5 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
+import type { QueueItem } from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkflowLibrarySort, WorkflowLibrarySortDirection } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryCardSize } from '@features/workflow/ui/library/workflowThumbnail';
@@ -51,6 +52,8 @@ export interface WorkflowProjectSnapshot {
   galleryValues: ResolvedValues;
   id: string;
   isWorkflowRunning: boolean;
+  /** Queue items owned by this project, used by live queue session selectors. */
+  queueItems: readonly QueueItem[];
   /** The active workflow's editable document. */
   projectGraph: ProjectGraphState;
   /** The active workflow's entry: its document plus source and run metadata. */

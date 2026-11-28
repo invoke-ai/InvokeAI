@@ -34,7 +34,7 @@ import {
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
 import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
-import { isInvocationNode, isNotesNode } from './types';
+import { isInvocationNode, isNotesNode, normalizeCurrentImageSize } from './types';
 
 const now = (): string => new Date().toISOString();
 
@@ -131,7 +131,7 @@ const METADATA_KEYS = ['author', 'contact', 'description', 'name', 'notes', 'tag
 
 /**
  * Reads a persisted version-2 document. Authored content lacking the editor's structure is refused (`null`), never
- * replaced; only missing metadata strings are filled in.
+ * replaced; missing metadata strings are filled in.
  */
 export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
   if (
@@ -675,6 +675,7 @@ export type ProjectGraphAction =
   | { type: 'setNodePosition'; nodeId: string; position: XYPosition }
   | { type: 'setNodePositions'; positions: Record<string, XYPosition> }
   | { type: 'setNodeLabel'; nodeId: string; label: string }
+  | { type: 'setCurrentImageNodeSize'; nodeId: string; width: number | undefined; height: number | undefined }
   | { type: 'setNodeNotes'; nodeId: string; notes: string }
   | { type: 'setNodeIsOpen'; nodeId: string; isOpen: boolean }
   | { type: 'setNodeIsIntermediate'; nodeId: string; isIntermediate: boolean }
@@ -735,6 +736,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   removeNodes: 'Delete workflow nodes',
   renameWorkflow: 'Rename workflow',
   setContainerLayout: 'Edit workflow form',
+  setCurrentImageNodeSize: 'Resize workflow current image node',
   setFieldDescription: 'Edit workflow field description',
   setFieldLabel: 'Rename workflow field',
   setFieldSeedMode: 'Change workflow seed mode',
@@ -786,6 +788,9 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
       const variant = getGeneratorVariant(action.value);
 
       return variant ? `${action.type}:${action.nodeId}:${action.fieldName}:${variant}` : undefined;
+    case 'setCurrentImageNodeSize':
+      // Resetting to default size is an explicit action, not part of a continuous resize stream.
+      return action.width === undefined && action.height === undefined ? undefined : `${action.type}:${action.nodeId}`;
     case 'setNodeLabel':
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
@@ -1000,6 +1005,29 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'updateNodes': {
       return updateWorkflowNodes(document, action.templates, action.nodeIds).document;
+    }
+    case 'setCurrentImageNodeSize': {
+      const current = document.nodes.find((node) => node.id === action.nodeId);
+      if (!current || current.type !== 'current_image') {
+        return document;
+      }
+      const { height, width } = normalizeCurrentImageSize(action.width, action.height);
+      if (current.data.width === width && current.data.height === height) {
+        return document;
+      }
+      return updateNode(document, action.nodeId, (node) => {
+        if (node.type !== 'current_image') {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            label: node.data.label,
+            ...(height === undefined ? {} : { height }),
+            ...(width === undefined ? {} : { width }),
+          },
+        };
+      });
     }
     case 'setNodeLabel': {
       // Narrowed per branch so TS keeps the node type / data correlation through the spread.
