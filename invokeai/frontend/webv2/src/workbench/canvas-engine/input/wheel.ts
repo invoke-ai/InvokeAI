@@ -1,8 +1,9 @@
 /**
- * Mouse wheel: plain wheel zooms around the cursor, resting on snap points; ctrl+wheel sizes brush/eraser and is
- * otherwise swallowed. Trackpad: plain wheel pans on both axes for every tool; ctrl+wheel, how browsers deliver a
- * pinch, zooms continuously around the cursor. `scrollInput` picks one, or `auto` judges each event (`wheelDevice.ts`);
- * a two-axis event or a pinch proves a trackpad.
+ * Ctrl+wheel or Cmd/meta+wheel steps the brush/eraser size once per event on any device, as the legacy canvas did,
+ * and is otherwise swallowed. Mouse wheel: plain wheel zooms around the cursor, resting on snap points. Trackpad: plain
+ * wheel pans on both axes for every tool; a pinch, which browsers deliver as ctrl+wheel without Control held, zooms
+ * continuously around the cursor. `scrollInput` picks one, or `auto` judges each event (`wheelDevice.ts`); a two-axis
+ * event or a pinch proves a trackpad.
  */
 
 import type { ScalarStore, ScrollInput } from '@workbench/canvas-engine/engineStores';
@@ -22,7 +23,7 @@ export interface WheelHandlerDeps {
   getActiveTool(): Tool | undefined;
   /** Steps the active brush/eraser diameter by one notch (`+1` grow, `-1` shrink). */
   stepActiveBrushSize(direction: 1 | -1): void;
-  /** Inverts ctrl+wheel brush sizing (default false: wheel-up grows); a user preference read fresh per event. */
+  /** Inverts ctrl/cmd+wheel brush sizing (default false: wheel-up grows); a user preference read fresh per event. */
   getInvertBrushSizeScroll(): boolean;
   getScrollInput(): ScrollInput;
   /** The physical Control key; a pinch's ctrl+wheel arrives with it `up` or, right after window focus, `unknown`. */
@@ -106,10 +107,23 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
       if (!event.ctrlKey) {
         deps.onWheelWithoutControl();
       }
-      const sample = classify(event, deps.viewport.getViewportSize(), deps.getControlKeyState());
+      const controlKey = deps.getControlKeyState();
+      const sample = classify(event, deps.viewport.getViewportSize(), controlKey);
       const anchor = screenAnchor(event);
+      const trackpad = routesAsTrackpad(sample);
 
-      if (routesAsTrackpad(sample)) {
+      const pinch = event.ctrlKey && trackpad && controlKey !== 'down';
+
+      if ((event.metaKey || event.ctrlKey) && !pinch) {
+        const tool = deps.getActiveTool();
+        if ((tool?.id === 'brush' || tool?.id === 'eraser') && sample.deltaY !== 0) {
+          const grow = sample.deltaY < 0;
+          deps.stepActiveBrushSize(grow !== deps.getInvertBrushSizeScroll() ? 1 : -1);
+        }
+        return;
+      }
+
+      if (trackpad) {
         if (event.ctrlKey) {
           deps.viewport.zoomAtPoint(deps.viewport.getZoom() * pinchZoomFactor(sample.deltaY), anchor);
         } else {
@@ -117,15 +131,6 @@ export const createWheelInput = (deps: WheelHandlerDeps): WheelInputHandlers => 
           deps.viewport.panBy({ x: -sample.deltaX, y: -sample.deltaY });
         }
         deps.invalidate({ view: true });
-        return;
-      }
-
-      if (event.ctrlKey) {
-        const tool = deps.getActiveTool();
-        if ((tool?.id === 'brush' || tool?.id === 'eraser') && sample.deltaY !== 0) {
-          const grow = sample.deltaY < 0;
-          deps.stepActiveBrushSize(grow !== deps.getInvertBrushSizeScroll() ? 1 : -1);
-        }
         return;
       }
 

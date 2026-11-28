@@ -11,6 +11,7 @@ interface WheelInit {
   ctrlKey?: boolean;
   deltaMode?: number;
   deltaX?: number;
+  metaKey?: boolean;
   wheelDeltaY?: number;
 }
 
@@ -64,6 +65,7 @@ const createHarness = (
       deltaMode: init.deltaMode ?? 0,
       deltaX: init.deltaX ?? 0,
       deltaY,
+      metaKey: init.metaKey ?? false,
       preventDefault: vi.fn(),
       timeStamp,
       wheelDeltaY: init.wheelDeltaY ?? 0,
@@ -100,6 +102,14 @@ describe('wheel input: mouse wheel', () => {
     expect(inverted.stepActiveBrushSize).toHaveBeenCalledWith(-1);
   });
 
+  it('steps the brush size on cmd+wheel, as on macOS', () => {
+    const h = createHarness({ scrollInput: 'mouse' });
+    h.notch(-1, { metaKey: true });
+    h.smooth(4, { metaKey: true });
+    expect(h.stepActiveBrushSize.mock.calls).toEqual([[1], [-1]]);
+    expect(h.wheelZoom).not.toHaveBeenCalled();
+  });
+
   it('swallows ctrl+wheel for other tools', () => {
     const h = createHarness({ scrollInput: 'mouse', tool: 'view' });
     h.notch(-1, { ctrlKey: true });
@@ -118,8 +128,8 @@ describe('wheel input: trackpad', () => {
     expect(h.invalidate).toHaveBeenCalledWith({ view: true });
   });
 
-  it('zooms continuously around the pointer on ctrl+wheel, at most 1.25x per event, without sizing the brush', () => {
-    const h = createHarness({ scrollInput: 'trackpad' });
+  it('zooms continuously around the pointer on a pinch, at most 1.25x per event, without sizing the brush', () => {
+    const h = createHarness({ controlKey: 'up', scrollInput: 'trackpad' });
     const documentUnderPointer = h.viewport.screenToDocument(ANCHOR);
     h.smooth(-10, { ctrlKey: true });
     expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.1), 10);
@@ -131,9 +141,32 @@ describe('wheel input: trackpad', () => {
     expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.1) / 1.25, 10);
     expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
   });
+
+  it('steps the brush size per event on ctrl+scroll with Control held or on cmd+scroll, without panning or zooming', () => {
+    const h = createHarness({ controlKey: 'down', scrollInput: 'trackpad' });
+    h.smooth(-4, { ctrlKey: true });
+    h.smooth(3, { ctrlKey: true, metaKey: true });
+    h.smooth(-4, { metaKey: true });
+    expect(h.stepActiveBrushSize.mock.calls).toEqual([[1], [-1], [1]]);
+    expect(h.viewport.getState()).toEqual({ pan: { x: 0, y: 0 }, zoom: 1 });
+  });
+
+  it('zooms on a pinch made with Cmd held', () => {
+    const h = createHarness({ controlKey: 'up', scrollInput: 'trackpad' });
+    h.smooth(-10, { ctrlKey: true, metaKey: true });
+    expect(h.stepActiveBrushSize).not.toHaveBeenCalled();
+    expect(h.viewport.getZoom()).toBeCloseTo(Math.exp(0.1), 10);
+  });
 });
 
 describe('wheel input: auto', () => {
+  it('sizes the brush on smooth ctrl+wheel with Control held after a trackpad was detected', () => {
+    const h = createHarness({ controlKey: 'down', trackpadDetected: true });
+    h.smooth(-4, { ctrlKey: true });
+    expect(h.stepActiveBrushSize).toHaveBeenCalledWith(1);
+    expect(h.viewport.getZoom()).toBe(1);
+  });
+
   it('zooms on a notch and sizes the brush on ctrl+notch, even after a trackpad was detected', () => {
     const h = createHarness({ trackpadDetected: true });
     h.notch(-1);
