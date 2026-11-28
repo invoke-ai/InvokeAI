@@ -1,0 +1,29 @@
+---
+title: MiniMax H3-Image
+---
+
+MiniMax H3-Image generates images from a prompt and edits images from one or more references. Invoke sends requests to MiniMax's hosted API. Usage is billed by MiniMax.
+
+## Connect MiniMax
+
+Create a key in the [MiniMax API Platform](https://platform.minimax.io/). In Invoke, open **Model Manager**, select **API Keys**, and save the key in the **MiniMax** card.
+
+To configure the key on the server, add it to `api_keys.yaml` in your Invoke root directory and restart Invoke.
+
+```yaml
+external_minimax_api_key: "your-minimax-api-key"
+```
+
+Invoke uses `https://api.minimax.io` by default. For a key from the [MiniMax China platform](https://platform.minimax.cn/), add the following to `api_keys.yaml` and restart Invoke. Use the base URL without `/v1`.
+
+```yaml
+external_minimax_base_url: https://api.minimax.cn
+```
+
+## Generate and edit
+
+Select **MiniMax H3-Image** or **MiniMax H3-Image Highspeed** in **Generate**. Both models use the same MiniMax API key and support the same size and reference settings. Enter a prompt to generate a new image, or add up to 16 reference images to guide an edit. On **Canvas**, an empty frame generates from the prompt. To edit on Canvas, fill the generation frame with an image. Invoke sends the composite as the first input, leaving room for up to 15 additional references.
+
+MiniMax rewrites the prompt by default for text-to-image generation and always rewrites it for image edits. Invoke's generation metadata records the prompt you entered.
+
+Choose a size with at least 655,360 total pixels and an aspect ratio from 1:3 to 3:1. For example, 1024 × 1024 and 1280 × 512 both work. Invoke supports up to 4096 pixels per side in Generate, Canvas, and Workflows. See the [MiniMax image generation guide](https://platform.minimax.io/docs/guides/image-generation) for provider limits.

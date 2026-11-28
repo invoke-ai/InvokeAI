@@ -21,6 +21,7 @@ from invokeai.app.services.external_generation.providers import (
     AlibabaCloudProvider,
     AtlasCloudProvider,
     GeminiProvider,
+    MiniMaxProvider,
     OpenAIProvider,
     SeedreamProvider,
 )
@@ -205,6 +206,7 @@ class ApiDependencies:
                 AlibabaCloudProvider.provider_id: AlibabaCloudProvider(app_config=configuration, logger=logger),
                 AtlasCloudProvider.provider_id: AtlasCloudProvider(app_config=configuration, logger=logger),
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
+                MiniMaxProvider.provider_id: MiniMaxProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),
             },
