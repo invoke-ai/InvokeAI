@@ -93,6 +93,11 @@ class FluxModelLoaderInvocation(BaseInvocation):
                 raise ValueError(f"Unknown model: {key}")
 
         main_config = context.models.get_config(self.model)
+        if not isinstance(main_config, (Checkpoint_Config_Base, Main_SDNQ_Diffusers_FLUX_Config)):
+            raise ValueError(
+                f"The FLUX model loader cannot run {self.model.name}: its format is {main_config.format.value}. "
+                "Supported formats are checkpoint, GGUF, BnB NF4 and SDNQ."
+            )
         self_contained = is_self_contained_sdnq_flux1_pipeline(main_config)
 
         def resolve(selected: ModelIdentifierField | None) -> ModelIdentifierField | None:
@@ -132,13 +137,10 @@ class FluxModelLoaderInvocation(BaseInvocation):
             tokenizer2 = preprocess_t5_tokenizer_model_identifier(t5_source)
             t5_encoder = preprocess_t5_encoder_model_identifier(t5_source)
 
-        transformer_config = main_config
-        assert isinstance(transformer_config, (Checkpoint_Config_Base, Main_SDNQ_Diffusers_FLUX_Config))
-
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder, loras=[]),
             vae=VAEField(vae=vae),
-            max_seq_len=get_flux_max_seq_length(transformer_config.variant),
+            max_seq_len=get_flux_max_seq_length(main_config.variant),
         )

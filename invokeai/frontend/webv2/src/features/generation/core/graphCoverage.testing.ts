@@ -56,6 +56,11 @@ const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape
     { label: 'diffusers', overrides: { format: 'diffusers' } },
     { label: 'standalone-components', overrides: { branch: 'conditional', format: 'checkpoint' } },
   ],
+  // FLUX.1 loads from a single file or a quantized transformer; Generate refuses a plain Diffusers folder.
+  flux: [
+    { label: 'checkpoint', overrides: { format: 'checkpoint' } },
+    { label: 'standalone-components', overrides: { format: 'gguf_quantized' } },
+  ],
   flux2: [
     { label: 'dev-diffusers', overrides: { format: 'diffusers', variant: 'dev' } },
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
@@ -471,13 +476,13 @@ export const sdxlRefinerRecallCase = () => {
 
 export const fluxReduxRecallCase = () => {
   const { model, settings } = recallTunedSettingsFor('flux', {
-    label: 'diffusers-with-redux',
-    overrides: { format: 'diffusers' },
+    label: 'checkpoint-with-redux',
+    overrides: { format: 'checkpoint' },
   });
   const redux: ComponentModelConfig = { base: 'flux', key: 'flux-redux', name: 'FLUX Redux', type: 'flux_redux' };
 
   return {
-    label: 'flux / diffusers-with-redux',
+    label: 'flux / checkpoint-with-redux',
     model,
     settings: {
       ...settings,

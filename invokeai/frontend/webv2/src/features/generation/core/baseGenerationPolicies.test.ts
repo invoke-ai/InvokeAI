@@ -654,6 +654,20 @@ describe('component policies', () => {
     ).not.toContain(reasons()[0]);
   });
 
+  it('blocks a FLUX.1 Diffusers model, which the FLUX.1 loader cannot run, but not its other formats', () => {
+    const issueKeys = (format: string) => {
+      const model = createModel('flux', { format, variant: 'schnell' });
+      const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
+
+      return getGenerateInvocationIssues({ ...settings, model }).map(({ messageKey }) => messageKey);
+    };
+
+    expect(issueKeys('diffusers')).toEqual(['widgets.generate.issues.flux1Diffusers']);
+    for (const format of ['checkpoint', 'gguf_quantized', 'bnb_quantized_nf4b', 'sdnq_quantized']) {
+      expect(issueKeys(format)).toEqual([]);
+    }
+  });
+
   it('holds FLUX Fill to a guidance floor of 25 with the field reason and a one-step fix', () => {
     const model = createModel('flux', { variant: 'dev_fill' });
     const settings = { ...createSettings(model), clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae };
