@@ -76,6 +76,23 @@ Most backend tests live in the [`tests/`](https://github.com/invoke-ai/InvokeAI/
 
 Tests do not download models routinely, and there is no shared helper that installs one. Prefer small CPU fixtures built in the test. A test that needs a real model must be marked `slow` (excluded by default and in CI) and must not download large models unless it is run on purpose. Keep the total number of models the slow tests need low, re-use models other tests already need, and comment why a new one is required.
 
+### Pushes to main reuse the merge queue's results
+
+The merge queue fast-forwards `main` to the commit its group tested, so a push to `main` skips each of `py3.12: linux-cpu`, `macos-default`, `windows-cpu` and `windows-ffmpeg` that already ran its tests on the same commit in the merge-group run (pytest step succeeded); the `merge queue results` job in the push run lists the run that verified them. The two database jobs (`linux-mysql`, `linux-mariadb`) are skipped together, only when both ran their tests there. A job that did not succeed there, or has no merge-group run (a direct push), runs as usual. The Windows ARM64 jobs always run on pushes. A post-merge flake on `main` therefore no longer shows for a skipped job: the identical tree passed in the queue.
+
+### Windows ARM64 in CI
+
+The Windows ARM64 job exercises the lockfile's ARM64 dependency fork and is slow, so it runs in shards, each a disjoint set of test files (`tests/sharding.py`, balanced by the durations in `tests/shard_durations.json`). It runs, with every shard, for every change the Python test filter matches (the filter the other Python jobs use), on pull requests, in the merge queue and on pushes to `main`; `always_run` runs it unconditionally. A maintainer is meant to mark `py3.12: windows-arm64` (not the individual shards) as a required check; once it is, the merge queue blocks on ARM64 for every change that runs the Python tests.
+
+Every shard uploads the durations it measured, but only from a session that exited cleanly. To refresh the balance, download the `shard-durations-*` artifacts of a run on `main` or in the merge queue where every shard passed (artifacts of a fork's pull request are written by that pull request's code), and merge them into `tests/shard_durations.json` from the repository root. The merge updates the existing entries and drops files that no longer exist:
+
+```bash
+gh run download <run-id> --pattern 'shard-durations-*' --dir <dir>
+uv run --no-sync python -m tests.sharding <dir>/*/*.json
+```
+
+`--shard=K/4` reproduces CI's shard only on Windows ARM64 with the same lockfile: some files skip themselves at import there (for example `test_umap_import.py`), and the partition depends on the set of collected files. Anything that narrows the collection (`-k`, `--lf`, paths) changes it as well. To reproduce a failure, run the failing test files named in the job log directly, without `--shard`.
+
 ### Test Coverage
 
 To review test coverage, append `--cov` and the report formats you want to your pytest command:

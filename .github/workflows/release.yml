@@ -47,6 +47,10 @@ jobs:
       always_run: true
 
   python-tests:
+    # `actions: read` is for the called workflow's `merge-queue-results` job, which a called workflow cannot elevate.
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/python-tests.yml
     with:
       always_run: true
