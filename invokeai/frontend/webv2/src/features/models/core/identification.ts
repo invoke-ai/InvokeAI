@@ -13,8 +13,9 @@ export const IDENTIFICATION_BATCH_SIZE = 10;
 
 /**
  * Whether the preview is cheap and useful enough to run without being asked. Probing reads only the header of
- * safetensors and GGUF files but scans and unpickles (without reading tensor data) `.ckpt`/`.pt`/`.bin` ones, and a folder model reads its configs;
- * those wait for the user. An Unknown record is always worth a look: that is what the preview is for.
+ * safetensors and GGUF files but scans and unpickles `.ckpt`/`.pt`/`.bin` ones (a legacy non-zip pickle is read
+ * whole), and a folder model reads its configs; those wait for the user. An Unknown record is always worth a
+ * look: that is what the preview is for.
  */
 export const shouldAutoIdentify = (model: IdentityFields): boolean => {
   if (model.type === 'unknown') {

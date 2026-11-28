@@ -71,7 +71,8 @@ class ModelManagerServiceBase(ABC):
         """Probe `key`'s files as `reidentify_model` would and report the record it would write, without writing
         anything or touching caches. The files are not hashed again, so the proposal carries the stored hash; the
         probe reads a safetensors or GGUF file's header and a pickled checkpoint (.ckpt, .pt, .bin) by a pickle
-        scan and a meta-device load that skips the tensor data.
+        scan and a meta-device load. That skips the tensor data of a zip checkpoint; a legacy non-zip pickle is
+        streamed through and scanned whole.
 
         Raises `UnknownModelException` for an unknown key, and `InvalidModelException` when the files are missing
         or unreadable. Files no model class accepts are not an error: `proposed` is None and `refusal` says why a

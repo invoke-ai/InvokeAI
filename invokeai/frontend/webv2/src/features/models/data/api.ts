@@ -118,7 +118,10 @@ export const getModelIdentification = async (key: string, signal?: AbortSignal):
     })
   );
 
-/** Preview several models at once; the backend accepts at most 100 keys per request. A key that cannot be previewed fails alone. */
+/**
+ * Preview several models at once; the backend accepts at most 100 keys per request. A key that cannot be previewed
+ * fails alone.
+ */
 export const bulkGetModelIdentification = async (
   keys: string[],
   signal?: AbortSignal

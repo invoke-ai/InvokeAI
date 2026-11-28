@@ -499,7 +499,9 @@ def get_model_identification(
     """Preview what reidentifying a model would do, without changing anything.
 
     Probing reads the model's files: only the header for safetensors and GGUF, but a pickle scan and a
-    meta-device torch.load (no tensor data) for .ckpt/.pt/.bin. It takes no claim on the key, because nothing is written.
+    meta-device torch.load for .ckpt/.pt/.bin. That skips the tensor data of a zip checkpoint, while a legacy
+    non-zip pickle is streamed through torch.load and scanned whole. It takes no claim on the key, because nothing
+    is written.
     """
     try:
         preview = ApiDependencies.invoker.services.model_manager.identify_model(key)
