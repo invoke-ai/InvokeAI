@@ -353,7 +353,7 @@ def test_flux2_overlapping_applications_do_not_mutate_cached_adapter(tmp_path, s
     }
     with ExitStack() as first_stack:
         patches = Flux2DenoiseInvocation._materialize_lora_patches(invocation, context, first_stack)
-        [(leaf, _, _)] = LayerPatcher._leaf_placements(patches[0][0].layers[key])
+        [(leaf, _)] = LayerPatcher.tensor_placements(patches[0][0].layers[key])
         assert leaf is not shared and leaf.up is original_up
         first_stack.enter_context(LayerPatcher.apply_smart_model_patches(model=first, patches=patches, **args))
         if not sidecar:

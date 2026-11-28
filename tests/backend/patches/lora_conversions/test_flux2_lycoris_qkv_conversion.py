@@ -1,10 +1,13 @@
 import math
+from unittest.mock import MagicMock
 
 import accelerate
 import pytest
 import torch
 from diffusers import Flux2Transformer2DModel
 
+import invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils as bfl_conversion
+from invokeai.backend.patches.layers.dora_layer import FactorizedDoRALayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch
@@ -12,6 +15,7 @@ from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_uti
     convert_bfl_lora_patch_to_diffusers,
     is_state_dict_likely_in_flux_bfl_peft_format,
     lora_model_from_flux2_bfl_peft_state_dict,
+    lora_model_from_flux_bfl_peft_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     lora_model_from_flux_kohya_state_dict,
@@ -283,3 +287,99 @@ def test_loha_split_preserves_alpha_and_bias(source_format: str) -> None:
 
     assert torch.allclose(torch.cat(actual_weights), expected_weight)
     assert torch.allclose(torch.cat(actual_biases), fused_bias * expected_scale)
+
+
+def _fused_factorized_state_dict(variant: str) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+    """A fused (18, 6) qkv LoKr or LoHa and its update; the LoKr's w1 has 2 rows for `unaligned`, which no third of
+    the rows is a whole number of w2 blocks of."""
+    rank, alpha = 2, torch.tensor(3.0)
+    if variant == "loha":
+        w1_a, w1_b, w2_a, w2_b = (
+            _tensor((18, rank), 0.25),
+            _tensor((rank, 6), 0.5),
+            _tensor((18, rank), 0.75),
+            _tensor((rank, 6), 1.0),
+        )
+        state_dict = {"hada_w1_a": w1_a, "hada_w1_b": w1_b, "hada_w2_a": w2_a, "hada_w2_b": w2_b, "alpha": alpha}
+        return state_dict, (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha.item() / rank)
+    w1_rows = 2 if variant == "lokr_unaligned" else 3
+    w1, w2_a, w2_b = _tensor((w1_rows, 2), 0.25), _tensor((18 // w1_rows, rank), 0.5), _tensor((rank, 3), 0.75)
+    state_dict = {"lokr_w1": w1, "lokr_w2_a": w2_a, "lokr_w2_b": w2_b, "alpha": alpha}
+    return state_dict, torch.kron(w1, w2_a @ w2_b) * (alpha.item() / rank)
+
+
+@pytest.mark.parametrize("source_format", ["bfl", "kohya"])
+@pytest.mark.parametrize("variant", ["lokr_aligned", "lokr_unaligned", "loha"])
+def test_a_fused_qkv_with_an_output_axis_magnitude_splits_exactly(source_format: str, variant: str) -> None:
+    """A row's norm depends on that row alone, so each projection takes its rows of the update and its third of the
+    magnitude and applies exactly what the fused layer would to its rows."""
+    state_dict, update = _fused_factorized_state_dict(variant)
+    magnitude = _tensor((18, 1), 0.5)
+    weight = _tensor((18, 6), -0.5).flip(0)
+    state_dict["dora_scale"] = magnitude
+    target_modules = (
+        "transformer_blocks.0.attn.to_q",
+        "transformer_blocks.0.attn.to_k",
+        "transformer_blocks.0.attn.to_v",
+    )
+
+    patch = _convert_patch(source_format, "img_attn.qkv", state_dict)
+
+    direction = weight.double() + update.double()
+    expected = magnitude.double() * direction / direction.norm(dim=1, keepdim=True) - weight.double()
+    split_layers = [patch.layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}{key}"] for key in target_modules]
+    assert all(isinstance(layer, FactorizedDoRALayer) for layer in split_layers)
+    actual = torch.cat(
+        [
+            layer.get_parameters({"weight": weight[6 * i : 6 * (i + 1)]}, weight=1.0)["weight"]
+            for i, layer in enumerate(split_layers)
+        ]
+    )
+    torch.testing.assert_close(actual.double(), expected, rtol=1e-4, atol=1e-5)
+
+
+@pytest.mark.parametrize("variant", ["lokr_aligned", "loha"])
+def test_fused_qkv_layers_with_an_input_axis_magnitude_apply_as_the_plain_layer_with_one_warning(
+    variant: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An input-axis norm runs over the rows of all three projections, which the split cannot reproduce. The image
+    and the text projection of a block both have one; the conversion warns once, with their count."""
+    layer_state_dict, update = _fused_factorized_state_dict(variant)
+    layer_state_dict["dora_scale"] = _tensor((1, 6), 0.5)
+    state_dict = {
+        f"diffusion_model.double_blocks.0.{name}.{suffix}": value
+        for name in ("img_attn.qkv", "txt_attn.qkv")
+        for suffix, value in layer_state_dict.items()
+    }
+    warning = MagicMock()
+    monkeypatch.setattr(bfl_conversion.logger, "warning", warning)
+
+    patch = lora_model_from_flux2_bfl_peft_state_dict(state_dict)
+
+    assert len(patch.layers) == 6
+    assert all(type(layer) in (LoKRLayer, LoHALayer) for layer in patch.layers.values())
+    warning.assert_called_once()
+    assert warning.call_args.args[0].startswith("2 LoKr/LoHa layer(s)")
+    actual = torch.cat(
+        [layer.get_parameters({"weight": torch.empty(6, 6)}, weight=1.0)["weight"] for layer in patch.layers.values()][
+            :3
+        ]
+    )
+    torch.testing.assert_close(actual, update)
+
+
+def test_the_input_axis_magnitude_warning_is_once_per_patch_not_per_generation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FLUX.2 converts the cached BFL-keyed patch again for every generation; the warning is about the patch."""
+    layer_state_dict, _ = _fused_factorized_state_dict("lokr_aligned")
+    layer_state_dict["dora_scale"] = _tensor((1, 6), 0.5)
+    state_dict = {f"diffusion_model.double_blocks.0.img_attn.qkv.{suffix}": v for suffix, v in layer_state_dict.items()}
+    warning = MagicMock()
+    monkeypatch.setattr(bfl_conversion.logger, "warning", warning)
+    patch = lora_model_from_flux_bfl_peft_state_dict(state_dict)
+
+    for _ in range(3):
+        convert_bfl_lora_patch_to_diffusers(patch)
+    warning.assert_called_once()
+
+    convert_bfl_lora_patch_to_diffusers(lora_model_from_flux_bfl_peft_state_dict(state_dict))
+    assert warning.call_count == 2

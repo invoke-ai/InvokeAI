@@ -318,6 +318,15 @@ On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layo
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
 on bitsandbytes NF4/LLM.int8 bases.
 
+LyCORIS LoKr and LoHa layers that carry a DoRA magnitude (`dora_wd`, "DoKr" and "DoHa") apply it wherever the file
+loads as LoKr or LoHa: the magnitude normalizes the weight with the update added, as it does for a low-rank DoRA, on
+the same weight formats. The exception is bitsandbytes NF4 and LLM.int8, where such a layer applies without its
+magnitude, as a plain LoKr or LoHa, and a warning says so once. DoKr and DoHa files are refused at install by the
+families whose LoRA column above refuses DoRA files, and by FLUX.3, MOSS-Image and Qwen-Image-2.1, which accept
+low-rank DoRA only. On a fused FLUX.2 QKV projection an output-axis magnitude splits exactly; an
+input-axis one cannot be split across Q, K and V, so that layer applies as a plain LoKr or LoHa and the conversion
+logs one warning with the count of such layers.
+
 Anima's Diffusers PEFT LoRAs share their layer names with other transformers (LTX-2, LTX-Video, CogView4, PixArt,
 Sana and others). A file whose attention widths are not Anima's is not recognized as Anima. If no other supported
 model family matches, it installs as an unknown model. LTX-Video LoRAs without cross-attention key and value layers

@@ -185,7 +185,7 @@ layer is applied. In the plain dotted layout (`transformer_blocks.` or `transfor
 in the Kohya layout (`lora_unet_transformer_blocks_`), LoHA files and LoKR files with factorized matrices
 (`lokr_w1_a`, `lokr_w2_a`) are recognized under that condition too, while LoRAs and LoKR files with whole matrices
 (`lokr_w1`, `lokr_w2`) are recognized as before. A LoHA or LoKR that also carries DoRA magnitudes
-(`dora_scale`) applies without them, as a plain LoHA or LoKR, so it can look different from the trainer's samples.
+(`dora_scale`) applies them, on the same weight formats as DoRA.
 A raw PEFT adapter's strength is set in
 its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
 with rsLoRA, applies at a different strength.

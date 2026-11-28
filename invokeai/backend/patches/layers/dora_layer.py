@@ -1,14 +1,29 @@
+import copy
+import math
 from typing import Dict, Optional
 
 import torch
 
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, patch_tensors, sub_patches
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 from invokeai.backend.util.cast_to_device import cast_to_device
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
+
+_LOW_PRECISION_DTYPES = (torch.float16, torch.bfloat16)
 
 
-class DoRALayer(LoRALayerBase):
-    """A DoRA layer. As defined in https://arxiv.org/pdf/2402.09353.
+class WeightDecomposedLayer(LoRALayerBase):
+    """A weight-decomposed (DoRA) layer: the update ``delta`` and a magnitude ``m`` give
+
+        W' = m * (W + delta) / ||W + delta||
+
+    and the layer's residual is ``W' - W``. Subclasses supply ``delta`` (``_scaled_delta``); the decomposition, the
+    axis the magnitude indexes, the float32 promotion and the application to a module are shared here.
 
     Two mutually-incompatible magnitude conventions exist in the wild, and they differ in *which axis* of the
     ``(out_features, in_features)`` weight the magnitude vector indexes:
@@ -23,7 +38,124 @@ class DoRALayer(LoRALayerBase):
     Applying one convention's magnitude with the other's math silently produces wrong weights, so the orientation
     is carried explicitly. A ``.dora_scale`` can hold either, and its stored shape tells which (see
     ``_dora_scale_is_out_dim``).
+
+    Unlike every other layer applied to a module, this one reads the values of the original weight, so it cannot be
+    applied to a weight that has no readable values (see ``reads_weight_values``).
     """
+
+    def __init__(
+        self,
+        dora_scale: torch.Tensor,
+        alpha: float | None,
+        bias: Optional[torch.Tensor],
+        magnitude_is_out_dim: bool,
+        direction_norm: torch.Tensor | None = None,
+    ):
+        super().__init__(alpha, bias)
+        self.dora_scale = dora_scale
+        # False -> LyCORIS convention (magnitude indexes in_features). True -> PEFT/ai-toolkit convention
+        # (magnitude indexes out_features).
+        self.magnitude_is_out_dim = magnitude_is_out_dim
+        # Application-local shared norm for a split fused input-axis layer; never bound on a cached adapter.
+        self.direction_norm = direction_norm
+
+    @staticmethod
+    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int, in_features: int) -> bool:
+        """Whether a ``.dora_scale`` holds one entry per output row.
+
+        LyCORIS stores ``(out_features, 1)``, or ``(out_features, 1, 1, 1)`` for a conv layer, with
+        ``wd_on_out=True`` (its default) and ``(1, in_features[, 1, 1])`` with ``wd_on_out=False``. The two
+        shapes only coincide when ``out_features == in_features == 1``, where both conventions give the same
+        weight.
+
+        LyCORIS never writes a 1-D scale, so a 1-D one comes from another writer or a squeezed file, and only its
+        length can tell the axis, which needs ``in_features``: ``(out_features,)`` is an output-axis scale when the
+        layer is not square, as PEFT's ``lora_magnitude_vector`` is. On a square layer both lengths are the same and
+        nothing in the file says which axis it indexes; a low-rank ``DoRALayer`` keeps the input-axis reading it has
+        always had, the LyCORIS ``dora_scale`` convention this key comes from. A LoKr or LoHa has no such history and
+        does not guess (see ``FactorizedDoRALayer.from_state_dict_values``).
+        """
+        if dora_scale.dim() == 1:
+            return dora_scale.shape[0] == out_features != in_features
+        return (
+            dora_scale.dim() >= 2
+            and dora_scale.shape[0] == out_features
+            and all(size == 1 for size in dora_scale.shape[1:])
+        )
+
+    def _residual(self, orig_weight: torch.Tensor, delta_v: torch.Tensor, consume_delta: bool = False) -> torch.Tensor:
+        """``W' - W`` for the original weight and the layer's scaled update, both promoted by the caller where a
+        low-precision dtype would round away a small update. With ``consume_delta`` the direction is formed in
+        ``delta_v``'s own storage, which saves a copy of the weight at the peak; the caller must hand over a tensor it
+        made and no longer reads."""
+        # At this point, out_weight is the unnormalized direction matrix.
+        if consume_delta and torch.promote_types(delta_v.dtype, orig_weight.dtype) == delta_v.dtype:
+            out_weight = delta_v.add_(orig_weight)
+        else:
+            out_weight = orig_weight + delta_v
+
+        if self.direction_norm is not None:
+            direction_norm = self.direction_norm
+            dora_scale = self.dora_scale
+        elif self.magnitude_is_out_dim:
+            # PEFT / ai-toolkit: norm over the input dim, one entry per output row.
+            trailing_dims = [1] * (out_weight.dim() - 1)
+            direction_norm = (
+                out_weight.reshape(out_weight.shape[0], -1).norm(dim=1).reshape(out_weight.shape[0], *trailing_dims)
+            )
+            dora_scale = self.dora_scale.reshape(out_weight.shape[0], *trailing_dims)
+        else:
+            # LyCORIS / kohya: norm over the output dim, one entry per input column.
+            # TODO(ryand): Simplify this logic.
+            direction_norm = (
+                out_weight.transpose(0, 1)
+                .reshape(out_weight.shape[1], -1)
+                .norm(dim=1, keepdim=True)
+                .reshape(out_weight.shape[1], *[1] * (out_weight.dim() - 1))
+                .transpose(0, 1)
+            )
+            dora_scale = self.dora_scale
+
+        # A row whose direction is all zeros has no norm to divide by; LyCORIS adds its epsilon for the same reason.
+        # Clamping leaves every other norm bit-identical and that row's result 0 rather than NaN, at any strength.
+        out_weight *= dora_scale / direction_norm.clamp_min(torch.finfo(direction_norm.dtype).eps)
+
+        return out_weight - orig_weight
+
+    @staticmethod
+    def _refuse_unreadable_weight(orig_parameters: dict[str, torch.Tensor]) -> None:
+        if any(p.device.type == "meta" for p in orig_parameters.values()):
+            # If any of the original parameters are on the 'meta' device, we assume this is because the base model is in
+            # a quantization format that doesn't allow easy dequantization.
+            raise RuntimeError(
+                "The base model quantization format (likely bitsandbytes) is not compatible with DoRA patches."
+            )
+
+    @staticmethod
+    def _reshape_to_orig(params: dict[str, torch.Tensor], orig_parameters: dict[str, torch.Tensor]):
+        """Reshape all params to match the original module's shape."""
+        for param_name, param_weight in params.items():
+            orig_param = orig_parameters[param_name]
+            if param_weight.shape != orig_param.shape:
+                params[param_name] = param_weight.reshape(orig_param.shape)
+        return params
+
+    def tensors(self) -> tuple[torch.Tensor | None, ...]:
+        """Every tensor the layer holds, for memory estimates."""
+        raise NotImplementedError()
+
+
+def reads_weight_values(patch: BaseLayerPatch) -> bool:
+    """Whether applying `patch` reads the values of the original weight, rather than only its shape.
+
+    Only a weight-decomposed layer does, so a module whose weight is stored quantized has to dequantize it (or refuse
+    the patch) for exactly these. A wrapper patch reads them if one of its sub-patches does.
+    """
+    return isinstance(patch, WeightDecomposedLayer) or any(reads_weight_values(sub) for sub in sub_patches(patch))
+
+
+class DoRALayer(WeightDecomposedLayer):
+    """A DoRA layer. As defined in https://arxiv.org/pdf/2402.09353: the update is the low-rank ``up @ down``."""
 
     def __init__(
         self,
@@ -35,15 +167,15 @@ class DoRALayer(LoRALayerBase):
         magnitude_is_out_dim: bool = False,
         direction_norm: torch.Tensor | None = None,
     ):
-        super().__init__(alpha, bias)
+        super().__init__(
+            dora_scale=dora_scale,
+            alpha=alpha,
+            bias=bias,
+            magnitude_is_out_dim=magnitude_is_out_dim,
+            direction_norm=direction_norm,
+        )
         self.up = up
         self.down = down
-        self.dora_scale = dora_scale
-        # False -> LyCORIS convention (magnitude indexes in_features). True -> PEFT/ai-toolkit convention
-        # (magnitude indexes out_features).
-        self.magnitude_is_out_dim = magnitude_is_out_dim
-        # Application-local shared norm for a split fused input-axis layer; never bound on a cached adapter.
-        self.direction_norm = direction_norm
 
     @classmethod
     def from_state_dict_values(cls, values: Dict[str, torch.Tensor]):
@@ -53,13 +185,9 @@ class DoRALayer(LoRALayerBase):
         )
 
         up = values["lora_up.weight"]
-        # ``dora_magnitude`` is the PEFT/ai-toolkit out-dim magnitude. ``dora_scale`` can index either axis.
-        if "dora_magnitude" in values:
-            dora_scale = values["dora_magnitude"]
-            magnitude_is_out_dim = True
-        else:
-            dora_scale = values["dora_scale"]
-            magnitude_is_out_dim = cls._dora_scale_is_out_dim(dora_scale, out_features=up.shape[0])
+        dora_scale, magnitude_is_out_dim = _magnitude_from_values(
+            values, out_features=up.shape[0], in_features=values["lora_down.weight"].shape[1]
+        )
 
         layer = cls(
             up=up,
@@ -88,21 +216,6 @@ class DoRALayer(LoRALayerBase):
 
         return layer
 
-    @staticmethod
-    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int) -> bool:
-        """Whether a ``.dora_scale`` holds one entry per output row.
-
-        LyCORIS stores ``(out_features, 1)``, or ``(out_features, 1, 1, 1)`` for a conv layer, with
-        ``wd_on_out=True`` (its default) and ``(1, in_features[, 1, 1])`` with ``wd_on_out=False``. The two
-        shapes only coincide when ``out_features == in_features == 1``, where both conventions give the same
-        weight. A 1-D scale has no axis to tell from, so it keeps the input-axis reading.
-        """
-        return (
-            dora_scale.dim() >= 2
-            and dora_scale.shape[0] == out_features
-            and all(size == 1 for size in dora_scale.shape[1:])
-        )
-
     def _rank(self) -> int:
         return self.down.shape[0]
 
@@ -111,7 +224,7 @@ class DoRALayer(LoRALayerBase):
 
         # Form the direction and residual in float32 so low-precision rounding cannot erase a small update.
         up, down = self.up, self.down
-        if orig_weight.dtype in (torch.float16, torch.bfloat16) or up.dtype in (torch.float16, torch.bfloat16):
+        if orig_weight.dtype in _LOW_PRECISION_DTYPES or up.dtype in _LOW_PRECISION_DTYPES:
             orig_weight = orig_weight.float()
             up, down = up.float(), down.float()
 
@@ -121,34 +234,18 @@ class DoRALayer(LoRALayerBase):
 
         delta_v = delta_v * self.scale()
 
-        # At this point, out_weight is the unnormalized direction matrix.
-        out_weight = orig_weight + delta_v
+        return self._residual(orig_weight, delta_v)
 
-        if self.direction_norm is not None:
-            direction_norm = self.direction_norm
-            dora_scale = self.dora_scale
-        elif self.magnitude_is_out_dim:
-            # PEFT / ai-toolkit: norm over the input dim, one entry per output row.
-            trailing_dims = [1] * (out_weight.dim() - 1)
-            direction_norm = (
-                out_weight.reshape(out_weight.shape[0], -1).norm(dim=1).reshape(out_weight.shape[0], *trailing_dims)
-            )
-            dora_scale = self.dora_scale.reshape(out_weight.shape[0], *trailing_dims)
-        else:
-            # LyCORIS / kohya: norm over the output dim, one entry per input column.
-            # TODO(ryand): Simplify this logic.
-            direction_norm = (
-                out_weight.transpose(0, 1)
-                .reshape(out_weight.shape[1], -1)
-                .norm(dim=1, keepdim=True)
-                .reshape(out_weight.shape[1], *[1] * (out_weight.dim() - 1))
-                .transpose(0, 1)
-            )
-            dora_scale = self.dora_scale
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
+        self._refuse_unreadable_weight(orig_parameters)
 
-        out_weight *= dora_scale / direction_norm
+        scale = self.scale()
+        params = {"weight": self.get_weight(orig_parameters["weight"]) * weight}
+        bias = self.get_bias(orig_parameters.get("bias", None))
+        if bias is not None:
+            params["bias"] = bias * (weight * scale)
 
-        return out_weight - orig_weight
+        return self._reshape_to_orig(params, orig_parameters)
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         if self.direction_norm is not None:
@@ -165,24 +262,178 @@ class DoRALayer(LoRALayerBase):
     def calc_size(self) -> int:
         return super().calc_size() + calc_tensors_size([self.up, self.down, self.dora_scale, self.direction_norm])
 
+    def tensors(self) -> tuple[torch.Tensor | None, ...]:
+        return (self.up, self.down, self.dora_scale, self.bias, self.direction_norm)
+
+
+class FactorizedDoRALayer(WeightDecomposedLayer):
+    """A LoKr or LoHa layer with a DoRA magnitude (LyCORIS ``dora_wd=True``: "DoKr" / "DoHa").
+
+    The update is the wrapped patch's own weight residual (its ``ΔW``, scaled by ``alpha / rank``, in the weight's
+    shape), decomposed like any other DoRA update. The wrapped patch is a ``LoKRLayer`` or ``LoHALayer`` and keeps the
+    factors, alpha and bias, or a ``MergedLayerPatch`` of them for the row ranges of one split fused projection.
+    """
+
+    def __init__(self, layer: BaseLayerPatch, dora_scale: torch.Tensor, magnitude_is_out_dim: bool):
+        # The magnitude stays float32 like the direction norm: the residual is the small difference of two nearly
+        # equal magnitudes, and a low-precision one rounds that difference away.
+        if dora_scale.dtype in _LOW_PRECISION_DTYPES:
+            dora_scale = dora_scale.float()
+        super().__init__(dora_scale=dora_scale, alpha=None, bias=None, magnitude_is_out_dim=magnitude_is_out_dim)
+        self.layer = layer
+
+    @classmethod
+    def from_state_dict_values(
+        cls, layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]
+    ) -> "FactorizedDoRALayer | LoKRLayer | LoHALayer":
+        """`layer`, built from `values` without their magnitude, with the magnitude in `values`.
+
+        A magnitude that fits neither axis of the update's weight would fail in the middle of a generation, or be
+        applied as an elementwise factor; one that fits both (a 1-D vector of a square layer) has no axis to apply on.
+        Either is returned as the plain `layer`, with one warning, as such a layer was applied before magnitudes were
+        read. It is not refused: the loaders of the SD families catch nothing per layer, so one odd layer would fail
+        the whole LoRA. PEFT and ai-toolkit store 1-D output-axis vectors and ComfyUI reads a square 1-D one per output
+        row, but no known writer emits a 1-D ``dora_scale`` for a LoKr or LoHa, so a guess could apply it on the wrong
+        axis."""
+        try:
+            is_out_dim = _factorized_magnitude_axis(layer, values)
+        except ValueError as error:
+            _warn_magnitude_unusable_once(str(error))
+            return layer
+        if is_out_dim is None:
+            size = layer.out_features()
+            _warn_magnitude_unusable_once(
+                f"a 1-D magnitude of length {size} on a square {size}x{size} {type(layer).__name__} fits both the "
+                "output and the input axis, and no known writer emits one"
+            )
+            return layer
+        magnitude = values["dora_magnitude"] if "dora_magnitude" in values else values["dora_scale"]
+        return cls(layer, dora_scale=magnitude, magnitude_is_out_dim=is_out_dim)
+
     def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         if any(p.device.type == "meta" for p in orig_parameters.values()):
-            # If any of the original parameters are on the 'meta' device, we assume this is because the base model is in
-            # a quantization format that doesn't allow easy dequantization.
-            raise RuntimeError(
-                "The base model quantization format (likely bitsandbytes) is not compatible with DoRA patches."
-            )
+            # The weight has no readable values (bitsandbytes NF4 / LLM.int8), so the magnitude cannot be applied.
+            # It applies as the plain inner LoKr/LoHa rather than failing the generation; a low-rank DoRA raises.
+            _warn_magnitude_unreadable_once()
+            return self.layer.get_parameters(orig_parameters, weight)
 
-        scale = self.scale()
-        params = {"weight": self.get_weight(orig_parameters["weight"]) * weight}
-        bias = self.get_bias(orig_parameters.get("bias", None))
-        if bias is not None:
-            params["bias"] = bias * (weight * scale)
+        layer = self.layer
+        factors = _factor_tensors(layer)
+        orig_parameters = {**orig_parameters, "weight": cast_to_device(orig_parameters["weight"], factors[0].device)}
+        # The same float32 promotion as DoRALayer, applied to the factors before their product is formed.
+        promoted = orig_parameters
+        if orig_parameters["weight"].dtype in _LOW_PRECISION_DTYPES or any(
+            t.dtype in _LOW_PRECISION_DTYPES for t in factors
+        ):
+            promoted = {**orig_parameters, "weight": orig_parameters["weight"].float()}
+            layer = copy.copy(layer)
+            layer.to(dtype=torch.float32)
 
-        # Reshape all params to match the original module's shape.
-        for param_name, param_weight in params.items():
-            orig_param = orig_parameters[param_name]
-            if param_weight.shape != orig_param.shape:
-                params[param_name] = param_weight.reshape(orig_param.shape)
+        # The wrapped patch scales its update by its own alpha / rank.
+        delta = layer.get_parameters(promoted, 1.0)
+        # `delta` is the layer's own fresh tensor, which the residual forms its direction in.
+        params = {"weight": self._residual(promoted["weight"], delta.pop("weight"), consume_delta=True) * weight}
+        if "bias" in delta:
+            params["bias"] = delta["bias"] * weight
 
-        return params
+        return self._reshape_to_orig(params, orig_parameters)
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.layer.to(device=device, dtype=dtype)
+        self.dora_scale = self.dora_scale.to(
+            device=device, dtype=torch.float32 if dtype in _LOW_PRECISION_DTYPES else dtype
+        )
+
+    def calc_size(self) -> int:
+        return self.layer.calc_size() + calc_tensors_size([self.dora_scale])
+
+    def tensors(self) -> tuple[torch.Tensor | None, ...]:
+        return (*(tensor for _, _, tensor in patch_tensors(self.layer)), self.dora_scale)
+
+
+_magnitude_ambiguous_warned = False
+
+
+def _warn_magnitude_unusable_once(reason: str) -> None:
+    global _magnitude_ambiguous_warned
+    if not _magnitude_ambiguous_warned:
+        _magnitude_ambiguous_warned = True
+        logger.warning(
+            f"A LoKr/LoHa layer of a LoRA has a DoRA magnitude it cannot apply ({reason}). Its magnitude is ignored, "
+            "and so is that of every layer like it: they apply as plain LoKr/LoHa."
+        )
+
+
+_magnitude_unreadable_warned = False
+
+
+def _warn_magnitude_unreadable_once() -> None:
+    global _magnitude_unreadable_warned
+    if not _magnitude_unreadable_warned:
+        _magnitude_unreadable_warned = True
+        logger.warning(
+            "LoKr/LoHa layers with a DoRA magnitude apply as plain LoKr/LoHa on bitsandbytes-quantized weights: "
+            "the magnitude needs the weight's values, which these formats don't expose."
+        )
+
+
+def _factor_tensors(patch: BaseLayerPatch) -> list[torch.Tensor]:
+    """The factors of a patch and its sub-patches, not a sparse bias."""
+    return [tensor for _, _, tensor in patch_tensors(patch) if not tensor.is_sparse]
+
+
+def _magnitude_from_values(
+    values: Dict[str, torch.Tensor], out_features: int, in_features: int
+) -> tuple[torch.Tensor, bool]:
+    """The magnitude of a layer's state dict values and whether it indexes the output axis. ``dora_magnitude`` is the
+    PEFT/ai-toolkit output-axis magnitude; ``dora_scale`` can index either axis."""
+    if "dora_magnitude" in values:
+        return values["dora_magnitude"], True
+    dora_scale = values["dora_scale"]
+    return dora_scale, WeightDecomposedLayer._dora_scale_is_out_dim(dora_scale, out_features, in_features)
+
+
+def _factorized_magnitude_axis(layer: LoKRLayer | LoHALayer, values: Dict[str, torch.Tensor]) -> bool | None:
+    """Whether the magnitude in `values` indexes the output axis of the weight `layer` updates; None where it fits both
+    (a 1-D vector of a square layer). Raises ``ValueError`` where it fits neither.
+
+    The shapes are those LyCORIS and PEFT write: ``(out, 1[, 1, 1])`` per output row (PEFT's also ``(out,)``) and
+    ``(1, in[, 1, 1])`` per input column. The input axis is matched exactly: a magnitude that merely divides the
+    columns would fail when applied, or scale a column of the wrong group. A 1-D or 2-D per-column magnitude does not
+    exist for a conv whose factors show its kernel (`has_kernel`). Factors that do not show one could still be a
+    conv's, flattened: for them a 4-D magnitude has to split the flattened columns into channels and a square kernel,
+    1x1 included (LyCORIS' input-axis DoRA writes ``(1, channels, 1, 1)`` for an SD1.5 proj_in).
+    """
+    out_features, in_features, has_kernel = layer.out_features(), layer.in_features(), layer.has_kernel()
+    is_peft = "dora_magnitude" in values
+    shape = tuple((values["dora_magnitude"] if is_peft else values["dora_scale"]).shape)
+    per_row = bool(shape) and shape[0] == out_features and all(size == 1 for size in shape[1:])
+    if is_peft:
+        if per_row:
+            return True
+    elif len(shape) == 1:
+        if shape[0] == out_features == in_features:
+            return None
+        if per_row:
+            return True
+        if shape[0] == in_features and not has_kernel:
+            return False
+    elif per_row:
+        return True
+    elif len(shape) == 2:
+        if shape == (1, in_features) and not has_kernel:
+            return False
+    elif len(shape) == 4 and shape[0] == 1 and shape[2:] == (1, 1):
+        channels = shape[1]
+        if has_kernel:
+            if channels == in_features:
+                return False
+        elif in_features % channels == 0:
+            kernel = math.isqrt(in_features // channels)
+            if kernel * kernel == in_features // channels:
+                return False
+    raise ValueError(
+        f"A DoRA magnitude of shape {shape} fits neither axis of the {out_features}x{in_features} weight the "
+        f"{type(layer).__name__} updates: it needs one entry per output row, ({out_features},) or ({out_features}, 1), "
+        f"or per input column, ({in_features},) or (1, {in_features}), in the layouts LyCORIS and PEFT write."
+    )

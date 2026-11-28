@@ -97,7 +97,7 @@ def test_loader_iterator_and_patcher_match_fused_formula_across_bases(tmp_path: 
     placements = [
         (leaf, leaf.up.clone(), leaf.down.clone(), leaf.dora_scale.clone())
         for layer in patch.layers.values()
-        for leaf, _, _ in LayerPatcher._leaf_placements(layer)
+        for leaf, _ in LayerPatcher.tensor_placements(layer)
     ]
     pinned = []
 

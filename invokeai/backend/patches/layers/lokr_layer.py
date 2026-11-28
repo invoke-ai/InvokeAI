@@ -47,6 +47,30 @@ class LoKRLayer(LoRALayerBase):
         else:
             return None
 
+    def out_features(self) -> int:
+        """The output rows of the update: those of kron(w1, w2), whose first operand's rows multiply the second's."""
+        w1_rows = self.w1.shape[0] if self.w1 is not None else self.w1_a.shape[0]  # type: ignore[union-attr]
+        if self.w2 is not None:
+            w2_rows = self.w2.shape[0]
+        elif self.t2 is not None:
+            # Tucker core: w2_a is (rank, rows).
+            w2_rows = self.w2_a.shape[1]  # type: ignore[union-attr]
+        else:
+            w2_rows = self.w2_a.shape[0]  # type: ignore[union-attr]
+        return w1_rows * w2_rows
+
+    def has_kernel(self) -> bool:
+        """Whether the factors show that the update is a conv's, with a kernel: a Tucker core or a 4-D `w2`. Other
+        factors are flattened, and cannot be told from a Linear's."""
+        return self.t2 is not None or (self.w2 is not None and self.w2.dim() == 4)
+
+    def in_features(self) -> int:
+        """The input columns of the update: those of kron(w1, w2), the input channels of a conv whose factors show its
+        kernel (see `has_kernel`) and the flattened columns, kernel included, of one whose factors do not."""
+        w1_cols = self.w1.shape[1] if self.w1 is not None else self.w1_b.shape[1]  # type: ignore[union-attr]
+        w2_cols = self.w2.shape[1] if self.w2 is not None else self.w2_b.shape[1]  # type: ignore[union-attr]
+        return w1_cols * w2_cols
+
     @classmethod
     def from_state_dict_values(
         cls,

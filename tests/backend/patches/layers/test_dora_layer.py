@@ -121,7 +121,8 @@ def test_out_dim_dora_scale_matches_lycoris_wd_on_out_for_conv() -> None:
         ((12, 1), True),  # LyCORIS wd_on_out=True, linear
         ((1, 20, 1, 1), False),  # LyCORIS wd_on_out=False, conv
         ((12, 1, 1, 1), True),  # LyCORIS wd_on_out=True, conv
-        ((20,), False),  # 1-D: no axis to tell from, keeps the input-axis reading
+        ((20,), False),  # 1-D of the input length
+        ((12,), True),  # 1-D of the output length, as PEFT writes a magnitude
     ],
 )
 def test_dora_scale_orientation_follows_its_shape(dora_scale_shape: tuple[int, ...], expected_out_dim: bool) -> None:
@@ -132,3 +133,36 @@ def test_dora_scale_orientation_follows_its_shape(dora_scale_shape: tuple[int, .
         {"lora_up.weight": up, "lora_down.weight": down, "dora_scale": torch.ones(dora_scale_shape)}
     )
     assert layer.magnitude_is_out_dim is expected_out_dim
+
+
+def test_a_square_layers_1d_scale_keeps_the_input_axis_reading() -> None:
+    """Both lengths are the same, and nothing in the file says which axis a 1-D scale indexes: it is read as LyCORIS'
+    `dora_scale` has always been, per input column."""
+    layer = DoRALayer.from_state_dict_values(
+        {"lora_up.weight": torch.ones(6, 2), "lora_down.weight": torch.ones(2, 6), "dora_scale": torch.ones(6)}
+    )
+    assert layer.magnitude_is_out_dim is False
+
+
+@pytest.mark.parametrize("out_axis", [True, False], ids=["out_axis", "in_axis"])
+def test_a_row_of_zero_norm_gives_zero_not_nan(out_axis: bool) -> None:
+    """A base row (or column) of zeros with no update on it has no norm to divide by. Its residual is 0, whatever the
+    strength: NaN would survive a strength of 0 as NaN * 0."""
+    up = torch.randn(4, 2)
+    down = torch.randn(2, 4)
+    weight = torch.randn(4, 4)
+    if out_axis:
+        weight[1] = 0
+        up[1] = 0
+        dora_scale = torch.ones(4, 1)
+    else:
+        weight[:, 1] = 0
+        down[:, 1] = 0
+        dora_scale = torch.ones(1, 4)
+    layer = DoRALayer.from_state_dict_values({"lora_up.weight": up, "lora_down.weight": down, "dora_scale": dora_scale})
+
+    for strength in (1.0, 0.0):
+        residual = layer.get_parameters({"weight": weight}, strength)["weight"]
+        assert torch.isfinite(residual).all()
+        zero_part = residual[1] if out_axis else residual[:, 1]
+        assert torch.equal(zero_part, torch.zeros_like(zero_part))

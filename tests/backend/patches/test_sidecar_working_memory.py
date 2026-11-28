@@ -180,3 +180,19 @@ def test_a_merged_lokr_sidecar_reserves_what_its_forward_allocates(
     weight_copy = _W * _W * torch.float32.itemsize
     excess = (reserved - peak) / weight_copy
     assert -0.1 < excess < 2, (reserved / weight_copy, peak / weight_copy)
+
+
+def test_a_decomposed_lokr_holds_no_spare_copy_of_its_update() -> None:
+    """The magnitude of a LoKr forms the direction in the update's own tensor, so the update the wrapped layer returned
+    does not stay alive beside the direction and the residual as a third weight copy: the peak of one application is
+    two copies, as it was three before."""
+    layer = any_lora_layer_from_state_dict(
+        {"lokr_w1": torch.randn(4, 4), "lokr_w2": torch.randn(_W // 4, _W // 4), "dora_scale": torch.rand(_W, 1) + 1}
+    )
+    weight = torch.randn(_W, _W)
+
+    mode = _PeakAllocation()
+    with torch.no_grad(), mode:
+        layer.get_parameters({"weight": weight}, 1.0)
+
+    assert mode.peak < 2.5 * weight.numel() * weight.element_size()

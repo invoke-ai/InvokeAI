@@ -20,12 +20,13 @@ and is common for FLUX.2 Klein LoRAs.
 """
 
 import re
+import weakref
 from typing import Dict
 
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
@@ -271,11 +272,13 @@ def lora_model_from_flux2_bfl_peft_state_dict(
 
     # Now convert BFL layer names to diffusers naming, splitting fused QKV as needed.
     layers: dict[str, BaseLayerPatch] = {}
+    unsplittable: list[str] = []
     for bfl_key, layer_sd in grouped_state_dict.items():
         layer = any_lora_layer_from_state_dict(layer_sd)
-        diffusers_layers = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer)
+        diffusers_layers = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer, unsplittable)
         for diff_key, diff_layer in diffusers_layers:
             layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}{diff_key}"] = diff_layer
+    _warn_unsplittable_magnitudes(unsplittable)
 
     return ModelPatchRaw(layers=layers)
 
@@ -301,24 +304,45 @@ def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
         return patch
 
     new_layers: dict[str, BaseLayerPatch] = {}
+    unsplittable: list[str] = []
     for layer_key, layer in patch.layers.items():
         if not layer_key.startswith(prefix):
             new_layers[layer_key] = layer
             continue
 
         bfl_key = layer_key[prefix_len:]
-        converted = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer)
+        converted = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer, unsplittable)
         for diff_key, diff_layer in converted:
             new_layers[f"{prefix}{diff_key}"] = diff_layer
+    # Each generation converts the cached patch again; its layers' warning is for the patch, not for every conversion.
+    if patch not in _warned_patches:
+        _warned_patches.add(patch)
+        _warn_unsplittable_magnitudes(unsplittable)
 
     return ModelPatchRaw(layers=new_layers)
 
 
-def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -> list[tuple[str, BaseLayerPatch]]:
+_warned_patches: weakref.WeakSet[ModelPatchRaw] = weakref.WeakSet()
+
+
+def _warn_unsplittable_magnitudes(unsplittable: list[str]) -> None:
+    if unsplittable:
+        logger.warning(
+            f"{len(unsplittable)} LoKr/LoHa layer(s) of a FLUX LoRA apply without their DoRA magnitude: an input-axis "
+            "magnitude cannot be split across the fused Q/K/V projection they train, e.g. "
+            f"'{unsplittable[0]}'. Their update is applied as plain LoKr/LoHa."
+        )
+
+
+def _convert_bfl_layer_patch_to_diffusers(
+    bfl_key: str, layer: BaseLayerPatch, unsplittable: list[str]
+) -> list[tuple[str, BaseLayerPatch]]:
     """Convert a single BFL-named LoRA layer patch to one or more diffusers-named patches.
 
     For simple renames, the layer object is reused. Fused QKV patches remain factorized;
-    input-axis DoRA defers its split until the patcher has the base weights.
+    input-axis DoRA defers its split until the patcher has the base weights. A fused LoKr or LoHa with an
+    input-axis magnitude cannot be split exactly: its name is appended to `unsplittable` and it applies without
+    the magnitude.
     """
     # Double blocks
     m = _DOUBLE_BLOCK_RE.match(bfl_key)
@@ -333,6 +357,7 @@ def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -
                 q_key=f"{diff_prefix}.attn.to_q",
                 k_key=f"{diff_prefix}.attn.to_k",
                 v_key=f"{diff_prefix}.attn.to_v",
+                unsplittable=unsplittable,
             )
         if rest == "txt_attn.qkv":
             return _split_qkv_layer_patch(
@@ -340,6 +365,7 @@ def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -
                 q_key=f"{diff_prefix}.attn.add_q_proj",
                 k_key=f"{diff_prefix}.attn.add_k_proj",
                 v_key=f"{diff_prefix}.attn.add_v_proj",
+                unsplittable=unsplittable,
             )
         # Simple renames
         if rest in _DOUBLE_BLOCK_RENAMES:
@@ -623,14 +649,39 @@ def _split_qkv_lokr_layer(
     return result
 
 
+def _split_qkv_factorized_dora_layer(
+    layer: FactorizedDoRALayer,
+    q_key: str,
+    k_key: str,
+    v_key: str,
+    unsplittable: list[str],
+) -> list[tuple[str, BaseLayerPatch]]:
+    """Split a fused QKV LoKr or LoHa with a DoRA magnitude. Output norms are row-local, so each projection is its
+    third of the update with its third of the magnitude. An input-axis magnitude normalizes across the rows of all
+    three projections, which needs their base weights; that update applies as the plain LoKr or LoHa instead, and
+    `q_key` is appended to `unsplittable`."""
+    parts = _split_qkv_layer_patch(layer.layer, q_key=q_key, k_key=k_key, v_key=v_key, unsplittable=unsplittable)
+    if not layer.magnitude_is_out_dim:
+        unsplittable.append(q_key)
+        return parts
+    magnitudes = layer.dora_scale.reshape(-1).chunk(3)
+    return [
+        (key, FactorizedDoRALayer(part, dora_scale=magnitude, magnitude_is_out_dim=True))
+        for (key, part), magnitude in zip(parts, magnitudes, strict=True)
+    ]
+
+
 def _split_qkv_layer_patch(
     layer: BaseLayerPatch,
     q_key: str,
     k_key: str,
     v_key: str,
+    unsplittable: list[str],
 ) -> list[tuple[str, BaseLayerPatch]]:
     if isinstance(layer, DoRALayer):
         return _split_qkv_dora_layer(layer, q_key=q_key, k_key=k_key, v_key=v_key)
+    if isinstance(layer, FactorizedDoRALayer):
+        return _split_qkv_factorized_dora_layer(layer, q_key=q_key, k_key=k_key, v_key=v_key, unsplittable=unsplittable)
     if isinstance(layer, LoRALayer):
         return _split_qkv_lora_layer(layer, q_key=q_key, k_key=k_key, v_key=v_key)
     if isinstance(layer, LoHALayer):

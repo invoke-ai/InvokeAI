@@ -126,5 +126,6 @@ in RAM.
   Sizes, starter models and measured speeds are on each model family's page.
 - **LoRAs** run beside the quantized layers rather than being merged into them, so a LoRA works on every format; DoRA
   patches work wherever the weight can be dequantized (GGUF, SDNQ, int8, nvfp4, fp8) and fail on bitsandbytes NF4 and
-  LLM.int8. DoRA layers on a quantized transformer dequantize their weight again on every step, so they are slower than plain LoRA layers: with a 400-layer DoRA LoRA, Anima-2.9B int8 denoises 1024² in 30 steps in about 30 s, against 18 s with the same LoRA as plain LoRA.
+  LLM.int8. LoKr and LoHa layers with a DoRA magnitude dequantize likewise; on NF4 and LLM.int8 they apply without
+  the magnitude, as plain LoKr or LoHa. DoRA layers on a quantized transformer dequantize their weight again on every step, so they are slower than plain LoRA layers: with a 400-layer DoRA LoRA, Anima-2.9B int8 denoises 1024² in 30 steps in about 30 s, against 18 s with the same LoRA as plain LoRA.
 - On a GPU, every format works with Low-VRAM mode, which streams from RAM whatever doesn't fit in VRAM.

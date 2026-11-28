@@ -14,8 +14,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.dora_layer import DoRALayer, FactorizedDoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
@@ -382,6 +383,16 @@ def _has_dora_patch(patches: list[tuple[BaseLayerPatch, float]]) -> bool:
     return any(isinstance(patch, DoRALayer) for patch, _ in patches)
 
 
+def _skip_factorized_dora_on_bnb(
+    quantized_linear_layer: torch.nn.Module, patches: list[tuple[BaseLayerPatch, float]]
+) -> None:
+    """A LoKr/LoHa magnitude is not applied on bitsandbytes weights, so their output differs from the dense one."""
+    if _is_bnb_quantized_linear(quantized_linear_layer) and any(
+        isinstance(patch, FactorizedDoRALayer) for patch, _ in patches
+    ):
+        pytest.skip("LoKr/LoHa layers with a DoRA magnitude apply without it on bitsandbytes weights")
+
+
 def _is_bnb_quantized_linear(layer: torch.nn.Module) -> bool:
     return type(layer).__name__ in {"InvokeLinear8bitLt", "InvokeLinearNF4"}
 
@@ -395,6 +406,8 @@ def _is_bnb_quantized_linear(layer: torch.nn.Module) -> bool:
         "flux_control_lora",
         "single_lokr",
         "single_dora",
+        "single_dokr",
+        "single_doha",
     ]
 )
 def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
@@ -505,6 +518,34 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
         )
         input = torch.randn(1, in_features)
         return ([(dora_layer, 0.7)], input)
+    elif layer_type in ("single_dokr", "single_doha"):
+        # A LoKr / LoHa with a DoRA magnitude reads the original weight like DoRA does.
+        if layer_type == "single_dokr":
+            factors: LoKRLayer | LoHALayer = LoKRLayer(
+                w1=torch.randn(rank, rank) * 0.1,
+                w1_a=None,
+                w1_b=None,
+                w2=torch.randn(out_features // rank, in_features // rank) * 0.1,
+                w2_a=None,
+                w2_b=None,
+                t2=None,
+                alpha=1.0,
+                bias=torch.randn(out_features) * 0.01,
+            )
+        else:
+            factors = LoHALayer(
+                w1_a=torch.randn(out_features, rank) * 0.1,
+                w1_b=torch.randn(rank, in_features) * 0.1,
+                w2_a=torch.randn(out_features, rank) * 0.1,
+                w2_b=torch.randn(rank, in_features) * 0.1,
+                t1=None,
+                t2=None,
+                alpha=1.0,
+                bias=torch.randn(out_features) * 0.01,
+            )
+        layer = FactorizedDoRALayer(factors, dora_scale=torch.ones(1, in_features), magnitude_is_out_dim=False)
+        input = torch.randn(1, in_features)
+        return ([(layer, 0.7)], input)
     else:
         raise ValueError(f"Unsupported layer_type: {layer_type}")
 
@@ -627,6 +668,7 @@ def test_quantized_linear_sidecar_patches(
     patches, input = patch_under_test
 
     linear_layer, quantized_linear_layer = quantized_linear_layer_under_test
+    _skip_factorized_dora_on_bnb(quantized_linear_layer, patches)
     expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
@@ -667,6 +709,7 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
     patches, input = patch_under_test
 
     _, quantized_linear_layer = quantized_linear_layer_under_test
+    _skip_factorized_dora_on_bnb(quantized_linear_layer, patches)
     expect_dora_incompatible = _is_bnb_quantized_linear(quantized_linear_layer) and _has_dora_patch(patches)
 
     # Move everything to the device.
