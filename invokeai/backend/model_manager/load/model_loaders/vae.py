@@ -1,5 +1,6 @@
 """Class for VAE model loading in InvokeAI."""
 
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -63,6 +64,44 @@ _WAN_LAYOUT_MARKER = "decoder.middle.0.residual.0.gamma"
 The same key diffusers' own `infer_diffusers_model_type` keys the Wan VAE off, so a file carrying
 it is one `convert_wan_vae_to_diffusers` knows how to read.
 """
+
+_WAN22_NESTED_BLOCK = re.compile(r"^(encoder|decoder)\.(down|up)samples\.(\d+)\.\2samples\.(\d+)\.(.+)$")
+"""A layer of a Wan 2.2-VAE residual block in the original layout: `encoder.downsamples.<i>.downsamples.<j>.*`."""
+
+_WAN_RESNET_RENAMES = {
+    "residual.0.": "norm1.",
+    "residual.2.": "conv1.",
+    "residual.3.": "norm2.",
+    "residual.6.": "conv2.",
+    "shortcut.": "conv_shortcut.",
+}
+
+
+def _convert_original_wan_vae_to_diffusers(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Convert a Wan VAE in the original layout (Wan 2.1's or Wan 2.2's) to diffusers' `AutoencoderKLWan` keys.
+
+    `convert_wan_vae_to_diffusers` reads only the Wan 2.1 layout. The Wan 2.2-VAE nests each stage's
+    layers one level deeper (`decoder.upsamples.<i>.upsamples.<j>`): its residual layers go to
+    `<i>`'s `resnets.<j>`, its resample layer to `<i>`'s `downsampler` / `upsampler`. Everything
+    else -- input/output convolutions, middle blocks, heads -- has the same names in both versions.
+    """
+    from diffusers.loaders.single_file_utils import convert_wan_vae_to_diffusers
+
+    blocks: dict[str, torch.Tensor] = {}
+    rest: dict[str, torch.Tensor] = {}
+    for key, value in sd.items():
+        match = _WAN22_NESTED_BLOCK.match(key)
+        if match is None:
+            rest[key] = value
+            continue
+        part, direction, block, layer, param = match.groups()
+        prefix = f"{part}.{direction}_blocks.{block}"
+        old = next((old for old in _WAN_RESNET_RENAMES if param.startswith(old)), None)
+        if old is None:
+            blocks[f"{prefix}.{direction}sampler.{param}"] = value
+        else:
+            blocks[f"{prefix}.resnets.{layer}.{_WAN_RESNET_RENAMES[old]}{param[len(old) :]}"] = value
+    return {**convert_wan_vae_to_diffusers(rest), **blocks}
 
 
 def _checkpoint_keys(path: str | Path) -> set[str]:
@@ -383,9 +422,9 @@ class VAELoader(GenericDiffusersLoader):
         from the TI2V-5B VAE checkpoint won't load (channel and shape mismatches
         throughout the encoder + decoder).
 
-        Reads the same formats and follows the same precision policy as `_load_wan_family_vae`: a
-        16-channel file registered under ``wan`` is the VAE Anima also accepts, and must not behave
-        differently for the base it was probed as.
+        Reads the diffusers layout and the original layout ComfyUI repacks ship, and follows the same
+        precision policy as `_load_wan_family_vae`: a 16-channel file registered under ``wan`` is the
+        VAE Anima also accepts, and must not behave differently for the base it was probed as.
         """
         import accelerate
         from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
@@ -396,6 +435,8 @@ class VAELoader(GenericDiffusersLoader):
         dtype = _wan_family_dtype(self._torch_dtype)
         sd = _read_checkpoint(config.path)
         reject_quantized_side_channel(sd, f"Wan VAE checkpoint {Path(config.path).name}")
+        if _WAN_LAYOUT_MARKER in sd:
+            sd = _convert_original_wan_vae_to_diffusers(sd)
 
         for k in list(sd.keys()):
             if sd[k].is_floating_point():

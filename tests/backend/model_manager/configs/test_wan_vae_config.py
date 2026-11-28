@@ -10,6 +10,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.vae import (
+    VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Wan_Config,
@@ -45,6 +46,16 @@ def _wan_vae_state_dict(z_dim: int) -> dict:
     }
 
 
+def _wan_vae_original_layout_state_dict(z_dim: int) -> dict:
+    """Synthetic Wan VAE in the original layout ComfyUI repacks ship (`decoder.conv1`, not `conv_in`)."""
+    return {
+        "decoder.conv1.weight": torch.zeros(384, z_dim, 3, 3, 3),
+        "encoder.downsamples.0.residual.0.gamma": torch.zeros(96, 1, 1, 1),
+        "decoder.middle.0.residual.0.gamma": torch.zeros(384, 1, 1, 1),
+        "decoder.upsamples.0.residual.0.gamma": torch.zeros(384, 1, 1, 1),
+    }
+
+
 class TestZDimDetection:
     def test_detects_16_channel(self):
         assert _wan_vae_z_dim(_wan_vae_state_dict(16)) == 16
@@ -56,6 +67,10 @@ class TestZDimDetection:
         # Some other 5D conv weight (not Wan).
         sd = {"decoder.conv_in.weight": torch.zeros(96, 32, 1, 3, 3)}
         assert _wan_vae_z_dim(sd) is None
+
+    @pytest.mark.parametrize("z_dim", [16, 48])
+    def test_detects_original_layout(self, z_dim: int):
+        assert _wan_vae_z_dim(_wan_vae_original_layout_state_dict(z_dim)) == z_dim
 
     def test_rejects_4d_conv(self):
         # Standard SD/SDXL 4D conv — not Wan.
@@ -127,6 +142,38 @@ class TestVAECheckpointWanConfig:
                     _make_mod(vae_path, state_dict=sd),
                     _build_overrides(vae_path, "junk"),
                 )
+
+
+class TestOriginalLayoutWanVsAnima:
+    """ComfyUI-layout Wan VAEs share Anima's block names; the latent width and filename decide."""
+
+    @pytest.mark.parametrize(
+        ("filename", "z_dim", "wan_latent_channels"),
+        [("wan2.2_vae.safetensors", 48, 48), ("vae.safetensors", 48, 48), ("wan_2.1_vae.safetensors", 16, 16)],
+    )
+    def test_wan_claims_and_anima_refuses(self, filename: str, z_dim: int, wan_latent_channels: int):
+        with TemporaryDirectory() as tmp:
+            vae_path = Path(tmp) / filename
+            vae_path.touch()
+            mod = _make_mod(vae_path, state_dict=_wan_vae_original_layout_state_dict(z_dim))
+
+            cfg = VAE_Checkpoint_Wan_Config.from_model_on_disk(mod, _build_overrides(vae_path, filename))
+            assert cfg.latent_channels == wan_latent_channels
+
+            with pytest.raises(NotAMatchError):
+                VAE_Checkpoint_Anima_Config.from_model_on_disk(mod, _build_overrides(vae_path, filename))
+
+    def test_16_channel_without_wan_in_filename_is_anima(self):
+        with TemporaryDirectory() as tmp:
+            vae_path = Path(tmp) / "qwen_image_vae.safetensors"
+            vae_path.touch()
+            mod = _make_mod(vae_path, state_dict=_wan_vae_original_layout_state_dict(16))
+
+            with pytest.raises(NotAMatchError, match="deferring"):
+                VAE_Checkpoint_Wan_Config.from_model_on_disk(mod, _build_overrides(vae_path, "Anima VAE"))
+
+            cfg = VAE_Checkpoint_Anima_Config.from_model_on_disk(mod, _build_overrides(vae_path, "Anima VAE"))
+            assert cfg.base == BaseModelType.Anima
 
 
 class TestVAEDiffusersWanConfig:

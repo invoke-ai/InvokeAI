@@ -57253,7 +57253,8 @@ export type components = {
          * @description Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).
          *
          *     Distinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,
-         *     Wan2.2-VAE) via the input channel count of ``decoder.conv_in.weight``.
+         *     Wan2.2-VAE) via the input channel count of the first decoder convolution, in
+         *     either the diffusers or the original (ComfyUI) layout.
          */
         VAE_Checkpoint_Wan_Config: {
             /**
