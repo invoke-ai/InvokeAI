@@ -39,7 +39,10 @@ const createItem = ({ kind, name }: GalleryItemRef): GalleryItem => {
     height: 64,
     isIntermediate: false,
     name,
+    colorLabel: null,
     starred: false,
+    rating: 0,
+    rejected: false,
     thumbnailUrl: `/thumbs/${name}`,
     width: 64,
   } as const;
@@ -357,7 +360,7 @@ describe('external generation reveal', () => {
     ['selectedImageName', 'image:other.png'],
     ['selectedImageNames', ['image:other.png']],
     ['semanticSearchText', ''],
-    ['starredOnly', true],
+    ['marksFilter', { flags: ['pick'] }],
   ])('treats a change to %s after arrival as the user navigating', async (key, value) => {
     mocks.readLastSavedOutput.mockImplementation(() => {
       galleryValues = { ...galleryValues, [key]: value };

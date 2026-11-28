@@ -1,4 +1,4 @@
-import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef, GalleryMarks } from '@features/gallery';
 import type * as GalleryMediaUsageModule from '@features/gallery/mediaUsage';
 import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type * as QueueUtilityModule from '@features/queue/utility';
@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => ({
   galleryWidgetsPatchValues: vi.fn(),
   getItemBoardIds: vi.fn((..._args: unknown[]) => new Map<string, string>()),
   getCanvasEngine: vi.fn(),
-  getItemStarred: vi.fn((..._args: unknown[]) => new Map<string, boolean>()),
+  getItemMarks: vi.fn((..._args: unknown[]) => new Map<string, GalleryMarks>()),
   getProject: vi.fn(),
   getSnapshot: vi.fn(),
   getInvocationTemplatesSnapshot: vi.fn<() => InvocationTemplatesSnapshot>(),
@@ -65,7 +65,7 @@ const mocks = vi.hoisted(() => ({
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
   itemMoveToBoard: vi.fn(),
-  itemSetStarred: vi.fn(),
+  itemSetMarks: vi.fn(),
   notificationsAdd: vi.fn(),
   notifyUndoable: vi.fn(),
   onImagesDeleted: vi.fn(),
@@ -74,6 +74,7 @@ const mocks = vi.hoisted(() => ({
     region: 'center',
   })),
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
+  writeGalleryItemMarks: vi.fn((..._args: unknown[]) => ({ rollback: vi.fn(), settle: vi.fn() })),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
   revealLayerProperties: vi.fn(),
@@ -82,7 +83,6 @@ const mocks = vi.hoisted(() => ({
   resolveItem: vi.fn(),
   resolveMediaUsage: vi.fn<(...args: unknown[]) => Promise<GalleryMediaUsageReport>>(),
   checkGalleryMediaUsage: vi.fn(),
-  setStarred: vi.fn(),
 }));
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
@@ -97,14 +97,13 @@ vi.mock('@features/gallery', () => ({
   galleryItemOrganization: {
     delete: (...args: unknown[]) => mocks.itemDelete(...args),
     moveToBoard: (...args: unknown[]) => mocks.itemMoveToBoard(...args),
-    setStarred: (...args: unknown[]) => mocks.itemSetStarred(...args),
+    setMarks: (...args: unknown[]) => mocks.itemSetMarks(...args),
   },
   galleryItems: { resolve: (...args: unknown[]) => mocks.resolveItem(...args) },
   galleryOrganization: {
     addToBoard: (...args: unknown[]) => mocks.addToBoard(...args),
     deleteImages: (...args: unknown[]) => mocks.deleteImages(...args),
     removeFromBoard: (...args: unknown[]) => mocks.removeFromBoard(...args),
-    setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
   galleryVideos: {
@@ -144,11 +143,12 @@ vi.mock('@features/gallery/queries', () => ({
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
   fetchGalleryVideoMetadata: () => Promise.resolve(null),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
-  getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
+  getGalleryItemMarksFromCaches: (...args: unknown[]) => mocks.getItemMarks(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
   invalidateGalleryBoardDestinations: (...args: unknown[]) => mocks.invalidateGalleryBoardDestinations(...args),
   invalidateGalleryItems: (...args: unknown[]) => mocks.invalidateGalleryItems(...args),
   patchGalleryItemCaches: (...args: unknown[]) => mocks.patchGalleryItemCaches(...args),
+  writeGalleryItemMarks: (...args: unknown[]) => mocks.writeGalleryItemMarks(...args),
 }));
 
 vi.mock('@features/models', () => ({
@@ -257,6 +257,9 @@ vi.mock('react-i18next', () => ({
       }
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
+      }
+      if (key.startsWith('widgets.gallery.itemActions.marks.')) {
+        return `${key}:${JSON.stringify(values)}`;
       }
       if (
         key.startsWith('widgets.gallery.itemActions.undoStale.') ||
@@ -377,6 +380,7 @@ const usageReport = (overrides: Partial<GalleryMediaUsageReport> = {}): GalleryM
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getItemMarks.mockReset().mockReturnValue(new Map());
   preferences.confirmImageDeletion = false;
   mocks.resolveMediaUsage.mockResolvedValue(usageReport());
   mocks.requestDeletionConfirmation.mockImplementation(
@@ -808,7 +812,10 @@ describe('video workflow loading', () => {
     isIntermediate: false,
     kind: 'video' as const,
     name: 'clip.mp4',
+    colorLabel: null,
     starred: false,
+    rating: 0 as const,
+    rejected: false,
     thumbnailUrl: '/thumb/clip.mp4',
     width: 512,
   };
@@ -879,42 +886,187 @@ describe('partial image mutation outcomes', () => {
     expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:locked.png'], { boardId: 'board-0' });
   });
 
-  it('stars optimistically before the request and reverts only backend-rejected images', async () => {
-    mocks.itemSetStarred.mockResolvedValue({
-      affectedBoardIds: [],
-      failed: [{ kind: 'image', name: 'locked.png' }],
-      succeeded: [{ kind: 'image', name: 'starred.png' }],
-    });
+  it('marks optimistically before the request and restores only backend-rejected items to their own prior marks', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'kept.png' },
+      { kind: 'video' as const, name: 'locked.mp4' },
+    ];
+    mocks.getItemMarks.mockReturnValue(
+      new Map<string, GalleryMarks>([
+        ['image:kept.png', { colorLabel: null, flag: 'none', rating: 2 }],
+        ['video:locked.mp4', { colorLabel: 'red', flag: 'reject', rating: 0 }],
+      ])
+    );
+    mocks.itemSetMarks.mockResolvedValue({ affectedBoardIds: [], failed: [refs[1]], succeeded: [refs[0]] });
 
     await act(async () => {
-      await actionsRef.current?.setImagesStarred(['starred.png', 'locked.png'], true);
+      await actionsRef.current?.setItemsMarks(refs, { flag: 'pick' });
     });
 
-    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
-      kind: 'star',
-      result: {
-        failed: [],
-        succeeded: [
-          { kind: 'image', name: 'starred.png' },
-          { kind: 'image', name: 'locked.png' },
-        ],
-      },
-      starred: true,
-    });
-    expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.itemSetStarred.mock.invocationCallOrder[0] ?? 0
+    // A bookmark is board data; a pointer mark refetches as soon as nothing else is pending.
+    const refetch = { boards: true, refetchDelayMs: 0 };
+
+    expect(mocks.writeGalleryItemMarks).toHaveBeenNthCalledWith(1, expect.anything(), refs, { flag: 'pick' }, refetch);
+    expect(mocks.writeGalleryItemMarks.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.itemSetMarks.mock.invocationCallOrder[0] ?? 0
     );
-    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:starred.png', 'image:locked.png'], {
+    expect(mocks.itemSetMarks).toHaveBeenCalledWith(refs, { flag: 'pick' }, expect.any(AbortSignal));
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:kept.png', 'video:locked.mp4'], {
+      rejected: false,
       starred: true,
+    });
+    // The write keeps its place for the item that took it and gives the other its own prior flag back.
+    expect(mocks.writeGalleryItemMarks).toHaveBeenCalledOnce();
+    expect(mocks.writeGalleryItemMarks.mock.results[0]?.value.rollback).not.toHaveBeenCalled();
+    expect(mocks.writeGalleryItemMarks.mock.results[0]?.value.settle).toHaveBeenCalledExactlyOnceWith([
+      { patch: { flag: 'reject' }, refs: [refs[1]] },
+    ]);
+    // Its own prior flag, never a blanket inversion; its rating and label were never painted.
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['video:locked.mp4'], {
+      rejected: true,
+      starred: false,
+    });
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(mocks.notifyUndoable).not.toHaveBeenCalled();
+  });
+
+  it('rolls the whole optimistic mark back when the request fails', async () => {
+    const refs = [{ kind: 'image' as const, name: 'a.png' }];
+    mocks.getItemMarks.mockReturnValue(
+      new Map<string, GalleryMarks>([['image:a.png', { colorLabel: 'blue', flag: 'none', rating: 1 }]])
+    );
+    mocks.itemSetMarks.mockRejectedValue(new Error('server down'));
+
+    await act(async () => {
+      await actionsRef.current?.setItemsMarks(refs, { colorLabel: null, rating: 4 });
     });
 
-    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
-    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
-      kind: 'star',
-      result: { failed: [], succeeded: [{ kind: 'image', name: 'starred.png' }] },
-      starred: true,
+    expect(mocks.writeGalleryItemMarks).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      refs,
+      { colorLabel: null, rating: 4 },
+      { boards: false, refetchDelayMs: 0 }
+    );
+    expect(mocks.writeGalleryItemMarks.mock.results[0]?.value.rollback).toHaveBeenCalledOnce();
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+  });
+
+  it('sends an item’s marks in press order, each after the one before it answered', async () => {
+    const ref = { kind: 'image' as const, name: 'a.png' };
+    const other = { kind: 'image' as const, name: 'b.png' };
+    let answerFirst = () => {};
+
+    mocks.itemSetMarks
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answerFirst = () => resolve({ affectedBoardIds: [], failed: [], succeeded: [ref] });
+          })
+      )
+      .mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: [ref] });
+
+    let presses: Promise<void>[] = [];
+
+    await act(async () => {
+      presses = [
+        actionsRef.current!.setItemsMarks([ref], { rating: 3 }, { quiet: true }),
+        actionsRef.current!.setItemsMarks([ref], { rating: 4 }, { quiet: true }),
+        actionsRef.current!.setItemsMarks([other], { rating: 1 }, { quiet: true }),
+      ];
+      await vi.waitFor(() => expect(mocks.itemSetMarks).toHaveBeenCalledTimes(2));
     });
-    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:locked.png'], { starred: false });
+
+    // The other item's mark does not wait; the second press on `a.png` waits for the first to answer.
+    expect(mocks.itemSetMarks.mock.calls.map(([refs, patch]) => [refs, patch])).toEqual([
+      [[ref], { rating: 3 }],
+      [[other], { rating: 1 }],
+    ]);
+
+    await act(async () => {
+      answerFirst();
+      await Promise.all(presses);
+    });
+
+    expect(mocks.itemSetMarks.mock.calls.map(([refs, patch]) => [refs, patch])).toEqual([
+      [[ref], { rating: 3 }],
+      [[other], { rating: 1 }],
+      [[ref], { rating: 4 }],
+    ]);
+    expect(mocks.writeGalleryItemMarks.mock.calls.map(([, , , refetch]) => refetch)).toEqual(
+      Array(3).fill({ boards: false, refetchDelayMs: 1_000 })
+    );
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('offers an Undo that restores each item its own prior marks, skipping items marked since', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'a.png' },
+      { kind: 'image' as const, name: 'b.png' },
+      { kind: 'video' as const, name: 'c.mp4' },
+      { kind: 'image' as const, name: 'already.png' },
+    ];
+    const known = (rating: GalleryMarks['rating']): GalleryMarks => ({ colorLabel: null, flag: 'none', rating });
+    mocks.getItemMarks.mockReturnValue(
+      new Map([
+        ['image:a.png', known(2)],
+        ['image:b.png', known(4)],
+        ['video:c.mp4', known(2)],
+        ['image:already.png', known(5)],
+      ])
+    );
+    mocks.itemSetMarks.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await actionsRef.current?.setItemsMarks(refs, { rating: 5 });
+    });
+
+    expect(mocks.notifyUndoable).toHaveBeenCalledExactlyOnceWith(
+      'widgets.gallery.itemActions.marks.rated:{"count":4,"rating":5}',
+      { onUndo: expect.any(Function), projectId: 'project-1' }
+    );
+
+    // b.png was rated again since; the others still hold this action's 5.
+    mocks.getItemMarks.mockReturnValue(
+      new Map([
+        ['image:a.png', known(5)],
+        ['image:b.png', known(1)],
+        ['video:c.mp4', known(5)],
+        ['image:already.png', known(5)],
+      ])
+    );
+    mocks.itemSetMarks.mockClear();
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    expect(mocks.itemSetMarks.mock.calls.map(([undone, patch]) => [undone, patch])).toEqual([
+      [[refs[0], refs[2]], { rating: 2 }],
+    ]);
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":3,"restored":2}',
+    });
+  });
+
+  it('marks quietly with no success notice or Undo, still reporting a failure', async () => {
+    const refs = [{ kind: 'image' as const, name: 'a.png' }];
+    mocks.itemSetMarks.mockResolvedValueOnce({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await actionsRef.current?.setItemsMarks(refs, { flag: 'reject' }, { quiet: true });
+    });
+
+    expect(mocks.notifyUndoable).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+
+    mocks.itemSetMarks.mockResolvedValueOnce({ affectedBoardIds: [], failed: refs, succeeded: [] });
+    await act(async () => {
+      await actionsRef.current?.setItemsMarks(refs, { flag: 'reject' }, { quiet: true });
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
   });
 });
 
@@ -930,7 +1082,6 @@ type ExpectedItemActions = {
   ): Promise<void>;
   moveItemsToBoard(refs: Array<{ kind: 'image' | 'video'; name: string }>, boardId: string): Promise<void>;
   openItemInPreview(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): void;
-  setItemsStarred(refs: Array<{ kind: 'image' | 'video'; name: string }>, starred: boolean): Promise<void>;
 };
 
 const getItemActions = (): ExpectedItemActions => actionsRef.current as unknown as ExpectedItemActions;
@@ -1415,7 +1566,10 @@ const galleryItem = (kind: GalleryItem['kind'], name: string): GalleryItem => {
     height: 64,
     isIntermediate: false,
     name,
+    colorLabel: null,
     starred: false,
+    rating: 0 as const,
+    rejected: false,
     thumbnailUrl: `/thumb/${name}`,
     width: 64,
   };

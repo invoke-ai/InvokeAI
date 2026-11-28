@@ -341,7 +341,10 @@ const createGalleryImageItem = (name: string, boardId = 'none'): GalleryImageIte
   kind: 'image',
   name,
   sourceQueueItemId: 'backend-gallery',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
   width: 512,
 });
@@ -3653,7 +3656,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
-      values: { searchTerm: '', semanticImageQuery: null, semanticSearchText: null, starredOnly: false },
+      values: { searchTerm: '', semanticImageQuery: null, semanticSearchText: null },
       widgetId: 'gallery',
     });
     state = workbenchReducer(state, { type: 'patchWidgetValues', values: { searchTerm: 'dog' }, widgetId: 'gallery' });

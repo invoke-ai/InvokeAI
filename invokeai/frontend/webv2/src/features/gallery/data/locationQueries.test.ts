@@ -50,7 +50,10 @@ const createItem = (name: string): GalleryItem => ({
   isIntermediate: false,
   kind: 'video',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/videos/${name}/thumbnail`,
   width: 64,
 });

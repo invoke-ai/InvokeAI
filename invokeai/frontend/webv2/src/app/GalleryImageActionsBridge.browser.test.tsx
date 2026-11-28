@@ -46,8 +46,7 @@ vi.mock('@workbench/image-actions', () => ({
       moveItemsToBoard: vi.fn(),
       openItemInNewTab: vi.fn(),
       openItemInPreview: vi.fn(),
-      setItemsStarred: vi.fn(),
-      setImagesStarred: vi.fn(),
+      setItemsMarks: vi.fn(),
     };
   },
 }));
@@ -61,7 +60,10 @@ const loadedImage: GalleryImageItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'loaded.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnail/loaded.png',
   width: 64,
 };

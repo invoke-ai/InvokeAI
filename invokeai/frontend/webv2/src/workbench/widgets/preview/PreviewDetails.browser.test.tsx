@@ -84,7 +84,10 @@ const imageItem: GalleryImageItem = {
   kind: 'image',
   name: 'still.png',
   sourceQueueItemId: 'queue-image',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/still.webp',
   width: 512,
 };
@@ -110,7 +113,10 @@ const videoItem: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'clip.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/clip.webp',
   width: 1920,
 };

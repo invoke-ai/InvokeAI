@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 828036,
+        "brotliBytes": 830774,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 826764,
+        "gzipBytes": 829817,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2144774,
-        "largestAssetRawBytes": 770754,
+        "initialRawBytes": 2152245,
+        "largestAssetRawBytes": 771138,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 117308,
+        "ownedRawBytes": 117327,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -364,15 +364,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1305696,
+        "brotliBytes": 1314759,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1297890,
+        "gzipBytes": 1307761,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3620562,
-        "largestAssetRawBytes": 770754,
+        "initialRawBytes": 3647529,
+        "largestAssetRawBytes": 771138,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 177610,
+        "ownedRawBytes": 179216,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -527,6 +527,7 @@
           "source:src/features/gallery/core/image.ts",
           "source:src/features/gallery/core/imagePaths.ts",
           "source:src/features/gallery/core/items.ts",
+          "source:src/features/gallery/core/marks.ts",
           "source:src/features/gallery/core/mediaCounts.ts",
           "source:src/features/gallery/core/recentImages.ts",
           "source:src/features/gallery/core/selection.ts",

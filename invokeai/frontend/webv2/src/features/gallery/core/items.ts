@@ -1,5 +1,6 @@
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
+import type { GalleryColorLabel, GalleryRating } from './marks';
 import type {
   GalleryImage,
   GalleryOrderDir,
@@ -7,6 +8,8 @@ import type {
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './types';
+
+import { toGalleryColorLabel, toGalleryRating } from './marks';
 
 export type GalleryItemKind = 'image' | 'video';
 
@@ -22,11 +25,15 @@ export type GalleryItemKey = `${GalleryItemKind}:${string}`;
 interface GalleryItemBase {
   boardId: string;
   category: GalleryItemCategory;
+  colorLabel: GalleryColorLabel | null;
   createdAt: string;
   fullUrl: string;
   height: number;
   isIntermediate: boolean;
   name: string;
+  rating: GalleryRating;
+  /** Never true together with `starred`, the bookmark. */
+  rejected: boolean;
   starred: boolean;
   thumbnailUrl: string;
   width: number;
@@ -84,15 +91,6 @@ export const getGalleryViewCategories = (view: GalleryView): GalleryItemCategory
     (category) => galleryViewByCategory[category] === view
   );
 
-export const shouldStarSelection = (items: readonly GalleryItem[], refs: readonly GalleryItemRef[]): boolean => {
-  if (refs.length === 0) {
-    return false;
-  }
-
-  const loadedItemsByKey = new Map(items.map((item) => [toGalleryItemKey(item), item]));
-  return refs.some((ref) => !loadedItemsByKey.get(toGalleryItemKey(ref))?.starred);
-};
-
 export const parseGalleryItemKey = (key: string): GalleryItemRef => {
   const separatorIndex = key.indexOf(':');
   const kind = key.slice(0, separatorIndex);
@@ -141,17 +139,22 @@ export const compareGalleryItems = (
   return direction * compareSqliteBinaryText(a.name, b.name);
 };
 
-type LegacyGalleryImage = GeneratedImageContract & Partial<Pick<GalleryImage, 'boardId' | 'imageCategory' | 'starred'>>;
+type LegacyGalleryImage = GeneratedImageContract &
+  Partial<Pick<GalleryImage, 'boardId' | 'colorLabel' | 'imageCategory' | 'rating' | 'rejected' | 'starred'>>;
 
+/** Records written before marks existed read as unmarked. */
 export const legacyGeneratedImageToGalleryItem = (image: LegacyGalleryImage): GalleryImageItem => ({
   boardId: image.boardId ?? 'none',
   category: image.imageCategory ?? 'general',
+  colorLabel: toGalleryColorLabel(image.colorLabel),
   createdAt: image.createdAt ?? image.queuedAt,
   fullUrl: image.imageUrl,
   height: image.height,
   isIntermediate: false,
   kind: 'image',
   name: image.imageName,
+  rating: toGalleryRating(image.rating),
+  rejected: image.starred !== true && image.rejected === true,
   sourceQueueItemId: image.sourceQueueItemId,
   starred: image.starred ?? false,
   thumbnailUrl: image.thumbnailUrl,
@@ -161,6 +164,7 @@ export const legacyGeneratedImageToGalleryItem = (image: LegacyGalleryImage): Ga
 export const generatedVideoToGalleryItem = (video: GeneratedVideoContract): GalleryVideoItem => ({
   boardId: video.boardId ?? 'none',
   category: video.category,
+  colorLabel: null,
   createdAt: video.createdAt ?? video.queuedAt,
   durationSeconds: video.durationSeconds,
   ...(video.fps === undefined ? {} : { fps: video.fps }),
@@ -170,6 +174,8 @@ export const generatedVideoToGalleryItem = (video: GeneratedVideoContract): Gall
   kind: 'video',
   ...(video.mediaOrigin === undefined ? {} : { mediaOrigin: video.mediaOrigin }),
   name: video.videoName,
+  rating: 0,
+  rejected: false,
   starred: false,
   thumbnailUrl: video.thumbnailUrl,
   width: video.width,
@@ -177,12 +183,15 @@ export const generatedVideoToGalleryItem = (video: GeneratedVideoContract): Gall
 
 export const galleryImageItemToGalleryImage = (item: GalleryImageItem): GalleryImage => ({
   boardId: item.boardId,
+  colorLabel: item.colorLabel,
   createdAt: item.createdAt,
   height: item.height,
   imageCategory: item.category,
   imageName: item.name,
   imageUrl: item.fullUrl,
   queuedAt: item.createdAt,
+  rating: item.rating,
+  rejected: item.rejected,
   sourceQueueItemId: item.sourceQueueItemId ?? 'backend-gallery',
   starred: item.starred,
   thumbnailUrl: item.thumbnailUrl,

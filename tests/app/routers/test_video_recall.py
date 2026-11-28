@@ -94,6 +94,8 @@ def _video_dto(video_name: str, **update: Any) -> VideoDTO:
         updated_at="None",
         is_intermediate=False,
         starred=False,
+        rating=0,
+        rejected=False,
         has_workflow=False,
         video_url=f"/videos/{video_name}",
         thumbnail_url=f"/thumbnails/{video_name}.webp",

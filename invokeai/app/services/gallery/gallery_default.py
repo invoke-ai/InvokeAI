@@ -25,6 +25,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.gallery import Filters
+from invokeai.app.services.shared.media_marks import MarkChanges, MarkFilters
 from invokeai.app.services.shared.media_references import MediaKind, MediaReferences
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import coerce_media_origin
@@ -91,6 +92,7 @@ class GalleryService(GalleryServiceABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> OffsetPaginatedResults[GalleryItem]:
         filters = Filters(
             origin=origin,
@@ -104,6 +106,7 @@ class GalleryService(GalleryServiceABC):
             created_to=created_to,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
         rows, total = self._queries.gallery.page(
             filters,
@@ -131,6 +134,7 @@ class GalleryService(GalleryServiceABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> Optional[GalleryItemLocation]:
         """Finds item's exact rank without building or returning the full name list."""
         filters = Filters(
@@ -145,6 +149,7 @@ class GalleryService(GalleryServiceABC):
             created_to=created_to,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
         row = self._queries.gallery.location(
             filters, kind=kind.value, name=name, descending=order_dir == SQLiteDirection.Descending
@@ -180,6 +185,7 @@ class GalleryService(GalleryServiceABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> GalleryItemNamesResult:
         filters = Filters(
             origin=origin,
@@ -194,6 +200,7 @@ class GalleryService(GalleryServiceABC):
             created_to=created_to,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
         rows, starred_count = self._names(filters, starred_first, order_dir)
         refs = [GalleryItemRef(kind=GalleryItemKind(kind), name=name) for kind, name, _ in rows]
@@ -215,6 +222,7 @@ class GalleryService(GalleryServiceABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> GalleryItemNames:
         filters = Filters(
             origin=origin,
@@ -229,11 +237,22 @@ class GalleryService(GalleryServiceABC):
             created_to=created_to,
             starred=starred,
             media_kind=media_kind,
+            marks=marks,
         )
         rows, starred_count = self._names(filters, starred_first, order_dir)
         # The raw names, deliberately: building one model per row is what made the deprecated variant expensive.
         names = [name for _, name, _ in rows]
         return GalleryItemNames(item_names=names, starred_count=starred_count, total_count=len(names))
+
+    def set_marks(
+        self, image_names: Collection[str], video_names: Collection[str], changes: MarkChanges
+    ) -> tuple[dict[str, Optional[str]], dict[str, Optional[str]]]:
+        def work(q: Queries) -> tuple[dict[str, Optional[str]], dict[str, Optional[str]]]:
+            return q.gallery.set_marks("image", image_names, changes), q.gallery.set_marks(
+                "video", video_names, changes
+            )
+
+        return self._queries.run(work)
 
     def get_dates(self, user_id: Optional[str] = None, is_admin: bool = False) -> list[VirtualSubBoardDTO]:
         counts, covers = self._queries.gallery.date_counts(user_id if user_id is not None and not is_admin else None)
@@ -403,7 +422,23 @@ class GalleryService(GalleryServiceABC):
         )
 
     def _to_item(self, row: Sequence[Any]) -> GalleryItem:
-        kind, name, width, height, category, starred, is_intermediate, board_id, created_at, duration, fps, origin = row
+        (
+            kind,
+            name,
+            width,
+            height,
+            category,
+            starred,
+            is_intermediate,
+            board_id,
+            created_at,
+            duration,
+            fps,
+            rating,
+            rejected,
+            color_label,
+            origin,
+        ) = row
         urls = self.__invoker.services.urls
         item_kind = GalleryItemKind(kind)
         if item_kind == GalleryItemKind.IMAGE:
@@ -421,6 +456,9 @@ class GalleryService(GalleryServiceABC):
             height=height,
             category=ImageCategory(category),
             starred=bool(starred),
+            rating=int(rating),
+            rejected=bool(rejected),
+            color_label=color_label,
             is_intermediate=bool(is_intermediate),
             board_id=board_id,
             created_at=created_at,

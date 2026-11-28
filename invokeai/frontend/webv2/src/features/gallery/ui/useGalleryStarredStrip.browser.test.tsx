@@ -30,7 +30,10 @@ const starred: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'starred.png',
+  colorLabel: null,
   starred: true,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumb/starred.png',
   width: 64,
 };

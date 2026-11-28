@@ -55,7 +55,10 @@ const createItem = (index: number, prefix = 'image'): GalleryItem => ({
   kind: 'image',
   name: `${prefix}-${index}`,
   sourceQueueItemId: 'backend-gallery',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/images/${prefix}-${index}/thumbnail`,
   width: 64,
 });
@@ -148,9 +151,9 @@ describe('Gallery item query read model', () => {
 
       const applyStar = () =>
         patchGalleryItemCaches(client, {
-          kind: 'star',
+          kind: 'marks',
+          patch: { flag: 'pick' },
           result: { failed: [], succeeded: [{ kind: 'image', name: page.items[0]!.name }] },
-          starred: true,
         });
       const rollback = applyStar();
       expect(client.getQueryData<GalleryItemsPage>(options.queryKey)?.items[0]?.starred).toBe(true);

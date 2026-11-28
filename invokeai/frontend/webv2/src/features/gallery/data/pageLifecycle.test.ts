@@ -45,7 +45,10 @@ const createItem = (index: number): GalleryItem => ({
   kind: 'image',
   name: `image-${index}`,
   sourceQueueItemId: 'backend-gallery',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/images/${index}/thumbnail`,
   width: 64,
 });

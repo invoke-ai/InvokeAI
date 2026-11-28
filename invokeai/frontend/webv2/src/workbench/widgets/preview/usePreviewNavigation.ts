@@ -8,6 +8,7 @@ import type {
 } from '@features/gallery';
 import type {
   GalleryItemsPage,
+  GalleryMarksFilter,
   GalleryNavigationEntry,
   GallerySemanticReference,
   getGallerySelectedImageQuery,
@@ -17,7 +18,10 @@ import type { QueueItem, QueueProgressSession } from '@features/queue/contracts'
 
 import {
   compareGalleryItems,
+  getGalleryGridListingMarks,
+  getGalleryStripListingMarks,
   gallerySemanticReferenceKey,
+  isGalleryMarksFilterActive,
   getGalleryItemView,
   getGalleryNavigationStep,
   getGallerySessionNavigationKey,
@@ -167,13 +171,18 @@ const toNeighbor = (entry: GalleryNavigationEntry | null): PreviewNeighbor =>
         : null;
 
 export interface PreviewNavigationState {
-  /** Every saved item the arrows can reach, in order: the starred strip, then the listing. */
+  /** Every saved item the arrows can reach, in order: the Bookmarked strip, then the listing. */
   boardItems: GalleryItem[];
   isLoadingBoard: boolean;
+  /** The marks filter the listing keeps; null under a ranking, which keeps every mark. */
+  listingMarksFilter: GalleryMarksFilter | null;
   /** Resolves true once a step was dispatched; false when there was nowhere to go or the step went stale. */
-  navigate: (offset: -1 | 1) => Promise<boolean>;
+  /** `itemsOnly` passes over in-progress sessions to the next saved item. */
+  navigate: (offset: -1 | 1, options?: { itemsOnly?: boolean }) => Promise<boolean>;
   /** What each step would land on, so a swipe can show it before committing. */
   neighbors: PreviewNeighbors;
+  /** The same over saved items only, as `navigate(offset, { itemsOnly: true })` steps. */
+  itemNeighbors: PreviewNeighbors;
   /** The selection's place in the whole strip-then-listing order (-1 while following live or off the list), and that
    * order's length. */
   position: { index: number; total: number };
@@ -186,7 +195,7 @@ export interface PreviewNavigationState {
   /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
   loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
   selectPreviewItem: (item: GalleryItem) => void;
-  /** How many of `boardItems` lead as the starred strip, ahead of the in-progress sessions. */
+  /** How many of `boardItems` lead as the Bookmarked strip, ahead of the in-progress sessions. */
   stripItemCount: number;
 }
 
@@ -244,9 +253,12 @@ export const usePreviewNavigation = ({
   // Media kind follows the same rule as the ranking: a ranked filmstrip navigates the Gallery's live kind, a listing
   // the stamp's. Host steps stamp exactly what was navigated (see the reducer's getRankingStampFields).
   const navigationMediaKind = navigationSemanticQuery ? galleryMediaKind : selectedImageQuery.mediaKind;
-  // The grid partitions: its listing is unstarred-only, with the starred items in the strip above it, unless the
-  // starred filter is on.
-  const navigationStarredOnly = selectedImageQuery.starredOnly;
+  // Without a flag filter the grid partitions: its listing leaves out bookmarked items, which the strip above it lists.
+  const navigationMarksFilter = selectedImageQuery.marksFilter;
+  const navigationGridMarks = useMemo(() => getGalleryGridListingMarks(navigationMarksFilter), [navigationMarksFilter]);
+  const navigationMarksKey = JSON.stringify(navigationGridMarks);
+  const hasNavigationMarksFilter = isGalleryMarksFilterActive(navigationMarksFilter);
+  const isNavigationStripHidden = getGalleryStripListingMarks(navigationMarksFilter) === null;
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
   const navigationPaginationMode =
     navigationSemanticQuery === null ? selectedImageQuery.paginationMode : galleryPaginationMode;
@@ -259,8 +271,8 @@ export const usePreviewNavigation = ({
   });
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
-  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
-  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationMarksKey}:${navigationSemanticKey}`;
+  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationMarksKey}:${navigationSemanticKey}`;
   const queryClient = useQueryClient();
 
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
@@ -314,8 +326,8 @@ export const usePreviewNavigation = ({
   );
 
   const listingFilterWithStarred = useMemo(
-    () => ({ ...listingFilter, starred: navigationStarredOnly }),
-    [listingFilter, navigationStarredOnly]
+    (): GalleryItemsFilter => ({ ...listingFilter, ...navigationGridMarks }),
+    [listingFilter, navigationGridMarks]
   );
   const selectedPageQuery = useQuery({
     ...galleryItemsPageOptions(listingFilterWithStarred, selectedPageOffset),
@@ -357,10 +369,13 @@ export const usePreviewNavigation = ({
   const listingTotal = selectedPageQuery.data?.total ?? boardPageResults[0]?.data.total;
   const isFetchingBoardItems = selectedPageQuery.isFetching || adjacentPageQueries.some((query) => query.isFetching);
 
-  // Share Gallery's bounded starred strip except for ranked, starred-only, or deep windows.
+  // Share Gallery's bounded Bookmarked strip except for ranked, flag-filtered, or deep windows.
   const hasStrip =
-    hasNavigationContext && !navigationStarredOnly && navigationSemanticQuery === null && !isDeepPageWindow;
-  const { data: stripData } = useQuery({ ...galleryStarredStripOptions(listingFilter), enabled: hasStrip });
+    hasNavigationContext && !isNavigationStripHidden && navigationSemanticQuery === null && !isDeepPageWindow;
+  const { data: stripData } = useQuery({
+    ...galleryStarredStripOptions(listingFilterWithStarred),
+    enabled: hasStrip,
+  });
   const stripItems = useMemo(() => {
     if (!hasStrip) {
       return EMPTY_PREVIEW_ITEMS;
@@ -368,7 +383,7 @@ export const usePreviewNavigation = ({
 
     const items = stripData?.items ?? EMPTY_PREVIEW_ITEMS;
 
-    // A starred selection beyond the strip's bound (the grid hides it behind "Show all") still belongs to the starred
+    // A bookmarked selection beyond the strip's bound (the grid hides it behind "Show all") still belongs to the bookmarked
     // partition: it joins the strip section so the arrows have somewhere to step from.
     return selectedItem?.starred && !items.some((item) => toGalleryItemKey(item) === selectedItemKey)
       ? [...items, selectedItem]
@@ -449,7 +464,7 @@ export const usePreviewNavigation = ({
   const navigationLocalItems = useMemo(() => {
     // Keep recent results until listings catch up, except in filtered or deep windows where they do not belong.
     const hasActiveSearch =
-      navigationStarredOnly || selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined;
+      hasNavigationMarksFilter || selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined;
 
     if (!hasActiveSearch && !isPaginatedWindow && !isDeepPageWindow) {
       return localItems;
@@ -467,8 +482,8 @@ export const usePreviewNavigation = ({
     isDeepPageWindow,
     isFetchingBoardItems,
     isPaginatedWindow,
+    hasNavigationMarksFilter,
     localItems,
-    navigationStarredOnly,
     optimisticQueueItemIds,
     selectedImageSearch,
     selectedItem,
@@ -485,7 +500,7 @@ export const usePreviewNavigation = ({
     [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationMediaKind, navigationOrderDir]
   );
   const previewLocalBoardItems = useMemo(() => {
-    // A recent starred since it landed has moved to the strip.
+    // A recent bookmarked since it landed has moved to the strip.
     const listingLocalItems = hasStrip ? localBoardItems.filter((item) => !item.starred) : localBoardItems;
 
     if (
@@ -504,7 +519,7 @@ export const usePreviewNavigation = ({
       navigationSemanticQuery === null ? previewLocalBoardItems : selectedItem ? [selectedItem] : EMPTY_PREVIEW_ITEMS,
     [navigationSemanticQuery, previewLocalBoardItems, selectedItem]
   );
-  // The listing and the strip refetch independently, so an item just starred can sit on both sides for a moment; the
+  // The listing and the strip refetch independently, so an item just bookmarked can sit on both sides for a moment; the
   // strip keeps it.
   const stripKeys = useMemo(() => new Set(stripItems.map(toGalleryItemKey)), [stripItems]);
   const mergeListingItems = useCallback(
@@ -564,7 +579,7 @@ export const usePreviewNavigation = ({
     [progressSessions]
   );
   const stripEntries = useMemo(() => toItemEntries(stripItems), [stripItems]);
-  // The grid's order: the starred strip it pins at the top, its In progress section, then the listing.
+  // The grid's order: the Bookmarked strip it pins at the top, its In progress section, then the listing.
   const navigationSections = useMemo(
     () => [stripEntries, sessionEntries, toItemEntries(listingItems)],
     [listingItems, sessionEntries, stripEntries]
@@ -686,12 +701,14 @@ export const usePreviewNavigation = ({
 
   // Share navigation between keyboard, footer, and swipe; comparison does not step saved images.
   const navigate = useCallback(
-    (offset: -1 | 1): Promise<boolean> => {
+    (offset: -1 | 1, { itemsOnly = false }: { itemsOnly?: boolean } = {}): Promise<boolean> => {
       if (isComparing || !isAccountScopeCurrent(accountScope)) {
         return Promise.resolve(false);
       }
 
       const direction = offset === 1 ? 'right' : 'left';
+      const getStep = (sections: readonly (readonly GalleryNavigationEntry[])[]) =>
+        getGalleryNavigationStep(sections, cursorKeys, direction, 1, { itemsOnly });
       const isCurrentNavigation = (): boolean =>
         isAccountScopeCurrent(accountScope) && navigationContextKeyRef.current === navigationContextKey;
       const stepTo = (entry: GalleryNavigationEntry | null, pages: typeof boardPageResults): boolean => {
@@ -706,16 +723,14 @@ export const usePreviewNavigation = ({
         return true;
       };
 
-      const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);
+      const loadedEntry = getStep(navigationSections);
       const listingStartPages = offset === 1 ? getListingStartPages(loadedEntry) : null;
 
       if (Array.isArray(listingStartPages)) {
         pageFetchRequestRef.current?.controller.abort();
         pageFetchRequestRef.current = null;
         pendingNavigationContextRef.current = null;
-        return Promise.resolve(
-          stepTo(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, direction), listingStartPages)
-        );
+        return Promise.resolve(stepTo(getStep(getSectionsFor(listingStartPages)), listingStartPages));
       }
 
       if (
@@ -768,7 +783,7 @@ export const usePreviewNavigation = ({
 
             const startPages = [{ offset: listingStartOffset, data: startPage }];
 
-            return stepTo(getGalleryNavigationStep(getSectionsFor(startPages), cursorKeys, direction), startPages);
+            return stepTo(getStep(getSectionsFor(startPages)), startPages);
           }
 
           if (selectedItemNeedsLocation && selectedItem) {
@@ -829,7 +844,7 @@ export const usePreviewNavigation = ({
                   ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
                 ),
               ];
-              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
+              const entry = getStep(sections);
 
               if (entry !== null) {
                 return stepTo(entry, pages);
@@ -865,7 +880,7 @@ export const usePreviewNavigation = ({
                 ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
               ),
             ];
-            const currentEntry = getGalleryNavigationStep(currentSections, cursorKeys, direction);
+            const currentEntry = getStep(currentSections);
 
             if (currentEntry !== null) {
               return stepTo(currentEntry, pages);
@@ -901,7 +916,7 @@ export const usePreviewNavigation = ({
                   }).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
                 ),
               ];
-              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
+              const entry = getStep(sections);
 
               if (entry !== null) {
                 return stepTo(entry, pages);
@@ -955,19 +970,19 @@ export const usePreviewNavigation = ({
   );
 
   // The same resolution navigate() makes, so a swipe reveals what committing it will select.
-  const neighbors = useMemo((): PreviewNeighbors => {
-    if (isComparing) {
-      return NO_NEIGHBORS;
-    }
-
-    const resolve = (offset: -1 | 1): PreviewNeighbor => {
-      const neighbor = getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left');
+  const resolveNeighbor = useCallback(
+    (offset: -1 | 1, itemsOnly: boolean): PreviewNeighbor => {
+      const getStep = (
+        sections: readonly (readonly GalleryNavigationEntry[])[],
+        direction: 'left' | 'right'
+      ): GalleryNavigationEntry | null => getGalleryNavigationStep(sections, cursorKeys, direction, 1, { itemsOnly });
+      const neighbor = getStep(navigationSections, offset === 1 ? 'right' : 'left');
       const listingStartPages = offset === 1 ? getListingStartPages(neighbor) : null;
 
       if (listingStartPages !== null) {
         return listingStartPages === 'unloaded'
           ? { kind: 'more' }
-          : toNeighbor(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, 'right'));
+          : toNeighbor(getStep(getSectionsFor(listingStartPages), 'right'));
       }
 
       // A selection that must be relocated first steps from wherever it is found, not from the loaded guess.
@@ -985,21 +1000,29 @@ export const usePreviewNavigation = ({
       const targetOffset = selectedItemPageOffset + offset * GALLERY_PAGE_SIZE;
 
       return targetOffset >= 0 && (listingTotal === undefined || targetOffset < listingTotal) ? { kind: 'more' } : null;
-    };
-
-    return { next: resolve(1), previous: resolve(-1) };
-  }, [
-    cursorKeys,
-    getListingStartPages,
-    getSectionsFor,
-    hasUnresolvedNextListingPage,
-    hasUnresolvedPreviousListingPage,
-    isComparing,
-    listingTotal,
-    navigationSections,
-    selectedItemNeedsLocation,
-    selectedItemPageOffset,
-  ]);
+    },
+    [
+      cursorKeys,
+      getListingStartPages,
+      getSectionsFor,
+      hasUnresolvedNextListingPage,
+      hasUnresolvedPreviousListingPage,
+      listingTotal,
+      navigationSections,
+      selectedItemNeedsLocation,
+      selectedItemPageOffset,
+    ]
+  );
+  const neighbors = useMemo(
+    (): PreviewNeighbors =>
+      isComparing ? NO_NEIGHBORS : { next: resolveNeighbor(1, false), previous: resolveNeighbor(-1, false) },
+    [isComparing, resolveNeighbor]
+  );
+  const itemNeighbors = useMemo(
+    (): PreviewNeighbors =>
+      isComparing ? NO_NEIGHBORS : { next: resolveNeighbor(1, true), previous: resolveNeighbor(-1, true) },
+    [isComparing, resolveNeighbor]
+  );
 
   // Prefetch the images a step would land on to avoid decode flashes during navigation.
   const previousNeighborUrl =
@@ -1020,6 +1043,8 @@ export const usePreviewNavigation = ({
   return {
     boardItems,
     isLoadingBoard,
+    itemNeighbors,
+    listingMarksFilter: navigationSemanticQuery === null ? navigationMarksFilter : null,
     navigate,
     neighbors,
     navigationQueryKey,

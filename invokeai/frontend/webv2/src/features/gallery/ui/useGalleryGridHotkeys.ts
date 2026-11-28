@@ -1,10 +1,14 @@
 import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryKnownMarks } from '@features/gallery/core/marks';
 import type { GalleryNavigationDirection, GalleryNavigationEntry } from '@features/gallery/core/selection';
 
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
+import { toggleGalleryBookmark, toggleGalleryBookmarkedOnly } from '@features/gallery/core/marks';
 import { getGalleryNavigationCursor, getGalleryNavigationStep } from '@features/gallery/core/selection';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { GalleryCullStepper } from './GalleryCullCommands';
 
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -57,8 +61,9 @@ const GALLERY_HOTKEYS = [
   ['gallery.moveFocusLeft', 'widgets.gallery.commands.moveFocusLeft', ['left', 'focus'], ['mod+arrowleft']],
   ['gallery.toggleFocusedInSelection', 'widgets.gallery.commands.toggleFocusedInSelection', null, []],
   ['gallery.deleteSelection', 'widgets.gallery.commands.deleteSelection', null, ['delete', 'backspace']],
-  ['gallery.starImage', 'widgets.gallery.commands.toggleStarImage', null, ['.']],
-  ['gallery.toggleStarredOnly', 'widgets.gallery.commands.toggleStarredOnly', null, []],
+  // Ids from when the bookmark was a star, kept so saved custom bindings survive.
+  ['gallery.starImage', 'widgets.gallery.commands.toggleBookmark', null, ['.']],
+  ['gallery.toggleStarredOnly', 'widgets.gallery.commands.toggleBookmarkedOnly', null, []],
 ] as const satisfies readonly (readonly [
   string,
   string,
@@ -79,8 +84,8 @@ export const useGalleryGridHotkeys = ({
   navigateToUnloadedSlot,
   getSelectionPage,
   onNavigationStart,
+  selectionMarks,
   selectItemRange,
-  shouldStar,
   toggleItem,
 }: {
   actionSelectionRefs: GalleryItemRef[];
@@ -98,7 +103,7 @@ export const useGalleryGridHotkeys = ({
    * Applies `select` (none for focus-only moves), brings the tile into view, and focuses it while the grid has focus.
    */
   moveToEntry: (entry: GalleryNavigationEntry, select: (() => void) | null) => void;
-  /** The arrow-key sections in visual order: the starred strip, in progress, the listing. */
+  /** The arrow-key sections in visual order: the Bookmarked strip, in progress, the listing. */
   navigationSections: readonly (readonly GalleryNavigationEntry[])[];
   /** Loads a sparse absolute slot; it becomes selectable after its page hydrates. */
   navigateToUnloadedSlot?: (absoluteIndex: number, request: GalleryUnloadedNavigationRequest) => void;
@@ -110,10 +115,10 @@ export const useGalleryGridHotkeys = ({
     item: GalleryItem,
     options?: { anchorKey?: GalleryItemKey | null; selectionPage?: number }
   ) => Promise<void>;
-  /** Whether the star command stars the action selection: some of it is not starred. */
-  shouldStar: boolean;
+  /** The action selection's known marks, aligned with `actionSelectionRefs`. */
+  selectionMarks: readonly GalleryKnownMarks[];
   toggleItem: (item: GalleryItem) => void;
-}) => {
+}): { cullStepper: GalleryCullStepper<GalleryNavigationEntry> } => {
   const { t } = useTranslation();
   const { actions, gallery, itemActions, loadedItems, runtime } = useGalleryWidget();
   const { followProgressSession, gallery: galleryCommands } = useGalleryUi();
@@ -237,14 +242,40 @@ export const useGalleryGridHotkeys = ({
     }
 
     if (commandId === 'gallery.starImage' && actionSelectionRefs.length > 0) {
-      void itemActions.setItemsStarred(actionSelectionRefs, shouldStar);
+      void itemActions.setItemsMarks(actionSelectionRefs, toggleGalleryBookmark(selectionMarks));
       return;
     }
 
     if (commandId === 'gallery.toggleStarredOnly' && gallery.semanticImageQuery === null) {
-      actions.setStarredOnly(!gallery.starredOnly);
+      actions.setMarksFilter(toggleGalleryBookmarkedOnly(gallery.marksFilter));
     }
   });
+
+  const cullStepper: GalleryCullStepper<GalleryNavigationEntry> = {
+    go: (entry) => {
+      onNavigationStart?.();
+      const unloadedSlotMatch = entry.kind === 'slot' ? /^gallery-unloaded-slot:(\d+)$/.exec(entry.id) : null;
+
+      if (unloadedSlotMatch) {
+        navigateToUnloadedSlot?.(Number(unloadedSlotMatch[1]), {
+          anchorKey: null,
+          mode: 'select',
+          onResolved: () => undefined,
+        });
+      } else if (entry.kind === 'item') {
+        const selectionPage = getSelectionPage?.(entry.item);
+
+        moveToEntry(entry, () =>
+          selectionPage === undefined ? actions.selectItem(entry.item) : actions.selectItem(entry.item, selectionPage)
+        );
+      }
+    },
+    // From the marked item, not the focused tile, and never from the top when the item is not shown.
+    peek: (fromKey, direction) =>
+      getGalleryNavigationCursor(navigationSections, [fromKey]) === null
+        ? null
+        : getGalleryNavigationStep(navigationSections, [fromKey], direction, columnCount, { itemsOnly: true }),
+  };
 
   useEffect(() => {
     const disposers = GALLERY_HOTKEYS.flatMap(([id, titleKey, navigation, defaultKeys]) => [
@@ -265,4 +296,6 @@ export const useGalleryGridHotkeys = ({
       disposers.forEach((dispose) => dispose());
     };
   }, [runtime.commands, runtime.hotkeys, t]);
+
+  return { cullStepper };
 };

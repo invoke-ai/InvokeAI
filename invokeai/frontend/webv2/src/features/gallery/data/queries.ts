@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryListingMarks } from '@features/gallery/core/marks';
 import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
@@ -12,6 +13,7 @@ import type {
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { canonicalizeGalleryListingMarks } from '@features/gallery/core/marks';
 import {
   GALLERY_MAX_INFINITE_PAGES,
   GALLERY_MAX_ROWS,
@@ -72,7 +74,8 @@ interface CanonicalGalleryBoardsQuery {
   orderDir: GalleryOrderDir;
 }
 
-export interface GalleryItemsFilter {
+/** Marks fields are absent = all; `starred` is the strip/grid partition. */
+export interface GalleryItemsFilter extends GalleryListingMarks {
   boardId: string;
   /** Inclusive calendar day (YYYY-MM-DD) on created_at. */
   createdFrom?: string;
@@ -82,13 +85,11 @@ export interface GalleryItemsFilter {
   mediaKind?: GalleryItemKind;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
-  /** Relevance order over the board, where order and starred do not apply. */
+  /** Relevance order over the board, where order and marks do not apply. */
   semanticQuery?: GallerySemanticReference | null;
-  /** Absent = all. */
-  starred?: boolean;
 }
 
-export interface CanonicalGalleryItemsFilter {
+export interface CanonicalGalleryItemsFilter extends GalleryListingMarks {
   boardId: string;
   createdFrom?: string;
   createdTo?: string;
@@ -99,7 +100,6 @@ export interface CanonicalGalleryItemsFilter {
   searchTerm: string;
   /** Label-free: a file query is keyed by its registry id. */
   semantic?: GallerySemanticQuery;
-  starred?: boolean;
 }
 
 /** Board, search and view changes zero the anchor offset. */
@@ -160,7 +160,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
     orderDir: filter.orderDir ?? 'DESC',
     searchTerm: filter.searchTerm.trim(),
-    ...(filter.starred !== undefined ? { starred: filter.starred } : {}),
+    ...canonicalizeGalleryListingMarks(filter),
   };
 };
 

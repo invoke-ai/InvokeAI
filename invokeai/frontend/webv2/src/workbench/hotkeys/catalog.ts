@@ -7,6 +7,7 @@ import { IS_MAC_OS } from './keys';
 const categoryScopes = {
   app: { kind: 'global' },
   canvas: { kind: 'widget', typeIds: ['canvas'] },
+  cull: { kind: 'widget', typeIds: ['preview', 'gallery'] },
   gallery: { kind: 'widget', typeIds: ['gallery'] },
   queue: { kind: 'widget', typeIds: ['queue'] },
   viewer: { kind: 'widget', typeIds: ['preview'] },
@@ -86,6 +87,61 @@ const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target=
 
 /** The Queue marks a row this way while it offers recall, so its A key works there as in the Gallery. */
 const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue-recall-item] *';
+
+/**
+ * Cull mode's keys, for the commands Preview and the Gallery register (`features/gallery/core/cull.ts`, pinned by
+ * `catalog.test.ts`). While the widget has the mode on they take Preview's own keys (1, P) and the global ones (1–6);
+ * Canvas and other widgets keep theirs. Shift inverts auto-advance, except on the rating steps.
+ */
+const CULL_MARK_HOTKEYS: readonly (readonly [id: string, key: string, title: string])[] = [
+  ['cull.rate1', '1', 'Rate 1 Star'],
+  ['cull.rate2', '2', 'Rate 2 Stars'],
+  ['cull.rate3', '3', 'Rate 3 Stars'],
+  ['cull.rate4', '4', 'Rate 4 Stars'],
+  ['cull.rate5', '5', 'Rate 5 Stars'],
+  ['cull.clearRating', '0', 'Clear Rating'],
+  ['cull.lowerRating', '[', 'Lower Rating'],
+  ['cull.raiseRating', ']', 'Raise Rating'],
+  ['cull.labelRed', '6', 'Red Label'],
+  ['cull.labelYellow', '7', 'Yellow Label'],
+  ['cull.labelGreen', '8', 'Green Label'],
+  ['cull.labelBlue', '9', 'Blue Label'],
+  ['cull.bookmark', 'p', 'Bookmark'],
+  ['cull.reject', 'x', 'Reject'],
+  ['cull.clearFlag', 'u', 'Clear Flag'],
+];
+const CULL_RATING_STEP_IDS = new Set(['cull.lowerRating', 'cull.raiseRating']);
+
+const cullHotkeys: HotkeyDefinition[] = [
+  {
+    category: 'cull',
+    commandId: 'cull.toggleMode',
+    defaultKeys: ['k'],
+    description: 'In Preview or the Gallery',
+    id: 'cull.toggleMode',
+    preventDefault: true,
+    scope: categoryScopes.cull,
+    title: 'Toggle Cull Mode',
+  },
+  ...CULL_MARK_HOTKEYS.map(([id, key, title]): HotkeyDefinition => {
+    const isStep = CULL_RATING_STEP_IDS.has(id);
+
+    return {
+      ...(isStep ? {} : { acceptsShift: true }),
+      category: 'cull',
+      commandId: id,
+      defaultKeys: [key],
+      description: isStep
+        ? 'In Cull mode, in Preview or the Gallery'
+        : 'In Cull mode, in Preview or the Gallery; with Shift, the opposite of Auto-advance',
+      id,
+      mode: 'cull',
+      preventDefault: true,
+      scope: categoryScopes.cull,
+      title,
+    };
+  }),
+];
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
@@ -273,9 +329,11 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'toggleFocusedInSelection', []),
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
   hotkey('gallery', 'remix', ['r'], { ignoreRepeat: true }),
-  hotkey('gallery', 'starImage', ['.']),
+  // Ids from when the bookmark was a star, kept so saved custom bindings survive.
+  hotkey('gallery', 'starImage', ['.'], { title: 'Toggle Bookmark' }),
   // Preview's compare Esc, answered where its second image is picked.
   hotkey('gallery', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
-  hotkey('gallery', 'toggleStarredOnly', []),
+  hotkey('gallery', 'toggleStarredOnly', [], { title: 'Toggle Bookmarked Only' }),
   { ...hotkey('queue', 'recallAll', ['a'], { ignoreRepeat: true }), targetSelector: QUEUE_RECALL_ITEM_TARGET_SELECTOR },
+  ...cullHotkeys,
 ];

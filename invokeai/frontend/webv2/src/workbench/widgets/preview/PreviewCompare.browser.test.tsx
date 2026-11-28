@@ -49,7 +49,10 @@ const detailsItem: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'clip.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/clip.webp',
   width: 1920,
 };

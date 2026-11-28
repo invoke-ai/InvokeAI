@@ -42,11 +42,12 @@ export type { GalleryLocatorRequest } from './core/selection';
 export {
   getGalleryItemBoardIdsFromCaches,
   getGalleryProjectBoardsFromCaches,
-  getGalleryItemStarredFromCaches,
+  getGalleryItemMarksFromCaches,
   invalidateGallery,
   invalidateGalleryBoardDestinations,
   invalidateGalleryItems,
   patchGalleryItemCaches,
+  writeGalleryItemMarks,
   getGalleryThumbnailRevision,
   getRefreshedGalleryThumbnailUrl,
   refreshGalleryThumbnails,

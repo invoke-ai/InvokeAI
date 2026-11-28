@@ -265,12 +265,14 @@ describe('useMapSelection', () => {
 
       await flush(() => handle.click?.({ kind: 'image', name: 'a.png' }));
 
-      expect(mocks.patchValues).toHaveBeenCalledWith('gallery', {
-        searchTerm: '',
-        semanticImageQuery: null,
-        semanticSearchText: null,
-        starredOnly: false,
-      });
+      expect(mocks.patchValues).toHaveBeenCalledWith(
+        'gallery',
+        expect.objectContaining({
+          searchTerm: '',
+          semanticImageQuery: null,
+          semanticSearchText: null,
+        })
+      );
     });
 
     it('switches the gallery to the assets tab for a non-general image', async () => {

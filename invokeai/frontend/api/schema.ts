@@ -2631,6 +2631,27 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/items/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Gallery Item Marks
+         * @description Sets a rating, a flag and a color label on images and videos. Marking someone else's item takes what starring
+         *     it does: being an administrator or one of the managers of the board it is on.
+         */
+        post: operations["set_gallery_item_marks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/gallery/maintenance/preview": {
         parameters: {
             query?: never;
@@ -9671,6 +9692,12 @@ export type components = {
              */
             type: "color";
         };
+        /**
+         * ColorLabel
+         * @description A color label on a gallery item.
+         * @enum {string}
+         */
+        ColorLabel: "red" | "yellow" | "green" | "blue" | "purple";
         /**
          * Color Map
          * @description Generates a color map from the provided image.
@@ -18649,6 +18676,18 @@ export type components = {
              */
             starred: boolean;
             /**
+             * Rating
+             * @description The item's rating, from 0 (unrated) to 5.
+             */
+            rating: number;
+            /**
+             * Rejected
+             * @description Whether the item is rejected. Never true together with `starred`.
+             */
+            rejected: boolean;
+            /** @description The item's color label, if it has one. */
+            color_label?: components["schemas"]["ColorLabel"] | null;
+            /**
              * Is Intermediate
              * @description Whether the item is an intermediate output.
              */
@@ -18707,6 +18746,66 @@ export type components = {
              * @description Number of items matching the listing filters.
              */
             total: number;
+        };
+        /**
+         * GalleryItemMarksRequest
+         * @description Marks to set on images and videos. A mark left out stays as it is on each item.
+         */
+        GalleryItemMarksRequest: {
+            /**
+             * Image Names
+             * @description The images to mark.
+             */
+            image_names?: string[];
+            /**
+             * Video Names
+             * @description The videos to mark.
+             */
+            video_names?: string[];
+            /**
+             * Rating
+             * @description The rating to set, from 0 (unrated) to 5.
+             */
+            rating?: number | null;
+            /** @description The flag to set: 'pick' stars the item, 'reject' rejects it, 'none' clears both. Either one clears the other. */
+            flag?: components["schemas"]["MarkFlag"] | null;
+            /**
+             * Color Label
+             * @description The color label to set, or 'none' to remove it.
+             */
+            color_label?: components["schemas"]["ColorLabel"] | "none" | null;
+        };
+        /**
+         * GalleryItemMarksResult
+         * @description What setting marks changed. Names the caller may not mark, and names of items that do not exist, are in no
+         *     list.
+         */
+        GalleryItemMarksResult: {
+            /**
+             * Updated Image Names
+             * @description The images whose marks were set.
+             */
+            updated_image_names: string[];
+            /**
+             * Updated Video Names
+             * @description The videos whose marks were set.
+             */
+            updated_video_names: string[];
+            /**
+             * Failed Image Names
+             * @description Images the caller may mark whose marks could not be saved.
+             */
+            failed_image_names: string[];
+            /**
+             * Failed Video Names
+             * @description Videos the caller may mark whose marks could not be saved.
+             */
+            failed_video_names: string[];
+            /**
+             * Affected Boards
+             * @description The boards of the updated items; 'none' for items on no board.
+             */
+            affected_boards: string[];
         };
         /**
          * GalleryItemNames
@@ -22130,6 +22229,18 @@ export type components = {
              * @description Bytes the image and its thumbnail occupy on disk; null until measured.
              */
             file_size_bytes?: number | null;
+            /**
+             * Rating
+             * @description The image's rating, from 0 (unrated) to 5.
+             */
+            rating: number;
+            /**
+             * Rejected
+             * @description Whether this image is rejected. Never true together with `starred`.
+             */
+            rejected: boolean;
+            /** @description The image's color label, if it has one. */
+            color_label?: components["schemas"]["ColorLabel"] | null;
             /**
              * Board Id
              * @description The id of the board the image belongs to, if one exists.
@@ -39291,6 +39402,12 @@ export type components = {
             format: "sdnq_quantized";
             variant: components["schemas"]["ZImageVariantType"];
         };
+        /**
+         * MarkFlag
+         * @description A gallery item's flag: picked (stored as `starred`), rejected, or neither.
+         * @enum {string}
+         */
+        MarkFlag: "pick" | "none" | "reject";
         /**
          * Combine Masks
          * @description Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`.
@@ -58244,6 +58361,18 @@ export type components = {
              */
             file_size_bytes?: number | null;
             /**
+             * Rating
+             * @description The video's rating, from 0 (unrated) to 5.
+             */
+            rating: number;
+            /**
+             * Rejected
+             * @description Whether this video is rejected. Never true together with `starred`.
+             */
+            rejected: boolean;
+            /** @description The video's color label, if it has one. */
+            color_label?: components["schemas"]["ColorLabel"] | null;
+            /**
              * Media Origin
              * @description How this video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio file the server wrapped into a waveform video.
              */
@@ -67418,6 +67547,14 @@ export interface operations {
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
                 created_to?: string | null;
+                /** @description Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither. */
+                flags?: components["schemas"]["MarkFlag"][] | null;
+                /** @description Keep items rated at least this (1-5). */
+                min_rating?: number | null;
+                /** @description Keep items rated at most this (0-5); 0 keeps unrated items. */
+                max_rating?: number | null;
+                /** @description Keep items with any of these color labels; 'none' keeps items without one. */
+                color_labels?: (components["schemas"]["ColorLabel"] | "none")[] | null;
             };
             header?: never;
             path?: never;
@@ -67472,6 +67609,14 @@ export interface operations {
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
                 created_to?: string | null;
+                /** @description Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither. */
+                flags?: components["schemas"]["MarkFlag"][] | null;
+                /** @description Keep items rated at least this (1-5). */
+                min_rating?: number | null;
+                /** @description Keep items rated at most this (0-5); 0 keeps unrated items. */
+                max_rating?: number | null;
+                /** @description Keep items with any of these color labels; 'none' keeps items without one. */
+                color_labels?: (components["schemas"]["ColorLabel"] | "none")[] | null;
             };
             header?: never;
             path?: never;
@@ -67526,6 +67671,14 @@ export interface operations {
                 search_term?: string | null;
                 /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
                 media_kind?: ("image" | "video") | null;
+                /** @description Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither. */
+                flags?: components["schemas"]["MarkFlag"][] | null;
+                /** @description Keep items rated at least this (1-5). */
+                min_rating?: number | null;
+                /** @description Keep items rated at most this (0-5); 0 keeps unrated items. */
+                max_rating?: number | null;
+                /** @description Keep items with any of these color labels; 'none' keeps items without one. */
+                color_labels?: (components["schemas"]["ColorLabel"] | "none")[] | null;
             };
             header?: never;
             path?: never;
@@ -67578,6 +67731,14 @@ export interface operations {
                 created_from?: string | null;
                 /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
                 created_to?: string | null;
+                /** @description Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither. */
+                flags?: components["schemas"]["MarkFlag"][] | null;
+                /** @description Keep items rated at least this (1-5). */
+                min_rating?: number | null;
+                /** @description Keep items rated at most this (0-5); 0 keeps unrated items. */
+                max_rating?: number | null;
+                /** @description Keep items with any of these color labels; 'none' keeps items without one. */
+                color_labels?: (components["schemas"]["ColorLabel"] | "none")[] | null;
             };
             header?: never;
             path?: never;
@@ -67625,6 +67786,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GalleryMediaUsage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_gallery_item_marks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryItemMarksRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemMarksResult"];
                 };
             };
             /** @description Validation Error */
@@ -68334,6 +68528,14 @@ export interface operations {
                 search_term?: string | null;
                 /** @description List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and names cover only the listed kind. */
                 media_kind?: ("image" | "video") | null;
+                /** @description Keep items with any of these flags: 'pick' (starred), 'reject', or 'none' for neither. */
+                flags?: components["schemas"]["MarkFlag"][] | null;
+                /** @description Keep items rated at least this (1-5). */
+                min_rating?: number | null;
+                /** @description Keep items rated at most this (0-5); 0 keeps unrated items. */
+                max_rating?: number | null;
+                /** @description Keep items with any of these color labels; 'none' keeps items without one. */
+                color_labels?: (components["schemas"]["ColorLabel"] | "none")[] | null;
             };
             header?: never;
             path: {

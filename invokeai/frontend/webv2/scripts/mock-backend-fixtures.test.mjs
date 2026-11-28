@@ -350,6 +350,55 @@ test('gallery item location shares listing filters and order, and reports missin
   });
 });
 
+test('marks set flags, ratings and labels on both kinds and filter every listing alike', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const base = 'categories=general&is_intermediate=false&starred_first=false&limit=1000&offset=0';
+    const all = await getJson(backend, `/api/v1/gallery/items/?${base}`);
+    const image = all.items.find((item) => item.kind === 'image' && item.starred);
+    const video = all.items.find((item) => item.kind === 'video');
+    const post = (body) =>
+      fetch(`${backend.origin}/api/v1/gallery/items/marks`, {
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+
+    assert.ok(all.items.some((item) => item.rating > 0) && all.items.some((item) => item.color_label));
+    assert.ok(all.items.some((item) => item.rejected && !item.starred));
+
+    const marked = await post({
+      color_label: 'purple',
+      flag: 'reject',
+      image_names: [image.name, 'missing.png'],
+      rating: 5,
+      video_names: [video.name],
+    });
+    const result = await marked.json();
+
+    assert.equal(marked.status, 200);
+    assert.deepEqual(result.updated_image_names, [image.name]);
+    assert.deepEqual(result.updated_video_names, [video.name]);
+
+    const query = `${base}&flags=reject&min_rating=5&color_labels=purple`;
+    const filtered = await getJson(backend, `/api/v1/gallery/items/?${query}`);
+    const keys = filtered.items.map(({ kind, name }) => `${kind}:${name}`);
+
+    assert.ok(keys.includes(`image:${image.name}`) && keys.includes(`video:${video.name}`));
+    assert.ok(filtered.items.every((item) => item.rejected && !item.starred && item.color_label === 'purple'));
+    assert.equal((await getJson(backend, `/api/v1/gallery/items/names?${query}`)).total_count, filtered.total);
+
+    await post({ color_label: 'none', flag: 'none', image_names: [image.name] });
+    const cleared = await getJson(backend, `/api/v1/gallery/items/?${base}&flags=none&color_labels=none`);
+
+    assert.ok(cleared.items.some((item) => item.kind === 'image' && item.name === image.name && !item.color_label));
+    assert.equal((await post({ image_names: [image.name], stars: 3 })).status, 422);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v1/gallery/items/?${base}&min_rating=4&max_rating=2`)).status,
+      422
+    );
+  });
+});
+
 test('media_kind narrows gallery items, names, location, date boards, and the image map consistently', async () => {
   await withRepresentativeBackend(async (backend) => {
     const query = 'categories=general&is_intermediate=false&starred_first=false&limit=1000&offset=0';
@@ -501,6 +550,8 @@ test('image upload preserves restore metadata and is retrievable through every i
       image_url: `/api/v1/images/i/${expectedName}/full`,
       is_intermediate: false,
       node_id: null,
+      rating: 0,
+      rejected: false,
       session_id: null,
       starred: false,
       thumbnail_url: `/api/v1/images/i/${expectedName}/thumbnail`,

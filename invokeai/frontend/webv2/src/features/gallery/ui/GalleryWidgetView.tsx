@@ -4,6 +4,11 @@ import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { TFunction } from 'i18next';
 
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
+import {
+  getGalleryGridListingMarks,
+  getGalleryMarksFilter,
+  getGalleryStripListingMarks,
+} from '@features/gallery/core/marks';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGalleryRevealRequest, subscribeGalleryRevealRequests } from '@features/gallery/core/selection';
 import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
@@ -28,7 +33,6 @@ import {
   getGallerySearchScope,
   getGallerySearchTerm,
   getGallerySemanticImageQuery,
-  getGalleryStarredOnly,
   getGalleryStateView,
   getGalleryTotalImages,
   getGalleryView,
@@ -103,7 +107,13 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
   const searchTerm = getGallerySearchTerm(galleryValues);
-  const starredOnly = getGalleryStarredOnly(galleryValues);
+  const marksFilterValue = galleryValues.marksFilter;
+  const starredOnlyValue = galleryValues.starredOnly;
+  const { gridMarks, stripMarks } = useMemo(() => {
+    const marksFilter = getGalleryMarksFilter({ marksFilter: marksFilterValue, starredOnly: starredOnlyValue });
+
+    return { gridMarks: getGalleryGridListingMarks(marksFilter), stripMarks: getGalleryStripListingMarks(marksFilter) };
+  }, [marksFilterValue, starredOnlyValue]);
   const recentImages = useMemo(() => getBoundedRecentImages(galleryValues.recentImages), [galleryValues.recentImages]);
   const page = getGalleryPage(galleryValues);
   const knownTotalImages = getGalleryTotalImages(galleryValues);
@@ -121,17 +131,17 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     selectedBoardId: getGalleryRawSelectedBoardId(galleryValues),
     semanticQuery,
     settings,
-    // The grid partitions: starred items live in the strip above it.
-    starred: starredOnly,
+    // Without a flag filter the grid partitions: bookmarked items live in the strip above it.
+    marks: gridMarks,
     // Compact bottom chips have no virtualized grid; keep their single page query on the dense listing path.
     sparseViewport: region !== 'bottom' || presentation === 'expanded',
   });
 
   const { loadMore, selectedBoardId, total } = data;
-  // No strip under a ranked result (no starred filter applies), under the starred-only listing (it would repeat the
-  // grid), or in a window anchored mid-board (the banner promises a slice, not the top of the board).
+  // No strip under a ranked result (no marks filter applies), under a flag filter (the grid lists exactly what it
+  // keeps), or in a window anchored mid-board (the banner promises a slice, not the top of the board).
   const starredStrip = useGalleryStarredStrip({
-    enabled: semanticQuery === null && !starredOnly && getGalleryAnchoredWindowPage(galleryValues) === 0,
+    enabled: semanticQuery === null && stripMarks !== null && getGalleryAnchoredWindowPage(galleryValues) === 0,
     filter: data.filter,
   });
   const gallery = useMemo(
@@ -164,7 +174,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
       const result = await queryClient.fetchQuery(galleryItemNamesOptions(data.filter));
 
       signal.throwIfAborted();
-      // Navigation order: the strip's starred items, then the listing.
+      // Navigation order: the strip's bookmarked items, then the listing.
       return [...starredStrip.items.map(toGalleryItemRef), ...result.items];
     },
     [data.filter, queryClient, starredStrip.items]
@@ -233,7 +243,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }, [galleryCommands, page, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    // The listing total is unstarred-only; the strip's total is the rest. Either one unknown leaves no count to state.
+    // The listing total leaves out bookmarked items unless a flag filter applies; the strip's total is the rest. Either one unknown leaves no count to state.
     const stripStatus = starredStrip.state.status;
     const count =
       total === null || stripStatus === 'loading' || stripStatus === 'error' ? null : total + starredStrip.total;
@@ -279,8 +289,8 @@ const BOARD_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
   'stale-error': 'widgets.gallery.boardsRefreshFailed',
 };
 const STARRED_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
-  error: 'widgets.gallery.starredLoadFailed',
-  'stale-error': 'widgets.gallery.starredRefreshFailed',
+  error: 'widgets.gallery.bookmarkedLoadFailed',
+  'stale-error': 'widgets.gallery.bookmarkedRefreshFailed',
 };
 
 /** The non-blocking notices for the widget's live region; a failed listing's error state is its own alert. */

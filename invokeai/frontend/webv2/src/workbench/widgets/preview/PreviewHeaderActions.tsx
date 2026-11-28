@@ -3,10 +3,15 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, HStack } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem } from '@features/gallery/contracts';
+import { GALLERY_CULL_TOGGLE_COMMAND_ID, getGalleryCullMode, getGalleryCullModeValues } from '@features/gallery/cull';
+import { ToggleIconButton } from '@platform/ui/Button';
+import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { ListChecksIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useLivePreviewFollow } from './livePreviewFollow';
 import { PreviewActionStrip } from './PreviewActionStrip';
@@ -58,6 +63,16 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
     [widgets]
   );
   const hasItem = actionItem !== null && actions !== null;
+  const { t } = useTranslation();
+  const isCullModeOn = useActiveProjectSelector(
+    (project) => getGalleryCullMode(getProjectWidgetValues(project, 'gallery')).enabled
+  );
+  const cullShortcut = useShortcutLabel(GALLERY_CULL_TOGGLE_COMMAND_ID);
+  const cullLabel = t('widgets.gallery.cull.toggle');
+  const setCullMode = useCallback(
+    (enabled: boolean) => widgets.patchValues('gallery', getGalleryCullModeValues({ enabled })),
+    [widgets]
+  );
 
   return (
     <HStack gap="1">
@@ -82,6 +97,18 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
       {zoomControls && (controlDensity === 'full' || zoomControls.isZoomed) ? (
         <PreviewZoomMenu density={controlDensity} zoom={zoomControls} />
       ) : null}
+      <ToggleIconButton
+        checked={isCullModeOn}
+        data-preview-cull-toggle=""
+        icon={ListChecksIcon}
+        label={cullLabel}
+        tooltip={
+          cullShortcut
+            ? t('widgets.gallery.cull.toggleTooltipWithShortcut', { shortcut: cullShortcut })
+            : t('widgets.gallery.cull.toggleTooltip')
+        }
+        onCheckedChange={setCullMode}
+      />
       <AutoSwitchMenu
         chrome="header"
         density="compact"

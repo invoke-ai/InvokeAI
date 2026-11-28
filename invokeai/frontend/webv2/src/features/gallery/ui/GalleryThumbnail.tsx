@@ -11,9 +11,10 @@ import {
   subscribeGalleryThumbnailRevision,
 } from '@features/gallery/queries';
 import { IconButton } from '@platform/ui/Button';
-import { StarIcon } from 'lucide-react';
+import { BookmarkIcon } from 'lucide-react';
 import {
   useCallback,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -26,6 +27,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { getGalleryItemDragData, getGalleryItemDragId } from './galleryDnd';
+import { GalleryItemMarksBadges, GalleryItemMarksMedia, getGalleryItemMarksDescription } from './GalleryItemMarks';
 import {
   GALLERY_TILE_MEDIA_SELECTOR,
   GalleryTileFrame,
@@ -88,7 +90,7 @@ const GalleryThumbnail = ({
   onFocusLost,
   onOpen,
   onOpenInNewTab,
-  onToggleStarred,
+  onToggleBookmark,
 }: {
   alwaysShowDimensions: boolean;
   compareRole: string | null;
@@ -108,7 +110,7 @@ const GalleryThumbnail = ({
   onOpen: (item: GalleryItem) => void;
   /** Null leaves the browser's middle-click behaviour alone. */
   onOpenInNewTab: ((item: GalleryItem) => void) | null;
-  onToggleStarred: (item: GalleryItem) => void;
+  onToggleBookmark: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
   const thumbnailRevision = useSyncExternalStore(
@@ -155,7 +157,7 @@ const GalleryThumbnail = ({
   }, [isDragging]);
 
   const itemKey = toGalleryItemKey(item);
-  // Covers the star toggle too: a star click can move the item between sections.
+  // Covers the bookmark toggle too: a bookmark click can move the item between sections.
   const setTileRef = useCallback(
     (node: HTMLDivElement | null) => {
       tileRef.current = node;
@@ -292,14 +294,16 @@ const GalleryThumbnail = ({
     }
   }, [getItemLabel, item]);
 
-  const handleToggleStarred = useCallback(
+  const handleToggleBookmark = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
 
-      onToggleStarred(item);
+      onToggleBookmark(item);
     },
-    [item, onToggleStarred]
+    [item, onToggleBookmark]
   );
+  const marksDescriptionId = useId();
+  const marksDescription = getGalleryItemMarksDescription(t, item);
 
   return (
     <GalleryTileFrame
@@ -324,6 +328,7 @@ const GalleryThumbnail = ({
       <GalleryTileMedia fit={fit} height={item.height} isSelected={isSelected || isCompared} width={item.width}>
         <button
           aria-current={isPrimary ? 'true' : undefined}
+          aria-describedby={marksDescription ? marksDescriptionId : undefined}
           aria-keyshortcuts="Enter"
           aria-label={
             item.kind === 'video'
@@ -347,7 +352,15 @@ const GalleryThumbnail = ({
             onError={handleImageError}
           />
         </button>
+        <GalleryItemMarksMedia item={item} />
       </GalleryTileMedia>
+      <GalleryItemMarksBadges item={item} />
+      {/* Outside the button, like every overlay: its content must match its accessible name. */}
+      {marksDescription ? (
+        <span hidden id={marksDescriptionId}>
+          {marksDescription}
+        </span>
+      ) : null}
       {/* The compare role owns this corner while comparing. */}
       {label && getItemLabel && !compareRole ? (
         <Badge
@@ -376,28 +389,26 @@ const GalleryThumbnail = ({
         </Badge>
       )}
       <IconButton
-        aria-label={
-          item.starred
-            ? t('widgets.gallery.unstarImage', { name: item.name })
-            : t('widgets.gallery.starImage', { name: item.name })
-        }
+        aria-label={t(item.starred ? 'widgets.gallery.removeBookmarkItem' : 'widgets.gallery.bookmarkItem', {
+          name: item.name,
+        })}
         className="gallery-thumb-overlay"
-        colorPalette={item.starred ? 'yellow' : 'gray'}
+        colorPalette="gray"
         insetInlineEnd="1"
         opacity={item.starred ? 1 : 0}
         position="absolute"
         size="sm"
-        // Pointer-only: the star hotkey toggles the selection, which keyboard focus follows.
+        // Pointer-only: the bookmark hotkey toggles the selection, which keyboard focus follows.
         tabIndex={-1}
         top="1"
         transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"
         zIndex="1"
         onAuxClick={stopPropagation}
-        onClick={handleToggleStarred}
+        onClick={handleToggleBookmark}
         onDoubleClick={stopPropagation}
       >
-        <StarIcon fill={item.starred ? 'currentColor' : 'none'} />
+        <BookmarkIcon fill={item.starred ? 'currentColor' : 'none'} />
       </IconButton>
       {previewStyle
         ? createPortal(

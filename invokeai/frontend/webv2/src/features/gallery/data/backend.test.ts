@@ -248,6 +248,9 @@ describe('getGalleryImageByName', () => {
       imageName: 'folder/workflow result.png',
       imageUrl: 'https://api.test/images/workflow-result.png',
       queuedAt: '2026-07-09T12:00:00.000Z',
+      colorLabel: null,
+      rating: 0,
+      rejected: false,
       sourceQueueItemId: 'backend-gallery',
       starred: true,
       thumbnailUrl: 'https://api.test/thumbnails/workflow-result.webp',
@@ -324,7 +327,7 @@ describe('listGalleryItems', () => {
     mocks.apiFetchJson.mockReset();
   });
 
-  it('maps a mixed page by kind and normalizes transport-only fields', async () => {
+  it('maps a mixed page by kind and normalizes transport-only fields, reading absent marks as unmarked', async () => {
     mocks.apiFetchJson.mockResolvedValue({
       items: [
         {
@@ -352,6 +355,9 @@ describe('listGalleryItems', () => {
           is_intermediate: true,
           kind: 'video',
           name: 'clip.mp4',
+          color_label: 'red',
+          rating: 2,
+          rejected: true,
           starred: false,
           thumbnail_url: '/thumbnails/clip.webp',
           width: 1280,
@@ -373,6 +379,9 @@ describe('listGalleryItems', () => {
           isIntermediate: false,
           kind: 'image',
           name: 'still.png',
+          colorLabel: null,
+          rating: 0,
+          rejected: false,
           starred: true,
           thumbnailUrl: 'https://api.test/thumbnails/still.webp',
           width: 768,
@@ -387,6 +396,9 @@ describe('listGalleryItems', () => {
           isIntermediate: true,
           kind: 'video',
           name: 'clip.mp4',
+          colorLabel: 'red',
+          rating: 2,
+          rejected: true,
           starred: false,
           thumbnailUrl: 'https://api.test/thumbnails/clip.webp',
           width: 1280,
@@ -411,7 +423,10 @@ describe('listGalleryItems', () => {
       orderDir: 'ASC',
       searchTerm: '  summer clip  ',
       signal: controller.signal,
-      starred: true,
+      colorLabels: ['red', 'none'],
+      flags: ['pick', 'reject'],
+      maxRating: 4,
+      minRating: 2,
     });
 
     const [url, init] = mocks.apiFetchJson.mock.calls[0] as [string, RequestInit];
@@ -426,7 +441,11 @@ describe('listGalleryItems', () => {
     expect(params.get('limit')).toBe('17');
     expect(params.get('offset')).toBe('34');
     expect(params.get('order_dir')).toBe('ASC');
-    expect(params.get('starred')).toBe('true');
+    expect(params.getAll('flags')).toEqual(['pick', 'reject']);
+    expect(params.get('min_rating')).toBe('2');
+    expect(params.get('max_rating')).toBe('4');
+    expect(params.getAll('color_labels')).toEqual(['red', 'none']);
+    expect(params.has('starred')).toBe(false);
     // The backend defaults to starred-first; the grid must pin it off.
     expect(params.get('starred_first')).toBe('false');
     expect(params.get('search_term')).toBe('summer clip');
@@ -447,6 +466,9 @@ describe('mixed gallery item details', () => {
       fps: null,
       height: 720,
       is_intermediate: false,
+      color_label: 'blue',
+      rating: 4,
+      rejected: false,
       starred: true,
       thumbnail_url: '/thumbnails/clip.webp',
       video_category: 'general',
@@ -467,6 +489,9 @@ describe('mixed gallery item details', () => {
       isIntermediate: false,
       kind: 'video',
       name: 'folder/clip.mp4',
+      colorLabel: 'blue',
+      rating: 4,
+      rejected: false,
       starred: true,
       thumbnailUrl: 'https://api.test/thumbnails/clip.webp',
       width: 1280,

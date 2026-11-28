@@ -49,62 +49,52 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     mocks.apiFetchJson.mockReset();
   });
 
-  it('stars an image-only request and returns its affected board', async () => {
+  it('marks both kinds in one request that sends only the marks the patch sets', async () => {
     const controller = new AbortController();
     mocks.apiFetchJson.mockResolvedValue({
-      affected_boards: ['board-image'],
-      starred_images: ['still.png'],
+      affected_boards: ['board-video', 'none'],
+      failed_image_names: [],
+      failed_video_names: [],
+      updated_image_names: ['still.png'],
+      updated_video_names: ['clip.mp4'],
     });
 
-    await expect(galleryItemOrganization.setStarred([imageRef('still.png')], true, controller.signal)).resolves.toEqual(
-      {
-        affectedBoardIds: ['board-image'],
-        failed: [],
-        succeeded: [imageRef('still.png')],
-      }
-    );
-    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/star', {
-      body: JSON.stringify({ image_names: ['still.png'] }),
+    await expect(
+      galleryItemOrganization.setMarks(
+        [imageRef('still.png'), videoRef('clip.mp4')],
+        { colorLabel: null, flag: 'reject' },
+        controller.signal
+      )
+    ).resolves.toEqual({
+      affectedBoardIds: ['board-video', 'none'],
+      failed: [],
+      succeeded: [imageRef('still.png'), videoRef('clip.mp4')],
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledExactlyOnceWith('/api/v1/gallery/items/marks', {
+      body: JSON.stringify({
+        image_names: ['still.png'],
+        video_names: ['clip.mp4'],
+        flag: 'reject',
+        color_label: 'none',
+      }),
       method: 'POST',
       signal: controller.signal,
     });
   });
 
-  it('uses the video bulk star, unstar, and delete DTOs without inferring success', async () => {
-    mocks.apiFetchJson
-      .mockResolvedValueOnce({ affected_boards: ['board-a'], failed_videos: [], starred_videos: ['clip.mp4'] })
-      .mockResolvedValueOnce({ affected_boards: ['board-a'], failed_videos: [], unstarred_videos: ['clip.mp4'] })
-      .mockResolvedValueOnce({
-        affected_boards: ['board-a'],
-        deleted_videos: ['clip.mp4'],
-        failed_videos: [],
-      });
+  it('uses the video bulk delete DTO without inferring success', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({
+      affected_boards: ['board-a'],
+      deleted_videos: ['clip.mp4'],
+      failed_videos: [],
+    });
 
-    await expect(galleryItemOrganization.setStarred([videoRef('clip.mp4')], true)).resolves.toMatchObject({
-      failed: [],
-      succeeded: [videoRef('clip.mp4')],
-    });
-    await expect(galleryItemOrganization.setStarred([videoRef('clip.mp4')], false)).resolves.toMatchObject({
-      failed: [],
-      succeeded: [videoRef('clip.mp4')],
-    });
     await expect(galleryItemOrganization.delete([videoRef('clip.mp4')])).resolves.toEqual({
       affectedBoardIds: ['board-a'],
       failed: [],
       succeeded: [videoRef('clip.mp4')],
     });
-
-    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(1, '/api/v1/videos/star', {
-      body: JSON.stringify({ video_names: ['clip.mp4'] }),
-      method: 'POST',
-      signal: undefined,
-    });
-    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/videos/unstar', {
-      body: JSON.stringify({ video_names: ['clip.mp4'] }),
-      method: 'POST',
-      signal: undefined,
-    });
-    expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(3, '/api/v1/videos/delete', {
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/videos/delete', {
       body: JSON.stringify({ video_names: ['clip.mp4'] }),
       method: 'POST',
       signal: undefined,
@@ -112,26 +102,6 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
   });
 
   it.each([
-    {
-      label: 'star with missing failed_videos',
-      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], true),
-      response: { affected_boards: ['board-a'], starred_videos: ['clip.mp4'] },
-    },
-    {
-      label: 'star with wrong-type failed_videos',
-      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], true),
-      response: { affected_boards: ['board-a'], failed_videos: 'locked.mp4', starred_videos: ['clip.mp4'] },
-    },
-    {
-      label: 'unstar with missing failed_videos',
-      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], false),
-      response: { affected_boards: ['board-a'], unstarred_videos: ['clip.mp4'] },
-    },
-    {
-      label: 'unstar with wrong-type failed_videos',
-      mutate: () => galleryItemOrganization.setStarred([videoRef('clip.mp4')], false),
-      response: { affected_boards: ['board-a'], failed_videos: 'locked.mp4', unstarred_videos: ['clip.mp4'] },
-    },
     {
       label: 'delete with missing failed_videos',
       mutate: () => galleryItemOrganization.delete([videoRef('clip.mp4')]),
@@ -142,7 +112,7 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
       mutate: () => galleryItemOrganization.delete([videoRef('clip.mp4')]),
       response: { affected_boards: ['board-a'], deleted_videos: ['clip.mp4'], failed_videos: 'locked.mp4' },
     },
-  ])('does not confirm a video bulk success for $label', async ({ mutate, response }) => {
+  ])('does not confirm a bulk success for $label', async ({ mutate, response }) => {
     mocks.apiFetchJson.mockResolvedValue(response);
 
     await expect(mutate()).resolves.toEqual({
@@ -152,7 +122,13 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     });
   });
 
-  it('isolates same-name media, deduplicates keys, intersects successes, and preserves request order', async () => {
+  it('rejects a malformed marks response rather than confirming anything', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ affected_boards: ['board-a'], failed_image_names: [] });
+
+    await expect(galleryItemOrganization.setMarks([videoRef('clip.mp4')], { rating: 2 })).rejects.toThrow(TypeError);
+  });
+
+  it('isolates same-name media, deduplicates keys, confirms only requested updates, and preserves request order', async () => {
     const refs = [
       videoRef('shared'),
       imageRef('locked.png'),
@@ -161,31 +137,22 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
       videoRef('shared'),
       imageRef('shared'),
     ];
-    mocks.apiFetchJson.mockImplementation((url: string) => {
-      if (url === '/api/v1/images/star') {
-        return Promise.resolve({
-          affected_boards: ['none', 'board-image', 'none'],
-          starred_images: ['unexpected.png', 'shared'],
-        });
-      }
-
-      return Promise.resolve({
-        affected_boards: ['board-video', 'none'],
-        failed_videos: [],
-        starred_videos: ['later.mp4', 'unexpected.mp4', 'shared'],
-      });
+    mocks.apiFetchJson.mockResolvedValue({
+      affected_boards: ['none', 'board-image', 'board-video'],
+      failed_image_names: [],
+      failed_video_names: [],
+      updated_image_names: ['unexpected.png', 'shared'],
+      updated_video_names: ['later.mp4', 'unexpected.mp4', 'shared'],
     });
 
-    await expect(galleryItemOrganization.setStarred(refs, true)).resolves.toEqual({
+    await expect(galleryItemOrganization.setMarks(refs, { flag: 'pick' })).resolves.toEqual({
       affectedBoardIds: ['board-image', 'board-video', 'none'],
       failed: [imageRef('locked.png')],
       succeeded: [videoRef('shared'), imageRef('shared'), videoRef('later.mp4')],
     });
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[0]?.[1]?.body))).toEqual({
+      flag: 'pick',
       image_names: ['locked.png', 'shared'],
-    });
-    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[1]?.[1]?.body))).toEqual({
       video_names: ['shared', 'later.mp4'],
     });
   });
@@ -517,19 +484,6 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(4);
   });
 
-  it.each([
-    { affected_boards: ['board-a'], failed_videos: [], starred_videos: 'clip.mp4' },
-    { affected_boards: ['unexpected-board'], failed_videos: [], starred_videos: ['unexpected.mp4'] },
-  ])('does not confirm malformed or unexpected video success payloads: $starred_videos', async (response) => {
-    mocks.apiFetchJson.mockResolvedValue(response);
-
-    await expect(galleryItemOrganization.setStarred([videoRef('clip.mp4')], true)).resolves.toEqual({
-      affectedBoardIds: [],
-      failed: [videoRef('clip.mp4')],
-      succeeded: [],
-    });
-  });
-
   it('does not issue transport requests for an empty operation', async () => {
     await expect(galleryItemOrganization.delete([])).resolves.toEqual({
       affectedBoardIds: [],
@@ -559,18 +513,23 @@ describe('galleryItemOrganization past the server’s per-request name cap', () 
     '/api/v1/board_images/batch': 'added_images',
     '/api/v1/board_images/batch/delete': 'removed_images',
     '/api/v1/images/delete': 'deleted_images',
-    '/api/v1/images/star': 'starred_images',
-    '/api/v1/images/unstar': 'unstarred_images',
     '/api/v1/videos/delete': 'deleted_videos',
-    '/api/v1/videos/star': 'starred_videos',
-    '/api/v1/videos/unstar': 'unstarred_videos',
   };
   const serve = (url: string, init: { body: string }) => {
     const body = JSON.parse(init.body) as { image_names?: string[]; video_names?: string[] };
     const names = body.image_names ?? body.video_names ?? [];
 
-    if (names.length > SERVER_MAX_NAMES) {
+    if ((body.image_names?.length ?? 0) > SERVER_MAX_NAMES || (body.video_names?.length ?? 0) > SERVER_MAX_NAMES) {
       return Promise.reject(new MockApiError('List should have at most 1000 items', 422));
+    }
+    if (url === '/api/v1/gallery/items/marks') {
+      return Promise.resolve({
+        affected_boards: ['board-1'],
+        failed_image_names: [],
+        failed_video_names: [],
+        updated_image_names: body.image_names ?? [],
+        updated_video_names: body.video_names ?? [],
+      });
     }
 
     return Promise.resolve({ affected_boards: ['board-1'], failed_videos: [], [fields[url]!]: names });
@@ -659,8 +618,7 @@ describe('galleryItemOrganization past the server’s per-request name cap', () 
   });
 
   it.each([
-    ['star', () => galleryItemOrganization.setStarred(refs('image', 2500), true)],
-    ['unstar', () => galleryItemOrganization.setStarred(refs('image', 2500), false)],
+    ['mark', () => galleryItemOrganization.setMarks(refs('image', 2500), { rating: 4 })],
     ['move to a board', () => galleryItemOrganization.moveToBoard(refs('image', 2500), 'board-1')],
     ['remove from its board', () => galleryItemOrganization.moveToBoard(refs('image', 2500), 'none')],
   ])('confirms every image when asked to %s 2,500 at once', async (_operation, run) => {

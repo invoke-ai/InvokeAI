@@ -196,7 +196,7 @@ const adapter: GalleryUiAdapter = {
     setPage: noop,
     setPageInfo: noop,
     setSearchTerm: noop,
-    setStarredOnly: noop,
+    setMarksFilter: noop,
     setSemanticSearchMode: noop,
     setSemanticSearchText: noop,
     commitSemanticSearch: noop,

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { HotkeyDefinition, RegisteredHotkey } from './types';
+import type { HotkeyContext, HotkeyDefinition, RegisteredHotkey } from './types';
 
+import { firstPartyHotkeyCatalog } from './catalog';
 import { applyCustomHotkeys, resolveHotkey, toPlatformHotkey } from './resolve';
 
 const event = { target: null } as KeyboardEvent;
@@ -306,5 +307,71 @@ describe('resolveHotkey', () => {
 
   it('keeps an empty custom key array as a disabled hotkey', () => {
     expect(applyCustomHotkeys({ defaultKeys: ['x'], id: 'app.invoke' }, { 'app.invoke': [] }).keys).toEqual([]);
+  });
+});
+
+describe('Cull mode precedence', () => {
+  // Preview registers its own `1` while it shows an image; the catalog lists the rest.
+  const zoomToActual: HotkeyDefinition = {
+    category: 'viewer',
+    commandId: 'viewer.zoomToActual',
+    defaultKeys: ['1'],
+    id: 'viewer.zoomToActual',
+    scope: { kind: 'widget', typeIds: ['preview'] },
+    title: 'Zoom to Actual Size',
+  };
+  const register = (customHotkeys: Record<string, string[]> = {}, includeCull = true): RegisteredHotkey[] =>
+    [...firstPartyHotkeyCatalog, zoomToActual]
+      .filter((hotkey) => includeCull || hotkey.mode === undefined)
+      .map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
+  const inWidget = (typeId: string | null, cullOn: boolean): HotkeyContext => ({
+    ...context,
+    activeInstanceId: typeId && `${typeId}-1`,
+    activeModes: cullOn ? ['cull'] : [],
+    activeWidgetTypeId: typeId,
+    focusedRegion: typeId ? 'center' : null,
+  });
+  const resolve = (hotkeys: RegisteredHotkey[], typeId: string | null, cullOn: boolean, matchedKey: string) =>
+    resolveHotkey({ context: inWidget(typeId, cullOn), event, hotkeys, matchedKey })?.commandId ?? null;
+
+  it('takes Preview’s own keys, the global ones and free Shift variants in Preview and Gallery while on', () => {
+    const hotkeys = register({ 'viewer.recallPrompts': ['p'] });
+
+    expect(resolve(hotkeys, 'preview', true, '1')).toBe('cull.rate1');
+    expect(resolve(hotkeys, 'preview', true, 'p')).toBe('cull.bookmark');
+    expect(resolve(hotkeys, 'gallery', true, '6')).toBe('cull.labelRed');
+    expect(resolve(hotkeys, 'gallery', true, 'shift+1')).toBe('cull.rate1');
+    expect(resolve(hotkeys, 'preview', true, 'shift+]')).toBe(null);
+  });
+
+  it('never lets a Shift variant take a combination another reachable binding names', () => {
+    // Shift+X cancels the current queue item, a global binding: culling while a batch generates keeps it.
+    expect(resolve(register(), 'gallery', true, 'shift+x')).toBe('app.cancelQueueItem');
+    expect(resolve(register(), 'preview', true, 'shift+x')).toBe('app.cancelQueueItem');
+    expect(resolve(register({ 'app.cancelQueueItem': [] }), 'preview', true, 'shift+x')).toBe('cull.reject');
+  });
+
+  it('resolves every key exactly as without Cull mode while it is off', () => {
+    const keys = [
+      ...firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'cull')
+        .flatMap(({ defaultKeys }) => defaultKeys),
+      'shift+x',
+      'shift+1',
+    ];
+
+    for (const typeId of ['preview', 'gallery', 'canvas', null]) {
+      for (const key of keys) {
+        expect(resolve(register(), typeId, false, key)).toBe(resolve(register({}, false), typeId, false, key));
+      }
+    }
+    expect(resolve(register(), 'preview', false, '1')).toBe('viewer.zoomToActual');
+  });
+
+  it('leaves Canvas and other widgets their own keys while on', () => {
+    expect(resolve(register(), 'canvas', true, 'x')).toBe('canvas.toggleFillColor');
+    expect(resolve(register(), 'canvas', true, '[')).toBe('canvas.brushSizeDown');
+    expect(resolve(register(), 'queue', true, '1')).toBe('app.selectGenerateTab');
+    expect(resolve(register(), 'canvas', true, 'shift+x')).toBe('app.cancelQueueItem');
   });
 });

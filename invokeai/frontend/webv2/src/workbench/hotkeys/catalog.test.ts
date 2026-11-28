@@ -1,3 +1,8 @@
+import {
+  GALLERY_CULL_COMMANDS,
+  GALLERY_CULL_HOTKEY_MODE,
+  GALLERY_CULL_TOGGLE_COMMAND_ID,
+} from '@features/gallery/cull';
 import { describe, expect, it } from 'vitest';
 
 import { firstPartyHotkeyCatalog, getRegionFocusDefaultKey, regionFocusHotkeys } from './catalog';
@@ -107,5 +112,18 @@ describe('firstPartyHotkeyCatalog', () => {
       (['left', 'right', 'up', 'down'] as const).map((direction) => [getRegionFocusDefaultKey(direction, IS_MAC_OS)])
     );
     expect(regionFocusHotkeys.every((hotkey) => hotkey.allowInEditable)).toBe(true);
+  });
+
+  // The catalog spells the cull ids itself so it needs no gallery import; saved custom bindings are keyed by them.
+  it('lists a binding for each of the Gallery’s cull commands, Shift-accepting except the rating steps', () => {
+    const cullRows = firstPartyHotkeyCatalog.filter((hotkey) => hotkey.mode !== undefined);
+
+    expect(cullRows.map(({ commandId, id, mode }) => [id, commandId, mode])).toEqual(
+      GALLERY_CULL_COMMANDS.map(({ id }) => [id, id, GALLERY_CULL_HOTKEY_MODE])
+    );
+    expect(cullRows.map((hotkey) => hotkey.acceptsShift === true)).toEqual(
+      GALLERY_CULL_COMMANDS.map(({ action }) => action.kind !== 'step')
+    );
+    expect(firstPartyHotkeyCatalog.some((hotkey) => hotkey.id === GALLERY_CULL_TOGGLE_COMMAND_ID)).toBe(true);
   });
 });

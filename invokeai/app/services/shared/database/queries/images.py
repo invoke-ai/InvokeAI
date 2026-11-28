@@ -64,6 +64,9 @@ _RECORD = (
     _I.image_subfolder,
     _I.project_id,
     _I.file_size_bytes,
+    _I.rating,
+    _I.rejected,
+    _I.color_label,
 )
 _RECORD_NAMES = tuple(column.name for column in _RECORD)
 
@@ -472,7 +475,8 @@ class ImageQueries(QueryModule):
 
     @write
     def update(self, conn: Connection, image_name: str, changes: ImageRecordChanges) -> None:
-        """Applies the changes to the image's category, session, intermediate flag and star."""
+        """Applies the changes to the image's category, session, intermediate flag and star; starring it clears
+        its rejection."""
         fields: dict[str, Any] = {}
         if changes.image_category is not None:
             fields["image_category"] = ImageCategory(changes.image_category).value
@@ -482,6 +486,8 @@ class ImageQueries(QueryModule):
             fields["is_intermediate"] = changes.is_intermediate
         if changes.starred is not None:
             fields["starred"] = changes.starred
+            if changes.starred:
+                fields["rejected"] = False
         if fields:
             values = {f"new_{field}": value for field, value in fields.items()}
             conn.execute(_update(tuple(sorted(fields))), {"target_image_name": image_name, **values})

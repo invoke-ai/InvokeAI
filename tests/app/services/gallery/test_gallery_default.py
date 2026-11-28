@@ -28,7 +28,7 @@ from invokeai.app.services.board_records.board_records_default import BoardRecor
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.gallery.gallery_common import GalleryItemKind
 from invokeai.app.services.gallery.gallery_default import GalleryService
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import gallery as gallery_queries
@@ -36,8 +36,10 @@ from invokeai.app.services.shared.database.schema.boards import board_members
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.schema.videos import videos
+from invokeai.app.services.shared.media_marks import ColorLabel, MarkChanges, MarkFilters, MarkFlag
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.urls.urls_default import LocalUrlService
+from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from tests.fixtures.database import capture_statements, explain_query_plan
 
@@ -1506,3 +1508,168 @@ class TestAllReadableBoardsScope:
 
         assert set(starred.item_names) == {"public-visibility.png", "own-unboarded.mp4"}
         assert set(videos_only.item_names) == {"shared-visibility.mp4", "public-visibility.mp4"}
+
+
+def _mark(services, image_names=(), video_names=(), **marks: Any) -> tuple[dict, dict]:
+    return services["gallery"].set_marks(list(image_names), list(video_names), MarkChanges(**marks))
+
+
+def _flags(services, kind: str, name: str) -> tuple[bool, bool]:
+    record = (services["images"] if kind == "image" else services["videos"]).get(name)
+    return record.starred, record.rejected
+
+
+def _record_changes(kind: str, starred: bool) -> ImageRecordChanges | VideoRecordChanges:
+    return ImageRecordChanges(starred=starred) if kind == "image" else VideoRecordChanges(starred=starred)
+
+
+class TestMarks:
+    def test_new_items_are_unmarked_and_set_marks_show_in_records_and_items(self, services) -> None:
+        _save_image(services["images"], "a.png", user_id="alice")
+        _save_video(services["videos"], "a.mp4", user_id="alice")
+        _start_gallery_for_item_results(services)
+        unmarked = services["images"].get("a.png")
+
+        _mark(services, ["a.png"], ["a.mp4"], rating=4, flag=MarkFlag.REJECT, color_label=ColorLabel.PURPLE)
+
+        assert (unmarked.rating, unmarked.rejected, unmarked.color_label) == (0, False, None)
+        for record in (services["images"].get("a.png"), services["videos"].get("a.mp4")):
+            assert (record.starred, record.rejected, record.rating, record.color_label) == (
+                False,
+                True,
+                4,
+                ColorLabel.PURPLE,
+            )
+        items = services["gallery"].list_items(limit=10, user_id="alice", is_admin=False).items
+        assert {(i.name, i.starred, i.rejected, i.rating, i.color_label) for i in items} == {
+            ("a.png", False, True, 4, ColorLabel.PURPLE),
+            ("a.mp4", False, True, 4, ColorLabel.PURPLE),
+        }
+
+    def test_a_mark_left_out_stays_and_none_clears_the_label(self, services) -> None:
+        _save_image(services["images"], "a.png", user_id="alice")
+        _mark(services, ["a.png"], rating=3, color_label=ColorLabel.RED, flag=MarkFlag.PICK)
+
+        _mark(services, ["a.png"], flag=MarkFlag.REJECT)
+        kept = services["images"].get("a.png")
+        _mark(services, ["a.png"], color_label="none", flag=MarkFlag.NONE)
+        cleared = services["images"].get("a.png")
+
+        assert (kept.rating, kept.color_label, kept.starred, kept.rejected) == (3, ColorLabel.RED, False, True)
+        assert (cleared.rating, cleared.color_label, cleared.starred, cleared.rejected) == (3, None, False, False)
+
+    @pytest.mark.parametrize("kind", ["image", "video"])
+    def test_an_item_is_never_both_starred_and_rejected(self, services, kind: str) -> None:
+        name = "item.png" if kind == "image" else "item.mp4"
+        if kind == "image":
+            _save_image(services["images"], name, user_id="alice")
+        else:
+            _save_video(services["videos"], name, user_id="alice")
+        store = services["images"] if kind == "image" else services["videos"]
+
+        def flag(value: MarkFlag) -> tuple[bool, bool]:
+            _mark(services, **{"image_names" if kind == "image" else "video_names": [name]}, flag=value)
+            return _flags(services, kind, name)
+
+        def star(starred: bool) -> tuple[bool, bool]:
+            store.update(name, _record_changes(kind, starred))
+            return _flags(services, kind, name)
+
+        flag(MarkFlag.REJECT)
+        assert star(True) == (True, False)
+        assert flag(MarkFlag.REJECT) == (False, True)
+        assert star(False) == (False, True)
+        assert flag(MarkFlag.PICK) == (True, False)
+        assert flag(MarkFlag.NONE) == (False, False)
+
+    def test_marks_skip_missing_items_and_report_each_items_board(self, services) -> None:
+        board = services["boards"].save("B", "alice")
+        _save_image(services["images"], "boarded.png", user_id="alice")
+        services["board_images"].add_image_to_board(board.board_id, "boarded.png")
+        _save_video(services["videos"], "loose.mp4", user_id="alice")
+
+        images_marked, videos_marked = _mark(services, ["boarded.png", "gone.png"], ["loose.mp4", "gone.mp4"], rating=2)
+
+        assert images_marked == {"boarded.png": board.board_id}
+        assert videos_marked == {"loose.mp4": None}
+
+    def test_a_batch_is_one_update_and_one_read_per_kind(self, services) -> None:
+        image_names = [f"{n}.png" for n in range(100)]
+        video_names = [f"{n}.mp4" for n in range(100)]
+        for name in image_names:
+            _save_image(services["images"], name, user_id="alice")
+        for name in video_names:
+            _save_video(services["videos"], name, user_id="alice")
+
+        with capture_statements(services["db"]) as statements:
+            images_marked, videos_marked = _mark(services, image_names, video_names, rating=5, flag=MarkFlag.PICK)
+
+        assert len(images_marked) == len(videos_marked) == 100
+        verbs = [sql.split(None, 1)[0].upper() for sql, _ in statements]
+        assert [verb for verb in verbs if verb in ("UPDATE", "SELECT")] == ["UPDATE", "SELECT", "UPDATE", "SELECT"]
+
+    @staticmethod
+    def _seed(services) -> None:
+        """Alice's items, each with other marks; Bob's matches every filter but is not Alice's."""
+        for name in ("pick.png", "plain.png"):
+            _save_image(services["images"], name, user_id="alice")
+        for name in ("reject.mp4", "three.mp4"):
+            _save_video(services["videos"], name, user_id="alice")
+        _save_image(services["images"], "bob.png", user_id="bob")
+        _mark(services, ["pick.png", "bob.png"], flag=MarkFlag.PICK, rating=5, color_label=ColorLabel.RED)
+        _mark(services, video_names=["reject.mp4"], flag=MarkFlag.REJECT, rating=1)
+        _mark(services, ["plain.png"], color_label=ColorLabel.BLUE)
+        _mark(services, video_names=["three.mp4"], flag=MarkFlag.PICK, rating=3, color_label=ColorLabel.RED)
+
+    @pytest.mark.parametrize(
+        ("filters", "expected"),
+        [
+            ({"marks": MarkFilters(flags=[MarkFlag.PICK])}, {"pick.png", "three.mp4"}),
+            ({"marks": MarkFilters(flags=[MarkFlag.REJECT])}, {"reject.mp4"}),
+            ({"marks": MarkFilters(flags=[MarkFlag.NONE])}, {"plain.png"}),
+            ({"marks": MarkFilters(flags=[MarkFlag.REJECT, MarkFlag.PICK])}, {"pick.png", "three.mp4", "reject.mp4"}),
+            ({"marks": MarkFilters(min_rating=3)}, {"pick.png", "three.mp4"}),
+            ({"marks": MarkFilters(max_rating=0)}, {"plain.png"}),
+            ({"marks": MarkFilters(min_rating=1, max_rating=3)}, {"reject.mp4", "three.mp4"}),
+            ({"marks": MarkFilters(color_labels=[ColorLabel.RED])}, {"pick.png", "three.mp4"}),
+            ({"marks": MarkFilters(color_labels=["none"])}, {"reject.mp4"}),
+            ({"marks": MarkFilters(color_labels=[ColorLabel.BLUE, "none"])}, {"plain.png", "reject.mp4"}),
+            (
+                {"marks": MarkFilters(flags=[MarkFlag.PICK], min_rating=4, color_labels=[ColorLabel.RED])},
+                {"pick.png"},
+            ),
+            ({"marks": MarkFilters(flags=[MarkFlag.PICK]), "media_kind": "video"}, {"three.mp4"}),
+            ({"marks": MarkFilters(flags=[MarkFlag.REJECT]), "starred": True}, set()),
+        ],
+    )
+    def test_mark_filters_select_the_same_items_in_pages_names_and_locations(
+        self, services, filters: dict[str, Any], expected: set[str]
+    ) -> None:
+        self._seed(services)
+        _start_gallery_for_item_results(services)
+        gallery = services["gallery"]
+        scope = {"user_id": "alice", "is_admin": False, **filters}
+
+        page = gallery.list_items(limit=10, **scope)
+        names = gallery.get_item_names(**scope)
+        located = {
+            name
+            for name in ("pick.png", "plain.png", "reject.mp4", "three.mp4")
+            if gallery.get_item_location(
+                kind=GalleryItemKind.VIDEO if name.endswith(".mp4") else GalleryItemKind.IMAGE, name=name, **scope
+            )
+            is not None
+        }
+
+        assert {item.name for item in page.items} == set(names.item_names) == located == expected
+        assert page.total == names.total_count == len(expected)
+
+    def test_list_filters_normalize_so_a_client_cannot_multiply_shapes(self) -> None:
+        def shape(**marks: Any) -> object:
+            return gallery_queries.Filters(marks=MarkFilters(**marks)).shape()
+
+        assert shape(flags=[MarkFlag.PICK]) == shape(flags=[MarkFlag.REJECT, "none", "none"])
+        assert shape(color_labels=[ColorLabel.RED]) == shape(color_labels=["none", ColorLabel.BLUE, "blue"])
+        assert shape(flags=list(MarkFlag)) == shape(flags=[]) == shape()
+        assert shape(color_labels=[*ColorLabel, "none"]) == shape()
+        assert shape(min_rating=1) == shape(max_rating=2) == shape(min_rating=4, max_rating=5)

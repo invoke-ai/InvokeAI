@@ -15,7 +15,7 @@ import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import type { GalleryItemContextMenuTarget } from './GalleryUiContext';
 
-import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionMarks, useGalleryWidget } from './GalleryWidgetContext';
 
 const getGalleryItemRange = (
   orderedRefs: readonly GalleryItemRef[],
@@ -290,7 +290,7 @@ export const useGalleryGridSelection = ({
       ? [parseGalleryItemKey(primaryKey)]
       : [];
   }, [gallery.selectedItemKey, loadedItems, selectedItemRefs]);
-  const shouldStarSelection = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
+  const selectionMarks = useGallerySelectionMarks(actionSelectionRefs, loadedItems);
 
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
@@ -305,12 +305,12 @@ export const useGalleryGridSelection = ({
           ),
         ];
 
-        // The menu sees only loaded items; the star answer also covers selected items no page holds.
+        // The menu sees only loaded items; the marks also cover selected items no page holds.
         setContextMenuTarget({
-          allStarred: !shouldStarSelection,
           itemRefs: selectedItemRefs,
           items: selectionItems,
           listingBoardId: gallery.listingBoardId,
+          marks: selectionMarks,
           returnFocus,
           x,
           y,
@@ -320,7 +320,7 @@ export const useGalleryGridSelection = ({
 
       setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], returnFocus, x, y });
     },
-    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
+    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, selectionMarks]
   );
 
   const getDragItems = useCallback(
@@ -347,8 +347,8 @@ export const useGalleryGridSelection = ({
     handleThumbnailContextMenu,
     loadedItems,
     selectedItemKeys,
+    selectionMarks,
     selectItemRange,
-    shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
   };

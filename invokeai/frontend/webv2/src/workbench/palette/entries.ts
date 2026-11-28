@@ -229,6 +229,7 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.togglePanels': 'Layout',
   'app.togglePreview': 'Layout',
   'app.toggleRightPanel': 'Layout',
+  'cull.toggleMode': 'Gallery',
 };
 
 /** Titles the app already words in its own catalog, so the palette reads like the control it runs. */
@@ -295,6 +296,8 @@ export const buildCatalogCommandEntries = ({
     .filter(
       (definition) =>
         !PALETTE_HIDDEN_COMMANDS.has(definition.commandId) &&
+        // A mode's keys act on what the press lands on; the palette has no such target.
+        definition.mode === undefined &&
         WIDGET_OPEN_COMMANDS[definition.commandId] === undefined &&
         (isHandled?.(definition.commandId) ?? true)
     )

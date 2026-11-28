@@ -12,6 +12,7 @@ from invokeai.app.services.gallery.gallery_common import (
     GalleryMediaUsage,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.media_marks import MarkChanges, MarkFilters
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
@@ -40,6 +41,7 @@ class GalleryServiceABC(ABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> OffsetPaginatedResults[GalleryItem]:
         """Lists a paginated, time-sorted stream of image + video items."""
         pass
@@ -61,6 +63,7 @@ class GalleryServiceABC(ABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> Optional[GalleryItemLocation]:
         """Finds an item's exact zero-based position in an ordinary item listing."""
         pass
@@ -82,6 +85,7 @@ class GalleryServiceABC(ABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> GalleryItemNamesResult:
         """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
 
@@ -107,6 +111,7 @@ class GalleryServiceABC(ABC):
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
         media_kind: Optional[GalleryMediaKind] = None,
+        marks: MarkFilters = MarkFilters(),
     ) -> GalleryItemNames:
         """Returns the ordered flat name list for optimistic UI / virtualized lists.
 
@@ -118,7 +123,18 @@ class GalleryServiceABC(ABC):
         `starred` restricts to starred (`True`) or unstarred (`False`) items; `None` applies no filter.
 
         `media_kind` restricts to images or videos; `None` lists both.
+
+        `marks` restricts by flag, rating and color label (see `MarkFilters`).
         """
+        pass
+
+    @abstractmethod
+    def set_marks(
+        self, image_names: Collection[str], video_names: Collection[str], changes: MarkChanges
+    ) -> tuple[dict[str, Optional[str]], dict[str, Optional[str]]]:
+        """Sets the marks on the named images and videos, in one transaction; it does not decide who may. Returns
+        the board of each image and of each video that existed (None for none); names of items that do not exist
+        are left out."""
         pass
 
     @abstractmethod

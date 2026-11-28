@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryKnownMarks, GalleryMarksFilter, GalleryMarksPatch } from '@features/gallery/core/marks';
 import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type {
@@ -39,7 +40,11 @@ export interface GalleryItemActions {
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
   openItemInNewTab(item: GalleryItem): void;
   openItemInPreview(item: GalleryItem): void;
-  setItemsStarred(items: GalleryItemRef[], starred: boolean): Promise<void>;
+  /**
+   * One optimistic request for both kinds; a mark left out of `patch` stays. Offers an Undo that restores each item's
+   * own prior marks; `quiet` drops the success notice (and its Undo), never a failure.
+   */
+  setItemsMarks(items: GalleryItemRef[], patch: GalleryMarksPatch, options?: { quiet?: boolean }): Promise<void>;
 }
 
 export interface GalleryItemActionContext {
@@ -59,11 +64,12 @@ export interface GalleryItemActionsOptions {
 }
 
 export interface GalleryItemContextMenuTarget {
-  /** `items` omits unloaded targets. */
-  allStarred?: boolean;
   itemRefs: GalleryItemRef[];
+  /** Omits unloaded targets. */
   items: GalleryItem[];
   listingBoardId?: string;
+  /** Aligned with `itemRefs`, including members `items` omits as unloaded; the menu reads loaded items without it. */
+  marks?: readonly GalleryKnownMarks[];
   /** Resolved on close: the menu that had focus is gone by then. */
   returnFocus?: () => HTMLElement | null;
   x: number;
@@ -98,7 +104,7 @@ export interface GalleryCommandsPort {
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setSearchTerm(searchTerm: string): void;
-  setStarredOnly(starredOnly: boolean): void;
+  setMarksFilter(marksFilter: GalleryMarksFilter): void;
   setSemanticSearchMode(enabled: boolean): void;
   setSemanticSearchText(text: string): void;
   commitSemanticSearch(text: string): void;
@@ -119,9 +125,11 @@ export interface GalleryNotificationsPort {
 
 export interface GalleryWidgetRuntime {
   commands: {
-    register(command: { handler: () => unknown; id: string; title: string }): () => void;
+    /** A Shift-accepting hotkey hands its command the press (`{ shiftKey }`) as the first argument. */
+    register(command: { handler: (...args: unknown[]) => unknown; id: string; title: string }): () => void;
   };
   hotkeys: {
+    activateMode(activation: { mode: string }): () => void;
     register(hotkey: { commandId: string; defaultKeys: string[]; id: string; title: string }): () => void;
   };
 }

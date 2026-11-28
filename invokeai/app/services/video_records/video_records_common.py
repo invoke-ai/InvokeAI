@@ -8,6 +8,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ResourceOrigin,
 )
+from invokeai.app.services.shared.media_marks import ColorLabel
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
@@ -87,6 +88,9 @@ class VideoRecord(BaseModelExcludeNull):
     file_size_bytes: Optional[int] = Field(
         default=None, description="Bytes the video, its thumbnail and sidecar occupy on disk; null until measured."
     )
+    rating: int = Field(description="The video's rating, from 0 (unrated) to 5.")
+    rejected: bool = Field(description="Whether this video is rejected. Never true together with `starred`.")
+    color_label: Optional[ColorLabel] = Field(default=None, description="The video's color label, if it has one.")
     media_origin: Optional[str] = Field(
         default=None,
         description="How this video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio "
@@ -125,6 +129,9 @@ def deserialize_video_record(video_dict: dict) -> VideoRecord:
     media_origin = coerce_media_origin(video_dict.get("media_origin", None))
     project_id = video_dict.get("project_id", None)
     file_size_bytes = video_dict.get("file_size_bytes", None)
+    rating = video_dict.get("rating", 0)
+    rejected = video_dict.get("rejected", False)
+    color_label = video_dict.get("color_label", None)
 
     return VideoRecord(
         video_name=video_name,
@@ -146,6 +153,9 @@ def deserialize_video_record(video_dict: dict) -> VideoRecord:
         media_origin=media_origin,
         project_id=project_id,
         file_size_bytes=file_size_bytes,
+        rating=rating,
+        rejected=rejected,
+        color_label=color_label,
     )
 
 

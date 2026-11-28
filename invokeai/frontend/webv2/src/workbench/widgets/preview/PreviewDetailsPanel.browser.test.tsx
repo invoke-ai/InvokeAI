@@ -125,7 +125,10 @@ const imageItem: GalleryImageItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'still.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumbnails/still.webp',
   width: 512,
 };

@@ -3,6 +3,7 @@ import type { GalleryItem } from '@features/gallery/contracts';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { EMPTY_GALLERY_MARKS_FILTER } from '@features/gallery/core/marks';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { patchGalleryItemCaches } from '@features/gallery/data/queryCache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -47,7 +48,7 @@ const itemActions = {
   moveItemsToBoard: vi.fn(async () => {}),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
-  setItemsStarred: vi.fn(async () => {}),
+  setItemsMarks: vi.fn(async () => {}),
 };
 
 const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' | 'name'>): GalleryBoard => ({
@@ -71,7 +72,10 @@ const createItem = (name: string, starred: boolean): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumb/${name}`,
   width: 64,
 });
@@ -96,6 +100,8 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     selectedItemKey: 'image:a.png',
     selectedItemKeys: ['image:a.png', 'image:b.png'],
     settings: DEFAULT_GALLERY_SETTINGS,
+    marksFilter: EMPTY_GALLERY_MARKS_FILTER,
+    selectionMarksFilter: EMPTY_GALLERY_MARKS_FILTER,
     ...overrides,
   }) as GalleryStateView;
 
@@ -113,7 +119,7 @@ const renderBar = async (
   const strip = starredStrip ?? EMPTY_GALLERY_STARRED_STRIP;
   const contextValue = {
     actions,
-    filter: { boardId: gallery.selectedBoardId, starred: gallery.starredOnly === true },
+    filter: { boardId: gallery.selectedBoardId },
     gallery,
     itemActions,
     loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
@@ -183,45 +189,60 @@ describe('GallerySelectionBar', () => {
     expect(host?.textContent).toContain('2 selected');
   });
 
-  it('stars the whole selection when any member is unstarred', async () => {
-    await renderBar(createGallery());
-    await click(getButton('widgets.gallery.starSelection'));
+  // The bookmark is the first toggle in the bar's marks popover.
+  const bookmark = async (): Promise<HTMLElement> => {
+    const find = () => document.querySelector<HTMLElement>('[data-mark-part="bookmark"]');
 
-    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+    if (!find()) {
+      await click(host!.querySelector<HTMLElement>('[data-gallery-marks-trigger]')!);
+      await expect.poll(find).not.toBeNull();
+    }
+
+    return find()!;
+  };
+  const pickOnly = { ...EMPTY_GALLERY_MARKS_FILTER, flags: ['pick' as const] };
+
+  it('bookmarks the whole selection when any member is not bookmarked', async () => {
+    await renderBar(createGallery());
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('false');
+    await click(await bookmark());
+
+    expect(itemActions.setItemsMarks).toHaveBeenCalledExactlyOnceWith(
       [
         { kind: 'image', name: 'a.png' },
         { kind: 'image', name: 'b.png' },
       ],
-      true
+      { flag: 'pick' }
     );
   });
 
-  it('unstars a starred-only selection whose members no page has loaded', async () => {
+  it('removes the bookmark from a bookmarked-only selection whose members no page has loaded', async () => {
     const selectedItemKeys = ['image:a.png', 'image:never-loaded-1.png', 'image:never-loaded-2.png'] as const;
     await renderBar(
       createGallery({
         items: [createItem('a.png', true)],
+        marksFilter: pickOnly,
         selectedItemKey: 'image:a.png',
         selectedItemKeys: [...selectedItemKeys],
-        selectionStarredOnly: true,
-        starredOnly: true,
+        selectionMarksFilter: pickOnly,
       })
     );
-    await click(getButton('widgets.gallery.unstarSelection'));
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('true');
+    await click(await bookmark());
 
-    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+    expect(itemActions.setItemsMarks).toHaveBeenCalledExactlyOnceWith(
       [
         { kind: 'image', name: 'a.png' },
         { kind: 'image', name: 'never-loaded-1.png' },
         { kind: 'image', name: 'never-loaded-2.png' },
       ],
-      false
+      { flag: 'none' }
     );
   });
 
-  it('retains the selected item star state after its sparse page is evicted', async () => {
+  it('retains the selected item’s marks after its sparse page is evicted', async () => {
     const gallery = createGallery({
-      items: [createItem('b.png', true)],
+      items: [{ ...createItem('b.png', true), rating: 4 }],
       selectedItemKey: 'image:b.png',
       selectedItemKeys: ['image:b.png'],
     });
@@ -229,17 +250,22 @@ describe('GallerySelectionBar', () => {
     await renderBar(gallery);
     await renderBar({ ...gallery, items: [] });
 
-    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
-    await click(getButton('widgets.gallery.unstarSelection'));
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('[data-gallery-marks-trigger]')?.getAttribute('aria-label')).toBe(
+      'widgets.gallery.marks.triggerWithSummary'
+    );
+    await click(await bookmark());
 
-    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], false);
+    expect(itemActions.setItemsMarks).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], {
+      flag: 'none',
+    });
   });
 
   it.each([
-    // A starred-only listing drops the item as the patch lands.
+    // A bookmarked-only listing drops the item as the patch lands.
     ['leaves the listing with the patch', false],
     ['sits on a page evicted earlier', true],
-  ] as const)('follows a star patch and its rollback for a selected item that %s', async (_case, evictedFirst) => {
+  ] as const)('follows a marks patch and its rollback for a selected item that %s', async (_case, evictedFirst) => {
     const gallery = createGallery({
       items: [createItem('b.png', true)],
       selectedItemKey: 'image:b.png',
@@ -255,32 +281,34 @@ describe('GallerySelectionBar', () => {
     let rollback = () => {};
     await act(() => {
       rollback = patchGalleryItemCaches(queryClient, {
-        kind: 'star',
+        kind: 'marks',
+        patch: { flag: 'none' },
         result: { failed: [], succeeded: [{ kind: 'image', name: 'b.png' }] },
-        starred: false,
       });
     });
     await renderBar(unloaded);
 
-    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
-    await click(getButton('widgets.gallery.starSelection'));
-    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], true);
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('false');
+    await click(await bookmark());
+    expect(itemActions.setItemsMarks).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], {
+      flag: 'pick',
+    });
 
     await act(() => rollback());
 
-    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('keeps a retained star flag for an item that stays selected when the selection grows', async () => {
+  it('keeps a retained bookmark for an item that stays selected when the selection grows', async () => {
     const gallery = createGallery({
       items: [createItem('a.png', true)],
+      marksFilter: pickOnly,
       selectedItemKey: 'image:a.png',
       selectedItemKeys: ['image:a.png'],
-      starredOnly: true,
     });
 
     await renderBar(gallery);
-    // A's page leaves the window, then starred B joins the selection.
+    // A's page leaves the window, then bookmarked B joins the selection.
     await renderBar({ ...gallery, items: [] });
     await renderBar({
       ...gallery,
@@ -289,10 +317,10 @@ describe('GallerySelectionBar', () => {
       selectedItemKeys: ['image:a.png', 'image:b.png'],
     });
 
-    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('restores a retained flag when a patch made before the selection grew is reverted', async () => {
+  it('restores a retained bookmark when a patch made before the selection grew is reverted', async () => {
     const gallery = createGallery({
       items: [createItem('a.png', true)],
       selectedItemKey: 'image:a.png',
@@ -310,27 +338,49 @@ describe('GallerySelectionBar', () => {
     let rollback = () => {};
     await act(() => {
       rollback = patchGalleryItemCaches(queryClient, {
-        kind: 'star',
+        kind: 'marks',
+        patch: { flag: 'none' },
         result: { failed: [], succeeded: [{ kind: 'image', name: 'a.png' }] },
-        starred: false,
       });
     });
     await renderBar(grown);
-    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('false');
 
     await act(() => rollback());
 
-    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+    expect((await bookmark()).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('reads star state from the strip for a selection the listing window has not loaded', async () => {
+  it('reads marks from the strip for a selection the listing window has not loaded', async () => {
     await renderBar(createGallery({ items: [] }), {
       items: [createItem('a.png', true), createItem('b.png', true)],
       total: 2,
     });
-    await click(getButton('widgets.gallery.unstarSelection'));
+    await click(await bookmark());
 
-    expect(itemActions.setItemsStarred).toHaveBeenCalledWith(expect.anything(), false);
+    expect(itemActions.setItemsMarks).toHaveBeenCalledWith(expect.anything(), { flag: 'none' });
+  });
+
+  it('marks the selection from a popover that returns focus to its trigger', async () => {
+    await renderBar(createGallery());
+    const trigger = document.querySelector<HTMLButtonElement>('[data-gallery-marks-trigger]')!;
+
+    trigger.focus();
+    await userEvent.keyboard('{Enter}');
+    const threeStars = () => document.querySelector<HTMLElement>('[data-mark-part="rating"] [aria-posinset="3"]');
+    await expect.poll(threeStars).not.toBeNull();
+    await click(threeStars()!);
+
+    expect(itemActions.setItemsMarks).toHaveBeenCalledExactlyOnceWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'b.png' },
+      ],
+      { rating: 3 }
+    );
+
+    await userEvent.keyboard('{Escape}');
+    await expect.poll(() => document.activeElement).toBe(trigger);
   });
 
   it('downloads and deletes the selection', async () => {

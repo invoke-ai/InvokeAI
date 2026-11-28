@@ -27,7 +27,7 @@ export type CanvasCompanionEngine = Pick<
 
 /** Canvas keys live while a companion widget holds focus; rows keep arrows, Delete and selection. */
 export const useCanvasCompanionHotkeys = (
-  runtime: { commands: Pick<WidgetCommandApi, 'register'>; hotkeys: WidgetHotkeyApi },
+  runtime: { commands: Pick<WidgetCommandApi, 'register'>; hotkeys: Pick<WidgetHotkeyApi, 'register'> },
   engine: CanvasCompanionEngine | null
 ): void => {
   const { t } = useTranslation();

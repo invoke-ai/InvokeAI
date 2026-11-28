@@ -1,3 +1,5 @@
+import type { GalleryColorLabel, GalleryRating } from './marks';
+
 export interface GeneratedImageContract {
   /** Board the backend saved the image to, when known. */
   boardId?: string;
@@ -105,7 +107,11 @@ export interface GalleryBoardAccess {
 
 export interface GalleryImage extends GeneratedImageContract {
   boardId: string;
+  /** Marks are optional on this legacy shape: records written before they existed read as unmarked. */
+  colorLabel?: GalleryColorLabel | null;
   imageCategory: 'general' | 'control' | 'mask' | 'user' | 'other';
+  rating?: GalleryRating;
+  rejected?: boolean;
   starred: boolean;
   /** Whether the image embeds the workflow that made it. Image records say; the mixed-media items listing does not, so grid images leave it unset. */
   hasWorkflow?: boolean;

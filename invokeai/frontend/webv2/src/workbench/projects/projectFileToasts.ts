@@ -137,7 +137,7 @@ export const startProjectFileReport = (
         ...(boards === 0 ? [] : [t('projects.file.unplacedBoards', { count: boards })]),
         ...(boardItems === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardItems })]),
         ...(documentReferences === 0 ? [] : [t('projects.file.missingReferences', { count: documentReferences })]),
-        ...(unstarred === 0 ? [] : [t('projects.file.unstarredItems', { count: unstarred })]),
+        ...(unstarred === 0 ? [] : [t('projects.file.unbookmarkedItems', { count: unstarred })]),
       ];
 
       settle({ description: parts.join(' '), title: successTitle, type: 'warning' });

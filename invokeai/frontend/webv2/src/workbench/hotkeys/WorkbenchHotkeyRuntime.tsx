@@ -2,6 +2,7 @@ import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
 import { isModalPresent } from '@platform/ui/modalPresence';
 import { isToastActivationKeyEvent } from '@platform/ui/toaster';
+import { areWidgetContributionSourcesEqual } from '@workbench/extensions/contributionSource';
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -9,12 +10,12 @@ import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/Wor
 import { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
 import { tinykeys } from 'tinykeys';
 
-import type { RegisteredHotkey } from './types';
+import type { HotkeyPress, RegisteredHotkey } from './types';
 
 import { firstPartyHotkeyCatalog } from './catalog';
 import { useExtensionHotkeyDefinitions } from './extensionHotkeys';
 import { useRegisterFirstPartyCommands } from './firstPartyCommands';
-import { acceptsHotkeyPress, toTinykeysBinding } from './keys';
+import { acceptsHotkeyPress, toShiftedTinykeysBinding, toTinykeysBinding } from './keys';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from './targetWidget';
 
@@ -22,6 +23,9 @@ export const getHotkeyExecutionSource = (
   hotkey: Pick<RegisteredHotkey, 'scope' | 'source'>,
   activeSource: WidgetContributionSource | null
 ): WidgetContributionSource | null => (hotkey.scope.kind === 'global' ? (hotkey.source ?? null) : activeSource);
+
+/** A Shift-accepting digit binding and one that names Shift can both match a press; the first that resolves runs. */
+const handledPresses = new WeakSet<KeyboardEvent>();
 
 /** Claimed bindings suppress browser defaults unless preventDefault is explicitly false. */
 export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boolean =>
@@ -55,13 +59,21 @@ export const WorkbenchHotkeyRuntime = () => {
     return [...firstPartyHotkeys, ...widgetHotkeys];
   }, [commandContributions, customHotkeys, extensionHotkeys]);
 
-  const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey, source: WidgetContributionSource | null) => {
-    void commandApi.executeForSource(hotkey.commandId, getHotkeyExecutionSource(hotkey, source));
-  });
+  const executeHotkey = useEffectEvent(
+    (hotkey: RegisteredHotkey, source: WidgetContributionSource | null, event: KeyboardEvent) => {
+      const press: HotkeyPress = { shiftKey: event.shiftKey };
+
+      void commandApi.executeForSource(
+        hotkey.commandId,
+        getHotkeyExecutionSource(hotkey, source),
+        ...(hotkey.acceptsShift ? [press] : [])
+      );
+    }
+  );
 
   const handleHotkey = useEffectEvent((event: KeyboardEvent, matchedKey: string) => {
     // A focused toast button keeps its activation keys; no shortcut, however scoped, takes them.
-    if (event.isComposing || event.keyCode === 229 || isToastActivationKeyEvent(event)) {
+    if (event.isComposing || event.keyCode === 229 || isToastActivationKeyEvent(event) || handledPresses.has(event)) {
       return;
     }
 
@@ -71,7 +83,16 @@ export const WorkbenchHotkeyRuntime = () => {
       targetWidget: getHotkeyTargetWidget(event.target),
     });
     const hotkey = resolveHotkey({
-      context: { ...target, isModalPresent: isModalPresent(event), projectId: project.projectId ?? '' },
+      context: {
+        ...target,
+        // Read at the press: a mode turned on or off changes no binding, only which ones answer.
+        activeModes: stores.hotkeyModes
+          .list()
+          .filter((activation) => !activation.source || areWidgetContributionSourcesEqual(activation.source, source))
+          .map(({ mode }) => mode),
+        isModalPresent: isModalPresent(event),
+        projectId: project.projectId ?? '',
+      },
       event,
       hotkeys: registeredHotkeys,
       matchedKey,
@@ -81,6 +102,8 @@ export const WorkbenchHotkeyRuntime = () => {
       return;
     }
 
+    handledPresses.add(event);
+
     if (shouldPreventHotkeyDefault(hotkey)) {
       event.preventDefault();
     }
@@ -89,7 +112,7 @@ export const WorkbenchHotkeyRuntime = () => {
       return;
     }
 
-    executeHotkey(hotkey, source);
+    executeHotkey(hotkey, source, event);
   });
 
   useEffect(() => {
@@ -105,6 +128,12 @@ export const WorkbenchHotkeyRuntime = () => {
               handleHotkey(event, key);
             }
           };
+        }
+
+        const shiftedBinding = hotkey.acceptsShift ? toShiftedTinykeysBinding(key) : '';
+
+        if (shiftedBinding) {
+          bindings[shiftedBinding] = (event) => handleHotkey(event, `shift+${key}`);
         }
       }
     }

@@ -23,7 +23,10 @@ const galleryItem: GalleryItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'a.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/api/v1/images/i/a.png/thumbnail',
   width: 512,
 };

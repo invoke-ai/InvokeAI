@@ -38,7 +38,10 @@ const createBackendItem = (name: string, createdAt: string): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumbnails/${name}`,
   width: 512,
 });
@@ -157,7 +160,10 @@ describe('mergeGalleryItemWindow', () => {
       isIntermediate: false,
       kind: 'image',
       name: 'shared',
+      colorLabel: null,
       starred: false,
+      rating: 0,
+      rejected: false,
       thumbnailUrl: '/thumbnails/shared',
       width: 64,
     } satisfies GalleryItem;
@@ -171,7 +177,10 @@ describe('mergeGalleryItemWindow', () => {
       createImage(99, {
         imageName: 'recent',
         queuedAt: '2026-07-30T12:00:01.000Z',
+        colorLabel: null,
         starred: true,
+        rating: 0,
+        rejected: false,
       })
     );
 
@@ -229,7 +238,7 @@ describe('mergeGalleryItemWindow', () => {
   it('overlays recents onto the unstarred listing only, and never a recent that has since been starred', () => {
     const backend = createBackendItem('backend.png', '2026-01-01T00:00:00.000Z');
     const fresh = asGenerated(createImage(1));
-    const starredSince = asGenerated(createImage(2, { starred: true }));
+    const starredSince = asGenerated(createImage(2, { colorLabel: null, rating: 0, rejected: false, starred: true }));
 
     expect(
       mergeGalleryItemWindow({

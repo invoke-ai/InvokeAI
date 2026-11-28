@@ -672,6 +672,88 @@ const parseClientStateValue = (value) => {
 };
 
 /** Mirrors `POST /api/v1/gallery/usage` over the fixtures; the mock has one account, so other accounts use nothing. */
+/** The server's `MAX_IMAGE_BATCH_SIZE`/`MAX_VIDEO_BATCH_SIZE`. */
+const MARKS_MAX_NAMES_PER_KIND = 1000;
+const MARKS_REQUEST_FIELDS = new Set(['color_label', 'flag', 'image_names', 'rating', 'video_names']);
+
+/** `POST /gallery/items/marks`: the real route's validation and skip rules; names it may not mark are in no list. */
+const setGalleryItemMarks = (state, faults, body) => {
+  const invalid = (detail) => [422, { detail }];
+
+  if (!body || typeof body !== 'object' || Object.keys(body).some((key) => !MARKS_REQUEST_FIELDS.has(key))) {
+    return invalid('Unknown field');
+  }
+
+  const imageNames = body.image_names ?? [];
+  const videoNames = body.video_names ?? [];
+  const { color_label: colorLabel = null, flag = null, rating = null } = body;
+
+  if (
+    !Array.isArray(imageNames) ||
+    !Array.isArray(videoNames) ||
+    imageNames.length > MARKS_MAX_NAMES_PER_KIND ||
+    videoNames.length > MARKS_MAX_NAMES_PER_KIND ||
+    (rating !== null && !(Number.isInteger(rating) && rating >= 0 && rating <= 5)) ||
+    (flag !== null && !MARK_FLAGS.includes(flag)) ||
+    (colorLabel !== null && colorLabel !== 'none' && !COLOR_LABELS.includes(colorLabel))
+  ) {
+    return invalid('Invalid marks request');
+  }
+  if (imageNames.length === 0 && videoNames.length === 0) {
+    return invalid('Name at least one image or video');
+  }
+  if (rating === null && flag === null && colorLabel === null) {
+    return invalid('Give at least one mark to set');
+  }
+
+  const affectedBoards = new Set();
+  const mark = (item) => {
+    if (rating !== null) {
+      item.rating = rating;
+    }
+    if (flag !== null) {
+      item.starred = flag === 'pick';
+      item.rejected = flag === 'reject';
+    }
+    if (colorLabel === 'none') {
+      delete item.color_label;
+    } else if (colorLabel !== null) {
+      item.color_label = colorLabel;
+    }
+    affectedBoards.add(item.board_id ?? 'none');
+  };
+  const updatedImageNames = [...new Set(imageNames)].filter((name) => {
+    const image = state.images.get(name);
+    const board = image?.board_id ? state.boards.get(image.board_id) : undefined;
+
+    if (!image || (board && boardRefusal(state, faults, board, 'manage_items'))) {
+      return false;
+    }
+    mark(image);
+    return true;
+  });
+  const updatedVideoNames = [...new Set(videoNames)].filter((name) => {
+    const video = state.videos.get(name);
+
+    if (!video || video.owner_user_id !== MOCK_USER_ID) {
+      return false;
+    }
+    mark(video);
+    return true;
+  });
+
+  return [
+    200,
+    {
+      affected_boards: [...affectedBoards].sort(),
+      failed_image_names: [],
+      failed_video_names: [],
+      updated_image_names: updatedImageNames,
+      updated_video_names: updatedVideoNames,
+    },
+  ];
+};
+
 const galleryMediaUsage = (state, faults, body) => {
   const imageNames = Array.isArray(body.image_names) ? body.image_names : [];
   const videoNames = Array.isArray(body.video_names) ? body.video_names : [];
@@ -826,7 +908,15 @@ const getOptionalBoolean = (url, name) => {
 };
 
 // Only media_origin belongs in the DTO; other metadata is served by /metadata.
+/** The marks fields as the backend serializes them: `color_label` absent when there is none. */
+const marksDto = (value) => ({
+  ...(value.color_label ? { color_label: value.color_label } : {}),
+  rating: value.rating ?? 0,
+  rejected: value.rejected ?? false,
+});
+
 const toVideoDto = (video) => ({
+  ...marksDto(video),
   board_id: video.board_id,
   created_at: video.created_at,
   duration: video.duration,
@@ -854,6 +944,7 @@ const toGalleryItem = (kind, value) =>
         kind,
         name: value.image_name,
         starred: value.starred ?? false,
+        ...marksDto(value),
         thumbnail_url: value.thumbnail_url,
         width: value.width,
       }
@@ -870,6 +961,7 @@ const toGalleryItem = (kind, value) =>
         media_origin: value.metadata?.media_origin ?? null,
         name: value.video_name,
         starred: value.starred,
+        ...marksDto(value),
         thumbnail_url: value.thumbnail_url,
         width: value.width,
       };
@@ -910,6 +1002,43 @@ const isListedBoard = (state, faults, boardId) => {
   return board !== undefined && !board.archived && boardAccessFor(state, faults, board).readable;
 };
 
+const MARK_FLAGS = ['pick', 'none', 'reject'];
+const COLOR_LABELS = ['red', 'yellow', 'green', 'blue', 'purple'];
+
+const parseRatingParam = (url, name, min) => {
+  const raw = url.searchParams.get(name);
+  const value = raw === null ? null : Number(raw);
+
+  return value === null || (Number.isInteger(value) && value >= min && value <= 5) ? value : Number.NaN;
+};
+
+/** The listing marks filters, AND-combined as the backend's; null when a value is invalid (a 422 there). */
+const getMarksFilter = (url) => {
+  const flags = url.searchParams.getAll('flags');
+  const colorLabels = url.searchParams.getAll('color_labels');
+  const minRating = parseRatingParam(url, 'min_rating', 1);
+  const maxRating = parseRatingParam(url, 'max_rating', 0);
+
+  return { colorLabels, flags, maxRating, minRating };
+};
+
+const getMarksFilterError = (url) => {
+  const { colorLabels, flags, maxRating, minRating } = getMarksFilter(url);
+
+  if (
+    flags.some((flag) => !MARK_FLAGS.includes(flag)) ||
+    colorLabels.some((label) => label !== 'none' && !COLOR_LABELS.includes(label)) ||
+    Number.isNaN(minRating) ||
+    Number.isNaN(maxRating)
+  ) {
+    return 'Invalid marks filter';
+  }
+
+  return minRating !== null && maxRating !== null && minRating > maxRating
+    ? 'min_rating must not be greater than max_rating'
+    : null;
+};
+
 const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = {}) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
@@ -919,6 +1048,7 @@ const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = 
   const mediaKind = getRequestedMediaKind(url);
   const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
+  const { colorLabels, flags, maxRating, minRating } = getMarksFilter(url);
   const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
 
   return getGalleryCandidates(state)
@@ -943,6 +1073,15 @@ const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = 
         return false;
       }
       if (starred !== undefined && Boolean(item.starred) !== starred) {
+        return false;
+      }
+      if (flags.length > 0 && !flags.includes(item.starred ? 'pick' : item.rejected ? 'reject' : 'none')) {
+        return false;
+      }
+      if ((minRating !== null && item.rating < minRating) || (maxRating !== null && item.rating > maxRating)) {
+        return false;
+      }
+      if (colorLabels.length > 0 && !colorLabels.includes(item.color_label ?? 'none')) {
         return false;
       }
       if (createdDate && item.created_at.slice(0, 10) !== createdDate) {
@@ -2874,6 +3013,17 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, listVirtualDateBoards(state));
       }
 
+      const isMarksFilteredListing =
+        path === '/api/v1/gallery/items/' ||
+        path === '/api/v1/gallery/items/location' ||
+        path === '/api/v1/gallery/items/names' ||
+        path === '/api/v1/gallery/item_names' ||
+        /^\/api\/v1\/virtual_boards\/by_date\/[^/]+\/item_names$/.test(path);
+      const marksFilterError = method === 'GET' && isMarksFilteredListing ? getMarksFilterError(url) : null;
+      if (marksFilterError) {
+        return json(422, { detail: marksFilterError });
+      }
+
       const virtualBoardItemNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/item_names$/.exec(path);
       if (method === 'GET' && virtualBoardItemNamesMatch) {
         const date = decodeURIComponent(virtualBoardItemNamesMatch[1]);
@@ -2928,6 +3078,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           node_id: null,
           session_id: null,
           starred: false,
+          rating: 0,
+          rejected: false,
           thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
           updated_at: now,
           width: 1,
@@ -2937,6 +3089,10 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         state.images.set(imageName, image);
         response.setHeader('location', image.image_url);
         return json(201, image);
+      }
+
+      if (method === 'POST' && path === '/api/v1/gallery/items/marks') {
+        return json(...setGalleryItemMarks(state, faults, await readJsonBody(request)));
       }
 
       if (method === 'POST' && (path === '/api/v1/images/star' || path === '/api/v1/images/unstar')) {
@@ -2953,6 +3109,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             continue;
           }
           image.starred = starred;
+          image.rejected = starred ? false : image.rejected;
           succeeded.push(name);
           affectedBoards.push(image.board_id ?? 'none');
         }
@@ -3002,6 +3159,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             image_url: `/api/v1/images/i/${imageName}/full`,
             is_intermediate: false,
             starred: false,
+            rating: 0,
+            rejected: false,
             thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
             updated_at: now,
           });
@@ -3047,6 +3206,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             created_at: now,
             is_intermediate: false,
             starred: false,
+            rating: 0,
+            rejected: false,
             updated_at: now,
             video_name: videoName,
           });
@@ -3150,6 +3311,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           metadata: null,
           owner_user_id: MOCK_USER_ID,
           starred: false,
+          rating: 0,
+          rejected: false,
           thumbnail_url: `/api/v1/videos/i/${videoName}/thumbnail`,
           video_category: url.searchParams.get('video_category') ?? 'general',
           video_name: videoName,
@@ -3183,6 +3346,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             continue;
           }
           video.starred = starred;
+          video.rejected = starred ? false : video.rejected;
           succeeded.push(name);
           affectedBoards.push(video.board_id ?? 'none');
         }

@@ -14,7 +14,10 @@ const selectedVideo: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'selected',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/videos/selected/thumbnail',
   width: 1280,
 };

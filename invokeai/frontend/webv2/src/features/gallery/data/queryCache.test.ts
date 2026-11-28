@@ -26,12 +26,13 @@ import {
   ensureGalleryBoardDestinations,
   getCachedGalleryBoard,
   getGalleryItemBoardIdsFromCaches,
-  getGalleryItemStarredFromCaches,
+  getGalleryItemMarksFromCaches,
   invalidateGallery,
   invalidateGalleryBoardDestinations,
   invalidateGalleryItems,
   patchGalleryBoardCaches,
   patchGalleryItemCaches,
+  writeGalleryItemMarks,
 } from './queryCache';
 
 vi.mock('./backend', async (importOriginal) => ({
@@ -71,7 +72,10 @@ const createItem = (
         kind,
         name,
         sourceQueueItemId: 'backend-gallery',
+        colorLabel: null,
         starred,
+        rating: 0 as const,
+        rejected: false,
         thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
         width: 512,
       }
@@ -85,6 +89,9 @@ const createItem = (
         isIntermediate: false,
         kind,
         name,
+        colorLabel: null,
+        rating: 0 as const,
+        rejected: false,
         starred,
         thumbnailUrl: `/api/v1/videos/i/${name}/thumbnail`,
         width: 512,
@@ -117,6 +124,8 @@ const getData = (client: QueryClient, queryKey: ReturnType<typeof getItemsKey>):
   return data as GalleryItemsData;
 };
 
+const toRef = ({ kind, name }: GalleryItem) => ({ kind, name });
+
 const getResult = (
   succeeded: GalleryItemMutationResult['succeeded'],
   failed: GalleryItemMutationResult['failed'] = []
@@ -127,7 +136,7 @@ describe('Gallery item cache patches', () => {
     accountLifecycle.activate('gallery-query-cache-test');
   });
 
-  it('patches a qualified star in place and rolls back without rebuilding untouched pages or page params', () => {
+  it('patches a qualified mark in place and rolls back without rebuilding untouched pages or page params', () => {
     const client = createClient();
     const target = createItem('target.png');
     const samePageUntouched = createItem('same-page-untouched.png');
@@ -141,9 +150,9 @@ describe('Gallery item cache patches', () => {
     const pageParamsBefore = before.pageParams;
 
     const rollback = patchGalleryItemCaches(client, {
-      kind: 'star',
+      kind: 'marks',
+      patch: { flag: 'pick' },
       result: getResult([{ kind: 'image', name: target.name }]),
-      starred: true,
     });
     const after = getData(client, key);
 
@@ -164,27 +173,79 @@ describe('Gallery item cache patches', () => {
     expect(rolledBack.pages[0]?.items[1]).toBe(samePageUntouched);
   });
 
-  it('drops a starred item from the unstarred listing window and decrements its total', () => {
+  it('takes marked items out of every listing their new marks fail, lowering each listing once', () => {
     const client = createClient();
-    const target = createItem('target.png');
-    const other = createItem('other.png');
-    const key = galleryKeys.items(
-      captureAccountScope(),
-      canonicalizeGalleryItemsFilter({ boardId: 'board-1', galleryView: 'images', searchTerm: '', starred: false })
-    );
-
-    client.setQueryData(key, createData([[target, other]]));
-    const rollback = patchGalleryItemCaches(client, {
-      kind: 'star',
-      result: getResult([{ kind: 'image', name: target.name }]),
-      starred: true,
+    const rated = (name: string, rating: 3 | 4) => ({ ...createItem(name), rating });
+    const first = rated('first.png', 4);
+    const second = rated('second.png', 3);
+    const kept = rated('kept.png', 4);
+    const filtered = canonicalizeGalleryItemsFilter({
+      boardId: 'board-1',
+      galleryView: 'images',
+      minRating: 3,
+      searchTerm: '',
+      starred: false,
     });
+    const windowKey = galleryKeys.items(captureAccountScope(), filtered);
+    const pageKey = galleryKeys.itemPage(captureAccountScope(), filtered, 60);
+    const unfilteredKey = getItemsKey('board-1');
+    const result = getResult([
+      { kind: 'image', name: first.name },
+      { kind: 'image', name: second.name },
+    ]);
 
-    expect(getData(client, key).pages[0]).toEqual({ items: [other], total: 1 });
+    client.setQueryData(windowKey, createData([[first, kept]]));
+    client.setQueryData<GalleryItemsPage>(pageKey, { items: [second], itemIndices: [60], offset: 60, total: 61 });
+    client.setQueryData(unfilteredKey, createData([[first, second, kept]]));
+    const rollback = patchGalleryItemCaches(client, { kind: 'marks', patch: { rating: 2 }, result });
+
+    // One listing, two cached entries: each loses both removed items from its total.
+    expect(getData(client, windowKey).pages[0]).toEqual({ items: [kept], total: 0 });
+    expect(client.getQueryData<GalleryItemsPage>(pageKey)).toEqual({
+      items: [],
+      itemIndices: [],
+      offset: 60,
+      total: 59,
+    });
+    expect(getData(client, unfilteredKey).pages[0]?.items).toEqual([
+      { ...first, rating: 2 },
+      { ...second, rating: 2 },
+      kept,
+    ]);
 
     rollback();
 
-    expect(getData(client, key).pages[0]).toEqual({ items: [target, other], total: 2 });
+    expect(getData(client, windowKey).pages[0]).toEqual({ items: [first, kept], total: 2 });
+    expect(getData(client, unfilteredKey).pages[0]?.items).toEqual([first, second, kept]);
+  });
+
+  it('keeps a bookmarked item in a flag listing that still lists it, and drops it from the grid partition', () => {
+    const client = createClient();
+    const target = { ...createItem('target.png'), rejected: true };
+    const flagsKey = galleryKeys.items(
+      captureAccountScope(),
+      canonicalizeGalleryItemsFilter({
+        boardId: 'board-1',
+        flags: ['pick', 'reject'],
+        galleryView: 'images',
+        searchTerm: '',
+      })
+    );
+    const gridKey = galleryKeys.items(
+      captureAccountScope(),
+      canonicalizeGalleryItemsFilter({ boardId: 'board-1', galleryView: 'images', searchTerm: '', starred: false })
+    );
+    const result = getResult([{ kind: 'image', name: target.name }]);
+
+    client.setQueryData(flagsKey, createData([[target]]));
+    client.setQueryData(gridKey, createData([[target]]));
+    patchGalleryItemCaches(client, { kind: 'marks', patch: { flag: 'pick' }, result });
+
+    expect(getData(client, flagsKey).pages[0]).toEqual({
+      items: [{ ...target, rejected: false, starred: true }],
+      total: 1,
+    });
+    expect(getData(client, gridKey).pages[0]).toEqual({ items: [], total: 0 });
   });
 
   it('deletes matching qualified items across pages and keeps each page total consistent', () => {
@@ -246,7 +307,7 @@ describe('Gallery item cache patches', () => {
   });
 
   describe('sparse page entries', () => {
-    it('patches star, delete, and move results and restores each page on rollback', () => {
+    it('patches marks, delete, and move results and restores each page on rollback', () => {
       const client = createClient();
       const target = createItem('sparse-target.png', 'board-1', false);
       const deleted = createItem('sparse-deleted.png', 'board-1', false, 'video');
@@ -262,17 +323,17 @@ describe('Gallery item cache patches', () => {
 
       client.setQueryData(key, before);
 
-      expect(getGalleryItemStarredFromCaches(client, [{ kind: 'image', name: target.name }])).toEqual(
-        new Map([[`image:${target.name}`, false]])
+      expect(getGalleryItemMarksFromCaches(client, [{ kind: 'image', name: target.name }])).toEqual(
+        new Map([[`image:${target.name}`, { colorLabel: null, flag: 'none', rating: 0 }]])
       );
       expect(getGalleryItemBoardIdsFromCaches(client, [{ kind: 'image', name: moved.name }])).toEqual(
         new Map([[`image:${moved.name}`, 'board-1']])
       );
 
       const rollbackStar = patchGalleryItemCaches(client, {
-        kind: 'star',
+        kind: 'marks',
+        patch: { flag: 'pick' },
         result: getResult([{ kind: 'image', name: target.name }]),
-        starred: true,
       });
       expect(client.getQueryData<GalleryItemsPage>(key)?.items[0]).toEqual({ ...target, starred: true });
       expect(client.getQueryData<GalleryItemsPage>(key)?.itemIndices).toEqual([60, 62, 64, 65]);
@@ -354,9 +415,9 @@ describe('Gallery item cache patches', () => {
 
       client.setQueryData(key, before);
       const rollback = patchGalleryItemCaches(client, {
-        kind: 'star',
+        kind: 'marks',
+        patch: { flag: 'none' },
         result: getResult([{ kind: 'image', name: target.name }]),
-        starred: false,
       });
 
       expect(getStrip(client, key)).toEqual({ items: [other], total: 4 });
@@ -374,9 +435,9 @@ describe('Gallery item cache patches', () => {
 
     client.setQueryData(key, createData([[target]]));
     const rollback = patchGalleryItemCaches(client, {
-      kind: 'star',
+      kind: 'marks',
+      patch: { flag: 'pick' },
       result: getResult([{ kind: 'image', name: target.name }]),
-      starred: true,
     });
     const concurrent = client.setQueryData<GalleryItemsData>(key, (current) => {
       if (!current) {
@@ -741,6 +802,194 @@ describe('Gallery window rebuild', () => {
     expect(data.pages.flatMap((page) => page.items.map((item) => item.name))).not.toContain('fresh-0.png');
     expect(data.pageParams).toEqual([0]);
     unsubscribe();
+  });
+});
+
+describe('Gallery item marks writes', () => {
+  const listFilter: GalleryItemsFilter = { boardId: 'board-1', galleryView: 'images', searchTerm: '' };
+  const ref = { kind: 'image' as const, name: 'a.png' };
+
+  const setUp = () => {
+    const client = createClient();
+    const key = galleryKeys.items(captureAccountScope(), canonicalizeGalleryItemsFilter(listFilter));
+    const item = createItem('a.png');
+
+    client.setQueryData(key, createData([[item]]));
+
+    return {
+      client,
+      item,
+      key,
+      rating: () => getData(client, key).pages[0]?.items[0]?.rating,
+      unsubscribe: new InfiniteQueryObserver(client, galleryItemsInfiniteOptions(listFilter)).subscribe(
+        () => undefined
+      ),
+    };
+  };
+
+  beforeEach(() => {
+    accountLifecycle.activate('gallery-marks-write-test');
+    vi.mocked(listGalleryItems).mockReset();
+  });
+
+  it('keeps a mark over a listing read that started before it, until a refetch after the server has it', async () => {
+    const { client, item, key, rating, unsubscribe } = setUp();
+    let answerRead = (_page: GalleryItemsPage) => {};
+
+    vi.mocked(listGalleryItems).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answerRead = resolve;
+        })
+    );
+    const read = client.refetchQueries({ queryKey: key });
+    const write = writeGalleryItemMarks(client, [ref], { rating: 4 }, { boards: false, refetchDelayMs: 0 });
+
+    answerRead({ items: [item], total: 1 });
+    await read;
+
+    expect(rating()).toBe(4);
+
+    // Once the server has the mark, its trailing refetch is the newer word, even from another client.
+    vi.mocked(listGalleryItems).mockResolvedValue({ items: [{ ...item, rating: 5 }], total: 1 });
+    write.settle();
+
+    await vi.waitFor(() => expect(rating()).toBe(5));
+    unsubscribe();
+  });
+
+  it('refetches the listings once after a burst, never while a write is pending', async () => {
+    const { client, item, unsubscribe } = setUp();
+
+    vi.mocked(listGalleryItems).mockResolvedValue({ items: [item], total: 1 });
+    const first = writeGalleryItemMarks(client, [ref], { rating: 1 }, { boards: false, refetchDelayMs: 10 });
+    const second = writeGalleryItemMarks(client, [ref], { rating: 2 }, { boards: false, refetchDelayMs: 10 });
+
+    first.settle();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 40);
+    });
+
+    expect(vi.mocked(listGalleryItems)).not.toHaveBeenCalled();
+
+    second.settle();
+
+    await vi.waitFor(() => expect(vi.mocked(listGalleryItems)).toHaveBeenCalledOnce());
+    unsubscribe();
+  });
+
+  it('moves an item from the Bookmarked strip into the grid at its place, and rolls both listings back', () => {
+    const client = createClient();
+    const owner = captureAccountScope();
+    const strip = createItem('s.png', 'board-1', true);
+    const marked = createItem('b.png', 'board-1', true);
+    const [newest, oldest, later] = ['c.png', 'a.png', '0.png'].map((name) => createItem(name));
+    const stripKey = galleryKeys.starredStrip(owner, canonicalizeGalleryItemsFilter({ ...listFilter, starred: true }));
+    const gridFilter = canonicalizeGalleryItemsFilter({ ...listFilter, starred: false });
+    const firstPageKey = galleryKeys.itemPage(owner, gridFilter, 0);
+    const laterPageKey = galleryKeys.itemPage(owner, gridFilter, 60);
+    const stripBefore: GalleryItemsPage = { items: [strip, marked], total: 2 };
+    const firstPageBefore: GalleryItemsPage = { items: [newest!, oldest!], itemIndices: [0, 1], offset: 0, total: 61 };
+    const laterPageBefore: GalleryItemsPage = { items: [later!], itemIndices: [60], offset: 60, total: 61 };
+
+    client.setQueryData(stripKey, stripBefore);
+    client.setQueryData(firstPageKey, firstPageBefore);
+    client.setQueryData(laterPageKey, laterPageBefore);
+    const write = writeGalleryItemMarks(client, [toRef(marked)], { flag: 'none' }, { boards: true, refetchDelayMs: 0 });
+    const unmarked = { ...marked, starred: false };
+
+    expect(client.getQueryData(stripKey)).toEqual({ items: [strip], total: 1 });
+    // Between its neighbours, with no index left between them: every index from its own moves up one.
+    expect(client.getQueryData(firstPageKey)).toEqual({
+      items: [newest, unmarked, oldest],
+      itemIndices: [0, 1, 2],
+      offset: 0,
+      total: 62,
+    });
+    expect(client.getQueryData(laterPageKey)).toEqual({ items: [later], itemIndices: [61], offset: 60, total: 62 });
+
+    write.rollback();
+
+    expect(client.getQueryData(stripKey)).toEqual(stripBefore);
+    expect(client.getQueryData(firstPageKey)).toEqual(firstPageBefore);
+    expect(client.getQueryData(laterPageKey)).toEqual(laterPageBefore);
+  });
+
+  it('narrows a partly failed write in place, so a later pending write on a succeeded item stays the newer word', async () => {
+    const client = createClient();
+    const key = galleryKeys.items(captureAccountScope(), canonicalizeGalleryItemsFilter(listFilter));
+    const [kept, failed] = ['x.png', 'y.png'].map((name) => createItem(name));
+    const ratings = () => getData(client, key).pages[0]?.items.map((item) => item.rating);
+    const unsubscribe = new InfiniteQueryObserver(client, galleryItemsInfiniteOptions(listFilter)).subscribe(
+      () => undefined
+    );
+
+    client.setQueryData(key, createData([[kept!, failed!]]));
+    const first = writeGalleryItemMarks(
+      client,
+      [toRef(kept!), toRef(failed!)],
+      { rating: 3 },
+      { boards: false, refetchDelayMs: 0 }
+    );
+    const second = writeGalleryItemMarks(client, [toRef(kept!)], { rating: 5 }, { boards: false, refetchDelayMs: 0 });
+
+    first.settle([{ patch: { rating: 0 }, refs: [toRef(failed!)] }]);
+    expect(ratings()).toEqual([5, 0]);
+
+    // A read the server answered before either write lands while the second is still pending.
+    vi.mocked(listGalleryItems).mockResolvedValue({ items: [kept!, failed!], total: 2 });
+    await client.refetchQueries({ queryKey: key });
+
+    expect(ratings()).toEqual([5, 0]);
+    second.rollback();
+    unsubscribe();
+  });
+
+  const setUpBookmark = () => {
+    const client = createClient();
+    const owner = captureAccountScope();
+    const item = createItem('x.png');
+    const stripKey = (boardId: string) =>
+      galleryKeys.starredStrip(owner, canonicalizeGalleryItemsFilter({ ...listFilter, boardId, starred: true }));
+    const strip: GalleryItemsPage = { items: [createItem('s.png', 'board-1', true)], total: 1 };
+    const land = (boardId: string, page: GalleryItemsPage) =>
+      client.fetchQuery({ queryFn: () => page, queryKey: stripKey(boardId), staleTime: 0 });
+
+    client.setQueryData(stripKey('board-1'), strip);
+    client.setQueryData(
+      galleryKeys.itemPage(owner, canonicalizeGalleryItemsFilter({ ...listFilter, starred: false }), 0),
+      { items: [item], itemIndices: [0], offset: 0, total: 1 }
+    );
+    writeGalleryItemMarks(client, [toRef(item)], { flag: 'pick' }, { boards: true, refetchDelayMs: 0 });
+    expect(client.getQueryData<GalleryItemsPage>(stripKey('board-1'))?.total).toBe(2);
+
+    return { client, item, land, strip, stripKey };
+  };
+
+  it('never puts an item deleted while its mark is pending back into a listing, unless the deletion rolls back', async () => {
+    const { client, item, land, strip, stripKey } = setUpBookmark();
+    const rollback = patchGalleryItemCaches(client, { kind: 'delete', result: getResult([toRef(item)]) });
+
+    await land('board-1', strip);
+    expect(client.getQueryData(stripKey('board-1'))).toEqual(strip);
+
+    rollback();
+    await land('board-1', strip);
+    expect(client.getQueryData<GalleryItemsPage>(stripKey('board-1'))?.total).toBe(2);
+  });
+
+  it('puts an item moved while its mark is pending only into its new board’s listings', async () => {
+    const { client, item, land, strip, stripKey } = setUpBookmark();
+
+    patchGalleryItemCaches(client, { boardId: 'board-2', kind: 'move', result: getResult([toRef(item)]) });
+    await land('board-1', strip);
+    await land('board-2', { items: [], total: 0 });
+
+    expect(client.getQueryData(stripKey('board-1'))).toEqual(strip);
+    expect(client.getQueryData(stripKey('board-2'))).toEqual({
+      items: [{ ...item, boardId: 'board-2', starred: true }],
+      total: 1,
+    });
   });
 });
 

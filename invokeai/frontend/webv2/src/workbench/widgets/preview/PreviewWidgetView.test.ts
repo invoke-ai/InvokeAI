@@ -1,5 +1,6 @@
 import type { GalleryItem } from '@features/gallery';
 
+import { getGalleryMarksFilter } from '@features/gallery/contracts';
 import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
@@ -17,7 +18,7 @@ describe('getPreviewSelectedPage', () => {
     paginationMode: 'infinite' as const,
     searchTerm: '',
     semanticKey: 'text:sunset',
-    starredOnly: false,
+    marksFilter: getGalleryMarksFilter({}),
   };
 
   it('centers matching semantic navigation on the selected result page', () => {
@@ -106,7 +107,10 @@ describe('mergePreviewBoardItems', () => {
       height: 64,
       isIntermediate: false,
       name,
+      colorLabel: null,
       starred,
+      rating: 0 as const,
+      rejected: false,
       thumbnailUrl: `/${kind}/${name}/thumbnail`,
       width: 64,
     };

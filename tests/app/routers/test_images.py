@@ -110,6 +110,7 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
         ("post", "/api/v1/images/star", {"image_names": ["test.png"]}),
         ("post", "/api/v1/images/unstar", {"image_names": ["test.png"]}),
         ("post", "/api/v1/images/download", {"image_names": ["test.png"]}),
+        ("post", "/api/v1/gallery/items/marks", {"image_names": ["test.png"], "rating": 1}),
     ],
 )
 def test_image_operations_are_blocked_during_image_move_maintenance(
@@ -849,6 +850,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/gallery/items/marks",
         "/api/v1/gallery/usage",
         "/api/v1/images/copy",
         "/api/v1/images/delete",

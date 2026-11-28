@@ -710,6 +710,8 @@ def _uploaded_video_dto() -> VideoDTO:
             "updated_at": "2026-01-01T00:00:00Z",
             "is_intermediate": False,
             "starred": False,
+            "rating": 0,
+            "rejected": False,
             "has_workflow": False,
             "video_subfolder": "",
             "video_url": "/api/v1/videos/i/uploaded.mp4/full",

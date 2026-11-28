@@ -12,6 +12,7 @@ import {
   type GalleryItemKey,
   type GalleryItemKind,
 } from '@features/gallery/core/items';
+import { galleryMarksFilterKey, getGalleryMarksFilter, type GalleryMarksFilter } from '@features/gallery/core/marks';
 import {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
@@ -102,13 +103,13 @@ export interface GalleryStateView {
   primarySelectedItemKey: GalleryItemKey | null;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
-  /** Members were starred when selected; a selection carried in from another listing says nothing about star flags. */
-  selectionStarredOnly: boolean;
+  /** The marks filter the selection was made under; a selection carried in from elsewhere says nothing of its marks. */
+  selectionMarksFilter: GalleryMarksFilter;
   semanticImageQuery: GallerySemanticReference | null;
   /** Null in metadata mode. */
   semanticSearchText: string | null;
   settings: GallerySettings;
-  starredOnly: boolean;
+  marksFilter: GalleryMarksFilter;
 }
 
 export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
@@ -116,8 +117,6 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
-
-export const getGalleryStarredOnly = (values: Record<string, unknown>): boolean => values.starredOnly === true;
 
 export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null =>
   parseGallerySemanticReference(values.semanticImageQuery);
@@ -139,7 +138,7 @@ const isSameGalleryListing = (left: Record<string, unknown>, right: Record<strin
   getGalleryRawSelectedBoardId(left) === getGalleryRawSelectedBoardId(right) &&
   getGalleryView(left) === getGalleryView(right) &&
   getGallerySearchTerm(left) === getGallerySearchTerm(right) &&
-  getGalleryStarredOnly(left) === getGalleryStarredOnly(right) &&
+  galleryMarksFilterKey(getGalleryMarksFilter(left)) === galleryMarksFilterKey(getGalleryMarksFilter(right)) &&
   getGalleryMediaFilter(left) === getGalleryMediaFilter(right) &&
   getGallerySearchScope(left) === getGallerySearchScope(right) &&
   gallerySemanticReferenceKey(getGallerySemanticImageQuery(left)) ===
@@ -300,8 +299,11 @@ export interface GallerySelectedImageQuery {
   /** One made outside the Gallery, such as a search pick: navigates its item's own board, unranked. */
   itemBoard: boolean;
   semanticKey: string | null;
-  starredOnly: boolean;
+  marksFilter: GalleryMarksFilter;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const getGallerySelectedImageQuery = (values: ResolvedValues): GallerySelectedImageQuery => {
   const query =
@@ -332,21 +334,22 @@ export const getGallerySelectedImageQuery = (values: ResolvedValues): GallerySel
     itemBoard: query?.itemBoard === true,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
     semanticKey: query && typeof query.semanticKey === 'string' && query.semanticKey ? query.semanticKey : null,
-    starredOnly: query && typeof query.starredOnly === 'boolean' ? query.starredOnly : getGalleryStarredOnly(values),
+    // A stamp without marks fields listed every mark.
+    marksFilter: getGalleryMarksFilter(isRecord(query) ? query : values),
   };
 };
 
 /** A selection stamped elsewhere is not this listing's, though it persists across those switches. */
 export const isGallerySelectionInScope = (
   selectedImageQuery: GallerySelectedImageQuery,
-  scope: Pick<GalleryStateView, 'galleryView' | 'listingBoardId' | 'searchTerm' | 'settings' | 'starredOnly'>
+  scope: Pick<GalleryStateView, 'galleryView' | 'listingBoardId' | 'marksFilter' | 'searchTerm' | 'settings'>
 ): boolean =>
   selectedImageQuery.boardId === scope.listingBoardId &&
   selectedImageQuery.galleryView === scope.galleryView &&
   selectedImageQuery.imageOrderDir === scope.settings.imageOrderDir &&
   selectedImageQuery.mediaKind === (toGalleryMediaKind(scope.settings.mediaFilter) ?? null) &&
   selectedImageQuery.searchTerm === scope.searchTerm &&
-  selectedImageQuery.starredOnly === scope.starredOnly;
+  galleryMarksFilterKey(selectedImageQuery.marksFilter) === galleryMarksFilterKey(scope.marksFilter);
 
 export const getGalleryTotalImages = (values: Record<string, unknown>): number | null =>
   typeof values.galleryTotalImages === 'number' && Number.isFinite(values.galleryTotalImages)
@@ -448,7 +451,7 @@ export const getGalleryStateView = (
   const galleryView = getGalleryView(values);
   const settings = getGallerySettings(values);
   const searchTerm = getGallerySearchTerm(values);
-  const starredOnly = getGalleryStarredOnly(values);
+  const marksFilter = getGalleryMarksFilter(values);
   const boards = backendBoards.length
     ? backendBoards
     : [
@@ -480,12 +483,12 @@ export const getGalleryStateView = (
     isGallerySelectionInScope(selectedImageQuery, {
       galleryView,
       listingBoardId,
+      marksFilter,
       searchTerm,
       settings,
-      starredOnly,
     }) &&
-    // A starred item lives in the strip, so the grid must not follow Preview's starred-list page.
-    (starredOnly || selectedItem?.starred !== true)
+    // A bookmarked item lives in the strip unless a flag filter hides it, so the grid must not follow its page.
+    (marksFilter.flags.length > 0 || selectedItem?.starred !== true)
       ? selectedImageQuery.page
       : null;
 
@@ -511,11 +514,11 @@ export const getGalleryStateView = (
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
-    selectionStarredOnly: selectedImageQuery.starredOnly,
+    selectionMarksFilter: selectedImageQuery.marksFilter,
     semanticImageQuery,
     semanticSearchText: getGallerySemanticSearchText(values),
     settings,
-    starredOnly,
+    marksFilter,
   };
 };
 

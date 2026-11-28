@@ -3,6 +3,7 @@ import type * as projectsApi from '@workbench/projects/api';
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { formatHotkeyLabel } from '@workbench/hotkeys';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -92,8 +93,8 @@ describe('HotkeysSettingsSection conflicts', () => {
     });
     await render();
 
-    await act(() => search().fill('starred'));
-    await expect.element(page.getByText('Toggle Starred Only', { exact: true })).toBeVisible();
+    await act(() => search().fill('bookmarked'));
+    await expect.element(page.getByText('Toggle Bookmarked Only', { exact: true })).toBeVisible();
     await expect.element(conflictText('Recall Seed')).toBeVisible();
 
     await act(() => search().fill('brush'));
@@ -121,6 +122,24 @@ describe('HotkeysSettingsSection conflicts', () => {
       )
       .toBeVisible();
     await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
+  });
+
+  it('says a Cull key’s Shift variant leaves a named combination alone, and Cancel’s row claims nothing', async () => {
+    const cancelTitle = 'Cancel current or next queue item';
+
+    await render();
+
+    await act(() => search().fill('reject'));
+    await expect
+      .element(
+        page.getByText(i18n.t('hotkeys.shiftKeptBy', { key: formatHotkeyLabel('shift+x'), title: cancelTitle }), {
+          exact: true,
+        })
+      )
+      .toBeVisible();
+
+    await act(() => search().fill(cancelTitle));
+    await expect.element(page.getByText(/while Cull mode is on$/)).not.toBeInTheDocument();
   });
 
   it('lists Clear Canvas on its own default shortcut, which meets no other default', async () => {

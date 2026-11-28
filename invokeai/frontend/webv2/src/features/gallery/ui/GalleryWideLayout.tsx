@@ -6,17 +6,19 @@ import { useCallback, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
+import { GalleryCullRow } from './GalleryCull';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryItemFilterMenu } from './GalleryItemFilterMenu';
 import { GalleryItemSearch } from './GalleryItemSearch';
+import { GalleryMarksFilterRow, GalleryMarksFilterToggle } from './GalleryMarksFilter';
 import { GallerySelectionBar } from './GallerySelectionBar';
-import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const CHROME_INSET_PADDING_TOP = 'calc(var(--chakra-spacing-2) + var(--wb-center-chrome-inset, 0px))';
 const CENTER_HANDLE_INSET = { pb: '2', pt: CHROME_INSET_PADDING_TOP } as const;
+const HIDDEN_WHEN_EMPTY = { display: 'none' } as const;
 
 export const GalleryWideLayout = () => {
   const { t } = useTranslation();
@@ -74,7 +76,7 @@ export const GalleryWideLayout = () => {
           <Box flex="1" maxW="22rem" minW="9rem">
             <GalleryItemSearch />
           </Box>
-          <GalleryStarredFilterToggle />
+          <GalleryMarksFilterToggle />
           <GalleryItemFilterMenu triggerRef={mediaFilterTriggerRef} />
           <GalleryUploadButton
             boards={gallery.boards}
@@ -82,6 +84,10 @@ export const GalleryWideLayout = () => {
             onUploadFiles={actions.uploadFiles}
           />
         </HStack>
+        <Stack gap="2" pb="2" pe="3" ps="3" _empty={HIDDEN_WHEN_EMPTY}>
+          <GalleryMarksFilterRow />
+          <GalleryCullRow />
+        </Stack>
         <Box
           aria-labelledby={segmentTabsTabId(viewTabsIdBase, gallery.galleryView)}
           flex="1"

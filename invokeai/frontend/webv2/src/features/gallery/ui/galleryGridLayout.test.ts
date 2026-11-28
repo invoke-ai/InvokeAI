@@ -30,7 +30,10 @@ const createImageItem = (name: string, starred = false): GalleryImageItem => ({
   isIntermediate: false,
   kind: 'image',
   name,
+  colorLabel: null,
   starred,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/api/v1/images/i/${name}/thumbnail`,
   width: 512,
 });

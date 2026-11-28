@@ -96,7 +96,10 @@ const uploadedImage: GalleryImageItem = {
   isIntermediate: false,
   kind: 'image',
   name: 'pasted.png',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/thumb/pasted.png',
   width: 2,
 };

@@ -3,6 +3,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, KeyboardSensor, MouseSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
+import { EMPTY_GALLERY_MARKS_FILTER } from '@features/gallery/core/marks';
 import { DEFAULT_GALLERY_SETTINGS, type GallerySettings } from '@features/gallery/core/settings';
 import { galleryBoardsOptions } from '@features/gallery/data/queries';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
@@ -102,9 +103,9 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     semanticSearchText: null,
     selectedItemKey: null,
     selectedItemKeys: [],
-    selectionStarredOnly: false,
+    selectionMarksFilter: EMPTY_GALLERY_MARKS_FILTER,
     settings: { ...DEFAULT_GALLERY_SETTINGS, showArchivedBoards: true, showDateBoards: true, ...settings },
-    starredOnly: false,
+    marksFilter: EMPTY_GALLERY_MARKS_FILTER,
     ...({} as Record<string, never>),
   }) as GalleryStateView;
 

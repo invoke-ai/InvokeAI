@@ -609,6 +609,8 @@ export const menuSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.menu.base?.content,
       ...dropdownContent,
+      // Names the surface for content drawn against it, as `--popover-bg` does for popovers.
+      '--menu-bg': `colors.${dropdownContent.bg}`,
     },
     arrow: {
       ...chakraSlotRecipes.menu.base?.arrow,
@@ -638,7 +640,25 @@ export const menuSlotRecipe = defineSlotRecipe({
     },
     separator: {
       ...chakraSlotRecipes.menu.base?.separator,
-      bg: 'border.subtle',
+      // The rule's top border is the line; a fill under it rounds to a second device pixel at fractional display scales.
+      bg: 'transparent',
+      borderColor: 'border.subtle',
+    },
+  },
+});
+
+/** Stars are the hit targets; the stock recipe gives them no focus ring or pointer. */
+export const ratingGroupSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.ratingGroup,
+  base: {
+    ...chakraSlotRecipes.ratingGroup.base,
+    item: {
+      ...chakraSlotRecipes.ratingGroup.base?.item,
+      borderRadius: 'l1',
+      cursor: 'pointer',
+      outline: 0,
+      _focusVisible: { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+      _disabled: { cursor: 'not-allowed', layerStyle: 'disabled' },
     },
   },
 });

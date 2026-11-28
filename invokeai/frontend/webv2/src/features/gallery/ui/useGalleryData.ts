@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemKind } from '@features/gallery/core/items';
+import type { GalleryListingMarks } from '@features/gallery/core/marks';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
@@ -144,13 +145,17 @@ const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
 };
 
 const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boolean => {
-  // Newly starred recents belong to the strip.
+  // Newly bookmarked recents belong to the strip; a marks filter is the listing's to apply, as a search is.
   if (
     filter.searchTerm !== '' ||
     filter.createdFrom !== undefined ||
     filter.createdTo !== undefined ||
     filter.starred === true ||
     (filter.starred === false && item.starred) ||
+    filter.flags !== undefined ||
+    filter.minRating !== undefined ||
+    filter.maxRating !== undefined ||
+    filter.colorLabels !== undefined ||
     Boolean(filter.semanticQuery) ||
     isDateBoardId(filter.boardId)
   ) {
@@ -267,7 +272,7 @@ export const useGalleryData = ({
   selectedBoardId,
   semanticQuery = null,
   settings,
-  starred,
+  marks,
   sparseViewport = false,
 }: {
   galleryView: GalleryView;
@@ -282,8 +287,8 @@ export const useGalleryData = ({
   selectedBoardId: string | null;
   semanticQuery?: GallerySemanticReference | null;
   settings: GallerySettings;
-  /** The grid passes `false`, its starred filter `true`; the picker omits it to see all. */
-  starred?: boolean;
+  /** The grid passes its listing's marks; the picker omits them to see all. */
+  marks?: GalleryListingMarks;
   sparseViewport?: boolean;
 }): GalleryData => {
   const { boards, boardsState } = useGalleryBoards({ settings });
@@ -302,7 +307,7 @@ export const useGalleryData = ({
       orderDir: settings.imageOrderDir,
       searchTerm: dateParse.text,
       ...(semanticQuery ? { semanticQuery } : {}),
-      ...(starred !== undefined ? { starred } : {}),
+      ...marks,
     }),
     [
       boardId,
@@ -313,7 +318,7 @@ export const useGalleryData = ({
       mediaKind,
       semanticQuery,
       settings.imageOrderDir,
-      starred,
+      marks,
     ]
   );
   // Query keys include the account epoch, so range and total state cannot survive an account switch.

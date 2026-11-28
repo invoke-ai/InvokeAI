@@ -65,6 +65,34 @@ const isPopupOwnedPress = (event: KeyboardEvent): boolean =>
 
 const customizedRank = (hotkey: RegisteredHotkey): number => (hotkey.customized ? 1 : 0);
 
+type PressMatch = 'explicit' | 'implicitShift' | null;
+
+/** `implicitShift`: the press is one of an `acceptsShift` binding's keys with Shift added, which it does not name. */
+const matchPress = (hotkey: RegisteredHotkey, pressed: string): PressMatch => {
+  const platformKeys = hotkey.keys.map((key) => toPlatformHotkey(key));
+
+  if (platformKeys.includes(pressed)) {
+    return 'explicit';
+  }
+
+  return hotkey.acceptsShift === true &&
+    platformKeys.some((key) => !key.split('+').includes('shift') && toPlatformHotkey(`shift+${key}`) === pressed)
+    ? 'implicitShift'
+    : null;
+};
+
+/** A popover or non-modal dialog keeps its presses from mode bindings, which act on the widget behind it. */
+const isInsideDialog = (target: EventTarget | null): boolean =>
+  typeof Element !== 'undefined' &&
+  target instanceof Element &&
+  target.closest('[role="dialog"], [role="alertdialog"]') !== null;
+
+const isModeOn = (hotkey: RegisteredHotkey, context: HotkeyContext, event: KeyboardEvent): boolean =>
+  hotkey.mode === undefined || (context.activeModes?.includes(hotkey.mode) === true && !isInsideDialog(event.target));
+
+/** While its mode is on, a mode binding takes the key from every other binding of the same scope priority. */
+const modeRank = (hotkey: RegisteredHotkey): number => (hotkey.mode === undefined ? 0 : 1);
+
 export const resolveHotkey = ({
   context,
   event,
@@ -84,16 +112,25 @@ export const resolveHotkey = ({
   // A focused text field, radio group or slider keeps the press unless the binding opts into editable targets.
   const isOwnedByTarget = isEditableHotkeyTarget(event.target) || isNativeControlKeyPress(event);
 
+  const candidates = hotkeys
+    .map((hotkey) => ({ hotkey, match: matchPress(hotkey, pressed) }))
+    .filter(({ hotkey, match }) => match !== null && isModeOn(hotkey, context, event))
+    .filter(({ hotkey }) => hotkey.allowInEditable || !isOwnedByTarget)
+    .filter(({ hotkey }) => isClaimedTarget(hotkey, event.target))
+    .filter(({ hotkey }) => hotkey.allowInModal || !context.isModalPresent)
+    .map((candidate) => ({ ...candidate, priority: getScopePriority(candidate.hotkey, context) }))
+    .filter(({ priority }) => priority >= 0);
+  // A binding that names the combination keeps it from one that only accepts Shift on its own key, whatever the rank.
+  const isNamed = candidates.some(({ match }) => match === 'explicit');
+
   return (
-    hotkeys
-      .filter((hotkey) => hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
-      .filter((hotkey) => hotkey.allowInEditable || !isOwnedByTarget)
-      .filter((hotkey) => isClaimedTarget(hotkey, event.target))
-      .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
-      .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
-      .filter(({ priority }) => priority >= 0)
+    candidates
+      .filter(({ match }) => !isNamed || match === 'explicit')
       .sort(
-        (left, right) => right.priority - left.priority || customizedRank(right.hotkey) - customizedRank(left.hotkey)
+        (left, right) =>
+          right.priority - left.priority ||
+          modeRank(right.hotkey) - modeRank(left.hotkey) ||
+          customizedRank(right.hotkey) - customizedRank(left.hotkey)
       )[0]?.hotkey ?? null
   );
 };

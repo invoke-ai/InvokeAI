@@ -1,7 +1,10 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetContributionSource, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'queue' | 'viewer' | 'workflows';
+export type HotkeyCategory = 'app' | 'canvas' | 'cull' | 'gallery' | 'queue' | 'viewer' | 'workflows';
+
+/** A mode a widget turns on (`runtime.hotkeys.activateMode`); its bindings answer only in a widget that has it on. */
+export type HotkeyMode = string;
 
 export type HotkeyScope =
   | { kind: 'global' }
@@ -26,6 +29,16 @@ export interface HotkeyDefinition {
   ignoreRepeat?: boolean;
   /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
   targetSelector?: string;
+  /**
+   * Binds only for presses aimed at a widget with the mode on, and then outranks every other binding of its scope
+   * priority; never inside a dialog or popover.
+   */
+  mode?: HotkeyMode;
+  /**
+   * Also answers with Shift held, handing its command a `HotkeyPress`, unless another binding the press can reach names
+   * that Shift combination itself.
+   */
+  acceptsShift?: boolean;
   unavailableReason?: string;
   source?: WidgetContributionSource;
 }
@@ -43,7 +56,14 @@ export interface HotkeyContext {
   activeWidgetTypeId: WidgetTypeId | null;
   /** An interactive modal is open; only hotkeys that opt in with `allowInModal` run beneath it. */
   isModalPresent: boolean;
+  /** Modes the widget the press is aimed at has on; absent means none. */
+  activeModes?: readonly HotkeyMode[];
   projectId: string;
+}
+
+/** What an `acceptsShift` binding's command receives as its first argument. */
+export interface HotkeyPress {
+  shiftKey: boolean;
 }
 
 export type CustomHotkeys = Record<string, string[]>;

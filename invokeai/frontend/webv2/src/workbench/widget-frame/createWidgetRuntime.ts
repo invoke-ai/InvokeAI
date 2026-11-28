@@ -105,6 +105,7 @@ export const createWidgetRuntime = ({
         scope: hotkey.scope ?? 'widget',
         source,
       }),
+    activateMode: (activation) => extensions.hotkeys.activateMode({ ...activation, source }),
   };
   const diagnostics = {
     logger: (namespace) =>

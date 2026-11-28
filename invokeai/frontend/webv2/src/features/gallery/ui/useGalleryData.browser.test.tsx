@@ -50,7 +50,10 @@ const createItem = (index: number): GalleryItem => ({
   isIntermediate: false,
   kind: 'image',
   name: `image-${index}.png`,
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: `/thumb/${index}`,
   width: 64,
 });

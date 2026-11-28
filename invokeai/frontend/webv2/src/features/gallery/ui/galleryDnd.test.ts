@@ -29,7 +29,10 @@ const createItem = (kind: GalleryItem['kind'], name: string, boardId: string): G
     height: 64,
     isIntermediate: false,
     name,
+    colorLabel: null,
     starred: false,
+    rating: 0 as const,
+    rejected: false,
     thumbnailUrl: `/thumbnail/${name}`,
     width: 64,
   };

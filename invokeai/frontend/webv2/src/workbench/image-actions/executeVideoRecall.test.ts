@@ -73,7 +73,10 @@ const item: GalleryVideoItem = {
   isIntermediate: false,
   kind: 'video',
   name: 'clip.mp4',
+  colorLabel: null,
   starred: false,
+  rating: 0,
+  rejected: false,
   thumbnailUrl: '/clip-thumb.jpg',
   width: 1280,
 };

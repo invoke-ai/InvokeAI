@@ -8,6 +8,7 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.shared.media_marks import ColorLabel
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
@@ -49,6 +50,9 @@ class GalleryItem(BaseModelExcludeNull):
     height: int = Field(description="The height of the item in pixels.")
     category: ImageCategory = Field(description="The category of the item (images and videos share the same enum).")
     starred: bool = Field(description="Whether the item is starred.")
+    rating: int = Field(description="The item's rating, from 0 (unrated) to 5.")
+    rejected: bool = Field(description="Whether the item is rejected. Never true together with `starred`.")
+    color_label: Optional[ColorLabel] = Field(default=None, description="The item's color label, if it has one.")
     is_intermediate: bool = Field(description="Whether the item is an intermediate output.")
     board_id: Optional[str] = Field(default=None, description="Owning board id, if any.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the item.")
@@ -60,6 +64,17 @@ class GalleryItem(BaseModelExcludeNull):
         description="How a video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio file "
         "the server wrapped into a waveform video. None for images and for unmarked videos.",
     )
+
+
+class GalleryItemMarksResult(BaseModel):
+    """What setting marks changed. Names the caller may not mark, and names of items that do not exist, are in no
+    list."""
+
+    updated_image_names: list[str] = Field(description="The images whose marks were set.")
+    updated_video_names: list[str] = Field(description="The videos whose marks were set.")
+    failed_image_names: list[str] = Field(description="Images the caller may mark whose marks could not be saved.")
+    failed_video_names: list[str] = Field(description="Videos the caller may mark whose marks could not be saved.")
+    affected_boards: list[str] = Field(description="The boards of the updated items; 'none' for items on no board.")
 
 
 class GalleryItemNamesResult(BaseModel):

@@ -18,14 +18,20 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { toGalleryItemRef } from '@features/gallery/core/items';
+import { EMPTY_GALLERY_MARKS_FILTER } from '@features/gallery/core/marks';
 import { requestGalleryItemReveal } from '@features/gallery/core/selection';
 import { getGallerySettings } from '@features/gallery/core/settings';
 import {
   galleryBoardsOptions,
   galleryItemsPageOptions,
+  galleryStarredStripOptions,
   getGalleryListingBoardsQuery,
 } from '@features/gallery/data/queries';
-import { invalidateGalleryItems, patchGalleryItemCaches } from '@features/gallery/data/queryCache';
+import {
+  invalidateGalleryItems,
+  patchGalleryItemCaches,
+  writeGalleryItemMarks,
+} from '@features/gallery/data/queryCache';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { getAutoSwitchFollowedLive } from '@features/queue/contracts';
@@ -33,7 +39,7 @@ import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { workbenchAutoScroll } from '@workbench/widgetDnd';
@@ -53,9 +59,10 @@ import type { GalleryListingState, GallerySparseListing } from './useGalleryData
 
 import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { getGalleryStateView } from './galleryStateView';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 import { useGalleryData } from './useGalleryData';
-import { EMPTY_GALLERY_STARRED_STRIP } from './useGalleryStarredStrip';
+import { EMPTY_GALLERY_STARRED_STRIP, useGalleryStarredStrip } from './useGalleryStarredStrip';
 
 const mocks = vi.hoisted(() => ({
   itemProgress: null as { percentage: number; message: string } | null,
@@ -207,8 +214,8 @@ void i18n.use(initReactI18next).init({
               navigationRight: 'Right',
               navigationUp: 'Up',
               selectAllOnPage: 'Select all',
-              toggleStarImage: 'Toggle star',
-              toggleStarredOnly: 'Toggle starred filter',
+              toggleBookmark: 'Toggle bookmark',
+              toggleBookmarkedOnly: 'Toggle bookmarked filter',
             },
             generationProgress: 'Generation progress',
             generationProgressPercent: 'Generation {{percentage}}%',
@@ -218,17 +225,17 @@ void i18n.use(initReactI18next).init({
             noMatchingImages: 'No images match',
             noMatchingVideos: 'No videos match',
             showAllMedia: 'Show all media',
-            noStarredItemsMatch: 'No starred items',
+            marksFilter: { clearFilters: 'Clear filters', noMatches: 'No items have these marks' },
             showAllStarred: 'Show all',
-            showAllStarredItems: 'Show all starred items',
+            showAllBookmarkedItems: 'Show all bookmarked items',
             dropMediaToUploadToBoard: 'Drop media to {{name}}',
             emptyBoardUploadHint: 'Drop media here or click to upload',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
             selectedBoardFallback: 'selected board',
-            starImage: 'Star {{name}}',
-            starredItems: 'Starred',
-            unstarImage: 'Unstar {{name}}',
+            bookmarkItem: 'Bookmark {{name}}',
+            removeBookmarkItem: 'Remove bookmark from {{name}}',
+            bookmarkedItems: 'Bookmarked',
             uncategorized: 'Uncategorized',
           },
           preview: {
@@ -297,7 +304,7 @@ const createFilter = (gallery: GalleryStateView): GalleryItemsFilter => {
     galleryView: gallery.galleryView,
     orderDir: gallery.settings.imageOrderDir,
     searchTerm: parse.text,
-    ...(gallery.starredOnly ? { starred: true } : {}),
+    ...(gallery.marksFilter.flags.length > 0 ? { flags: gallery.marksFilter.flags } : {}),
   };
 };
 
@@ -341,11 +348,11 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     selectedBoardId: board.id,
     selectedItemKey: 'image:first.png',
     selectedItemKeys: ['image:first.png'],
-    selectionStarredOnly: false,
+    selectionMarksFilter: EMPTY_GALLERY_MARKS_FILTER,
     semanticImageQuery: null,
     semanticSearchText: null,
     settings: { ...getGallerySettings(resolvedValues({ paginationMode: 'paginated' })), imageDensityPercent: 0 },
-    starredOnly: false,
+    marksFilter: EMPTY_GALLERY_MARKS_FILTER,
     ...overrides,
   };
 };
@@ -355,7 +362,7 @@ const actionMocks = {
   selectItem: vi.fn(),
   selectItemRange: vi.fn(),
   setCompareItem: vi.fn(),
-  setStarredOnly: vi.fn(),
+  setMarksFilter: vi.fn(),
   toggleItemInSelection: vi.fn(),
   updateSettings: vi.fn(),
   uploadFiles: vi.fn(),
@@ -369,19 +376,19 @@ const imageActionMocks = {
   moveItemsToBoard: vi.fn(),
   openItemInNewTab: vi.fn(),
   openItemInPreview: vi.fn(),
-  setItemsStarred: vi.fn(),
-  setImagesStarred: vi.fn(),
+  setItemsMarks: vi.fn(),
 };
 const noop = vi.fn();
-const registeredCommands = new Map<string, () => unknown>();
+const registeredCommands = new Map<string, (press?: unknown) => unknown>();
 const runtime = {
   commands: {
-    register: ({ handler, id }: { handler: () => unknown; id: string }) => {
+    register: ({ handler, id }: { handler: (press?: unknown) => unknown; id: string }) => {
       registeredCommands.set(id, handler);
       return () => registeredCommands.delete(id);
     },
   },
   hotkeys: {
+    activateMode: () => () => undefined,
     register: ({ commandId, defaultKeys }: { commandId: string; defaultKeys: string[] }) => {
       const handler = (event: KeyboardEvent) => {
         if (defaultKeys.includes(event.key.toLowerCase())) {
@@ -411,7 +418,7 @@ const createActions = (): GalleryActions =>
     selectProjectBoard: vi.fn(),
     setCompareItem: actionMocks.setCompareItem,
     setSearchTerm: noop,
-    setStarredOnly: actionMocks.setStarredOnly,
+    setMarksFilter: actionMocks.setMarksFilter,
     setView: noop,
     toggleImageInSelection: actionMocks.toggleItemInSelection,
     toggleItemInSelection: actionMocks.toggleItemInSelection,
@@ -420,7 +427,6 @@ const createActions = (): GalleryActions =>
   }) as unknown as GalleryActions;
 
 type CanonicalContextTarget = {
-  allStarred?: boolean;
   itemRefs?: GalleryItemRef[];
   items: GalleryItem[];
   returnFocus?: () => HTMLElement | null;
@@ -435,7 +441,6 @@ const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
           ? {
               itemRefs: target.itemRefs ?? null,
               items: target.items.map(({ kind, name }) => ({ kind, name })),
-              ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
             }
           : null
       )}
@@ -546,6 +551,7 @@ const Harness = ({
   liveFollowEnabled,
   pinnedSessionId,
   progressSessions,
+  strip = currentStrip,
 }: {
   background?: 'bg' | 'bg.panel';
   coMountPreviewSources?: boolean;
@@ -553,6 +559,7 @@ const Harness = ({
   liveFollowEnabled: boolean;
   pinnedSessionId: string | null;
   progressSessions: QueueProgressSession[];
+  strip?: GalleryStarredStrip;
 }) => {
   const sensors = useSensors(
     useSensor(withShellMouseSensor ? PrimaryMouseSensor : PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -565,14 +572,14 @@ const Harness = ({
     gallery,
     itemActions: imageActionMocks,
     listing: currentListing,
-    loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
+    loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
     projectName: 'Project',
     region: 'right',
     pinRevealIndex,
     runtime,
     setVisibleRange,
     sparseListing: currentSparseListing,
-    starredStrip: currentStrip,
+    starredStrip: strip,
   } as unknown as GalleryWidgetContextValue;
 
   return (
@@ -636,7 +643,7 @@ const QueryBackedGalleryHarness = ({
     selectedBoardId: gallery.selectedBoardId,
     semanticQuery: gallery.semanticImageQuery,
     settings: gallery.settings,
-    starred: gallery.starredOnly ? true : undefined,
+    marks: gallery.marksFilter.flags.length > 0 ? { flags: gallery.marksFilter.flags } : undefined,
     sparseViewport: true,
   });
   const sensors = useSensors(
@@ -735,7 +742,7 @@ const getButton = (label: string): HTMLButtonElement => {
 
 const findStarredToggle = (expanded: boolean): HTMLButtonElement | null =>
   [...(host?.querySelectorAll<HTMLButtonElement>(`button[aria-expanded="${String(expanded)}"]`) ?? [])].find((button) =>
-    button.textContent?.startsWith('Starred')
+    button.textContent?.startsWith('Bookmarked')
   ) ?? null;
 
 const getStarredToggle = (expanded: boolean): HTMLButtonElement => {
@@ -847,16 +854,16 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     // WCAG 2.5.3.
-    await expect.element(trigger).toHaveAccessibleName(/^Starred\s+1$/);
+    await expect.element(trigger).toHaveAccessibleName(/^Bookmarked\s+1$/);
     expect(trigger.closest('[role="list"]')).toBeNull();
     expect(starredSection?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
     expect(regularSection?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
     expect(host?.querySelectorAll('button[aria-label="Select starred.png for preview"]')).toHaveLength(1);
     expect(sectionOrder()).toEqual(['starred', 'regular']);
-    expect(host?.querySelector('button[aria-label="Show all starred items"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Show all bookmarked items"]')).toBeNull();
   });
 
-  it('stars from the strip for a selection the listing window has not loaded', async () => {
+  it('bookmarks from the strip for a selection the listing window has not loaded', async () => {
     setStrip([starred]);
     await renderGallery(
       createGallery({
@@ -868,13 +875,30 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
 
     registeredCommands.get('gallery.starImage')?.();
-    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith([{ kind: 'image', name: 'starred.png' }], false);
+    expect(imageActionMocks.setItemsMarks).toHaveBeenCalledWith([{ kind: 'image', name: 'starred.png' }], {
+      flag: 'none',
+    });
 
-    await click(getButton('Unstar starred.png'));
-    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledTimes(2);
+    await click(getButton('Remove bookmark from starred.png'));
+    expect(imageActionMocks.setItemsMarks).toHaveBeenCalledTimes(2);
 
     registeredCommands.get('gallery.toggleStarredOnly')?.();
-    expect(actionMocks.setStarredOnly).toHaveBeenCalledExactlyOnceWith(true);
+    expect(actionMocks.setMarksFilter).toHaveBeenCalledExactlyOnceWith({
+      ...EMPTY_GALLERY_MARKS_FILTER,
+      flags: ['pick'],
+    });
+  });
+
+  it('says when a marks filter leaves nothing, and clears it from there', async () => {
+    await renderGallery(
+      createGallery({ items: [], marksFilter: { ...EMPTY_GALLERY_MARKS_FILTER, flags: ['reject'] } })
+    );
+
+    const empty = host?.querySelector('[data-gallery-marks-filter-empty]');
+
+    expect(empty?.textContent).toContain('No items have these marks');
+    await click(empty!.querySelector('button')!);
+    expect(actionMocks.setMarksFilter).toHaveBeenCalledExactlyOnceWith(EMPTY_GALLERY_MARKS_FILTER);
   });
 
   it('renders same-name media independently and gives a video a static accessible poster', async () => {
@@ -903,7 +927,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(videoCell?.textContent).toContain('1:06');
     expect(playIcon?.getAttribute('aria-hidden')).toBe('true');
     expect(imageButton.closest('[role="listitem"]')?.textContent).toContain('128x96');
-    expect(host?.querySelector('button[aria-label="Star shared"]')).not.toBeNull();
+    expect(host?.querySelector('button[aria-label="Bookmark shared"]')).not.toBeNull();
     expect(host?.querySelector('video')).toBeNull();
   });
 
@@ -1140,12 +1164,12 @@ describe('GalleryImageGrid mixed item cells', () => {
       ],
       { returnFocus: undefined, targetsOffScreen: false }
     );
-    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
+    expect(imageActionMocks.setItemsMarks).toHaveBeenCalledWith(
       [
         { kind: 'image', name: 'shared' },
         { kind: 'video', name: 'shared' },
       ],
-      true
+      { flag: 'pick' }
     );
   });
 });
@@ -1174,7 +1198,7 @@ describe('GalleryImageGrid image-map labels', () => {
 
   beforeEach(() => setIndexAvailability({ modelName: null, state: 'ready' }));
 
-  it('reveals the hovered item label in step with its dimensions and star', async () => {
+  it('reveals the hovered item label in step with its dimensions and bookmark', async () => {
     mocks.getItemLabel.mockImplementation((item) => Promise.resolve(item.name === 'a.png' ? 'sunset' : 'forest'));
     await renderGallery(createGallery({ items: [createItem('image', 'a.png'), createItem('image', 'b.png')] }));
 
@@ -1185,7 +1209,7 @@ describe('GalleryImageGrid image-map labels', () => {
 
     expect(mocks.getItemLabel).toHaveBeenCalledWith({ kind: 'image', name: 'a.png' });
     const dimensions = findBadge(tile, '128x96');
-    const star = tile.querySelector<HTMLElement>('button[aria-label="Star a.png"]') ?? undefined;
+    const star = tile.querySelector<HTMLElement>('button[aria-label="Bookmark a.png"]') ?? undefined;
     await vi.waitFor(() =>
       expect([findBadge(tile, 'sunset'), dimensions, star].map(opacityOf)).toEqual(['1', '1', '1'])
     );
@@ -1958,7 +1982,7 @@ describe('shared gallery progress section', () => {
     const cases: [Partial<GalleryStateView>, GalleryListingState['status']][] = [
       [{ selectedBoardId: 'board-other', items: [] }, 'empty'],
       [{ searchTerm: 'unmatched', items: [] }, 'empty'],
-      [{ starredOnly: true, items: [] }, 'empty'],
+      [{ marksFilter: { ...EMPTY_GALLERY_MARKS_FILTER, flags: ['pick'] }, items: [] }, 'empty'],
       [{ galleryView: 'assets', items: [] }, 'loading'],
       [{ items: [] }, 'error'],
       [{ page: 5, anchoredWindowPage: 5 }, 'ready'],
@@ -2014,5 +2038,82 @@ describe('shared gallery progress section', () => {
     )) {
       expect(tile.tabIndex).toBe(-1);
     }
+  });
+});
+
+describe('Cull mode marks', () => {
+  afterEach(() => imageActionMocks.setItemsMarks.mockReset());
+
+  // Read from the query cache, as the Gallery reads its strip and grid, so a mark's cache write is what they show.
+  const CachedListingsHarness = ({ values }: { values: Record<string, unknown> }) => {
+    const filter: GalleryItemsFilter = { boardId: board.id, galleryView: 'images', searchTerm: '' };
+    const strip = useGalleryStarredStrip({ enabled: true, filter });
+    const { data } = useQuery({ ...galleryItemsPageOptions({ ...filter, starred: false }, 0), enabled: false });
+    const gallery = getGalleryStateView(resolvedValues(values), [board], data?.items ?? [], strip.items);
+
+    return (
+      <Harness gallery={gallery} liveFollowEnabled={false} pinnedSessionId={null} progressSessions={[]} strip={strip} />
+    );
+  };
+
+  it('keeps a bookmarked item selected in the strip, and the next key marks it and moves on from there', async () => {
+    const filter: GalleryItemsFilter = { boardId: board.id, galleryView: 'images', searchTerm: '' };
+    const [newest, marked, oldest] = ['c.png', 'b.png', 'a.png'].map((name) => createItem('image', name));
+    const values = {
+      cullAutoAdvance: false,
+      cullMode: true,
+      imageDensityPercent: 0,
+      selectedBoardId: board.id,
+      selectedImageName: 'image:b.png',
+    };
+
+    queryClient!.setQueryData<GalleryItemsPage>(galleryStarredStripOptions(filter).queryKey, {
+      items: [createItem('image', 's.png', { starred: true })],
+      total: 1,
+    });
+    queryClient!.setQueryData<GalleryItemsPage>(galleryItemsPageOptions({ ...filter, starred: false }, 0).queryKey, {
+      items: [newest!, marked!, oldest!],
+      itemIndices: [0, 1, 2],
+      offset: 0,
+      total: 3,
+    });
+    currentGalleryValues = values;
+    // The request stays unanswered: everything shown comes from the optimistic write.
+    imageActionMocks.setItemsMarks.mockImplementation((refs: GalleryItemRef[], patch) => {
+      writeGalleryItemMarks(queryClient!, refs, patch, { boards: false, refetchDelayMs: 1_000 });
+      return new Promise<void>(() => {});
+    });
+    const selectedTile = () => host?.querySelector('[data-gallery-item-key][aria-pressed="true"]');
+
+    await interact(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient!}>
+              <CachedListingsHarness values={values} />
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+    expect(selectedTile()?.getAttribute('data-gallery-item-key')).toBe('image:b.png');
+
+    await interact(() => registeredCommands.get('cull.bookmark')?.());
+
+    expect(selectedTile()?.closest('[data-gallery-section]')?.getAttribute('data-gallery-section')).toBe('starred');
+    expect(selectedTile()?.getAttribute('data-gallery-item-key')).toBe('image:b.png');
+    expect(host?.querySelectorAll('[data-gallery-item-key="image:b.png"]')).toHaveLength(1);
+
+    // Shift inverts auto-advance for the press.
+    await interact(() => registeredCommands.get('cull.rate3')?.({ shiftKey: true }));
+
+    expect(imageActionMocks.setItemsMarks).toHaveBeenLastCalledWith(
+      [toGalleryItemRef(marked!)],
+      { rating: 3 },
+      {
+        quiet: true,
+      }
+    );
+    expect(actionMocks.selectItem.mock.calls.at(-1)?.[0]).toMatchObject({ name: 'c.png' });
   });
 });

@@ -4,6 +4,7 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import { Box, HStack, Skeleton } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
+import { GalleryItemMarksOverlay, getGalleryItemMarksDescription } from '@features/gallery/marks';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useDeviceLabel } from '@features/queue/devices';
@@ -14,14 +15,14 @@ import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImage
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import { PinIcon } from 'lucide-react';
-import { memo, useCallback, useMemo, type MouseEvent } from 'react';
+import { memo, useCallback, useId, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
 import { getPreviewDockBarHeight, PREVIEW_DOCK_BAR_PROPS } from './previewDockBar';
 
-/** Thumbnails in the gallery's order: starred, live GPU slots, then the listing. */
+/** Thumbnails in the gallery's order: bookmarked, live GPU slots, then the listing. */
 
 export const PreviewFilmstrip = ({
   density,
@@ -44,7 +45,7 @@ export const PreviewFilmstrip = ({
   /** Whether that session was pinned by hand; clicking it again unpins. */
   isSessionPinned?: boolean;
   items: GalleryItem[];
-  /** How many `items` come before the in-progress slots: the starred strip, which the gallery pins above them. */
+  /** How many `items` come before the in-progress slots: the Bookmarked strip, which the gallery pins above them. */
   leadingItemCount?: number;
   selectedItemKey: GalleryItemKey | null;
   /** In-progress slots in the gallery's order, after the strip and before the listing. */
@@ -58,6 +59,7 @@ export const PreviewFilmstrip = ({
   onContextMenu?: (item: GalleryItem, x: number, y: number) => void;
   onSelect: (item: GalleryItem) => void;
 }) => {
+  const { t } = useTranslation();
   const thumbSize = density === 'full' ? '12' : '8';
   const renderItem = (item: GalleryItem) => {
     const itemKey = toGalleryItemKey(item);
@@ -66,6 +68,7 @@ export const PreviewFilmstrip = ({
       <FilmstripThumb
         key={itemKey}
         item={item}
+        marksDescription={getGalleryItemMarksDescription(t, item)}
         isSelected={itemKey === selectedItemKey}
         size={thumbSize}
         onCompare={onCompare}
@@ -224,6 +227,7 @@ const FilmstripLiveThumb = ({
 const FilmstripThumb = memo(function FilmstripThumb({
   item,
   isSelected,
+  marksDescription,
   size,
   onCompare,
   onContextMenu,
@@ -231,6 +235,8 @@ const FilmstripThumb = memo(function FilmstripThumb({
 }: {
   item: GalleryItem;
   isSelected: boolean;
+  /** From the strip, so thumbs need no translation subscription of their own. */
+  marksDescription: string | null;
   size: string;
   onCompare?: (item: GalleryItem) => void;
   onContextMenu?: (item: GalleryItem, x: number, y: number) => void;
@@ -284,33 +290,47 @@ const FilmstripThumb = memo(function FilmstripThumb({
     },
     [isSelected, setNodeRef]
   );
+  const marksDescriptionId = useId();
 
   return (
+    // The marks overlay is the button's sibling so its text stays out of the button's content.
     <Box
-      ref={thumbRef}
-      {...listeners}
-      as="button"
-      aria-current={isSelected || undefined}
-      aria-label={item.kind === 'video' ? `Video ${item.name}` : item.name}
-      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
-      borderWidth="2px"
-      boxSize={size}
       css={isDragging ? FILMSTRIP_THUMB_DRAG_CSS : FILMSTRIP_THUMB_ARMED_CSS}
       flexShrink={0}
       opacity={isDragging ? 0.4 : undefined}
-      overflow="hidden"
       position="relative"
-      rounded="sm"
-      // Allow horizontal touch pan; sustained holds still activate dragging.
-      touchAction="pan-x"
-      onClick={handleClick}
-      onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >
-      {thumbnailSrc ? (
-        <img alt={item.name} loading="lazy" src={thumbnailSrc} style={FILMSTRIP_IMG_STYLE} />
-      ) : (
-        <Box aria-hidden bg="bg.muted" h="full" w="full" />
-      )}
+      <Box
+        ref={thumbRef}
+        {...listeners}
+        as="button"
+        aria-current={isSelected || undefined}
+        aria-describedby={marksDescription ? marksDescriptionId : undefined}
+        aria-label={item.kind === 'video' ? `Video ${item.name}` : item.name}
+        borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+        borderWidth="2px"
+        boxSize={size}
+        display="block"
+        overflow="hidden"
+        position="relative"
+        rounded="sm"
+        // Allow horizontal touch pan; sustained holds still activate dragging.
+        touchAction="pan-x"
+        onClick={handleClick}
+        onContextMenu={onContextMenu ? handleContextMenu : undefined}
+      >
+        {thumbnailSrc ? (
+          <img alt={item.name} loading="lazy" src={thumbnailSrc} style={FILMSTRIP_IMG_STYLE} />
+        ) : (
+          <Box aria-hidden bg="bg.muted" h="full" w="full" />
+        )}
+      </Box>
+      <GalleryItemMarksOverlay compact borderRadius={FILMSTRIP_INNER_RADIUS} inset="2px" item={item} />
+      {marksDescription ? (
+        <span hidden id={marksDescriptionId}>
+          {marksDescription}
+        </span>
+      ) : null}
     </Box>
   );
 });
@@ -322,8 +342,11 @@ const FILMSTRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
 /** Same touch drag cue as the gallery grid: the source thumb desaturates while dragged. */
 const FILMSTRIP_THUMB_DRAG_CSS = { filter: 'saturate(0)' } as const;
 
-/** Match Gallery's desaturated data-drag-armed cue before held-touch movement starts dragging. */
-const FILMSTRIP_THUMB_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)' } } as const;
+/** Match Gallery's desaturated data-drag-armed cue, set on the button, before held-touch movement starts dragging. */
+const FILMSTRIP_THUMB_ARMED_CSS = { '&:has(> [data-drag-armed=true])': { filter: 'saturate(0)' } } as const;
+
+/** Inside the thumb's 2px border. */
+const FILMSTRIP_INNER_RADIUS = 'calc({radii.sm} - 2px)';
 
 // The thumb row centers itself with `h="full"`, which needs the content wrapper to actually span the viewport height
 // rather than shrink to it.
