@@ -88,11 +88,14 @@ def _config(flow_map: bool = True, path: str = "flux3.safetensors") -> Main_Chec
 def _load(
     monkeypatch: pytest.MonkeyPatch, build: QuantizedFlux3, observe: tuple[str, ...] = (), *, flow_map: bool = True
 ) -> tuple[SeamRun, torch.nn.Module]:
+    # The seam serves in-memory tensors without a real file header; leave the mapped-source path explicit.
+    monkeypatch.setattr(flux3_loaders, "safetensors_backend", lambda _path: "mmap")
     run = prepare(SEAM, monkeypatch, state_dict=build.state_dict, metadata=build.metadata, observe=observe)
     return run, run.load(_config(flow_map), SubModelType.Transformer)
 
 
 def _refused(monkeypatch: pytest.MonkeyPatch, build: QuantizedFlux3, match: str) -> SeamRun:
+    monkeypatch.setattr(flux3_loaders, "safetensors_backend", lambda _path: "mmap")
     run = prepare(SEAM, monkeypatch, state_dict=build.state_dict, metadata=build.metadata)
     with pytest.raises(ValueError, match=match):
         run.load(_config(), SubModelType.Transformer)
@@ -161,6 +164,20 @@ def test_one_reservation_holds_the_int8_codes_at_one_byte(monkeypatch: pytest.Mo
     run, _ = _load(monkeypatch, build)
 
     assert run.reserved == [codes + 4 * scales + 4 * dense]
+
+
+def test_int8_install_receives_the_mapped_source_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+    original = flux3_loaders.install_int8_convrot_layers
+
+    def install(*args, **kwargs):
+        seen.update(kwargs)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(flux3_loaders, "install_int8_convrot_layers", install)
+    _load(monkeypatch, _build("int8_convrot"))
+
+    assert seen["source_tensors_mapped"] is True
 
 
 @pytest.mark.parametrize("scheme", ["nvfp4_comfy", "nvfp4_bfl"])
@@ -414,6 +431,7 @@ def test_no_parameter_of_a_torchao_load_reads_the_file_afterwards(
     run = prepare(SEAM, monkeypatch, metadata=build.metadata)
     model = run.load(_config(path=str(path)), SubModelType.Transformer)
 
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
     assert tensors_reading_the_file(model, path) == []
 
 

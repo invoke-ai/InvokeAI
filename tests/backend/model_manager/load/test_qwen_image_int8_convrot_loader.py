@@ -125,7 +125,7 @@ def _run(
     import diffusers
 
     checkpoint = tmp_path / "qwen_image_edit_2511_int8_convrot.safetensors"
-    checkpoint.touch()
+    safetensors.torch.save_file({"_fixture": torch.zeros(1, dtype=torch.int8)}, checkpoint)
     config = Main_Checkpoint_QwenImage_Config.model_construct(
         path=str(checkpoint), name="qwen_image_int8", default_settings=SimpleNamespace(fp8_storage=fp8_storage)
     )

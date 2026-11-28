@@ -213,12 +213,12 @@ def test_iter_image_paths_streams_directory_entries_in_deterministic_order(
             return False
 
     real_scandir = os.scandir
-    monkeypatch.setattr(
-        "invokeai.app.services.image_files.image_files_disk.os.scandir",
-        lambda path: Scan() if not isinstance(path, int) and Path(path) == tmp_path else real_scandir(path),
-    )
-
-    paths = list(storage.iter_image_paths())
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "invokeai.app.services.image_files.image_files_disk.os.scandir",
+            lambda path: Scan() if not isinstance(path, int) and Path(path) == tmp_path else real_scandir(path),
+        )
+        paths = list(storage.iter_image_paths())
 
     assert [path.name for path in paths] == sorted(names)
     assert Entry.peak_active <= 2

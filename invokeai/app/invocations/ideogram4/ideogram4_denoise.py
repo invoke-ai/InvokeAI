@@ -36,7 +36,7 @@ from invokeai.backend.quantization.dequantizing_linear import peak_dequant_trans
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES, get_model_compute_dtype
 
 # Named sampler presets bundle step count, guidance schedule (with polish tail), and the
@@ -330,7 +330,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
 
         Taking the maximum up front costs reading `LoadedModel.model` -- documented as returning the
         model unlocked, and it is already constructed by then -- and loading the second branch into
-        RAM before the first is locked. Under the default `keep_ram_copy_of_weights` that is not a
+        RAM before the first is locked. When `keep_ram_copy_of_weights` is enabled, that is not a
         new peak, since both branches hold their RAM copies through the loop anyway; with RAM copies
         off it is one cold load's worth, which the cache absorbs the same way it absorbs any
         overshoot. Neither branch can be evicted meanwhile: `LoadedModel` takes a first-use hold the
@@ -418,7 +418,11 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         target = self._second_branch_residency_target(context, conditional_info, unconditional_info, reservation)
         second_reservation = reservation
         if target is not None:
-            free_bytes, _total = torch.cuda.mem_get_info(unconditional_info.compute_device)
+            device = unconditional_info.compute_device
+            if torch.version.hip is None and device_is_integrated(device) is True:
+                free_bytes = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+            else:
+                free_bytes, _total = torch.cuda.mem_get_info(device)
             second_reservation = max(reservation, free_bytes - target)
 
         unconditional_cached, unconditional = stack.enter_context(
@@ -533,9 +537,11 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         it all. Same purpose as Wan's expert swapper, which bounds its transformer's residency
         through the reservation for the same reason.
 
-        The target is derived, not chosen: whatever is left once the system's share, the reservation
-        the cache will really apply, and the *other* branch are subtracted from the device. That
-        keeps the cost proportional to how badly the pair overflows, and it makes
+        The target is derived, not chosen: on a discrete CUDA/ROCm device, whatever is left once
+        the system's share, the reservation the cache will really apply, and the *other* branch
+        are subtracted from the device. Integrated NVIDIA CUDA instead uses current host headroom,
+        which already reflects the first branch, so only the system share and reservation are
+        subtracted. That keeps the cost proportional to how badly the pair overflows, and it makes
         `device_working_mem_gb` the knob for it -- raising the reserve lowers the target one for one,
         with no second setting to discover. Measured on the reference card at 1024x1024, 8 steps:
 
@@ -569,13 +575,17 @@ class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):
         # how much VRAM the cache may take, which is this policy by another route.
         if context.config.get().max_cache_vram_gb is not None:
             return None
-        _free, total = torch.cuda.mem_get_info(device)
         # The cache raises any reservation below its configured floor (`_get_vram_available`), so
         # the node's own estimate is not what will be held free. Asking with the smaller number
         # would clear the gate at low resolutions while the cache reserved more and the pair still
         # took everything.
         effective_reservation = max(reservation, int(context.config.get().device_working_mem_gb * 2**30))
-        room = total - IDEOGRAM4_LEAVE_FREE_FOR_THE_SYSTEM_BYTES - effective_reservation - first_branch.weight_bytes
+        if torch.version.hip is None and device_is_integrated(device) is True:
+            free_headroom = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+            room = free_headroom - IDEOGRAM4_LEAVE_FREE_FOR_THE_SYSTEM_BYTES - effective_reservation
+        else:
+            _free, total = torch.cuda.mem_get_info(device)
+            room = total - IDEOGRAM4_LEAVE_FREE_FOR_THE_SYSTEM_BYTES - effective_reservation - first_branch.weight_bytes
         if room >= second_branch.weight_bytes:
             return None
         return max(room, IDEOGRAM4_MIN_RESIDENT_SECOND_BRANCH_BYTES)

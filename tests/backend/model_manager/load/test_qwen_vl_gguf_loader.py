@@ -21,12 +21,10 @@ from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import load_bundled_qwen2_5_vl_tokenizer
 from tests.backend.model_manager.load.qwen_vl_gguf_fixture import (
-    HIDDEN_SIZE,
     build_dense_model,
     gguf_config,
     load_text_encoder,
     make_loader,
-    tiny_qwen_vl_config,
     write_qwen_vl_gguf,
 )
 
@@ -152,17 +150,8 @@ def test_the_tokenizer_is_the_vendored_one(monkeypatch, gguf_path: Path) -> None
     assert tokenizer is load_bundled_qwen2_5_vl_tokenizer()
 
 
-def test_the_load_makes_room_for_the_packed_weights_it_already_holds(monkeypatch, gguf_path: Path) -> None:
-    """The embedding is dequantized with the other non-Linear tensors, so the one reservation the cache is asked for
-    covers the packed weights still held and the unpacked result, not only the dequantization temporaries.
-
-    Reserved separately, the embedding asked for 6 copies of itself (the kernel's peak) and nothing for what the load
-    already holds, so a cache with that much free kept a model that the load's real footprint would have pushed out. The
-    tiny embedding is a single slice, so that 6x term is present either way: what differs is the packed weights and the
-    result being counted. A real cache, holding a real model, is the judge of whether the reservation evicts it.
-    """
-    vocab_size = tiny_qwen_vl_config().text_config.vocab_size
-    embedding_decode_bytes = 6 * vocab_size * HIDDEN_SIZE * torch.float32.itemsize
+def test_the_load_requests_packed_weight_reservation_with_a_one_byte_shortfall(monkeypatch, gguf_path: Path) -> None:
+    """The embedding reservation is issued with a deliberate one-byte cache-capacity shortfall."""
     logger = MagicMock()
     logger.getEffectiveLevel.return_value = logging.INFO
     cache = ModelCache(
@@ -174,12 +163,22 @@ def test_the_load_makes_room_for_the_packed_weights_it_already_holds(monkeypatch
         logger=logger,
     )
     try:
-        cache.put("cached_model", torch.randn(1024))
-        # Free RAM is exactly what decoding the embedding alone takes, beside the model already cached.
-        cache._ram_cache_size_bytes = embedding_decode_bytes + cache._get_ram_in_use()
+        cache.put("cached_model", torch.randn(1024), prefetch=True)
+        # Make the real reservation one byte larger than the available capacity, independent of the fixture's
+        # packed tensor sizes.
+        original_make_room = cache.make_room
+        requests = []
+
+        def leave_one_byte_short(bytes_needed: int, **kwargs):
+            requests.append(bytes_needed)
+            cache._ram_cache_size_bytes = cache._get_ram_in_use() + bytes_needed - 1
+            return original_make_room(bytes_needed, **kwargs)
+
+        monkeypatch.setattr(cache, "make_room", leave_one_byte_short)
 
         load_text_encoder(monkeypatch, gguf_path, ram_cache=cache)
 
-        assert "cached_model" not in cache._cached_models
+        assert requests and requests[0] > 0
+        assert "cached_model" not in cache.cached_model_keys()
     finally:
         cache.shutdown()

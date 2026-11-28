@@ -10,16 +10,22 @@ A tiny `Ideogram4Config` stands in for the released geometry: same module tree, 
 of 458.
 """
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
+from invokeai.backend.ideogram4.quantized_loading import quantize_weight_to_fp8
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Ideogram4_Config
 from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import ideogram4
 from invokeai.backend.model_manager.load.model_loaders.ideogram4 import Ideogram4CheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.quantization.int8_convrot import (
     CONVROT_GROUP_SIZE,
     Int8ConvrotLinear,
@@ -85,6 +91,16 @@ SEAM = Seam(
     patches_device=True,
 )
 
+DIFFUSERS_SEAM = Seam(
+    loader=ideogram4.Ideogram4DiffusersModel,
+    module=ideogram4,
+    load_file_host=ideogram4,
+    entry="_load_one_transformer",
+    patches_device=True,
+    sets_torch_dtype=False,
+    casts_fp8_storage=False,
+)
+
 
 def _driver(
     monkeypatch,
@@ -96,7 +112,9 @@ def _driver(
     geometry: Ideogram4Config = TINY_CONFIG,
 ):
     checkpoint = tmp_path / "ideogram4_fp8_scaled.safetensors"
-    checkpoint.touch()
+    # The loader probes the real file header to choose mmap vs pread; keep the checkpoint tiny because
+    # the seam supplies the actual state dict used by the test.
+    save_file({"probe.weight": torch.zeros(1, dtype=FP8)}, str(checkpoint))
     config = Main_Checkpoint_Ideogram4_Config.model_construct(
         path=str(checkpoint),
         name="ideogram4",
@@ -132,6 +150,53 @@ def _load(
     return run.load(model_config, SubModelType.Transformer), run
 
 
+def test_diffusers_fp8_load_widens_raw_bias_before_a_real_forward(monkeypatch, tmp_path) -> None:
+    """Raw fp8 is storage-only except for scaled Linear weights consumed by ``Fp8Linear``."""
+    state_dict, _ = _checkpoint(())
+    codes, scale = quantize_weight_to_fp8(state_dict[f"{KEPT}.weight"])
+    state_dict[f"{KEPT}.weight"] = codes
+    state_dict[f"{KEPT}.weight_scale"] = scale
+    state_dict["input_proj.weight"] = state_dict["input_proj.weight"].to(FP8)
+    state_dict["input_proj.bias"] = state_dict["input_proj.bias"].to(FP8)
+    source_bytes = sum(tensor.numel() * tensor.element_size() for tensor in state_dict.values())
+
+    def install(patch):
+        patch.setattr("invokeai.backend.ideogram4.modeling_ideogram4.Ideogram4Config", lambda: TINY_CONFIG)
+
+    run = prepare(DIFFUSERS_SEAM, monkeypatch, state_dict=state_dict, geometry=install)
+    reservations: list[tuple[int, dict[str, int]]] = []
+    run.loader._ram_cache.make_room = lambda reserve, **kwargs: reservations.append((reserve, kwargs))
+
+    model = run.load(tmp_path / "transformer")
+
+    quantized = model.get_submodule(KEPT)
+    assert isinstance(quantized, Fp8Linear)
+    assert quantized.weight.dtype is FP8
+
+    with torch.no_grad():
+        output = model(
+            llm_features=torch.randn(1, 1, TINY_CONFIG.llm_features_dim),
+            x=torch.randn(1, 1, TINY_CONFIG.in_channels),
+            t=torch.tensor([0.5]),
+            position_ids=torch.zeros(1, 1, 3, dtype=torch.long),
+            segment_ids=torch.zeros(1, 1, dtype=torch.long),
+            indicator=torch.ones(1, 1, dtype=torch.long),
+        )
+    assert output.shape == (1, 1, TINY_CONFIG.in_channels)
+    assert model.input_proj.weight.dtype is torch.float32
+    assert model.input_proj.bias.dtype is torch.float32
+
+    expected_host_bytes = sum(
+        state_dict[key].numel() * torch.float32.itemsize for key in ("input_proj.weight", "input_proj.bias")
+    )
+    assert reservations == [
+        (
+            source_bytes,
+            {"host_bytes_needed": expected_host_bytes},
+        )
+    ]
+
+
 def test_with_neither_consumer_the_scales_are_folded_into_full_precision_weights(monkeypatch, tmp_path) -> None:
     """Neither the fp8 matmul nor FP8 Storage wants these packed, so folding is right: keeping them
     would dequantize on every forward to save memory nobody asked to save."""
@@ -160,6 +225,9 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
     before = {key: value.clone() for key, value in state_dict.items()}
 
     model, run = _load(monkeypatch, tmp_path, state_dict, keep_fp8=False, fp8_storage=True)
+
+    # The real header contains an FP8 weight, so the loader selects pread and does not retain mapped source pages.
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
 
     kept = model.get_submodule(KEPT)
     assert kept.weight.dtype is FP8
@@ -191,6 +259,31 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
     )
     assert recovered_scales > 0, "otherwise this cell would not notice the plan dropping the term"
     assert run.reserved[-1] == kept_codes + dense + recovered_scales
+
+
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch, tmp_path) -> None:
+    state_dict, _ = _checkpoint(())
+    run, config = _driver(monkeypatch, tmp_path, state_dict, keep_fp8=False)
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
+    make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    run.loader._ram_cache.make_room = make_room
+    extracted = False
+    original_extract = ideogram4.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(ideogram4, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        run.load(config, SubModelType.Transformer)
+
+    assert extracted is False
+    make_room.assert_called_once_with(0, host_bytes_needed=1234)
 
 
 def test_with_the_fp8_matmul_the_codes_stay_and_the_scales_are_attached(monkeypatch, tmp_path) -> None:

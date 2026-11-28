@@ -55,7 +55,7 @@ from invokeai.backend.model_manager.load.model_loaders._single_file_guards impor
     reject_float8_weights,
     reject_formats_declared_in_the_header,
 )
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -85,9 +85,11 @@ from invokeai.backend.quantization.nvfp4 import (
     NVFP4_FORMAT,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 _TRANSFORMER_SUPPORTED_NOTE = (
@@ -182,6 +184,12 @@ def _is_bundled_component(key: str) -> bool:
     return layout.strip_transformer_prefix(key).startswith(cc.TRANSFORMER_FOREIGN_PREFIXES)
 
 
+def _safetensors_payload_size(path: Path, key_filter: Callable[[str], bool]) -> int:
+    """Return selected tensor payload bytes from a safetensors header without reading tensor data."""
+    header = read_safetensors_header(path)
+    return sum(entry["data_offsets"][1] - entry["data_offsets"][0] for key, entry in header.items() if key_filter(key))
+
+
 def _diffusers_transformer_key_map(official_keys: Iterable[str]) -> dict[str, str]:
     """Official -> diffusers name for every bare transformer key, quantization side channels included.
 
@@ -224,8 +232,12 @@ class _LTX2ComponentLoading:
     _logger: Any
 
     def _reserve_for_cast(self, sd: dict[str, torch.Tensor], dtype: torch.dtype) -> None:
-        """Reserve what the cast to ``dtype`` will leave resident, before any tensor widens."""
-        self._ram_cache.make_room(predict_cast_state_dict_size(sd, dtype, keep_fp8=False))
+        """Reserve the distinct cast output; dense component sources are file-backed mappings."""
+        reserved_bytes = predict_cast_state_dict_size(sd, dtype, keep_fp8=False)
+        _, host_bytes_needed = state_dict_cast_bytes(sd, dtype, in_place=False)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=host_bytes_needed), host_bytes_needed
+        )
 
     def _build_dense(
         self, factory: Callable[[], torch.nn.Module], sd: dict[str, torch.Tensor], what: str, dtype: torch.dtype
@@ -366,6 +378,8 @@ class _LTX2ComponentLoading:
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=True,
             )
             self._logger.info(
                 f"{what}: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -381,6 +395,7 @@ class _LTX2ComponentLoading:
                 skip_patterns=skip_patterns,
                 fp8_layers={},
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=True,
             )
             cast_state_dict(sd, model_dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
 
@@ -419,7 +434,18 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
         if not isinstance(config, Main_Diffusers_LTX2_Config) or submodel_type not in _SUBMODEL_ROLES:
             return 0
         files = {config.components.get(role) for role in _SUBMODEL_ROLES[submodel_type]} - {None}
-        return sum((model_path / name).stat().st_size for name in files if (model_path / name).is_file())
+        total = 0
+        for name in files:
+            path = model_path / name
+            if not path.is_file():
+                continue
+            if submodel_type is SubModelType.Connectors:
+                total += _safetensors_payload_size(
+                    path, lambda key: layout.strip_transformer_prefix(key).startswith(_CONNECTOR_KEY_PREFIXES)
+                )
+            else:
+                total += path.stat().st_size
+        return total
 
     def _load_model(
         self,
@@ -672,10 +698,20 @@ class LTX2Gemma4EncoderModel(ModelLoader):
             # The shared helper: foreign-scale refusal, reservation before the split, the dense cast
             # and the module swap, in that order.
             install_int8_convrot_layers(
-                model, sd, int8_markers, model_dtype, architecture="LTX-2 Gemma-4", reserve=self._ram_cache.make_room
+                model,
+                sd,
+                int8_markers,
+                model_dtype,
+                architecture="LTX-2 Gemma-4",
+                reserve=self._ram_cache.make_room,
+                source_tensors_mapped=True,
             )
         else:
-            self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False))
+            reserved_bytes = predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False)
+            _, additional_bytes = state_dict_cast_bytes(sd, model_dtype, in_place=True, source_tensors_mapped=True)
+            require_ram_headroom(
+                self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            )
             cast_state_dict(sd, model_dtype, keep_fp8=False)
 
         _assign_gemma4_tower(model, sd, what)

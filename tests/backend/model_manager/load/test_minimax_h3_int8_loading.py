@@ -10,6 +10,7 @@ routes -- once from the header before committing to the tensor read, once from t
 the header route is only exercised by an actual file.
 """
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -20,7 +21,10 @@ from safetensors.torch import save_file
 
 from invokeai.backend.minimax_h3.transformer_minimax_h3 import MiniMaxH3AttnProcessor
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_MiniMaxH3_Config
-from invokeai.backend.model_manager.load.model_loaders.minimax_h3 import MiniMaxH3CheckpointModel
+from invokeai.backend.model_manager.load.model_loaders.minimax_h3 import (
+    MiniMaxH3CheckpointModel,
+    _pruned_cast_host_bytes,
+)
 from invokeai.backend.model_manager.taxonomy import MiniMaxH3VariantType
 from invokeai.backend.quantization.int8_convrot import (
     Int8ConvrotLinear,
@@ -118,6 +122,15 @@ def _load(path: Path) -> torch.nn.Module:
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._logger = MagicMock()
     return loader._load_transformer_from_singlefile(config)
+
+
+def test_pruned_cast_estimator_does_not_retain_source_tensors() -> None:
+    tensor = torch.zeros(64, dtype=torch.float16)
+    sd = {"final_layer.adaln_proj.linear.weight": tensor}
+    before = sys.getrefcount(tensor)
+
+    assert _pruned_cast_host_bytes(sd, True) == 64 * torch.float32.itemsize
+    assert sys.getrefcount(tensor) == before
 
 
 def _quantized_module(model: torch.nn.Module) -> torch.nn.Module:

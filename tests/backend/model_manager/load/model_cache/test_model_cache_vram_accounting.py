@@ -25,6 +25,27 @@ MB = 1024**2
 requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="Requires CUDA.")
 
 
+@pytest.fixture(autouse=True)
+def _default_to_discrete_cuda(monkeypatch: pytest.MonkeyPatch):
+    """Keep generic allocator tests on discrete semantics; integrated cases opt in explicitly."""
+    original_memory_available = TorchDevice.memory_available_to_process
+    original_has_dedicated_vram = model_cache_module.device_has_dedicated_vram
+
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+
+    def has_dedicated_vram(device: torch.device) -> bool:
+        return True if torch.device(device).type == "cuda" else original_has_dedicated_vram(device)
+
+    def memory_available_to_process(cls, device: torch.device) -> int:
+        if torch.device(device).type == "cuda":
+            free, _ = TorchDevice.cuda_mem_get_info(device)
+            return free + torch.cuda.memory_allocated(device)
+        return original_memory_available(device)
+
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", has_dedicated_vram)
+    monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(memory_available_to_process))
+
+
 class BigModule(torch.nn.Module):
     """A module whose single parameter is `mb` MiB of fp32."""
 
@@ -49,6 +70,131 @@ def _make_cache(logger: logging.Logger | MagicMock | None = None) -> ModelCache:
         logger=logger,
         shared_cpu_weights=None,
     )
+
+
+def test_integrated_cuda_cache_cap_is_clamped_by_host_headroom(monkeypatch: pytest.MonkeyPatch):
+    cache = ModelCache(
+        execution_device_working_mem_gb=0.1,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    try:
+        cache._execution_device = torch.device("cuda")
+        cache._max_vram_cache_size_gb = 100.0
+        monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 80 * GB)
+        monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 80 * GB))
+        monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 10 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+
+        assert cache._get_vram_available(0) == pytest.approx(69.9 * GB)
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+def test_integrated_cuda_vram_admission_credits_reusable_allocator_blocks(monkeypatch: pytest.MonkeyPatch):
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    try:
+        cache._execution_device = torch.device("cuda")
+        monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 15 * GB)
+        monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 15 * GB))
+        monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 10 * GB)
+        monkeypatch.setattr(torch.cuda, "memory_reserved", lambda _device: 14 * GB)
+        monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 10 * GB)
+        monkeypatch.setattr(torch.cuda, "memory_stats", lambda _device: {"inactive_split_bytes.all.current": 0})
+        monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
+        monkeypatch.delenv("PYTORCH_ALLOC_CONF", raising=False)
+
+        # The commit-limited availability includes only 5 GiB of new capacity; 4 GiB of
+        # allocator blocks are reusable without another commit and must remain creditable.
+        assert cache._get_vram_available(0) == 8 * GB
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+@pytest.mark.parametrize("cap_gb", [None, 8.0], ids=["uncapped", "capped"])
+def test_integrated_cuda_physical_and_cache_availability_share_host_headroom(
+    monkeypatch: pytest.MonkeyPatch, cap_gb: float | None
+):
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cap_gb,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    try:
+        cache._execution_device = torch.device("cuda")
+        monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
+        monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
+        monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+        working = 2 * GB
+
+        expected_cache = (8.0 if cap_gb is None else 3.0) * GB
+        assert cache._get_vram_available(working) == expected_cache
+        assert cache._get_physical_vram_available(working) == 8 * GB
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+def test_integrated_cuda_reserve_decision_uses_host_headroom(monkeypatch: pytest.MonkeyPatch):
+    cache = _calibrating_cache("cuda", None)
+    calls: list[bool] = []
+    try:
+        monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
+        monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
+        monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+        monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: pytest.fail("CUDA free used")))
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda _cls, force=False: calls.append(force)))
+
+        cache._release_allocator_blocks_for_reserve(9 * GB)
+        assert calls == []
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+def test_integrated_cuda_calibration_matches_cache_identity(monkeypatch: pytest.MonkeyPatch):
+    cache = _calibrating_cache("cuda", 8.0)
+    try:
+        monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
+        monkeypatch.setattr(model_cache_module, "_host_memory_available", lambda: 13 * GB)
+        monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
+        monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
+        working = 4 * GB
+
+        assert cache.calibration_capacity() == 4.5 * GB
+        assert cache.calibration_capacity() == cache._get_vram_available(working) + working
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
 
 
 @requires_cuda
@@ -233,6 +379,7 @@ def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch
         shared_cpu_weights=None,
     )
     cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    monkeypatch.setattr(torch.version, "hip", "7.14.0")
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (12 * GB, 16 * GB))
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
     monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 2 * GB)

@@ -25,13 +25,13 @@ from invokeai.app.services.model_records.model_records_base import (
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, _is_integrated_cuda
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import ModelType
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 
 # Default settings a user chooses, which identification cannot derive and so must not replace on re-identify. The load
@@ -39,6 +39,25 @@ from invokeai.backend.util.logging import InvokeAILogger
 # they carry over only while the base is unchanged. The rest are the architecture's recommendations.
 _USER_CURATED_LOAD_SETTINGS = ("cpu_only", "fp8_storage")
 _USER_CURATED_BASE_BOUND_SETTINGS = ("vae", "components")
+
+
+def _resolve_keep_ram_copy_of_weights(configured: bool | None, device: torch.device) -> bool:
+    """Resolve automatic copy retention without changing explicit user choices."""
+    if configured is not None:
+        return configured
+    return not (device.type == "cuda" and torch.version.hip is None and device_is_integrated(device) is True)
+
+
+def _calc_global_ram_budget_bytes(
+    caches: list[ModelCache], explicit_max_gb: float | None, system_ram_headroom_bytes: int
+) -> int:
+    """Calculate the process-wide RAM cap without multiplying one Spark pool per cache."""
+    gb = 2**30
+    if explicit_max_gb is not None:
+        return int(explicit_max_gb * gb)
+    if caches and all(_is_integrated_cuda(cache.execution_device) for cache in caches):
+        return max(cache.local_ram_cache_size_bytes for cache in caches)
+    return min(sum(cache.local_ram_cache_size_bytes for cache in caches), system_ram_headroom_bytes)
 
 
 class ModelManagerService(ModelManagerServiceBase):
@@ -181,10 +200,11 @@ class ModelManagerService(ModelManagerServiceBase):
         shared_store = SharedCpuWeightsStore()
 
         def build_cache(device: torch.device) -> ModelCache:
+            keep_ram_copy = _resolve_keep_ram_copy_of_weights(app_config.keep_ram_copy_of_weights, device)
             return ModelCache(
                 execution_device_working_mem_gb=app_config.device_working_mem_gb,
                 enable_partial_loading=app_config.enable_partial_loading,
-                keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
+                keep_ram_copy_of_weights=keep_ram_copy,
                 max_ram_cache_size_gb=app_config.max_cache_ram_gb,
                 max_vram_cache_size_gb=app_config.max_cache_vram_gb,
                 reserve_vram_gb=app_config.reserve_vram_gb,
@@ -209,25 +229,27 @@ class ModelManagerService(ModelManagerServiceBase):
             if key not in ram_caches:
                 ram_caches[key] = build_cache(device)
 
-        # Attach the single global RAM budget. The cap is the user's max_cache_ram_gb interpreted as a
-        # true system-wide limit; when unset, it is the sum of the caches' individually-calculated
-        # sizes, so each device keeps its effective capacity and weight deduplication becomes headroom.
-        # That sum is then clamped to a safe fraction of system RAM: each per-device heuristic already
-        # allows up to ~half of system RAM, so summing across N GPUs would otherwise claim ~N× that and
-        # leave nothing for the OS, causing swap thrashing. The clamp leaves real headroom; shared-weight
-        # dedup means the true footprint usually stays well under the cap regardless.
+        # Attach one global RAM budget. An explicit max_cache_ram_gb is a process-wide cap. Otherwise,
+        # separate-memory devices retain the existing summed capacity with a system-RAM headroom clamp;
+        # integrated CUDA caches share one physical pool, so their global cap must not sum that pool once
+        # per device. Dynamic pressure checks still evict unlocked integrated-CUDA entries when needed.
         gb = 2**30
         device_caches = distinct_caches(ram_caches.values())
         # Cross-device weight adoption (and its per-model meta-shell capture) only pays off with more
         # than one device cache; disable the capture cost otherwise.
         shared_store.enable_shell_capture = len(device_caches) > 1
-        if app_config.max_cache_ram_gb is not None:
-            global_ram_budget_bytes = int(app_config.max_cache_ram_gb * gb)
-        else:
-            summed_cache_bytes = sum(c.local_ram_cache_size_bytes for c in device_caches)
-            system_ram_headroom_bytes = ModelCache.calc_system_ram_headroom_bytes()
-            global_ram_budget_bytes = min(summed_cache_bytes, system_ram_headroom_bytes)
-            if global_ram_budget_bytes < summed_cache_bytes:
+        system_ram_headroom_bytes = ModelCache.calc_system_ram_headroom_bytes()
+        global_ram_budget_bytes = _calc_global_ram_budget_bytes(
+            device_caches, app_config.max_cache_ram_gb, system_ram_headroom_bytes
+        )
+        summed_cache_bytes = sum(c.local_ram_cache_size_bytes for c in device_caches)
+        if global_ram_budget_bytes < summed_cache_bytes and app_config.max_cache_ram_gb is None:
+            if device_caches and all(_is_integrated_cuda(c.execution_device) for c in device_caches):
+                logger.info(
+                    f"Capping model cache RAM budget at {global_ram_budget_bytes / gb:.2f} GB to the shared "
+                    f"integrated CUDA pool (sum of per-device capacities was {summed_cache_bytes / gb:.2f} GB)."
+                )
+            else:
                 logger.info(
                     f"Capping model cache RAM budget at {global_ram_budget_bytes / gb:.2f} GB to leave system "
                     f"headroom (sum of per-device caches was {summed_cache_bytes / gb:.2f} GB)."

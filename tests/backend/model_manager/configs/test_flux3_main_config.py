@@ -450,5 +450,7 @@ def test_a_full_repo_download_sizes_the_tokenizer_without_the_root_package(tmp_p
     assert isinstance(config, Main_Diffusers_Flux3_Config)
     loader = Flux3DiffusersModel(app_config=MagicMock(), logger=MagicMock(), ram_cache=MagicMock())
 
-    assert loader.get_size_fs(config, root, SubModelType.Tokenizer) == 0
+    tokenizer_bytes = (root / "text_encoder" / "tokenizer.json").stat().st_size
+    assert loader.get_size_fs(config, root, SubModelType.Tokenizer) == tokenizer_bytes
+    assert tokenizer_bytes < (root / "model.safetensors").stat().st_size
     assert 1_000 <= loader.get_size_fs(config, root, SubModelType.Transformer) < 2_000_000

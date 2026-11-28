@@ -14,6 +14,7 @@ import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
@@ -23,6 +24,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
+    integrated_cuda_admission_lock,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast import weight_streaming
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
@@ -78,6 +80,14 @@ class LoadedModelWithoutConfig:
         # reference — its hold is released on the first lock (_end_first_use_window) or, if this
         # wrapper is dropped un-entered, by the claim's own finalizer when it dies with us.
         self._first_use_claim = first_use_claim
+        if cache is not None and hasattr(cache, "_register_loaded_model_handle"):
+            # Register this callback before the cache's WeakSet callback. Weakref callbacks run
+            # in reverse registration order; otherwise the finalizer can observe this dying handle
+            # as still live, release nothing, and never be retried.
+            handle_finalizer = finalize(self, cache._release_loaded_model_handle, cache_record)
+            handle_finalizer.atexit = False
+            if not cache._register_loaded_model_handle(cache_record, self):
+                handle_finalizer.detach()
         # Fallback for a record obtained through plain get() (or by a caller that could not get a
         # claim): arm the hold here instead. The instructions between that get() returning and
         # this constructor are then unshielded — an eviction landing exactly there is the
@@ -163,7 +173,8 @@ class LoadedModelWithoutConfig:
         """
         stream_started_at = time.time()
         with MODEL_LOAD_LOCK.read_lock():
-            settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
+            with integrated_cuda_admission_lock(self.compute_device):
+                settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
         # Termination backstop: pathological interleavings (another thread's budget disagreeing
         # with ours can unload what a pass just loaded) could in principle re-truncate forever.
         # After comfortably more passes than the model's size can honestly require, run one final
@@ -172,12 +183,13 @@ class LoadedModelWithoutConfig:
         while not settled:
             remaining_capped_passes -= 1
             with MODEL_LOAD_LOCK.read_lock():
-                settled = self._cache.continue_lock(
-                    self._cache_record,
-                    working_mem_bytes,
-                    max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
-                    stream_started_at=stream_started_at,
-                )
+                with integrated_cuda_admission_lock(self.compute_device):
+                    settled = self._cache.continue_lock(
+                        self._cache_record,
+                        working_mem_bytes,
+                        max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
+                        stream_started_at=stream_started_at,
+                    )
             if remaining_capped_passes <= 0:
                 # The uncapped pass settles by construction; guard against a regression in that
                 # invariant turning this loop into a spin.
@@ -205,18 +217,18 @@ class LoadedModelWithoutConfig:
             if observed:
                 probe.lock_started(self._cache, self._cache_record)
             if offload_others:
-                # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
-                # dicts, which must not overlap a model construction.
+                # The global load lock before admission and the cache's own lock: a move to RAM loads state dicts,
+                # which must not overlap a model construction.
                 with MODEL_LOAD_LOCK.read_lock():
-                    self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
+                    with integrated_cuda_admission_lock(self.compute_device):
+                        self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
             self._lock_paced(working_mem_bytes)
             locked = True
             self._end_first_use_window()
             self.repair_required_tensors_on_device()
             cached_model = self._cache_record.cached_model
             if isinstance(cached_model, CachedModelWithPartialLoad):
-                # Outside the global load lock and the cache's lock, see `pin_streamed_weights`.
-                cached_model.pin_streamed_weights()
+                self._pin_streamed_weights(cached_model)
         except BaseException:
             if locked:
                 self._cache.unlock(self._cache_record)
@@ -349,7 +361,8 @@ class LoadedModelWithoutConfig:
         # also called directly (outside __enter__/model_on_device) by some text-encoder invocations,
         # so the guard lives here rather than only at the call sites.
         with MODEL_LOAD_LOCK.read_lock():
-            return cached_model.repair_required_tensors_on_compute_device()
+            with integrated_cuda_admission_lock(self.compute_device):
+                return cached_model.repair_required_tensors_on_compute_device()
 
     def unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
         """Unload model weights through the cache's failure-safe path.
@@ -359,11 +372,12 @@ class LoadedModelWithoutConfig:
         Full-load-only entries ignore the requested byte count and unload all weights.
         """
         with MODEL_LOAD_LOCK.read_lock():
-            freed = self._cache.unload_model_from_vram(
-                self._cache_record,
-                vram_bytes_to_free,
-                keep_required_weights_in_vram=keep_required_weights_in_vram,
-            )
+            with integrated_cuda_admission_lock(self.compute_device):
+                freed = self._cache.unload_model_from_vram(
+                    self._cache_record,
+                    vram_bytes_to_free,
+                    keep_required_weights_in_vram=keep_required_weights_in_vram,
+                )
         self._pin_streamed_weights_of_a_trimmed_lock(freed)
         return freed
 
@@ -373,15 +387,22 @@ class LoadedModelWithoutConfig:
         node that holds a second model of the same size at the same time: prefer this to sizing an `unload_from_vram`
         request from `resident_weight_bytes`, which does not know that reserve."""
         with MODEL_LOAD_LOCK.read_lock():
-            freed = self._cache.hold_model_residency(self._cache_record, max_resident_bytes)
+            with integrated_cuda_admission_lock(self.compute_device):
+                freed = self._cache.hold_model_residency(self._cache_record, max_resident_bytes)
         self._pin_streamed_weights_of_a_trimmed_lock(freed)
         return freed
 
     def _pin_streamed_weights_of_a_trimmed_lock(self, freed: int) -> None:
         cached_model = self._cache_record.cached_model
         if freed and self._cache_record.is_locked and isinstance(cached_model, CachedModelWithPartialLoad):
-            # A node that makes room within its lock (a second expert or branch) runs on: what this moved to RAM
-            # streams from now on. Outside the locks, as in `_lock_on_device`.
+            self._pin_streamed_weights(cached_model)
+
+    def _pin_streamed_weights(self, cached_model: CachedModelWithPartialLoad) -> None:
+        """Pin slowly without stalling dedicated-device loads; integrated CUDA excludes cold construction."""
+        if model_cache_module._is_integrated_cuda(self.compute_device):
+            with MODEL_LOAD_LOCK.read_lock(), integrated_cuda_admission_lock(self.compute_device):
+                cached_model.pin_streamed_weights()
+        else:
             cached_model.pin_streamed_weights()
 
 

@@ -1,9 +1,13 @@
+import json
+import weakref
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
+import invokeai.backend.model_manager.load.model_loaders.krea2 as krea2_module
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Krea2_Config,
     Main_Diffusers_Krea2_Config,
@@ -47,11 +51,16 @@ class _TinyKrea2Transformer(torch.nn.Module):
         self.weight = torch.nn.Parameter(torch.empty(2, 2))
 
 
+def _write_safetensors_header(path) -> None:
+    """The loader seam serves the payload, but ownership selection still reads the checkpoint header."""
+    save_file({"_fixture": torch.zeros(1)}, str(path))
+
+
 def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_path) -> None:
     import diffusers
 
     checkpoint_path = tmp_path / "krea2.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -126,7 +135,7 @@ def test_single_file_loader_decodes_an_int8_convrot_checkpoint(monkeypatch, tmp_
     state_dict["dense.weight"] = torch.ones(4, 8, dtype=torch.float16)
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -217,7 +226,7 @@ def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_pa
             self.wide = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
 
     checkpoint_path = tmp_path / "krea2Int4Convrot_v10Turbo.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -509,6 +518,124 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
     assert fp8_calls == [], "an int8 encoder must not be treated as an fp8 one"
 
 
+def test_checkpoint_encoder_refuses_mxfp8_decode_before_expanding_scales(monkeypatch, tmp_path) -> None:
+    import transformers
+    from safetensors import torch as safetensors_torch
+
+    from invokeai.backend.quantization.block_scale_tiles import block_scale_grid
+    from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE
+    from tests.fixtures.quantized_payloads import comfy_quant_marker
+
+    class _TinyLanguageModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.proj = torch.nn.Linear(128, 128, bias=False)
+
+    class _TinyEncoder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.language_model = _TinyLanguageModel()
+            self.visual = _TinyVisionTower()
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    rows, columns = 128, 128
+    state_dict = {
+        "proj.weight": torch.ones(rows, columns, dtype=FP8_DTYPE),
+        "proj.weight_scale": block_scale_grid(torch.full((rows, columns // 32), 127, dtype=torch.uint8)),
+        "proj.comfy_quant": comfy_quant_marker({"format": "mxfp8"}),
+    }
+    checkpoint_path = tmp_path / "qwen3vl_mxfp8.safetensors"
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
+    config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
+    loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    loader._load_te_config = lambda _config: SimpleNamespace()
+    monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+    decoded_bytes = (
+        rows
+        * (columns // 32)
+        * (torch.float32.itemsize + torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize)
+    )
+
+    def make_room(_reserved: int, *, host_bytes_needed: int | None = None):
+        return SimpleNamespace(ram_headroom_satisfied=host_bytes_needed != decoded_bytes)
+
+    loader._ram_cache.make_room = MagicMock(side_effect=make_room)
+    extracted = False
+    original_extract = krea2_module.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(krea2_module, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        loader._load_text_encoder(config)
+
+    assert extracted is False
+    assert loader._ram_cache.make_room.call_args.kwargs == {"host_bytes_needed": decoded_bytes}
+
+
+@pytest.mark.parametrize(
+    ("weight_shape", "scale_shape", "decoder_error"),
+    [
+        ((128, 128), (127, 4), "MXFP8 scale must be a 2-D"),
+        ((127, 128), (127, 4), "not in the cuBLAS tile layout"),
+        ((128, 96), (128, 3), "not in the cuBLAS tile layout"),
+    ],
+)
+def test_checkpoint_encoder_refuses_malformed_mxfp8_before_cache_admission(
+    monkeypatch, tmp_path, weight_shape, scale_shape, decoder_error
+) -> None:
+    import transformers
+    from safetensors import torch as safetensors_torch
+
+    from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE
+    from tests.fixtures.quantized_payloads import comfy_quant_marker
+
+    class _TinyEncoder(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.language_model = torch.nn.Module()
+            self.language_model.proj = torch.nn.Linear(128, 128, bias=False)
+            self.visual = _TinyVisionTower()
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    state_dict = {
+        "proj.weight": torch.ones(weight_shape, dtype=FP8_DTYPE),
+        "proj.weight_scale": torch.zeros(scale_shape, dtype=torch.uint8),
+        "proj.comfy_quant": comfy_quant_marker({"format": "mxfp8"}),
+    }
+    checkpoint_path = tmp_path / "qwen3vl_malformed_mxfp8.safetensors"
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
+    config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
+    loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
+    loader._load_te_config = lambda _config: SimpleNamespace()
+    monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(krea2_module.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+
+    with pytest.raises(ValueError, match=decoder_error):
+        loader._load_text_encoder(config)
+
+    loader._ram_cache.make_room.assert_not_called()
+
+
 def test_directory_encoder_loader_reaches_transformers_from_pretrained(monkeypatch, tmp_path) -> None:
     import transformers
 
@@ -587,7 +714,7 @@ def test_an_int8_weight_without_a_marker_is_refused(monkeypatch, tmp_path) -> No
     }
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -644,7 +771,7 @@ def _int8_transformer_driver(monkeypatch, tmp_path, model_class, state_dict, *, 
     from safetensors import torch as safetensors_torch
 
     checkpoint_path = tmp_path / "krea2_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -930,14 +1057,30 @@ class _TinyNativeKrea2(torch.nn.Module):
         self.transformer_blocks = torch.nn.ModuleList([_TinyNativeKrea2Block(self.WIDTH)])
 
 
-def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ...] = ()):
+class _TinyWideNativeKrea2(torch.nn.Module):
+    WIDTH = 128
+
+    def __init__(self, **_kwargs) -> None:
+        super().__init__()
+        self.img_in = torch.nn.Linear(self.WIDTH, self.WIDTH, bias=True)
+        self.transformer_blocks = torch.nn.ModuleList([_TinyNativeKrea2Block(self.WIDTH)])
+
+
+def _native_fp8_driver(
+    monkeypatch,
+    tmp_path,
+    state_dict,
+    observe: tuple[str, ...] = (),
+    metadata=None,
+    model_class=_TinyNativeKrea2,
+):
     import diffusers
 
     from invokeai.backend.model_manager.load.model_loaders import krea2
     from tests.fixtures.loader_seams import Seam, prepare
 
     checkpoint = tmp_path / "krea2_fp8_scaled_everything.safetensors"
-    checkpoint.touch()
+    _write_safetensors_header(checkpoint)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint), variant=Krea2VariantType.Turbo, fp8_storage=None
     )
@@ -946,8 +1089,8 @@ def _native_fp8_driver(monkeypatch, tmp_path, state_dict, observe: tuple[str, ..
         seam,
         monkeypatch,
         state_dict=state_dict,
-        metadata=None,
-        geometry=lambda patch: patch.setattr(diffusers, "Krea2Transformer2DModel", _TinyNativeKrea2, raising=False),
+        metadata=metadata,
+        geometry=lambda patch: patch.setattr(diffusers, "Krea2Transformer2DModel", model_class, raising=False),
         observe=observe,
     )
     return run, config
@@ -1001,6 +1144,8 @@ def test_a_quantized_norm_keeps_its_scale_through_the_native_rename(monkeypatch,
     run, config = _native_fp8_driver(monkeypatch, tmp_path, state_dict)
 
     model = run.load(config)
+
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
 
     block = model.transformer_blocks[0]
     # The controls: Linears, whose parameter *is* named `weight`, with and without a bias beside it.
@@ -1066,6 +1211,88 @@ def test_room_is_reserved_before_the_scaled_weights_are_widened(monkeypatch, tmp
     assert torch.allclose(model.transformer_blocks[0].attn.to_q.weight.float(), payload.dequantized, atol=1e-5)
     assert [step for step, _ in run.order] == list(widening), run.order
     assert all(reserved for _step, reserved in run.order), run.order
+
+
+def test_mxfp8_scale_decode_has_host_room_before_extraction(monkeypatch, tmp_path) -> None:
+    """The compact MXFP8 grids must be admitted before extraction expands them to float32."""
+    from tests.fixtures.quantized_payloads import mxfp8_marker, mxfp8_tensors
+
+    exponents = (torch.arange(128 * 4, dtype=torch.int64).reshape(128, 4) % 8) + 124
+    tensors, _expected = mxfp8_tensors("blocks.0.attn.wq", exponents)
+    state_dict = {**_native_block(_TinyWideNativeKrea2.WIDTH), **tensors}
+    metadata = {"_quantization_metadata": json.dumps({"layers": {"blocks.0.attn.wq": mxfp8_marker()}})}
+    run, config = _native_fp8_driver(
+        monkeypatch,
+        tmp_path,
+        state_dict,
+        observe=("extract_fp8_scaled_layers",),
+        metadata=metadata,
+        model_class=_TinyWideNativeKrea2,
+    )
+    admissions = []
+    make_room = run.loader._ram_cache.make_room
+
+    def record_admission(*args, **kwargs):
+        admissions.append((args, kwargs))
+        return make_room(*args, **kwargs)
+
+    run.loader._ram_cache.make_room = record_admission
+
+    run.load(config)
+
+    assert run.order == [("extract_fp8_scaled_layers", 1)]
+    assert run.reserved[0] == 0
+    assert admissions[0] == ((0,), {"host_bytes_needed": 512 * (4 + 1 + 2 * 4 + 4)})
+
+
+def test_qwen3vl_tower_releases_folded_scale_before_nvfp4_install(monkeypatch) -> None:
+    """The folded FP8 side-channel must not stay live through the later packed install."""
+    from invokeai.backend.quantization.fp8_scaled import extract_fp8_scaled_layers
+    from tests.fixtures.quantized_payloads import quantize_scaled_fp8
+
+    payload = quantize_scaled_fp8(torch.ones(2, 2, dtype=torch.float32))
+    captured_scale = None
+
+    def capture_layers(sd, **kwargs):
+        nonlocal captured_scale
+        layers = extract_fp8_scaled_layers(sd, **kwargs)
+        captured_scale = weakref.ref(layers["proj"].weight_scale)
+        return layers
+
+    class TinyVision(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.proj = torch.nn.Linear(2, 2, bias=False)
+
+        @classmethod
+        def _from_config(cls, _config):
+            return cls()
+
+    install_started_with_live_scale = None
+
+    def observe_install(*args, **kwargs):
+        nonlocal install_started_with_live_scale
+        install_started_with_live_scale = captured_scale() is not None
+        return 0
+
+    monkeypatch.setattr(
+        krea2_module,
+        "read_qwen3vl_visual_tower_tensors",
+        lambda _files, _mapped_storage_ids=None: {
+            "proj.weight": payload.codes,
+            "proj.weight_scale": payload.scale,
+        },
+    )
+    monkeypatch.setattr(krea2_module, "extract_fp8_scaled_layers", capture_layers)
+    monkeypatch.setattr(krea2_module, "_remap_qwen3vl_tower_keys", lambda entries, **_kwargs: entries)
+    monkeypatch.setattr(krea2_module, "install_nvfp4_layers", observe_install)
+    monkeypatch.setattr("transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionModel", TinyVision)
+
+    krea2_module._load_qwen3vl_visual_tower(
+        [], SimpleNamespace(), torch.float32, reserve=lambda _bytes, **_kwargs: None
+    )
+
+    assert install_started_with_live_scale is False
 
 
 def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
@@ -1149,7 +1376,7 @@ def test_single_file_loader_holds_rms_norm_weights_in_fp32_as_stored(monkeypatch
     assert not torch.equal(stored.to(torch.bfloat16).to(stored_dtype), stored)
     served_norm = stored.clone()
     checkpoint_path = tmp_path / "krea2.safetensors"
-    checkpoint_path.touch()
+    _write_safetensors_header(checkpoint_path)
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
     )

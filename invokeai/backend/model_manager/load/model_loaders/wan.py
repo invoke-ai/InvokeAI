@@ -723,7 +723,9 @@ class WanCheckpointModel(ModelLoader):
                     },
                 }
                 reserve_for_load(
-                    lambda planned_bytes: self._ram_cache.make_room(planned_bytes + in_flight),
+                    lambda planned_bytes, *, host_bytes_needed: self._ram_cache.make_room(
+                        planned_bytes + in_flight, host_bytes_needed=host_bytes_needed
+                    ),
                     planned_sd,
                     model_dtype,
                     keep_fp8=keep_fp8,

@@ -1,7 +1,6 @@
 """Class for Krea-2 model loading in InvokeAI."""
 
 from abc import abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, Optional, TypeVar
 
@@ -28,6 +27,7 @@ from invokeai.backend.model_manager.load.load_default import (
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.qwen3_vl_labels import variant_label
 from invokeai.backend.model_manager.taxonomy import (
@@ -49,6 +49,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     INPUT_SCALE_SUFFIXES,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -61,6 +62,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reattach_layer_sidechannel,
+    safetensors_backend,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -82,7 +84,11 @@ from invokeai.backend.quantization.nvfp4 import (
     WEIGHT_SCALE_2_SUFFIX,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
     predict_nvfp4_install_size,
+)
+from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
+    _TOKENIZER_DIR as _QWEN3_VL_TOKENIZER_DIR,
 )
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     build_qwen3_vl_processor,
@@ -90,6 +96,7 @@ from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     load_bundled_qwen3_vl_tokenizer,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import HostMemoryReserver
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 # Kept as a module-level alias: this helper moved to model_manager.util.qwen3_vl so the MiniMax H3
@@ -365,7 +372,7 @@ def _load_qwen3vl_visual_tower(
     vision_config: Any,
     dtype: torch.dtype,
     *,
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
 ) -> torch.nn.Module:
     """Build a Qwen3-VL vision tower from the ``visual.*`` tensors of `files`, reading nothing else.
 
@@ -381,7 +388,8 @@ def _load_qwen3vl_visual_tower(
     from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
 
     what = "Qwen3-VL vision tower"
-    sd: dict[str, Any] = dict(read_qwen3vl_visual_tower_tensors(files))
+    mapped_storage_ids: set[int] = set()
+    sd: dict[str, Any] = dict(read_qwen3vl_visual_tower_tensors(files, mapped_storage_ids))
     if not sd:
         raise RuntimeError(
             f"{', '.join(str(f) for f in files) or 'This encoder'} carries no Qwen3-VL vision tower weights, so it "
@@ -421,6 +429,8 @@ def _load_qwen3vl_visual_tower(
             skip_patterns=skip_patterns,
             # The branch's only reservation, and the nvfp4 layers are no longer in `sd`.
             extra_reserved_bytes=predict_nvfp4_install_size(tower, nvfp4_payloads, dtype, skip_patterns),
+            extra_host_bytes=predict_nvfp4_install_host_size(tower, nvfp4_payloads, dtype, skip_patterns),
+            source_tensors_mapped=mapped_storage_ids,
         )
     else:
         # Whole keys were renamed, so each `.weight_scale` still sits beside its `.weight`.
@@ -434,8 +444,10 @@ def _load_qwen3vl_visual_tower(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
             skip_patterns=skip_patterns,
+            source_tensors_mapped=mapped_storage_ids,
         )
         dequantize_fp8_scaled(sd, fp8_layers, dtype)
+        fp8_layers = {}
         cast_state_dict(sd, dtype, keep_fp8=False, model=tower)
 
     install_nvfp4_layers(tower, sd, nvfp4_payloads, dtype, skip_patterns)
@@ -465,9 +477,16 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
     ) -> int:
         if submodel_type is SubModelType.VisionEncoder:
             return qwen3vl_visual_tower_nbytes(qwen3vl_visual_tower_files(model_path / SubModelType.TextEncoder.value))
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(model_path / SubModelType.Tokenizer.value)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(model_path / SubModelType.Tokenizer.value, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -588,6 +607,7 @@ class Krea2CheckpointModel(ModelLoader):
         if not isinstance(config, Main_Checkpoint_Krea2_Config):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
@@ -679,6 +699,9 @@ class Krea2CheckpointModel(ModelLoader):
                     )
                 layer_hints = {path_map.get(name, name): hints for name, hints in layer_hints.items()}
 
+            # MXFP8 extraction widens compact scale grids before the regular reservation below can account for
+            # them. Admit that decode peak first; the file-sized reservation already covers the compact source grids.
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             # ComfyUI 'scaled fp8' checkpoints (fp8 weight + .weight_scale, optionally .input_scale).
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
@@ -712,6 +735,8 @@ class Krea2CheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=nvfp4_bytes,
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
@@ -738,6 +763,7 @@ class Krea2CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=source_tensors_mapped,
             )
 
             if fp8_layers and not keep_fp8:
@@ -931,9 +957,16 @@ class Qwen3VLEncoderLoader(ModelLoader):
     ) -> int:
         if submodel_type is SubModelType.VisionEncoder:
             return qwen3vl_visual_tower_nbytes(qwen3vl_visual_tower_files(self._component_paths(model_path)[0]))
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(self._component_paths(model_path)[1])
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(self._component_paths(model_path)[1], include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _load_model(
         self,
@@ -1074,11 +1107,26 @@ class _Qwen3VLEncoderSingleFileLoader(ModelLoader, Generic[_Qwen3VLSingleFileCon
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        if submodel_type is SubModelType.Processor:
-            return 0
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+            if load_bundled_qwen3_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_QWEN3_VL_TOKENIZER_DIR)
         if submodel_type is SubModelType.VisionEncoder:
             return self._vision_encoder_nbytes(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
+
+            if load_bundled_qwen3_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_QWEN3_VL_TOKENIZER_DIR, include_runtime_overhead=True)
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     @abstractmethod
     def _load_text_encoder(self, config: _Qwen3VLSingleFileConfig) -> AnyModel:
@@ -1139,6 +1187,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         decision = self._decision(config, SubModelType.TextEncoder)
         keep_matmul_fp8 = decision.fp8_compute
         storage_supported = decision.storage_supported
@@ -1196,6 +1245,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             sd = _remap_qwen3vl_singlefile_keys(sd)
             layer_hints = {qwen3vl_target_key(path): hints for path, hints in layer_hints.items()}
 
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale). Only the language-model linears are
             # quantized in the checkpoints seen so far.
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
@@ -1233,6 +1283,8 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 # The nvfp4 layers taken out above are held beside the int8 ones, and this is the
                 # branch's only reservation.
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Qwen3-VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -1271,6 +1323,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer wants them packed: fold the scales into the weights. Both consumers

@@ -223,6 +223,14 @@ class TestCheckpointLoader:
         path = tmp_path / "moss-image-dit.safetensors"
         save_file({f"{prefix}{key}": value for key, value in sd.items()}, str(path))
         loader = _loader(MossImageCheckpointModel, monkeypatch)
+        reservations: list[dict[str, object]] = []
+        reserve_for_load = loader_module.reserve_for_load
+
+        def record_reservation(*args: object, **kwargs: object) -> None:
+            reservations.append(kwargs)
+            reserve_for_load(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
         config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
 
         model = loader._load_model(config, SubModelType.Transformer)
@@ -237,6 +245,7 @@ class TestCheckpointLoader:
         torch.testing.assert_close(forward(model), forward(reference))
         # Reserved once, before anything was cast or assigned.
         loader._ram_cache.make_room.assert_called_once()
+        assert reservations[0]["source_tensors_mapped"] is True
 
     def test_a_quantization_side_channel_is_refused(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         sd = _tiny_state_dict(tiny_reference())
@@ -506,9 +515,19 @@ class TestFusedAndInt8Checkpoints:
         stored, meant = int8_convrot_state_dict(tiny_reference())
         path = tmp_path / "moss_image_base_int8_convrot.safetensors"
         save_file(stored, str(path))
+        seen: dict[str, bool] = {}
+        original_install = loader_module.install_int8_convrot_layers
+
+        def install(*args, **kwargs):
+            seen["source_tensors_mapped"] = kwargs.get("source_tensors_mapped", False)
+            return original_install(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "install_int8_convrot_layers", install)
 
         model, loader = self._load(monkeypatch, path)
 
+        # The checkpoint is mapped, while the derived RoPE buffer is owned; count conservatively for the mixed source.
+        assert seen["source_tensors_mapped"] is True
         block = model.layers[1].proj
         # `proj` is a ModuleDict: the swap has to land in it, not on a stray attribute.
         for name in ("k", "v", "o", "ffn_up_gate", "ffn_down"):
@@ -712,9 +731,18 @@ class TestTorchaoFp8Checkpoint:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         path, dense, quantized = self._file(tmp_path)
+        reservations: list[dict[str, object]] = []
+        reserve_for_load = loader_module.reserve_for_load
+
+        def record_reservation(*args: object, **kwargs: object) -> None:
+            reservations.append(kwargs)
+            reserve_for_load(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
 
         model, _, _ = self._load(monkeypatch, path, keep_fp8=False)
 
+        # FP8 files are read with safetensors' pread backend, so the source storage is owned.
         assert [name for name, p in model.named_parameters() if p.dtype is not torch.float32] == []
         for layer, (codes, scale) in quantized.items():
             assert torch.equal(model.get_submodule(layer).weight, codes.float() * scale), layer

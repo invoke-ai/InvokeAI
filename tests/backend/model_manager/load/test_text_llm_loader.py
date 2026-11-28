@@ -7,8 +7,9 @@ through the loader's own entry point, with the vendored config swapped for the t
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 import torch
@@ -29,6 +30,7 @@ from transformers import (
 
 from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import text_llm as loader_module
 from invokeai.backend.model_manager.load.model_loaders.text_llm import (
     TextLLMCheckpointLoader,
@@ -73,7 +75,11 @@ class TestTheReleasedLayouts:
         reserved: list[int] = []
 
         model = qwen3_5_vl_from_state_dict(
-            _meta_state_dict(keys, markers), torch.bfloat16, reserve=reserved.append, what="pup", logger=MagicMock()
+            _meta_state_dict(keys, markers),
+            torch.bfloat16,
+            reserve=lambda n, **_kwargs: reserved.append(n),
+            what="pup",
+            logger=MagicMock(),
         )
 
         kept = {name: module for name, module in model.named_modules() if isinstance(module, Int8ConvrotLinear)}
@@ -107,7 +113,11 @@ class TestTheReleasedLayouts:
         reserved: list[int] = []
 
         model = qwen3_5_vl_from_state_dict(
-            _meta_state_dict(keys, {}), torch.bfloat16, reserve=reserved.append, what="pup", logger=MagicMock()
+            _meta_state_dict(keys, {}),
+            torch.bfloat16,
+            reserve=lambda n, **_kwargs: reserved.append(n),
+            what="pup",
+            logger=MagicMock(),
         )
 
         assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
@@ -219,7 +229,8 @@ FOLDER_SEAM = _seam(TextLLMModelLoader, torch.float32)
 
 def _config(tmp_path: Path, cpu_only: bool | None = None) -> TextLLM_Checkpoint_Config:
     path = tmp_path / "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors"
-    path.write_bytes(b"\0" * 64)
+    # The loader seam replaces the checkpoint payload, but ownership selection still reads the real header.
+    save_file({"_fixture": torch.zeros(1)}, path)
     return TextLLM_Checkpoint_Config.model_construct(path=str(path), name=path.stem, cpu_only=cpu_only)
 
 
@@ -246,10 +257,19 @@ class TestTheCheckpointLoader:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         reference = _reference()
+        seen: dict[str, bool] = {}
+        original_install = loader_module.install_int8_convrot_layers
+
+        def install(*args, **kwargs):
+            seen["source_tensors_mapped"] = kwargs["source_tensors_mapped"]
+            return original_install(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "install_int8_convrot_layers", install)
         run = prepare(SEAM, monkeypatch, state_dict=_int8_checkpoint(reference), geometry=_tiny_geometry)
 
         model = run.load(_config(tmp_path), None)
 
+        assert seen["source_tensors_mapped"] is True
         kept = {name for name, module in model.named_modules() if isinstance(module, Int8ConvrotLinear)}
         assert kept == set(_QUANTIZED) - _WIDENED
         assert not any(name.startswith("mtp") for name in model.state_dict())
@@ -300,9 +320,27 @@ class TestTheCheckpointLoader:
 
         model = run.load(_config(tmp_path), None)
 
+        assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
         assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
         torch.testing.assert_close(_text_logits(model), _text_logits(reference))
         assert run.reserved == [_nbytes(model.state_dict())]
+
+    def test_owned_dense_state_dict_reserves_as_unmapped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _tiny_geometry(monkeypatch)
+        state_dict = {key: value.detach().clone() for key, value in _reference().state_dict().items()}
+        seen: dict[str, bool] = {}
+        original_reserve_for_load = loader_module.reserve_for_load
+
+        def reserve_for_load(*args, **kwargs):
+            seen["source_tensors_mapped"] = kwargs["source_tensors_mapped"]
+            return original_reserve_for_load(*args, **kwargs)
+
+        monkeypatch.setattr(loader_module, "reserve_for_load", reserve_for_load)
+        qwen3_5_vl_from_state_dict(
+            state_dict, torch.float32, reserve=lambda _nbytes, **_kwargs: None, what="owned", logger=MagicMock()
+        )
+
+        assert seen["source_tensors_mapped"] is False
 
     @pytest.mark.parametrize(
         ("cpu_only", "expected"), [(None, torch.bfloat16), (True, torch.float32)], ids=["on the device", "cpu only"]
@@ -534,8 +572,54 @@ class TestTheFolderLoader:
         folder.mkdir()
         (folder / "config.json").write_text("{}")
         (folder / "model.safetensors").write_bytes(b"\0" * 1024)
+        (folder / "tokenizer.json").write_bytes(b"tokenizer")
+        (folder / "tokenizer_config.json").write_bytes(b"config")
         config = _folder_config(folder)
         loader = prepare(FOLDER_SEAM, monkeypatch).loader
 
-        assert loader.get_size_fs(config, folder, submodel) == 0
+        tokenizer_bytes = (folder / "tokenizer.json").stat().st_size + (folder / "tokenizer_config.json").stat().st_size
+        assert loader.get_size_fs(config, folder, submodel) == tokenizer_bytes
         assert loader.get_size_fs(config, folder, None) == 1024
+
+    @pytest.mark.parametrize(
+        ("submodel", "factory"),
+        [(SubModelType.Tokenizer, "AutoTokenizer"), (SubModelType.Processor, "AutoProcessor")],
+    )
+    def test_the_text_side_is_admitted_before_cold_construction(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, submodel: SubModelType, factory: str
+    ) -> None:
+        folder = tmp_path / "llm"
+        folder.mkdir()
+        (folder / "tokenizer.json.gz").write_bytes(b"compressed")
+        config = _folder_config(folder)
+        tokenizer_bytes = (folder / "tokenizer.json.gz").stat().st_size
+        runtime_bytes = 130 * 2**20
+        constructed = False
+
+        def construct(*_args: Any, **_kwargs: Any) -> object:
+            nonlocal constructed
+            constructed = True
+            return object()
+
+        monkeypatch.setattr(getattr(loader_module, factory), "from_pretrained", construct)
+        loader = object.__new__(TextLLMModelLoader)
+        loader._app_config = SimpleNamespace(log_memory_usage=False)
+        loader._logger = MagicMock()
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
+        loader._ram_cache = MagicMock()
+        loader._ram_cache.get_with_first_use_claim.side_effect = IndexError
+        loader._ram_cache.shared_cpu_weights = None
+        loader._ram_cache.make_room.return_value = SimpleNamespace(ram_headroom_satisfied=False)
+        loader._ram_cache.execution_device = torch.device("cuda:0")
+        monkeypatch.setattr(load_default, "_is_integrated_cuda", lambda _device: True)
+        monkeypatch.setattr(loader, "_get_model_path", lambda _config: folder)
+        monkeypatch.setattr(loader, "_load_model", construct)
+
+        with pytest.raises(MemoryError, match="Insufficient host memory"):
+            loader._load_and_cache(config, submodel)
+
+        assert loader._ram_cache.make_room.call_args_list == [
+            call(tokenizer_bytes, host_bytes_needed=tokenizer_bytes + runtime_bytes)
+        ]
+        assert not constructed

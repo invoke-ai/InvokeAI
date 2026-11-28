@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config, MainModelDefaultSettings
 from invokeai.backend.model_manager.load import load_default
@@ -110,7 +111,7 @@ def _load(monkeypatch: pytest.MonkeyPatch, tmp_path, neighbour: str, fp8_storage
     }
 
     checkpoint_path = tmp_path / "krea2_turbo_nvfp4.safetensors"
-    checkpoint_path.touch()
+    save_file({"_fixture": torch.zeros(1)}, str(checkpoint_path))
     config = Main_Checkpoint_Krea2_Config.model_construct(
         path=str(checkpoint_path),
         name="krea2_turbo_nvfp4",
@@ -198,7 +199,16 @@ def test_one_reservation_counts_the_nvfp4_layers_as_they_are_held(loaded) -> Non
         neighbour = 128 * CONVROT_GROUP_SIZE + 128 * torch.float32.itemsize
     else:
         neighbour = 128 * CONVROT_GROUP_SIZE * COMPUTE_DTYPE.itemsize
-    loaded.loader._ram_cache.make_room.assert_called_once_with(packed + decoded + dense + neighbour)
+    loaded.loader._ram_cache.make_room.assert_called_once()
+    call = loaded.loader._ram_cache.make_room.call_args
+    assert call.args == (packed + decoded + dense + neighbour,)
+    # Packed mmap payloads are installed zero-copy, so they belong to the retained reservation but not to incremental
+    # host demand. The dense path's decode/cast peak is therefore below the final reservation as well.
+    if loaded.neighbour == "dense":
+        decoded_peak = 128 * 64 * (2 + COMPUTE_DTYPE.itemsize) + (128 * 64 // 16) * COMPUTE_DTYPE.itemsize
+        assert call.kwargs["host_bytes_needed"] == dense + neighbour + decoded_peak
+    else:
+        assert 0 < call.kwargs["host_bytes_needed"] < call.args[0]
 
 
 def test_fp8_storage_casts_the_dense_layers_of_an_nvfp4_build_and_leaves_its_nvfp4_buffers(

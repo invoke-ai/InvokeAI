@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from invokeai.backend.util.devices import device_has_dedicated_vram
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram, device_is_integrated
 from invokeai.backend.util.vae_working_memory import should_pretile_vae_decode
 from invokeai.backend.working_memory.coefficients import find_entry, shipped_data
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
@@ -223,9 +223,12 @@ def untiled_peak_bytes(
 
 
 def default_tile_size(operation: Literal["encode", "decode"], device: torch.device, element_size: int) -> int:
-    """The largest tile whose encode or decode takes at most half of the device's memory."""
+    """The largest tile whose estimate takes at most half the available memory budget."""
     if device.type == "cuda":
-        total = torch.cuda.get_device_properties(device).total_memory
+        if torch.version.hip is None and device_is_integrated(device) is True:
+            total = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+        else:
+            total = torch.cuda.get_device_properties(device).total_memory
     elif device.type == "xpu" and device_has_dedicated_vram(device):
         total = torch.xpu.get_device_properties(device).total_memory
     else:

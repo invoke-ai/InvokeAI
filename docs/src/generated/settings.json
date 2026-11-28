@@ -507,7 +507,7 @@
     {
       "category": "CACHE",
       "default": null,
-      "description": "The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.",
+      "description": "For separate-memory systems, the maximum amount of CPU RAM to use for model caching in GB. On native integrated-CUDA platforms, this limits the shared host/CUDA memory pool used by the model cache. If unset, the limit will be configured automatically based on available memory. In most cases, it is recommended to leave this unset.",
       "env_var": "INVOKEAI_MAX_CACHE_RAM_GB",
       "literal_values": [],
       "name": "max_cache_ram_gb",
@@ -583,13 +583,13 @@
     },
     {
       "category": "CACHE",
-      "default": true,
-      "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.",
+      "default": null,
+      "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. If unset, Invoke disables the duplicate copy on integrated CUDA and keeps it on other devices. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching.",
       "env_var": "INVOKEAI_KEEP_RAM_COPY_OF_WEIGHTS",
       "literal_values": [],
       "name": "keep_ram_copy_of_weights",
       "required": false,
-      "type": "<class 'bool'>",
+      "type": "typing.Optional[bool]",
       "validation": {}
     },
     {
@@ -606,7 +606,7 @@
     {
       "category": "CACHE",
       "default": false,
-      "description": "After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.",
+      "description": "After every queue item (each image of a batch), move models held in separate VRAM to RAM and return the freed memory to the GPU driver. Integrated CUDA can also unload the duplicate CUDA copy when keep_ram_copy_of_weights is enabled; the physical-memory effect is hardware-dependent and unverified. With no retained copy, or on CPU, MPS and integrated XPU, there is no separate device pool to free. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because memory pressure rises when it is repeated.",
       "env_var": "INVOKEAI_CLEAR_VRAM_AFTER_SESSION",
       "literal_values": [],
       "name": "clear_vram_after_session",

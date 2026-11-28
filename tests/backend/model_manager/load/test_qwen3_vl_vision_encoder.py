@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     Qwen3VLEncoderGGUFLoader,
     Qwen3VLEncoderLoader,
 )
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data, calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import (
     qwen3vl_visual_tower_files,
@@ -125,16 +125,44 @@ def test_only_the_tower_tensors_are_read(tmp_path: Path) -> None:
     assert set(tensors) == {k for k in state_dict if k.startswith("model.visual.")}
 
 
-def test_the_cache_reserves_the_tower_not_the_file(tmp_path: Path) -> None:
+def test_mixed_shards_report_only_mmap_tower_storages(tmp_path: Path) -> None:
+    """A pread FP8 shard and mmap dense shard must not be collapsed into one ownership flag."""
+    mmap_path = tmp_path / "model-00001-of-00002.safetensors"
+    pread_path = tmp_path / "model-00002-of-00002.safetensors"
+    mmap_tensor = torch.ones(2, dtype=torch.bfloat16)
+    pread_tensor = torch.zeros(2, dtype=torch.bfloat16)
+    save_file({"model.visual.blocks.0.norm1.weight": mmap_tensor}, str(mmap_path))
+    save_file(
+        {
+            "model.visual.blocks.0.norm2.weight": pread_tensor,
+            "model.language_model.layers.0.mlp.weight": torch.ones(4, 4, dtype=torch.float8_e4m3fn),
+        },
+        str(pread_path),
+    )
+
+    mapped_storage_ids: set[int] = set()
+    tensors = read_qwen3vl_visual_tower_tensors([mmap_path, pread_path], mapped_storage_ids)
+
+    assert mapped_storage_ids == {tensors["model.visual.blocks.0.norm1.weight"].untyped_storage().data_ptr()}
+    assert tensors["model.visual.blocks.0.norm2.weight"].untyped_storage().data_ptr() not in mapped_storage_ids
+
+
+def test_the_cache_reserves_the_tower_not_the_file(monkeypatch, tmp_path: Path) -> None:
     """`_load_and_cache` reserves `get_size_fs` before the load. Sized by the file, a tower load would evict
     ten times what it needs on the real 4B (0.77 of 8.27 GiB)."""
     reference = _tiny_encoder()
     path = tmp_path / "qwen3vl_tiny.safetensors"
     loader = _single_file(path, dict(reference.state_dict()), tiny_qwen3vl_config())
     config = _checkpoint_config(path)
+    from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
+        _TOKENIZER_DIR,
+        load_bundled_qwen3_vl_tokenizer,
+    )
+
+    monkeypatch.setattr(load_bundled_qwen3_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=0))
 
     assert loader.get_size_fs(config, path, SubModelType.VisionEncoder) == _tower_bytes(reference)
-    assert loader.get_size_fs(config, path, SubModelType.Processor) == 0
+    assert loader.get_size_fs(config, path, SubModelType.Processor) == calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
     assert loader.get_size_fs(config, path, SubModelType.TextEncoder) == path.stat().st_size > _tower_bytes(reference)
 
 
@@ -364,7 +392,9 @@ def test_the_krea2_pipeline_serves_its_encoders_tower_and_processor(tmp_path: Pa
     assert isinstance(processor, Qwen3VLProcessor)
     assert processor.tokenizer("a cat").input_ids == load_bundled_qwen3_vl_tokenizer()("a cat").input_ids
     assert loader.get_size_fs(config, tmp_path, SubModelType.VisionEncoder) == _tower_bytes(reference)
-    assert loader.get_size_fs(config, tmp_path, SubModelType.Processor) == 0
+    assert loader.get_size_fs(config, tmp_path, SubModelType.Processor) == calc_tokenizer_size_by_fs(
+        tmp_path / "tokenizer"
+    )
 
 
 def test_a_sharded_folder_reads_only_the_shards_holding_the_tower(tmp_path: Path) -> None:

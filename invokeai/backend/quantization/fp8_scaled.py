@@ -24,7 +24,8 @@ from typing import Any, Callable, Iterable, Literal, Mapping
 
 import torch
 
-from invokeai.backend.quantization.block_scale_tiles import unblock_scale_grid
+from invokeai.backend.quantization.block_scale_tiles import check_tile_layout, unblock_scale_grid
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 
 FP8_DTYPE = torch.float8_e4m3fn
 
@@ -558,6 +559,60 @@ def decode_mx_block_scales(
         # poison the layer just as quietly. Neither published build contains one.
         raise ValueError(f"'{path}': its MXFP8 scale grid contains the reserved E8M0 value 0x{_E8M0_NAN:02X} (NaN).")
     return torch.exp2((exponents - _E8M0_BIAS).to(torch.float32))
+
+
+def mxfp8_scale_decode_host_bytes(sd: Mapping[str, Any], layer_hints: Mapping[str, Any]) -> int:
+    """Return the extra host bytes needed while extraction expands MXFP8 scale grids.
+
+    The compact grids are already covered by the checkpoint reservation. Extraction retains each decoded
+    float32 grid and briefly materializes the largest grid's decode temporaries.
+    """
+    decoded_bytes = 0
+    largest_grid_bytes = 0
+    for path, hints in layer_hints.items():
+        if not isinstance(hints, Mapping) or hints.get("format") != MXFP8_FORMAT:
+            continue
+        weight = sd.get(f"{path}.weight")
+        scale = sd.get(f"{path}.weight_scale")
+        if scale is None:
+            scale = sd.get(f"{path}.scale_weight")
+        if (
+            getattr(weight, "dtype", None) not in FP8_WEIGHT_DTYPES
+            or getattr(scale, "dtype", None) not in _MX_SCALE_DTYPES
+            or getattr(scale, "dim", lambda: 0)() != 2
+            or getattr(weight, "dim", lambda: 0)() != 2
+            or scale.shape[0] != weight.shape[0]
+        ):
+            continue
+        blocks = scale.shape[1]
+        if blocks == 0:
+            continue
+        block_size, remainder = divmod(weight.shape[1], blocks)
+        if remainder or hints.get("block_size", MXFP8_BLOCK_SIZE) != block_size:
+            continue
+        try:
+            check_tile_layout(*scale.shape)
+        except ValueError:
+            # Extraction will report the decoder's established layout error before any allocation.
+            continue
+        grid_bytes = scale.nelement()
+        decoded_bytes += grid_bytes * torch.float32.itemsize
+        largest_grid_bytes = max(largest_grid_bytes, grid_bytes)
+    # decode_mx_block_scales materializes the unblocked uint8 view, int32 exponents, subtraction result, and
+    # float32 cast for the largest grid while decoded grids from prior layers remain live.
+    return decoded_bytes + largest_grid_bytes * (
+        torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize
+    )
+
+
+def admit_mxfp8_scale_decode(
+    sd: Mapping[str, Any], layer_hints: Mapping[str, Any], reserve: HostMemoryReserver | None
+) -> int:
+    """Reserve the temporary host peak before extraction expands MXFP8 scale grids."""
+    host_bytes_needed = mxfp8_scale_decode_host_bytes(sd, layer_hints)
+    if reserve is not None and host_bytes_needed:
+        require_ram_headroom(reserve(0, host_bytes_needed=host_bytes_needed), host_bytes_needed)
+    return host_bytes_needed
 
 
 def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:

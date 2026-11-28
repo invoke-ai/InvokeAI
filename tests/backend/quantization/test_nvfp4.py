@@ -30,6 +30,7 @@ from invokeai.backend.quantization.nvfp4 import (
     find_nvfp4_layers,
     install_nvfp4_layers,
     pop_nvfp4_layers,
+    predict_modelopt_nvfp4_relayout_host_size,
     predict_nvfp4_install_size,
     relayout_modelopt_nvfp4_payloads,
     split_nvfp4_rows,
@@ -150,6 +151,27 @@ def test_a_modelopt_layer_is_re_laid_out_into_the_bytes_comfyui_stores() -> None
         (comfy["layer.weight"], comfy["layer.weight_scale"], comfy["layer.weight_scale_2"]),
     ):
         assert torch.equal(dequantize_nvfp4_weight(weight, scale, scale_2, torch.float32), expected)
+
+
+def test_modelopt_relayout_host_peak_counts_copy_temporaries() -> None:
+    tensors = _zero_layer("layer")
+    payload = NVFP4Payload(tensors["layer.weight"], tensors["layer.weight_scale"], tensors["layer.weight_scale_2"])
+
+    assert predict_modelopt_nvfp4_relayout_host_size({"layer": payload}) == max(
+        3 * payload.weight.nbytes, payload.weight.nbytes + payload.weight_scale.nbytes
+    )
+
+
+def test_modelopt_relayout_host_peak_accumulates_fused_split_views() -> None:
+    tensors = _zero_layer("fused", rows=384)
+    payload = NVFP4Payload(tensors["fused.weight"], tensors["fused.weight_scale"], tensors["fused.weight_scale_2"])
+    parts = split_nvfp4_rows("fused", payload, 3)
+
+    predicted = predict_modelopt_nvfp4_relayout_host_size({f"part-{index}": part for index, part in enumerate(parts)})
+    part_output_bytes = parts[0].weight.nbytes + parts[0].weight_scale.nbytes
+    expected = part_output_bytes * 2 + 3 * parts[0].weight.nbytes
+
+    assert predicted == expected
 
 
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16, torch.float32])

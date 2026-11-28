@@ -10,6 +10,8 @@ loader that ignored the rotation would produce a weight that loads cleanly and g
 """
 
 import json
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import safetensors.torch
@@ -20,6 +22,8 @@ from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Con
 from invokeai.backend.model_manager.load.model_loaders import flux
 from invokeai.backend.model_manager.load.model_loaders.flux import FluxCheckpointModel
 from invokeai.backend.model_manager.taxonomy import FluxVariantType
+from invokeai.backend.quantization.block_scale_tiles import block_scale_grid
+from invokeai.backend.quantization.fp8_scaled import FP8_DTYPE
 from invokeai.backend.quantization.int8_convrot import (
     CONVROT_GROUP_SIZE,
     Int8ConvrotLinear,
@@ -114,7 +118,9 @@ def _driver(monkeypatch, tmp_path, state_dict: dict, header: dict | None = None,
     if written:
         safetensors.torch.save_file(state_dict, str(checkpoint))
     else:
-        checkpoint.touch()
+        # The seam serves the state dict below, but production still inspects the real safetensors header to
+        # choose mmap versus pread. Keep that boundary exercised with a tiny valid file instead of a touch-only path.
+        safetensors.torch.save_file(state_dict, str(checkpoint))
     config = Main_Checkpoint_FLUX_Config.model_construct(
         path=str(checkpoint), name="flux1-dev-int8", variant=FluxVariantType.Dev
     )
@@ -159,6 +165,47 @@ def test_an_int8_checkpoint_stays_int8_and_un_rotates(monkeypatch, tmp_path) -> 
         reconstructed = layer._dequantized_weight(torch.device("cpu"), torch.float32)
         original = originals[path]
         assert torch.allclose(reconstructed, original, rtol=0.05, atol=0.05 * original.abs().max()), path
+
+
+def test_mxfp8_decode_is_refused_before_expanding_scales_when_host_room_is_exactly_short(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    state_dict, originals = _checkpoint(marker=None)
+    for path in QUANTIZED:
+        state_dict[f"{path}.weight"] = originals[path].bfloat16()
+        del state_dict[f"{path}.weight_scale"]
+
+    path = QUANTIZED[0]
+    rows, columns = originals[path].shape
+    state_dict[f"{path}.weight"] = torch.ones(rows, columns, dtype=FP8_DTYPE)
+    state_dict[f"{path}.weight_scale"] = block_scale_grid(torch.full((rows, columns // 32), 127, dtype=torch.uint8))
+    state_dict[f"{path}.comfy_quant"] = comfy_quant_marker({"format": "mxfp8"})
+    run, config = _driver(monkeypatch, tmp_path, state_dict)
+    decoded_bytes = (
+        rows
+        * (columns // 32)
+        * (torch.float32.itemsize + torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize)
+    )
+
+    def make_room(_reserved: int, *, host_bytes_needed: int | None = None):
+        return SimpleNamespace(ram_headroom_satisfied=host_bytes_needed != decoded_bytes)
+
+    run.loader._ram_cache.make_room = MagicMock(side_effect=make_room)
+    extracted = False
+    original_extract = flux.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(flux, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        run.load(config)
+
+    assert extracted is False
+    assert run.loader._ram_cache.make_room.call_args.kwargs == {"host_bytes_needed": decoded_bytes}
 
 
 def test_the_biases_of_the_quantized_layers_survive(monkeypatch, tmp_path) -> None:

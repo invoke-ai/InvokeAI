@@ -5,6 +5,8 @@ end state of the module: the layer keeps its fp8 codes with a flat per-row scale
 to exactly `codes * scale` when nothing does.
 """
 
+from types import SimpleNamespace
+
 import pytest
 import safetensors.torch
 import torch
@@ -84,13 +86,13 @@ def _checkpoint() -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], dic
 
 
 def _load(
-    monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool
-) -> tuple[torch.nn.Module, dict[str, torch.Tensor]]:
-    """The model, and the tensors the loader read from the real file."""
+    monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool, make_room=None
+) -> tuple[torch.nn.Module, dict[str, torch.Tensor], object, object]:
+    """The model, tensors read from the real file, and the loader seam record."""
     state_dict, _, _ = _checkpoint()
     checkpoint = tmp_path / CHECKPOINT
     safetensors.torch.save_file(state_dict, checkpoint)
-    loaded = record_reads(monkeypatch).tensors
+    read_log = record_reads(monkeypatch)
     config = Main_Checkpoint_QwenImage21_Config.model_construct(
         path=str(checkpoint), name="qwen21", default_settings=MainModelDefaultSettings(fp8_storage=False)
     )
@@ -100,11 +102,13 @@ def _load(
         patch.setattr(qwen_image_2_1, "_build_transformer", lambda _sd: _TinyTransformer())
 
     run = prepare(SEAM, monkeypatch, metadata=None, geometry=install)
-    return run.load(config, SubModelType.Transformer), loaded
+    if make_room is not None:
+        run.loader._ram_cache.make_room = make_room
+    return run.load(config, SubModelType.Transformer), read_log.tensors, run, read_log
 
 
 def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tmp_path) -> None:
-    model, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, _, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
     _, codes, scales = _checkpoint()
 
     layer = model.transformer_blocks[0].attn.to_q
@@ -126,7 +130,7 @@ def test_the_fp8_layers_stay_quantized_with_a_flat_per_row_scale(monkeypatch, tm
 
 @pytest.mark.parametrize("keep_fp8", [True, False])
 def test_a_folded_layer_is_exactly_the_codes_times_the_scale(monkeypatch, tmp_path, keep_fp8: bool) -> None:
-    model, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
+    model, _, _, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
     _, codes, scales = _checkpoint()
 
     folded = codes["norm_out.linear"].float() * scales["norm_out.linear"]
@@ -141,15 +145,62 @@ PREFIX = "model.diffusion_model."
 @needs_mapping_that_shows_file_writes
 @pytest.mark.parametrize("keep_fp8", [False, True], ids=["folded", "kept"])
 def test_no_parameter_reads_the_file_after_the_load(monkeypatch, tmp_path, keep_fp8: bool) -> None:
-    """`img_in` is stored in the compute dtype, so neither the fold nor the cast replaces it, and a kept load leaves the
-    fp8 codes as read too. A parameter that is still a slice of the file's mapping pins the whole file."""
-    model, _ = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
+    """A loaded parameter must not pin the checkpoint mapping outside cache accounting."""
+    model, _, run, read_log = _load(monkeypatch, tmp_path, keep_fp8=keep_fp8)
 
+    assert read_log.backends == ["pread"]
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
     assert tensors_reading_the_file(model, tmp_path / CHECKPOINT) == []
 
 
+def test_a_pread_fp8_load_fits_a_32k_host_admission(monkeypatch, tmp_path) -> None:
+    requested: list[int] = []
+
+    def admit(_reserved: int, *, host_bytes_needed: int = 0) -> object:
+        requested.append(host_bytes_needed)
+        if host_bytes_needed > 32 * 1024:
+            raise AssertionError(f"pread FP8 load requested {host_bytes_needed} host bytes")
+        return object()
+
+    _model, _loaded, run, read_log = _load(monkeypatch, tmp_path, keep_fp8=False, make_room=admit)
+
+    assert read_log.backends == ["pread"]
+    # The conversion peak is seven BF16 copies of one 32x16 fixture output.
+    expected_host_bytes = 7 * _TinyTransformer().img_in.weight.numel() * torch.bfloat16.itemsize
+    assert requested == [expected_host_bytes]
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is False
+
+
+def test_mxfp8_decode_admission_precedes_scale_extraction(monkeypatch, tmp_path) -> None:
+    """The decoder's host estimate must be admitted before extraction expands a compact scale grid."""
+    requested: list[tuple[int, int]] = []
+
+    def admit(reserved: int, *, host_bytes_needed: int = 0):
+        requested.append((reserved, host_bytes_needed))
+        return SimpleNamespace(ram_headroom_satisfied=False)
+
+    extracted = False
+    original_extract = qwen_image_2_1.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
+    monkeypatch.setattr(qwen_image_2_1, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        _load(monkeypatch, tmp_path, keep_fp8=False, make_room=admit)
+
+    assert requested == [(0, 1234)]
+    assert extracted is False
+
+
 def test_a_kept_fp8_load_does_not_copy_the_codes(monkeypatch, tmp_path) -> None:
-    model, loaded = _load(monkeypatch, tmp_path, keep_fp8=True)
+    model, loaded, _, _ = _load(monkeypatch, tmp_path, keep_fp8=True)
 
     codes = model.transformer_blocks[0].attn.to_q.weight
     assert codes.data_ptr() == loaded[PREFIX + "transformer_blocks.0.attn.to_q._weight_qdata"].data_ptr()

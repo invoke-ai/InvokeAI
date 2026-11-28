@@ -298,6 +298,17 @@ def test_host_dequant_reservation_follows_execution_device_changes(monkeypatch):
     assert peak_ggml_linear_dequant_transient_bytes(model) == 1312  # 512 * 2 + 288.
 
 
+def test_integrated_cuda_dequant_reservation_includes_host_intermediate(monkeypatch):
+    from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
+
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", lambda: torch.device("cuda:1"))
+    monkeypatch.setattr(devices, "device_is_integrated", lambda _device: True)
+    monkeypatch.setattr(torch.version, "hip", None)
+    linear = _gguf_linear(256, 2, gguf.GGMLQuantizationType.IQ4_NL, torch.float16)
+
+    assert peak_ggml_linear_dequant_transient_bytes(linear) == 5408
+
+
 def test_new_device_dequant_kernel_keeps_conservative_intermediate_reservation(monkeypatch):
     from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
 

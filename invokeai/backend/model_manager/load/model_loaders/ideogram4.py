@@ -45,6 +45,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -55,6 +56,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
+    safetensors_backend,
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
 )
@@ -68,6 +70,7 @@ from invokeai.backend.quantization.int8_convrot import (
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
 
@@ -130,7 +133,6 @@ class Ideogram4DiffusersModel(ModelLoader):
             raise Exception("A submodel type must be provided when loading Ideogram 4 main pipelines.")
 
         model_path = Path(config.path)
-
         match submodel_type:
             case SubModelType.Transformer:
                 return self._load_transformer_pair(model_path)
@@ -188,9 +190,9 @@ class Ideogram4DiffusersModel(ModelLoader):
         reject_int8_layers_a_plain_fold_cannot_decode(sd, f"Ideogram 4 transformer {folder.name}")
         reject_scale_spellings_this_path_drops(sd, f"Ideogram 4 transformer {folder.name}")
 
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
-
         if is_bnb4bit_state_dict(sd):
+            reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+            require_ram_headroom(self._ram_cache.make_room(reserved_bytes), reserved_bytes)
             # Here rather than at the top: bitsandbytes is not installed on macOS, and importing it
             # up front failed every load through this method there, fp8 and unquantized included.
             from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
@@ -205,15 +207,55 @@ class Ideogram4DiffusersModel(ModelLoader):
             return model
 
         if is_fp8_state_dict(sd):
-            # Weight-only fp8 (e4m3): dequantizes to compute dtype at forward time; runs on any device.
-            model = Ideogram4Transformer(Ideogram4Config())
-            model.to(compute_dtype)
-            swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
-            load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype)
+            reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+            additional_bytes = sum(
+                tensor.nelement()
+                * (torch.float32.itemsize if tensor_key.endswith(".weight_scale") else compute_dtype.itemsize)
+                for tensor_key, tensor in sd.items()
+                if tensor.is_floating_point()
+                and tensor.dtype != torch.float8_e4m3fn
+                and tensor.dtype != (torch.float32 if tensor_key.endswith(".weight_scale") else compute_dtype)
+            )
+            scaled_fp8_weights = {
+                tensor_key: tensor
+                for tensor_key, tensor in sd.items()
+                if tensor_key.endswith(".weight")
+                and tensor.dtype == torch.float8_e4m3fn
+                and f"{tensor_key}_scale" in sd
+            }
+            raw_fp8_tensors = {
+                tensor_key: tensor
+                for tensor_key, tensor in sd.items()
+                if tensor.dtype == torch.float8_e4m3fn and tensor_key not in scaled_fp8_weights
+            }
+            additional_bytes += sum(tensor.nelement() * compute_dtype.itemsize for tensor in raw_fp8_tensors.values())
+            require_ram_headroom(
+                self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            )
+            # Build on meta so packed FP8 checkpoints do not first allocate a dense float32 model. The prepared
+            # state dict supplies the non-FP8 tensors at compute dtype and assign=True preserves non-persistent
+            # buffers without materializing a second dense parameter set.
+            with accelerate.init_empty_weights():
+                model = Ideogram4Transformer(Ideogram4Config())
+                # Match the former dense FP8 path: it cast the non-persistent RoPE frequencies too.
+                model.to(dtype=compute_dtype)
+            with accelerate.init_empty_weights(include_buffers=True):
+                swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
+            for tensor_key in raw_fp8_tensors:
+                sd[tensor_key] = sd[tensor_key].to(dtype=compute_dtype)
+            load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True)
             model.eval()
             return model
 
         # Unquantized fallback.
+        reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+        # ``assign=True`` aliases the checkpoint tensors into the empty model, then ``to`` creates
+        # converted model tensors while this local state dict remains alive. Account for the full
+        # converted output, not the smaller in-place cast peak.
+        _, additional_bytes = state_dict_cast_bytes(sd, compute_dtype, in_place=False)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
         with accelerate.init_empty_weights():
             model = Ideogram4Transformer(Ideogram4Config())
         load_state_dict_ignoring_extras(model, sd, source="Ideogram 4 transformer", assign=True)
@@ -265,7 +307,29 @@ class Ideogram4DiffusersModel(ModelLoader):
             # unaffected: its sidecars are `.absmax` and `.quant_state.*`, which name no scale.
             reject_quantized_side_channel(sd, f"Ideogram 4 text encoder {encoder_path.name}")
 
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
+        reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+        is_bnb_nf4 = "quantization_config" in raw_cfg and bool(raw_cfg["quantization_config"].get("load_in_4bit"))
+        if is_bnb_nf4:
+            require_ram_headroom(self._ram_cache.make_room(reserved_bytes), reserved_bytes)
+        elif keeps_fp8:
+            additional_bytes = sum(
+                tensor.nelement()
+                * (torch.float32.itemsize if tensor_key.endswith(".weight_scale") else compute_dtype.itemsize)
+                for tensor_key, tensor in sd.items()
+                if tensor.is_floating_point()
+                and tensor.dtype != torch.float8_e4m3fn
+                and tensor.dtype != (torch.float32 if tensor_key.endswith(".weight_scale") else compute_dtype)
+            )
+            require_ram_headroom(
+                self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            )
+        else:
+            # ``assign=True`` aliases the checkpoint tensors into the empty model, then ``to`` creates
+            # converted model tensors while this local state dict remains alive.
+            _, additional_bytes = state_dict_cast_bytes(sd, compute_dtype, in_place=False)
+            require_ram_headroom(
+                self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+            )
 
         if keeps_fp8:
             # Weight-only fp8 (e4m3): build the empty architecture, swap the quantized Linears for
@@ -275,16 +339,15 @@ class Ideogram4DiffusersModel(ModelLoader):
             # assign=True fills the meta params directly.
             with accelerate.init_empty_weights():
                 model: torch.nn.Module = AutoModel.from_config(cfg)
-                # `required=False`: the architecture comes from the folder's config.json, so an
-                # encoder without a vision tower is a shape this loader may legitimately meet.
-                drop_qwen3vl_visual_tower(model, required=False)
+            # `required=False`: the architecture comes from the folder's config.json, so an
+            # encoder without a vision tower is a shape this loader may legitimately meet.
+            drop_qwen3vl_visual_tower(model, required=False)
+            with accelerate.init_empty_weights(include_buffers=True):
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
             load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, assign=True, strict=False)
             _verify_encoder_fully_materialized(model, context="Ideogram 4 fp8 text encoder")
             model.eval()
             return model
-
-        is_bnb_nf4 = "quantization_config" in raw_cfg and bool(raw_cfg["quantization_config"].get("load_in_4bit"))
 
         with accelerate.init_empty_weights():
             model = AutoModel.from_config(cfg)
@@ -374,6 +437,7 @@ class Ideogram4CheckpointModel(ModelLoader):
         from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
 
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd: dict[str, torch.Tensor] = load_safetensors_checkpoint(model_path)
@@ -399,6 +463,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 **parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)),
             }
 
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Two consumers want these packed and either is enough: the fp8 matmul, which runs on
             # them directly, and FP8 Storage asked of this model. Asking only the matmul -- which is
@@ -436,6 +501,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 architecture="Ideogram 4",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=source_tensors_mapped,
             )
             kept = 0
         else:
@@ -454,6 +520,7 @@ class Ideogram4CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer asked. Fold the scales in: staying quantized would halve VRAM but

@@ -5,6 +5,7 @@ import json
 import threading
 import traceback
 import weakref
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -15,8 +16,9 @@ from PIL import Image
 from safetensors.torch import save_file
 from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
+import invokeai.app.invocations.text_encoder.qwen_image_text_encoder as qwen_image_text_encoder_module
 from invokeai.app.invocations.fields import ImageField
-from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
+from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
     _EDIT_DROP_IDX,
     _GENERATE_DROP_IDX,
@@ -24,8 +26,13 @@ from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
     _build_prompt,
     _read_checkpoint,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
+from invokeai.app.services.shared.invocation_context import ModelsInterface
+from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
+    lora_model_from_qwen_image_state_dict,
+)
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.qwen2_5_vl.headless import HeadlessQwen2_5_VLForConditionalGeneration
 from invokeai.backend.util.devices import TorchDevice
 
@@ -298,15 +305,41 @@ class TestQuantizedEncoderLoad:
     TOTAL_SIZE = 16 * 2**30  # bf16 Qwen2.5-VL-7B on disk
 
     @staticmethod
-    def _make_invocation(quantization: str) -> QwenImageTextEncoderInvocation:
+    def _make_invocation(quantization: str, loras: list[LoRAField] | None = None) -> QwenImageTextEncoderInvocation:
         encoder = ModelIdentifierField(
             key="enc", hash="h", name="qwen-vl", base=BaseModelType.QwenImage, type=ModelType.QwenVLEncoder
         )
         return QwenImageTextEncoderInvocation(
             prompt="a cat",
-            qwen_vl_encoder=QwenVLEncoderField(tokenizer=encoder, text_encoder=encoder),
+            qwen_vl_encoder=QwenVLEncoderField(tokenizer=encoder, text_encoder=encoder, loras=loras or []),
             quantization=quantization,
         )
+
+    @staticmethod
+    def _make_lora_field() -> LoRAField:
+        lora = ModelIdentifierField(
+            key="lora", hash="h", name="qwen-lora", base=BaseModelType.QwenImage, type=ModelType.LoRA
+        )
+        return LoRAField(lora=lora, weight=1.0)
+
+    @staticmethod
+    def _make_lora_patch() -> ModelPatchRaw:
+        return lora_model_from_qwen_image_state_dict(
+            {
+                "text_encoder.model.language_model.layers.0.mlp.down_proj.lora_A.weight": torch.ones(2, 128),
+                "text_encoder.model.language_model.layers.0.mlp.down_proj.lora_B.weight": torch.ones(64, 2),
+            }
+        )
+
+    @staticmethod
+    def _make_patchable_encoder() -> torch.nn.Module:
+        encoder = torch.nn.Module()
+        encoder.model = torch.nn.Module()
+        encoder.model.language_model = torch.nn.Module()
+        encoder.model.language_model.layers = torch.nn.ModuleList([torch.nn.Module()])
+        encoder.model.language_model.layers[0].mlp = torch.nn.Module()
+        encoder.model.language_model.layers[0].mlp.down_proj = torch.nn.Linear(128, 64, bias=False)
+        return encoder
 
     def _make_context(
         self, tmp_path: Path, events: list[str], single_file: bool = False, vram_available: int | None = None
@@ -330,6 +363,86 @@ class TestQuantizedEncoderLoad:
 
         context.models.make_room_in_vram.side_effect = make_room
         return context, tensors
+
+    def test_cold_lora_load_can_acquire_the_model_write_lock(self, tmp_path: Path):
+        """A cold LoRA cache load takes the same process-global write lock as the encoder construction."""
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        workers: list[threading.Thread] = []
+        acquired = threading.Event()
+        lora_patch = self._make_lora_patch()
+
+        def load_lora(identifier: ModelIdentifierField):
+            assert identifier.type is ModelType.LoRA
+
+            def cold_load() -> None:
+                with MODEL_LOAD_LOCK.write_lock():
+                    acquired.set()
+
+            worker = threading.Thread(target=cold_load)
+            workers.append(worker)
+            worker.start()
+            assert acquired.wait(timeout=1), "cold LoRA loading was blocked by the encoder load lock"
+            worker.join(timeout=1)
+            return SimpleNamespace(model=lora_patch, model_in_ram=lambda: nullcontext())
+
+        context.models.load.side_effect = load_lora
+        invocation = self._make_invocation("int8", [self._make_lora_field()])
+
+        try:
+            with (
+                patch.object(
+                    Qwen2_5_VLForConditionalGeneration, "from_pretrained", return_value=self._make_patchable_encoder()
+                ),
+                patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+            ):
+                _, _, cleanup = invocation._load_quantized_encoder(context)
+                cleanup()
+        finally:
+            for worker in workers:
+                worker.join(timeout=1)
+
+    def test_warm_lora_patch_is_removed_after_quantized_load(self, tmp_path: Path):
+        """A warm LoRA is patched after construction and the returned cleanup restores the encoder."""
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        workers: list[threading.Thread] = []
+        read_acquired = threading.Event()
+        lora_patch = self._make_lora_patch()
+
+        def load_lora(identifier: ModelIdentifierField):
+            assert identifier.type is ModelType.LoRA
+
+            def warm_load() -> None:
+                with MODEL_LOAD_LOCK.read_lock():
+                    read_acquired.set()
+
+            worker = threading.Thread(target=warm_load)
+            workers.append(worker)
+            worker.start()
+            assert read_acquired.wait(timeout=1), "warm LoRA patching was blocked by the encoder load lock"
+            worker.join(timeout=1)
+            return SimpleNamespace(model=lora_patch, model_in_ram=lambda: nullcontext())
+
+        context.models.load.side_effect = load_lora
+        encoder = self._make_patchable_encoder()
+        invocation = self._make_invocation("int8", [self._make_lora_field()])
+
+        try:
+            with (
+                patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", return_value=encoder),
+                patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+            ):
+                loaded, _, cleanup = invocation._load_quantized_encoder(context)
+
+            patched_layer = loaded.model.language_model.layers[0].mlp.down_proj
+            assert patched_layer.get_num_patches() == 1
+            assert not _write_lock_held()
+            cleanup()
+            assert patched_layer.get_num_patches() == 0
+        finally:
+            for worker in workers:
+                worker.join(timeout=1)
 
     @pytest.mark.parametrize(("quantization", "ratio"), [("int8", 0.6), ("nf4", 0.4)])
     def test_makes_room_in_vram_before_loading_onto_the_execution_device(
@@ -375,6 +488,47 @@ class TestQuantizedEncoderLoad:
         context.logger.warning.assert_not_called()
         cleanup()
 
+    def test_integrated_cuda_admission_spans_room_and_quantized_allocation(self, tmp_path: Path):
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        device = torch.device("cuda:0")
+
+        def make_room_with_write_lock(needed: int) -> int:
+            assert _write_lock_held()
+            events.append("make_room(write)")
+            return needed
+
+        context.models.make_room_in_vram_with_write_lock.side_effect = make_room_with_write_lock
+
+        @contextmanager
+        def admission_guard(guard_device: torch.device):
+            assert guard_device == device
+            events.append("admission-enter")
+            yield
+            events.append("admission-exit")
+
+        def fake_from_pretrained(path, **kwargs):
+            events.append("from_pretrained")
+            assert _write_lock_held()
+            return MagicMock()
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+            patch.object(qwen_image_text_encoder_module, "integrated_cuda_admission_lock", admission_guard),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == [
+            "make_room",
+            "make_room",
+            "admission-enter",
+            "make_room(write)",
+            "from_pretrained",
+            "admission-exit",
+        ]
+
     def test_checkpoint_is_read_outside_the_model_load_lock(self, tmp_path: Path):
         """The disk read is the slow part of the load on anything but NVMe, and while MODEL_LOAD_LOCK is held (or
         wanted by a writer) other workers' VRAM moves and cold constructions wait. Only the offload and the
@@ -400,7 +554,15 @@ class TestQuantizedEncoderLoad:
             events.append("from_pretrained" if _write_lock_held() else "from_pretrained(wrong lock)")
             return MagicMock()
 
+        def make_room_with_write_lock(needed: int) -> int:
+            assert _write_lock_held()
+            events.append("make_room(write)")
+            return needed
+
+        context.models.make_room_in_vram_with_write_lock.side_effect = make_room_with_write_lock
+
         with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
             patch(
                 "invokeai.app.invocations.text_encoder.qwen_image_text_encoder._read_checkpoint", side_effect=fake_read
             ),
@@ -410,7 +572,7 @@ class TestQuantizedEncoderLoad:
             self._make_invocation("int8")._load_quantized_encoder(context)
 
         assert acquired_during_read == [True], "a construction was blocked for the duration of the checkpoint read"
-        assert events == ["make_room", "read", "from_pretrained"]
+        assert events == ["make_room", "read", "make_room", "make_room(write)", "from_pretrained"]
 
     def test_warns_when_less_than_the_estimate_could_be_made_available(self, tmp_path: Path):
         """`make_room_in_vram` cannot offload locked models, so it reports what is actually available after
@@ -419,6 +581,7 @@ class TestQuantizedEncoderLoad:
         context, _ = self._make_context(tmp_path, events, vram_available=1000 * MB)
 
         with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=False),
             patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", return_value=MagicMock()),
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda:0")),
         ):
@@ -429,6 +592,266 @@ class TestQuantizedEncoderLoad:
         assert "1000 MB" in message
         assert f"{int(self.TOTAL_SIZE * 0.6) / MB:.0f} MB" in message
         assert "cuda:0" in message
+
+    def test_integrated_cuda_shortfall_stops_before_checkpoint_read(self, tmp_path: Path):
+        """Shared CUDA memory is the same resource as host RAM, so do not start an oversized external load."""
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events, vram_available=1000 * MB)
+        device = torch.device("cuda:0")
+
+        def fake_read(path: Path):
+            events.append("read")
+            return {}
+
+        def fake_from_pretrained(path, **kwargs):
+            events.append("from_pretrained")
+            return MagicMock()
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+            patch.object(qwen_image_text_encoder_module, "_read_checkpoint", side_effect=fake_read),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+            pytest.raises(torch.OutOfMemoryError) as excinfo,
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == ["make_room"]
+        context.logger.warning.assert_not_called()
+        assert "refusing to read the checkpoint" in str(excinfo.value.__cause__)
+
+    def test_integrated_cuda_rechecks_admission_after_checkpoint_read(self, tmp_path: Path):
+        """A cold load can consume shared memory while this checkpoint is read; construction must recheck before
+        taking the model-load writer, avoiding an admission/model-lock inversion."""
+        events: list[str] = []
+        lock_modes: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        device = torch.device("cuda:0")
+        calls = 0
+
+        def make_room(_needed: int) -> int:
+            nonlocal calls
+            calls += 1
+            events.append("make_room")
+            lock_modes.append("read" if _read_lock_held() else "write" if _write_lock_held() else "none")
+            return _needed if calls < 3 else 0
+
+        context.models.make_room_in_vram.side_effect = make_room
+        context.models.make_room_in_vram_with_write_lock.side_effect = make_room
+
+        def fake_read(path: Path):
+            events.append("read")
+
+            def ordinary_cold_load() -> None:
+                with MODEL_LOAD_LOCK.write_lock():
+                    events.append("ordinary-cold-load")
+
+            thread = threading.Thread(target=ordinary_cold_load)
+            thread.start()
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+            return {}
+
+        with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+            patch.object(qwen_image_text_encoder_module, "_read_checkpoint", side_effect=fake_read),
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained") as from_pretrained,
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+            pytest.raises(torch.OutOfMemoryError) as excinfo,
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        assert events == ["make_room", "read", "ordinary-cold-load", "make_room", "make_room"]
+        assert lock_modes == ["none", "none", "write"]
+        from_pretrained.assert_not_called()
+        assert "refusing construction" in str(excinfo.value.__cause__)
+
+    def test_checkpoint_read_can_overlap_the_public_offload_path(self, tmp_path: Path):
+        """The public offload path takes the model read lock before integrated admission.
+
+        Qwen deliberately holds neither while reading its checkpoint. Keep this race on the real
+        ModelsInterface and ModelCache entry points: an offload that makes shared memory inadequate
+        must finish, and the Qwen load must refuse before constructing the quantized model.
+        """
+        model_root = tmp_path / "qwen-vl"
+        _write_sharded_checkpoint(model_root / "text_encoder", total_size=self.TOTAL_SIZE)
+        needed = int(self.TOTAL_SIZE * 0.6)
+        cache = ModelCache(
+            execution_device_working_mem_gb=0,
+            enable_partial_loading=False,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+        )
+        cache._execution_device = torch.device("cuda:0")
+        services = SimpleNamespace(model_manager=SimpleNamespace(load=SimpleNamespace(ram_cache=cache)))
+        models = ModelsInterface(services=services, data=MagicMock(), util=MagicMock())
+        context = SimpleNamespace(
+            models=models,
+            util=SimpleNamespace(signal_progress=MagicMock()),
+            logger=MagicMock(),
+        )
+        checkpoint_reading = threading.Event()
+        release_checkpoint = threading.Event()
+        offload_finished = threading.Event()
+        available = needed
+        offload_calls = 0
+        offload_lock_modes: list[str] = []
+        offload_result: list[int] = []
+        errors: list[BaseException] = []
+
+        def physical_available(_working_mem_bytes=None) -> int:
+            return available
+
+        def offload_unlocked(_needed: int, **_kwargs) -> int:
+            nonlocal available, offload_calls
+            offload_calls += 1
+            offload_lock_modes.append("read" if _read_lock_held() else "other")
+            if offload_calls > 1:
+                available = 0
+                offload_finished.set()
+            return 0
+
+        def read_checkpoint(_path: Path) -> dict[str, torch.Tensor]:
+            checkpoint_reading.set()
+            assert release_checkpoint.wait(timeout=5), "checkpoint read was not released"
+            return {}
+
+        def run_offload() -> None:
+            try:
+                offload_result.append(models.make_room_in_vram(needed))
+            except BaseException as error:
+                errors.append(error)
+
+        def run_load() -> None:
+            try:
+                self._make_invocation("int8")._load_quantized_encoder(context)
+            except BaseException as error:
+                errors.append(error)
+
+        try:
+            with (
+                patch.object(models, "get_config", return_value=SimpleNamespace()),
+                patch.object(models, "get_absolute_path", return_value=model_root),
+                patch.object(cache, "_get_physical_vram_available", side_effect=physical_available),
+                patch.object(cache, "_offload_unlocked_models", side_effect=offload_unlocked),
+                patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+                patch(
+                    "invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated",
+                    return_value=True,
+                ),
+                patch.object(qwen_image_text_encoder_module, "_read_checkpoint", side_effect=read_checkpoint),
+                patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained") as from_pretrained,
+                patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda:0")),
+            ):
+                loader = threading.Thread(target=run_load)
+                loader.start()
+                assert checkpoint_reading.wait(timeout=5), "Qwen did not reach checkpoint read"
+
+                offloader = threading.Thread(target=run_offload)
+                offloader.start()
+                assert offload_finished.wait(timeout=5), "public offload did not finish"
+                offloader.join(timeout=5)
+                release_checkpoint.set()
+                loader.join(timeout=5)
+
+                assert not offloader.is_alive() and not loader.is_alive(), "Qwen/offload paths deadlocked"
+                assert errors and isinstance(errors[0], torch.OutOfMemoryError)
+                assert offload_result == [0]
+                assert offload_calls == 3
+                assert offload_lock_modes == ["read", "read", "read"]
+                from_pretrained.assert_not_called()
+                assert "refusing construction" in str(errors[0].__cause__)
+        finally:
+            release_checkpoint.set()
+            cache.shutdown()
+
+    def test_integrated_cuda_rechecks_shared_memory_under_the_construction_lock(self, tmp_path: Path):
+        """A cold load may consume shared memory after Qwen's read-lock check and before construction."""
+        model_root = tmp_path / "qwen-vl"
+        _write_sharded_checkpoint(model_root / "text_encoder", total_size=self.TOTAL_SIZE)
+        needed = int(self.TOTAL_SIZE * 0.6)
+        cache = ModelCache(
+            execution_device_working_mem_gb=0,
+            enable_partial_loading=False,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+        )
+        cache._execution_device = torch.device("cuda:0")
+        services = SimpleNamespace(model_manager=SimpleNamespace(load=SimpleNamespace(ram_cache=cache)))
+        models = ModelsInterface(services=services, data=MagicMock(), util=MagicMock())
+        context = SimpleNamespace(
+            models=models,
+            util=SimpleNamespace(signal_progress=MagicMock()),
+            logger=MagicMock(),
+        )
+        postcheck_done = threading.Event()
+        writer_reduced = threading.Event()
+        available = needed
+        make_room_calls = 0
+        errors: list[BaseException] = []
+
+        def physical_available(_working_mem_bytes=None) -> int:
+            return available
+
+        def offload_unlocked(_needed: int, **_kwargs) -> int:
+            return 0
+
+        real_make_room = models.make_room_in_vram
+
+        def make_room(needed_bytes: int) -> int:
+            nonlocal make_room_calls
+            result = real_make_room(needed_bytes)
+            make_room_calls += 1
+            if make_room_calls == 2:
+                postcheck_done.set()
+                assert writer_reduced.wait(timeout=5), "cold load did not consume shared memory"
+            return result
+
+        def ordinary_cold_load() -> None:
+            nonlocal available
+            assert postcheck_done.wait(timeout=5), "Qwen did not finish its post-read check"
+            with MODEL_LOAD_LOCK.write_lock():
+                available = 0
+                writer_reduced.set()
+
+        def run_load() -> None:
+            try:
+                self._make_invocation("int8")._load_quantized_encoder(context)
+            except BaseException as error:
+                errors.append(error)
+
+        try:
+            with (
+                patch.object(models, "make_room_in_vram", side_effect=make_room),
+                patch.object(models, "get_config", return_value=SimpleNamespace()),
+                patch.object(models, "get_absolute_path", return_value=model_root),
+                patch.object(cache, "_get_physical_vram_available", side_effect=physical_available),
+                patch.object(cache, "_offload_unlocked_models", side_effect=offload_unlocked),
+                patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=True),
+                patch(
+                    "invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated",
+                    return_value=True,
+                ),
+                patch.object(qwen_image_text_encoder_module, "_read_checkpoint", return_value={}),
+                patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained") as from_pretrained,
+                patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda:0")),
+            ):
+                loader = threading.Thread(target=run_load)
+                writer = threading.Thread(target=ordinary_cold_load)
+                loader.start()
+                writer.start()
+                writer.join(timeout=5)
+                loader.join(timeout=5)
+
+                assert not writer.is_alive() and not loader.is_alive(), "Qwen/cold-load paths deadlocked"
+                assert errors and isinstance(errors[0], torch.OutOfMemoryError)
+                from_pretrained.assert_not_called()
+                assert "refusing construction" in str(errors[0].__cause__)
+        finally:
+            writer_reduced.set()
+            cache.shutdown()
 
     def test_neither_reads_nor_builds_the_lm_head(self, tmp_path: Path):
         """A real read and `from_pretrained`, with only the quantization (which needs a GPU in practice) switched
@@ -492,6 +915,7 @@ class TestQuantizedEncoderLoad:
             alive_at_empty_cache.append(partial_ref[0]() is not None)
 
         with (
+            patch.object(qwen_image_text_encoder_module, "device_is_integrated", return_value=False),
             patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda:0")),
             patch.object(TorchDevice, "empty_cache", side_effect=empty_cache),

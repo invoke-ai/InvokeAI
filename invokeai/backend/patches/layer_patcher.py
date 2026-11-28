@@ -1,13 +1,13 @@
 import re
 from collections import Counter
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from itertools import chain
 from typing import Dict, Iterable, Iterator, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel
 
-from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, integrated_cuda_admission_lock
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch, sub_patches
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.fused_input_dora_layer import FusedInputDoRALayer, UnsupportedFusedInputDoRABase
@@ -35,9 +35,13 @@ class LayerPatcher:
         force_direct_patching: bool = False,
         force_sidecar_patching: bool = False,
         suppress_warning_layers: Optional[re.Pattern] = None,
+        admission_device: torch.device | None = None,
+        exclusive_model_load_lock: bool = False,
     ):
         """Apply 'smart' model patching that chooses whether to use direct patching or a sidecar wrapper for each
-        module.
+        module. When ``admission_device`` is provided, patch allocations are serialized with integrated-CUDA model
+        admission after taking the model-load lock. ``exclusive_model_load_lock`` uses the write lock so device
+        allocations that must exclude concurrent cache moves can opt out of shared read semantics.
         """
 
         # original_weights are stored for unpatching layers that are directly patched.
@@ -77,7 +81,11 @@ class LayerPatcher:
             # patch application must exclude construction, like any VRAM load. Read semantics:
             # patching on different devices may overlap; only construction is exclusive. The lock
             # is released before the yield — patched inference must not block model loads.
-            with MODEL_LOAD_LOCK.read_lock():
+            admission = (
+                integrated_cuda_admission_lock(admission_device) if admission_device is not None else nullcontext()
+            )
+            model_load_lock = MODEL_LOAD_LOCK.write_lock() if exclusive_model_load_lock else MODEL_LOAD_LOCK.read_lock()
+            with model_load_lock, admission:
                 for patch_spec in patches:
                     patch, patch_weight = patch_spec[:2]
                     LayerPatcher.apply_smart_model_patch(
@@ -98,27 +106,34 @@ class LayerPatcher:
             yield
         finally:
             try:
-                # Restore directly patched layers.
-                for param_key, weight in original_weights.get_changed_weights():
-                    cur_param = model.get_parameter(param_key)
-                    # In place for the same reason as the patch step; a shape-expanded parameter is replaced.
-                    if cur_param.shape == weight.shape and LayerPatcher._can_update_in_place(
-                        cur_param, shared_storage, weight
-                    ):
-                        cur_param.data.copy_(weight)
-                    else:
-                        cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
+                model_load_lock = (
+                    MODEL_LOAD_LOCK.write_lock() if exclusive_model_load_lock else MODEL_LOAD_LOCK.read_lock()
+                )
+                admission = (
+                    integrated_cuda_admission_lock(admission_device) if admission_device is not None else nullcontext()
+                )
+                with model_load_lock, admission:
+                    # Restore directly patched layers.
+                    for param_key, weight in original_weights.get_changed_weights():
+                        cur_param = model.get_parameter(param_key)
+                        # In place for the same reason as the patch step; a shape-expanded parameter is replaced.
+                        if cur_param.shape == weight.shape and LayerPatcher._can_update_in_place(
+                            cur_param, shared_storage, weight
+                        ):
+                            cur_param.data.copy_(weight)
+                        else:
+                            cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
-                # Clear patches from all patched modules.
-                # Note: This logic assumes no nested modules in original_modules.
-                for orig_module in original_modules.values():
-                    orig_module.clear_patches()
+                    # Clear patches from all patched modules.
+                    # Note: This logic assumes no nested modules in original_modules.
+                    for orig_module in original_modules.values():
+                        orig_module.clear_patches()
 
-                # Return every sidecar-applied patch to where it came from. `clear_patches()` only
-                # drops the module's reference; without this the tensors stay on the device, inside
-                # an object the model cache owns and believes is in RAM.
-                for leaf, leaf_device, leaf_dtype in patch_placements.values():
-                    leaf.to(device=leaf_device, dtype=leaf_dtype)
+                    # Return every sidecar-applied patch to where it came from. `clear_patches()` only
+                    # drops the module's reference; without this the tensors stay on the device, inside
+                    # an object the model cache owns and believes is in RAM.
+                    for leaf, leaf_device, leaf_dtype in patch_placements.values():
+                        leaf.to(device=leaf_device, dtype=leaf_dtype)
             finally:
                 cache_pins.close()
 

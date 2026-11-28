@@ -4,7 +4,7 @@ Both serve the model, its tokenizer and its processor as submodels, so a caller 
 container the same way, through the model cache (`load_text_llm_tokenizer_and_processor`).
 """
 
-from collections.abc import Callable
+import json
 from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -29,11 +29,17 @@ from invokeai.backend.model_manager.configs.text_llm import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import (
+    QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+    calc_tokenizer_size_by_fs,
+)
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.quantization.fp8_scaled import (
     cast_state_dict,
     load_safetensors_checkpoint,
     reject_quantized_side_channel,
+    safetensors_backend,
 )
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -48,6 +54,7 @@ from invokeai.backend.qwen3_5.qwen3_5_vl import (
     qwen3_5_vl_config,
     qwen3_5_vl_generation_config,
 )
+from invokeai.backend.util.ram import HostMemoryReserver
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
@@ -68,16 +75,39 @@ _QWEN3_5_MODEL_TYPES = frozenset({"qwen3_5", "qwen3_5_text"})
 _DEQUANTIZED_ON_LOAD = ("lm_head",)
 
 
+def _tokenizer_runtime_overhead(model_path: Path) -> int:
+    try:
+        model_type = json.loads((model_path / "config.json").read_text(encoding="utf-8")).get("model_type")
+    except (OSError, ValueError):
+        model_type = None
+    return (
+        QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES
+        if model_type in _QWEN3_5_MODEL_TYPES
+        else TOKENIZER_RUNTIME_OVERHEAD_BYTES
+    )
+
+
 class _TextLLMLoader(ModelLoader):
     """What both TextLLM containers share: tokenizer and processor sizes, and the compute dtype."""
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        # A few small files, or none at all: the generic sizing would charge them the whole model.
+        # The text side is loaded from the model folder but must not reserve its weight files.
         if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
-            return 0
+            return calc_tokenizer_size_by_fs(model_path)
         return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            return calc_tokenizer_size_by_fs(
+                model_path,
+                include_runtime_overhead=True,
+                runtime_overhead_bytes=_tokenizer_runtime_overhead(model_path),
+            )
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
 
     def _without_mtp_head(self, names: dict[str, str], what: str) -> dict[str, str]:
         """What of a single file is worth reading: not the multi-token-prediction head, which is never read at all."""
@@ -138,6 +168,28 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
     """Loads a single-file Qwen3.5 vision-language model, and serves its own instances of the vendored Qwen3.5
     tokenizer and processor."""
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR
+
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR)
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        if submodel_type in (SubModelType.Tokenizer, SubModelType.Processor):
+            from invokeai.backend.qwen3_5.qwen3_5_encoder import _TOKENIZER_DIR
+
+            return calc_tokenizer_size_by_fs(
+                _TOKENIZER_DIR,
+                include_runtime_overhead=True,
+                runtime_overhead_bytes=QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+            )
+        return super()._get_host_bytes_needed(config, model_path, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -156,6 +208,7 @@ class TextLLMCheckpointLoader(_TextLLMLoader):
                     reserve=self._ram_cache.make_room,
                     what=what,
                     logger=self._logger,
+                    source_tensors_mapped=safetensors_backend(path) == "mmap",
                 )
                 reject_incomplete_load(model, what=what)
                 return model
@@ -188,9 +241,10 @@ def qwen3_5_vl_from_state_dict(
     sd: dict[str, torch.Tensor],
     dtype: torch.dtype,
     *,
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
     what: str,
     logger: Logger,
+    source_tensors_mapped: bool = False,
 ) -> "Qwen3_5ForConditionalGeneration":
     """Build a `Qwen3_5ForConditionalGeneration` from a single file's state dict, bf16 or `int8_tensorwise`.
 
@@ -205,6 +259,8 @@ def qwen3_5_vl_from_state_dict(
         reserve: The cache's `make_room`, asked once before anything is widened.
         what: Names the checkpoint in errors and log lines.
         logger: For the dropped and kept counts.
+        source_tensors_mapped: Whether the state dict came from a file-backed safetensors mapping. The production
+            checkpoint path passes this; callers with owned or meta tensors retain the conservative default.
     """
     from transformers import Qwen3_5ForConditionalGeneration
 
@@ -236,6 +292,7 @@ def qwen3_5_vl_from_state_dict(
             architecture="Qwen3.5",
             reserve=reserve,
             skip_patterns=(*skip_patterns, *_DEQUANTIZED_ON_LOAD),
+            source_tensors_mapped=source_tensors_mapped,
         )
         logger.info(
             f"{what}: kept {len(kept)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, dequantized "
@@ -253,6 +310,7 @@ def qwen3_5_vl_from_state_dict(
             skip_patterns=skip_patterns,
             fp8_layers={},
             nvfp4_payloads={},
+            source_tensors_mapped=source_tensors_mapped,
         )
         cast_state_dict(sd, dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
 

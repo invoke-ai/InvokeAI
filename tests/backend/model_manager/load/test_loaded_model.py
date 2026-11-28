@@ -1,9 +1,12 @@
 import logging
+import threading
+from unittest.mock import patch
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
@@ -11,6 +14,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_o
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -138,6 +142,92 @@ def test_supports_partial_loading_reflects_cached_model_type():
     assert not LoadedModelWithoutConfig(
         CacheRecord(key="full", cached_model=full_model), cache=None
     ).supports_partial_loading
+
+
+def test_dedicated_device_pin_does_not_wait_for_cold_load_writer(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+    writer_holding = threading.Event()
+    release_writer = threading.Event()
+
+    def writer() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            writer_holding.set()
+            release_writer.wait(timeout=10)
+
+    class CacheThatStartsWriter(FakeCache):
+        def lock(self, cache_record, working_mem_bytes, max_move_bytes=None):
+            del cache_record, working_mem_bytes, max_move_bytes
+            self.lock_calls += 1
+            self.writer_thread = threading.Thread(target=writer)
+            self.writer_thread.start()
+            return True
+
+    cached_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("meta"), keep_ram_copy=False
+    )
+    record = CacheRecord(key="partial", cached_model=cached_model)
+    cache = CacheThatStartsWriter()
+    loaded_model = LoadedModelWithoutConfig(record, cache=cache)
+    pin_started = threading.Event()
+    with (
+        patch.object(loaded_model, "repair_required_tensors_on_device", side_effect=writer_holding.wait),
+        patch.object(cached_model, "pin_streamed_weights", side_effect=pin_started.set),
+    ):
+        pin_thread = threading.Thread(target=loaded_model._lock_on_device, args=(None,))
+        pin_thread.start()
+        try:
+            assert writer_holding.wait(timeout=10)
+            assert pin_started.wait(timeout=5), "slow pinning must not wait on the global model-load lock"
+        finally:
+            release_writer.set()
+            pin_thread.join(timeout=10)
+    cache.writer_thread.join(timeout=10)
+    assert not pin_thread.is_alive() and not cache.writer_thread.is_alive()
+    assert pin_started.is_set()
+    loaded_model._unlock()
+
+
+def test_integrated_device_pin_waits_for_cold_load_writer(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
+    cached_model = CachedModelWithPartialLoad(
+        model=torch.nn.Linear(4, 4), compute_device=torch.device("cuda"), keep_ram_copy=False
+    )
+    record = CacheRecord(key="partial", cached_model=cached_model)
+    record.lock()
+    loaded_model = LoadedModelWithoutConfig(record, cache=None)
+    writer_holding = threading.Event()
+    release_writer = threading.Event()
+    read_lock_entered = threading.Event()
+    pin_started = threading.Event()
+    original_read_lock = MODEL_LOAD_LOCK.read_lock
+
+    def read_lock():
+        read_lock_entered.set()
+        return original_read_lock()
+
+    def writer() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            writer_holding.set()
+            release_writer.wait(timeout=5)
+
+    writer_thread = threading.Thread(target=writer)
+    writer_thread.start()
+    assert writer_holding.wait(timeout=5)
+    with (
+        patch.object(MODEL_LOAD_LOCK, "read_lock", side_effect=read_lock),
+        patch.object(cached_model, "pin_streamed_weights", side_effect=pin_started.set),
+    ):
+        pin_thread = threading.Thread(target=loaded_model._pin_streamed_weights_of_a_trimmed_lock, args=(1,))
+        pin_thread.start()
+        try:
+            assert read_lock_entered.wait(timeout=5), "integrated pin did not take the model-load read lock"
+        finally:
+            release_writer.set()
+            pin_thread.join(timeout=5)
+    writer_thread.join(timeout=5)
+    assert not pin_thread.is_alive() and not writer_thread.is_alive()
+    assert pin_started.is_set()
+    record.unlock()
 
 
 def test_enter_unlocks_if_repair_raises():

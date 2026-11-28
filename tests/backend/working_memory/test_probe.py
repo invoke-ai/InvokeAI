@@ -23,6 +23,7 @@ import torch
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.util import devices
@@ -240,6 +241,14 @@ class CacheOnFakeDevice:
             storage_device="cpu",
             logger=logger,
         )
+        # Build the cache without touching CUDA, then exercise its dedicated-GPU offload policy against the fake
+        # allocator. Keep the policy and allocator backend scripted: this cache is not testing CUDA topology.
+        self.cache._execution_device = torch.device("cuda:0")
+        # Calibration locks use the fake cache's explicit lock path below; keep their pre-lock whole-cache sweep out
+        # of these tests so the existing window baselines remain about the scripted fake allocations.
+        self.cache.offload_unlocked_models_from_vram = lambda keep_cache_keys=(): 0  # type: ignore[method-assign]
+        self.cache._get_vram_available = lambda working_mem_bytes, honor_cap=True: 8 * GIB  # type: ignore[method-assign]
+        self.cache._release_allocator_blocks_for_reserve = lambda working_mem_bytes, force=False: False  # type: ignore[method-assign]
         self.cache.lock = self._lock  # type: ignore[method-assign]
         self.cache._get_vram_in_use = lambda: device.allocated  # type: ignore[method-assign]
         self.offloads: dict[str, list[str]] = {}
@@ -316,9 +325,13 @@ def device(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeDevice]:
 
 
 @pytest.fixture
-def model_cache(device: FakeDevice) -> Iterator[CacheOnFakeDevice]:
+def model_cache(device: FakeDevice, monkeypatch: pytest.MonkeyPatch) -> Iterator[CacheOnFakeDevice]:
     # The cache's drops and offloads run a full `gc.collect()`; frozen, the worker's earlier heap is not walked.
     gc.freeze()
+    monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: True)
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
     cache = CacheOnFakeDevice(device)
     try:
         yield cache
@@ -574,6 +587,29 @@ def test_a_co_lock_that_offloads_more_than_it_loads_has_a_negative_offset(
     assert window.reserved is not None and window.reserved.offset == text_encoder // 4 - text_encoder
     assert window.demand_bytes == 2 * GIB
     assert (window.valid, window.reasons) == (True, [])
+
+
+def test_fake_cache_does_not_query_cuda_topology_or_allocator(
+    device: FakeDevice, model_cache: CacheOnFakeDevice, monkeypatch: pytest.MonkeyPatch
+):
+    """The fake dedicated-GPU cache must use its scripted policy and allocator, not the host's CUDA runtime."""
+
+    def forbidden(*args: object, **kwargs: object) -> object:
+        raise AssertionError("fake probe cache reached the real CUDA runtime")
+
+    monkeypatch.setattr(torch.cuda, "current_device", forbidden)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", forbidden)
+    monkeypatch.setattr(devices, "device_is_integrated", forbidden)
+    monkeypatch.setattr(model_cache_module, "device_is_integrated", forbidden)
+    empty_cache_calls: list[int] = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: empty_cache_calls.append(1))
+
+    model_cache.admit("text-encoder")
+    model_cache.offload("text-encoder")
+    TorchDevice.empty_cache()
+
+    assert empty_cache_calls == [1, 1]
+    assert device.releases == 2
 
 
 @pytest.mark.parametrize("evict", ["drop", "offload"])
@@ -847,7 +883,7 @@ def test_a_cpu_only_model_leaving_the_device_cache_leaves_the_window_valid(
 ):
     """A `cpu_only` text encoder in the GPU's cache computes on the CPU, its "VRAM" RAM: offloaded or dropped, nothing
     leaves the device."""
-    model_cache.cache.put("t5", torch.nn.Linear(1024, 512, bias=False))
+    model_cache.cache.put("t5", torch.nn.Linear(1024, 512, bias=False), execution_device=torch.device("cpu"))
     cached_model = model_cache.cache._cached_models["t5"].cached_model
     assert cached_model.compute_device.type == "cpu"
     cached_model._is_in_vram = True

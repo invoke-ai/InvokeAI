@@ -24,7 +24,7 @@ nvfp4: see the [format comparison](#format-comparison).
 NF4 models need bitsandbytes. The macOS install leaves it out, so NF4 doesn't load on Apple silicon; on Intel GPUs and
 the CPU, NF4 is untested and not supported. Pick a GGUF, int8 or SDNQ build of the model instead.
 </MemoryOption>
-<MemoryOption id="sysmem-fallback" title="Windows with NVIDIA: turn off the sysmem fallback">
+<MemoryOption id="sysmem-fallback" title="Windows with a discrete NVIDIA GPU: turn off the sysmem fallback">
 The Windows driver moves memory that doesn't fit in VRAM into system RAM, which slows generation down massively. Set
 **CUDA - Sysmem Fallback Policy** to **Prefer No Sysmem Fallback**: [steps](/configuration/optimization/low-vram-mode/#platform-notes).
 </MemoryOption>
@@ -35,9 +35,11 @@ around it; close games and other GPU programs while generating, and read the
 </MemoryOption>
 <MemoryOption id="low-vram-mode" title="Low-VRAM mode is already on">
 On NVIDIA, AMD and Intel GPUs, Invoke streams the layers of a model too large for your VRAM from RAM as they are needed.
-Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lists the settings that tune it. On an
-NVIDIA or AMD (ROCm) GPU, [Async Weight Streaming](/configuration/optimization/async-weight-streaming/) makes the streamed steps
-faster, with identical images.
+On integrated NVIDIA CUDA such as Spark, Invoke uses CUDA's reported shared-memory pool as the cache ceiling and checks
+live memory pressure when a model load needs capacity. Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/)
+lists the settings that tune it.
+On an NVIDIA or AMD (ROCm) GPU, [Async Weight Streaming](/configuration/optimization/async-weight-streaming/) makes the
+streamed steps faster, with identical images.
 </MemoryOption>
 <MemoryOption id="fp8-storage" title="Turn on FP8 Storage for full-precision models that don't fit">
 On NVIDIA, AMD and Intel GPUs (not Apple silicon or the CPU), with a full-precision model: a per-model setting in the

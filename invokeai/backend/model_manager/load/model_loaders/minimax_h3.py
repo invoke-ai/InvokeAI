@@ -48,6 +48,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.model_manager.util.qwen3_vl import normalize_qwen3vl_rope_config
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 
 _H3_SUPPORTED_NOTE = "Only unquantized and Comfy 'int8_tensorwise' (int8/int8-convrot) single files are supported."
 
@@ -62,6 +63,20 @@ def _reject_formats_declared_in_the_header(model_path: Path, what: str, logger: 
 def _reject_float8_weights(sd: dict[str, Any], what: str, model_path: Path) -> None:
     """H3's undeclared-fp8 refusal (see the shared guard for why it exists)."""
     reject_float8_weights(sd, what, model_path, _H3_SUPPORTED_NOTE)
+
+
+def _pruned_cast_host_bytes(sd: dict[str, torch.Tensor], pruned: bool, *, source_tensors_mapped: bool = False) -> int:
+    """Estimate pruned AdaLN cast demand without retaining a shallow source mapping."""
+    if not pruned:
+        return 0
+    cast_sd = {
+        key: tensor for key, tensor in sd.items() if ".adaln_proj.linear." in key or key.startswith("norm_out.linear.")
+    }
+    _, additional_bytes = state_dict_cast_bytes(
+        cast_sd, torch.float32, in_place=True, source_tensors_mapped=source_tensors_mapped
+    )
+    del cast_sd
+    return additional_bytes
 
 
 def _raise_if_no_weight_shards(submodel_path: Path, submodel_label: str) -> None:
@@ -232,7 +247,11 @@ class MiniMaxH3CheckpointModel(ModelLoader):
         rope_freq_dim = sd["rope.inv_freq"].shape[0] if "rope.inv_freq" in sd else 16
         sd, quant_markers = convert_minimax_h3_checkpoint_to_diffusers(sd)
 
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
+        reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+        additional_bytes = _pruned_cast_host_bytes(sd, config.pruned, source_tensors_mapped=True)
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
 
         # The AdaLN-curve projections are stored f16 but run float32 (see the pruned class).
         if config.pruned:
@@ -362,7 +381,8 @@ class MiniMaxH3TextEncoderCheckpointModel(ModelLoader):
         _reject_float8_weights(sd, "MiniMax H3 text encoder", model_path)
         sd, quant_markers = convert_minimax_h3_text_encoder_checkpoint(sd)
 
-        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
+        reserved_bytes = sum(t.nelement() * t.element_size() for t in sd.values())
+        require_ram_headroom(self._ram_cache.make_room(reserved_bytes, host_bytes_needed=0), 0)
 
         layer_prefix = "model.language_model.layers."
         num_layers = 1 + max(int(k.removeprefix(layer_prefix).split(".")[0]) for k in sd if k.startswith(layer_prefix))

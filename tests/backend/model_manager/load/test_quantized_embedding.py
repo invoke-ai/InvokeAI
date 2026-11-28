@@ -49,7 +49,10 @@ def test_ggml_embedding_decodes_bounded_rows_bit_exactly(monkeypatch):
     assert embedding.weight.device == weight.quantized_data.device
     assert not embedding.weight.requires_grad
     assert cache.make_room.call_args_list == [
-        call(weight.quantized_data.nbytes + expected.nbytes + 6 * rows_per_chunk * 512 * dtype.itemsize)
+        call(
+            weight.quantized_data.nbytes + expected.nbytes + 6 * rows_per_chunk * 512 * dtype.itemsize,
+            host_bytes_needed=expected.nbytes + 6 * rows_per_chunk * 512 * dtype.itemsize,
+        )
     ]
 
 
@@ -86,7 +89,8 @@ def test_a_packed_weight_is_materialized_and_reserved_by_its_dequantized_size() 
 
     assert materialize_quantized_embedding(embedding, ram_cache=ram_cache, model=embedding, state_dict={}) is True
 
-    assert ram_cache.make_room.call_args_list == [call(weight_bytes + 7 * _VOCAB * _HIDDEN * torch.float32.itemsize)]
+    host_bytes = 7 * _VOCAB * _HIDDEN * torch.float32.itemsize
+    assert ram_cache.make_room.call_args_list == [call(weight_bytes + host_bytes, host_bytes_needed=host_bytes)]
     assert not isinstance(embedding.weight, GGMLTensor)
     assert embedding.weight.shape == (_VOCAB, _HIDDEN)
     # An indexed read is the whole reason this step exists.
@@ -137,7 +141,10 @@ def test_an_sdnq_weight_keeps_whole_tensor_decoding_and_reserves_its_payloads(mo
 
     assert materialize_quantized_embedding(embedding, ram_cache=ram_cache, model=embedding, state_dict={}) is True
 
-    assert ram_cache.make_room.call_args_list == [call(weight.sdnq_storage_nbytes() + 6 * expected.nbytes)]
+    host_bytes = 6 * expected.nbytes
+    assert ram_cache.make_room.call_args_list == [
+        call(weight.sdnq_storage_nbytes() + host_bytes, host_bytes_needed=host_bytes)
+    ]
     assert len(decoded) == 1 and decoded[0] is weight
     assert torch.equal(embedding.weight, expected)
     assert not isinstance(embedding.weight, SDNQTensor)
@@ -170,7 +177,10 @@ def test_checkpoint_and_model_aliases_count_their_backing_storage_once(shared):
     assert materialize_quantized_embedding(embedding, ram_cache=cache, model=model, state_dict=checkpoint)
 
     assert cache.make_room.call_args_list == [
-        call((packed_bytes if shared else 2 * packed_bytes) + storage.nbytes + unused.nbytes + 7 * output_bytes)
+        call(
+            (packed_bytes if shared else 2 * packed_bytes) + storage.nbytes + unused.nbytes + 7 * output_bytes,
+            host_bytes_needed=7 * output_bytes,
+        )
     ]
     assert isinstance(model.projection.weight, GGMLTensor)
     assert isinstance(checkpoint["embed.weight"], GGMLTensor)
@@ -197,7 +207,10 @@ def test_other_live_sdnq_weights_include_all_auxiliary_storage_once():
     assert materialize_quantized_embedding(embedding, ram_cache=cache, model=embedding, state_dict=checkpoint)
 
     assert cache.make_room.call_args_list == [
-        call(packed_bytes + held_bytes + 7 * _VOCAB * _HIDDEN * torch.float32.itemsize)
+        call(
+            packed_bytes + held_bytes + 7 * _VOCAB * _HIDDEN * torch.float32.itemsize,
+            host_bytes_needed=7 * _VOCAB * _HIDDEN * torch.float32.itemsize,
+        )
     ]
 
 
@@ -222,7 +235,10 @@ def test_unquantized_ggml_storage_still_materializes_in_the_compute_dtype(qtype)
 
     assert torch.equal(embedding.weight, source.float())
     assert embedding.weight.dtype == torch.float32
-    assert cache.make_room.call_args_list == [call(packed.nbytes + source.numel() * torch.float32.itemsize)]
+    host_bytes = 0 if qtype is gguf.GGMLQuantizationType.F32 else source.numel() * torch.float32.itemsize
+    assert cache.make_room.call_args_list == [
+        call(packed.nbytes + source.numel() * torch.float32.itemsize, host_bytes_needed=host_bytes)
+    ]
 
 
 @pytest.mark.parametrize("failure", ["reservation", "decode"])
@@ -282,3 +298,17 @@ def test_failed_sdnq_materialization_preserves_the_original_weight(monkeypatch, 
 
     assert embedding.weight is weight
     assert decoded == ([] if failure == "reservation" else [weight])
+
+
+def test_failed_host_admission_stops_before_dequantization(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = create_autospec(ModelCache, instance=True)
+    cache.make_room.return_value = type("FailedAdmission", (), {"ram_headroom_satisfied": False})()
+    embedding = _q8_0_embedding()
+    monkeypatch.setattr(
+        GGMLTensor,
+        "get_dequantized_tensor",
+        lambda _weight: pytest.fail("dequantization must not start after failed RAM admission"),
+    )
+
+    with pytest.raises(MemoryError, match="host memory"):
+        materialize_quantized_embedding(embedding, model=embedding, state_dict={}, ram_cache=cache)

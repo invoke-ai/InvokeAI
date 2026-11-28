@@ -761,6 +761,14 @@ class ModelsInterface(InvocationContextInterface):
         with MODEL_LOAD_LOCK.read_lock():
             return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
+    def make_room_in_vram_with_write_lock(self, vram_bytes_needed: int) -> int:
+        """Make room while the caller holds `MODEL_LOAD_LOCK`'s write lock.
+
+        This is for an out-of-cache load that has already serialized construction and must recheck shared memory
+        without dropping the writer lock. The cache call still acquires its own admission and cache locks.
+        """
+        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
+
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:
         if model.base == BaseModelType.External or model.format == ModelFormat.ExternalApi:

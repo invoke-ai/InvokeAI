@@ -7,7 +7,10 @@ branches are exercised: the one that keeps fp8 pops every block scale, the one t
 """
 
 import json
+import weakref
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -18,7 +21,9 @@ from invokeai.backend.model_manager.load import load_default
 from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderCheckpointLoader
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
-from invokeai.backend.quantization.nvfp4 import NVFP4Linear, NVFP4Payload
+from invokeai.backend.quantization import fp8_scaled
+from invokeai.backend.quantization.load_plan import reserve_for_load
+from invokeai.backend.quantization.nvfp4 import NVFP4Linear, NVFP4Payload, predict_nvfp4_install_host_size
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 from tests.fixtures.safetensors_files import record_reads
@@ -141,6 +146,222 @@ def _config(checkpoint: Path) -> MistralEncoder_Checkpoint_Config:
     return MistralEncoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=MistralVariantType.Cow)
 
 
+def test_reservation_does_not_recast_folded_fp8_weights() -> None:
+    """Folded weights and their removed scales are not later cast destinations.
+
+    Real 1M-element payloads keep the arithmetic representative without creating the whole encoder.
+    """
+    elements = 1 << 20
+    layers = 32
+    state_dict = {}
+    for layer in range(layers):
+        state_dict[f"layer.{layer}.weight"] = torch.empty(elements, dtype=torch.float8_e4m3fn)
+        state_dict[f"layer.{layer}.weight_scale"] = torch.empty((), dtype=torch.float32)
+    folded_keys = set(state_dict)
+    folded_output_bytes = layers * elements * COMPUTE_DTYPE.itemsize
+    weight = torch.empty(elements, dtype=torch.float8_e4m3fn, device="meta")
+    scale = torch.empty((), dtype=torch.float32, device="meta")
+    fold_peak = max(
+        (layer * (folded_output_bytes // layers - elements) + folded_output_bytes // layers)
+        + fp8_scaled.fold_transient_bytes(weight, scale)
+        for layer in range(layers)
+    )
+    calls: list[tuple[int, int]] = []
+
+    def reserve(needed: int, *, host_bytes_needed: int) -> None:
+        calls.append((needed, host_bytes_needed))
+
+    needed = reserve_for_load(
+        reserve,
+        state_dict,
+        COMPUTE_DTYPE,
+        keep_fp8=False,
+        model=None,
+        fp8_layers={},
+        nvfp4_payloads={},
+        folded_keys=folded_keys,
+        folded_output_bytes=folded_output_bytes,
+        extra_host_bytes=fold_peak,
+    )
+
+    assert needed == folded_output_bytes
+    assert calls == [(folded_output_bytes, fold_peak)]
+
+
+@pytest.mark.parametrize("source_tensors_mapped", [False, True], ids=["owned", "mapped"])
+def test_fold_net_delta_carries_through_cast_and_install(source_tensors_mapped: bool) -> None:
+    """The post-fold phase starts from outputs minus only owned folded sources."""
+    elements = 128
+    state_dict = {
+        "layer.weight": torch.empty(elements, dtype=torch.float8_e4m3fn),
+        "layer.weight_scale": torch.empty((), dtype=torch.float32),
+        "dense": torch.empty(elements, dtype=COMPUTE_DTYPE),
+    }
+    folded_keys = {"layer.weight", "layer.weight_scale"}
+    folded_output_bytes = elements * COMPUTE_DTYPE.itemsize
+    payload = NVFP4Payload(
+        weight=torch.empty((128, 32), dtype=torch.uint8),
+        weight_scale=torch.empty((128, 4), dtype=torch.float8_e4m3fn),
+        weight_scale_2=torch.empty((), dtype=torch.float32),
+    )
+    model = torch.nn.Module()
+    model.add_module("packed", torch.nn.Conv1d(1, 1, 1))
+    install_peak = predict_nvfp4_install_host_size(model, {"packed": payload}, COMPUTE_DTYPE, ())
+    source_release = 0 if source_tensors_mapped else elements + 4
+    post_fold_delta = folded_output_bytes - source_release
+    needed = folded_output_bytes + elements * COMPUTE_DTYPE.itemsize + 128 * 64 * COMPUTE_DTYPE.itemsize
+    source_bytes = (
+        elements * COMPUTE_DTYPE.itemsize if source_tensors_mapped else elements * COMPUTE_DTYPE.itemsize + elements + 4
+    )
+    expected_host = max(0, needed - source_bytes, post_fold_delta + install_peak)
+    calls: list[tuple[int, int]] = []
+
+    def reserve(bytes_needed: int, *, host_bytes_needed: int) -> None:
+        calls.append((bytes_needed, host_bytes_needed))
+
+    actual = reserve_for_load(
+        reserve,
+        state_dict,
+        COMPUTE_DTYPE,
+        keep_fp8=False,
+        model=model,
+        fp8_layers={},
+        nvfp4_payloads={"packed": payload},
+        source_tensors_mapped=source_tensors_mapped,
+        folded_keys=folded_keys,
+        folded_output_bytes=folded_output_bytes,
+    )
+
+    assert actual == needed
+    assert calls == [(needed, expected_host)]
+
+
+def test_mxfp8_decode_headroom_is_checked_before_extraction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    checkpoint, _, _ = _write_checkpoint(tmp_path, evidence="marker")
+    run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(True))
+    make_room = MagicMock(return_value=SimpleNamespace(ram_headroom_satisfied=False))
+    run.loader._ram_cache.make_room = make_room
+    monkeypatch.setattr(
+        "invokeai.backend.quantization.fp8_scaled.mxfp8_scale_decode_host_bytes", lambda _sd, _hints: 1234
+    )
+    extracted = False
+    original_extract = mistral_encoder.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(mistral_encoder, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        run.load(_config(checkpoint))
+
+    assert extracted is False
+    make_room.assert_called_once_with(0, host_bytes_needed=1234)
+
+
+@pytest.mark.parametrize("scale_dtype", [torch.float32, torch.float8_e4m3fn], ids=["fp32_scale", "fp8_scale"])
+def test_mistral_fp8_fallback_folds_in_bounded_slabs(monkeypatch: pytest.MonkeyPatch, scale_dtype: torch.dtype) -> None:
+    """The fallback must not hold full FP32 weight/product copies beside the target output."""
+    from torch.utils._python_dispatch import TorchDispatchMode
+    from torch.utils._pytree import tree_leaves
+
+    class LiveBytes(TorchDispatchMode):
+        def __init__(self) -> None:
+            super().__init__()
+            self.live = 0
+            self.peak = 0
+
+        def _free(self, size: int) -> None:
+            self.live -= size
+
+        def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+            kwargs = kwargs or {}
+            inputs = {t.untyped_storage().data_ptr() for t in tree_leaves((args, kwargs)) if torch.is_tensor(t)}
+            out = func(*args, **kwargs)
+            for tensor in tree_leaves(out):
+                storage = tensor.untyped_storage() if torch.is_tensor(tensor) else None
+                if storage is None or storage.nbytes() == 0 or storage.data_ptr() in inputs:
+                    continue
+                inputs.add(storage.data_ptr())
+                self.live += storage.nbytes()
+                self.peak = max(self.peak, self.live)
+                weakref.finalize(tensor, self._free, storage.nbytes())
+            return out
+
+    slab_elements = 256
+    monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", slab_elements)
+    weight = torch.arange(128 * 64, dtype=torch.float32).reshape(128, 64).to(torch.float8_e4m3fn)
+    scale = torch.linspace(0.5, 1.5, 128).to(scale_dtype)
+    expected = (weight.float() * scale.float().reshape(-1, 1)).to(torch.bfloat16)
+    sd = {"layer.weight": weight, "layer.weight_scale": scale}
+
+    with LiveBytes() as live:
+        mistral_encoder._drop_quantization_metadata(sd, logger=MagicMock(), target_dtype=torch.bfloat16)
+
+    torch.testing.assert_close(sd["layer.weight"], expected, rtol=0, atol=0, equal_nan=True)
+    assert sd["layer.weight"].dtype is torch.bfloat16
+    assert "layer.weight_scale" not in sd
+    target_bytes = weight.numel() * torch.bfloat16.itemsize
+    bound = fp8_scaled.fold_transient_bytes(torch.empty(weight.shape, dtype=weight.dtype, device="meta"), scale) + (
+        scale.numel() * torch.float32.itemsize if scale_dtype is not torch.float32 else 0
+    )
+    assert live.peak - target_bytes <= bound
+
+
+def test_mistral_fp8_fallback_reserves_fold_outputs_through_dense_cast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    checkpoint, _, _ = _write_checkpoint(tmp_path, evidence="none")
+    tensors = load_file(checkpoint)
+    tensors["model.embed_tokens.weight"] = torch.zeros((4096, HIDDEN), dtype=torch.float32)
+    save_file(tensors, checkpoint)
+    run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(False), observe=WIDENING)
+    make_room_calls: list[dict[str, int]] = []
+
+    def record_make_room(_needed: int, **kwargs: int) -> None:
+        make_room_calls.append(kwargs)
+
+    run.loader._ram_cache.make_room = record_make_room
+
+    original_load = mistral_encoder.load_safetensors_checkpoint
+    last_folded_weight_ref: weakref.ReferenceType[torch.Tensor] | None = None
+
+    def capture_load(path, *, select=None, owned: bool = False):
+        nonlocal last_folded_weight_ref
+        loaded = original_load(path, select=select, owned=owned)
+        last_folded_weight_ref = weakref.ref(loaded[f"model.layers.{LAYERS - 1}.{FP8_PROJECTION}.weight"])
+        return loaded
+
+    monkeypatch.setattr(mistral_encoder, "load_safetensors_checkpoint", capture_load)
+    original_drop = mistral_encoder._drop_quantization_metadata
+    sizing_source_released: list[bool] = []
+
+    def observe_drop(sd, logger, target_dtype=None):
+        result = original_drop(sd, logger, target_dtype)
+        sizing_source_released.append(last_folded_weight_ref() is None)
+        return result
+
+    monkeypatch.setattr(mistral_encoder, "_drop_quantization_metadata", observe_drop)
+    model = run.load(_config(checkpoint))
+
+    fold_outputs = sum(
+        tensors[f"model.layers.{layer}.{FP8_PROJECTION}.weight"].numel() * COMPUTE_DTYPE.itemsize
+        for layer in range(LAYERS)
+    )
+    embedding_output = tensors["model.embed_tokens.weight"].numel() * COMPUTE_DTYPE.itemsize
+    folded_source_bytes = sum(
+        tensors[f"model.layers.{layer}.{FP8_PROJECTION}.{suffix}"].nbytes
+        for layer in range(LAYERS)
+        for suffix in ("weight", "weight_scale", "comfy_quant")
+    )
+    assert make_room_calls[-1]["host_bytes_needed"] >= fold_outputs - folded_source_bytes + embedding_output
+    assert sizing_source_released == [True]
+    assert model.get_input_embeddings().weight.dtype is COMPUTE_DTYPE
+    assert torch.equal(model.get_input_embeddings().weight, tensors["model.embed_tokens.weight"].to(COMPUTE_DTYPE))
+
+
 @pytest.mark.parametrize(
     ("keep_fp8", "evidence"),
     [(False, "marker"), (True, "marker"), (False, "header")],
@@ -260,6 +481,12 @@ def test_a_raw_fp8_weight_survives_a_split_that_empties_the_scaled_mapping(
 
 def test_a_checkpoint_without_nvfp4_layers_loads_as_before(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     checkpoint, expected, _ = _write_checkpoint(tmp_path, evidence="none")
+    tensors = load_file(checkpoint)
+    for layer in range(LAYERS):
+        tensors[f"model.layers.{layer}.{FP8_PROJECTION}.weight_scale"] = torch.full(
+            (KV_ROWS,), 0.5, dtype=torch.float8_e4m3fn
+        )
+    save_file(tensors, checkpoint)
     run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(False), observe=WIDENING)
 
     model = run.load(_config(checkpoint))

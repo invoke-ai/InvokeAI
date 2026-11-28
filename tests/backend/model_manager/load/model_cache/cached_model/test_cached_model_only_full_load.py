@@ -1,12 +1,16 @@
+import logging
 from typing import Callable
+from unittest.mock import MagicMock
 
 import gguf
 import pytest
 import torch
 
+import invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load as full_load_module
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
@@ -26,6 +30,24 @@ class NonTorchModel:
 
     def run_inference(self, x: torch.Tensor) -> torch.Tensor:
         return self.linear(x)
+
+
+class HookCheckingLinear(torch.nn.Linear):
+    """Child hook that requires a sibling key omitted by partial alias state dicts."""
+
+    def __init__(self):
+        super().__init__(64, 128, bias=False)
+        self.register_buffer("scale", torch.ones(1))
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        if prefix + "scale" not in state_dict:
+            raise AssertionError("partial alias state dict reached child hook")
+        state_dict.pop(prefix + "scale")
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
+class TaggedParameter(torch.nn.Parameter):
+    marker = "tagged"
 
 
 @parameterize_mps_and_cuda
@@ -92,6 +114,218 @@ def test_a_tie_broken_by_the_move_is_restored(keep_ram_copy: bool):
     cached_model.full_load_to_vram()
 
     assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA to observe both transfer directions")
+def test_tied_full_load_without_ram_copy_moves_one_source_copy_before_module_to(monkeypatch):
+    """Moving a no-shadow model deduplicates tied tensors in both directions before normal module moves."""
+    model = TiedWeightsModule()
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device("cuda"), total_bytes=100, keep_ram_copy=False
+    )
+    move_calls = []
+    original_move_shared = full_load_module.move_shared
+
+    def track_move_shared(tensor, device, moved):
+        before = len(moved)
+        result = original_move_shared(tensor, device, moved)
+        if len(moved) > before:
+            move_calls.append(tensor)
+        return result
+
+    monkeypatch.setattr(full_load_module, "move_shared", track_move_shared)
+    module_to = MagicMock(wraps=model.to)
+    monkeypatch.setattr(model, "to", module_to)
+
+    cached_model.full_load_to_vram()
+    assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
+    assert len(move_calls) == 1
+    module_to.assert_called_once()
+
+    move_calls.clear()
+    cached_model.full_unload_from_vram()
+    assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
+    assert len(move_calls) == 1
+    assert module_to.call_count == 2
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA to exercise both transfer directions")
+def test_tied_transfer_does_not_call_child_state_dict_hooks():
+    model = TiedWeightsModule()
+    model.head = HookCheckingLinear()
+    model.head.weight = model.embed.weight
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device("cuda"), total_bytes=100, keep_ram_copy=False
+    )
+
+    cached_model.full_load_to_vram()
+    assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
+    cached_model.full_unload_from_vram()
+    assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA to exercise both transfer directions")
+def test_tied_transfer_preserves_parameter_subclass():
+    model = TiedWeightsModule()
+    ordinary = model.embed.weight
+    tagged = TaggedParameter(ordinary.detach())
+    model.head.weight = tagged
+    model.register_buffer("shared_buffer", ordinary.data)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device("cuda"), total_bytes=100, keep_ram_copy=False
+    )
+
+    cached_model.full_load_to_vram()
+    assert isinstance(model.embed.weight, torch.nn.Parameter)
+    assert isinstance(model.head.weight, TaggedParameter)
+    assert model.head.weight.marker == "tagged"
+    assert model.embed.weight is not model.head.weight
+    assert model.embed.weight.data_ptr() == model.head.weight.data_ptr()
+    assert model.shared_buffer.data_ptr() == model.embed.weight.data_ptr()
+    cached_model.full_unload_from_vram()
+    assert isinstance(model.embed.weight, torch.nn.Parameter)
+    assert isinstance(model.head.weight, TaggedParameter)
+    assert model.head.weight.marker == "tagged"
+    assert model.embed.weight is not model.head.weight
+    assert model.embed.weight.data_ptr() == model.head.weight.data_ptr()
+    assert model.shared_buffer.data_ptr() == model.embed.weight.data_ptr()
+
+
+@pytest.mark.parametrize("keep_ram_copy", [False, True])
+def test_tied_invoke_int8_parameter_uses_specialized_conversion(keep_ram_copy: bool):
+    """An InvokeInt8Params tie must quantize through its own CUDA conversion path."""
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA to exercise bitsandbytes conversion")
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeInt8Params, InvokeLinear8bitLt
+
+    model = torch.nn.Module()
+    model.embed = torch.nn.Embedding(128, 64)
+    model.linear = InvokeLinear8bitLt(input_features=64, output_features=128, has_fp16_weights=False)
+    model.linear.weight = InvokeInt8Params(
+        data=model.embed.weight.data,
+        requires_grad=False,
+        has_fp16_weights=False,
+        CB=None,
+        SCB=None,
+    )
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device("cuda"), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
+
+    for _ in range(2):
+        cached_model.full_load_to_vram()
+        assert model.linear.weight.CB is not None
+        assert model.linear.weight.SCB is not None
+        output = model.linear(torch.randn(2, 64, device="cuda"))
+        assert output.shape == (2, 128)
+        cached_model.full_unload_from_vram()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA and bitsandbytes int8 kernels")
+def test_prequantized_int8_sidecars_move_with_weight_without_ram_copy():
+    """A no-shadow full transfer must move pre-quantized CB and SCB with the parameter and preserve inference."""
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
+
+    torch.manual_seed(0)
+    source = torch.nn.Linear(64, 32)
+    layer = InvokeLinear8bitLt(input_features=64, output_features=32, has_fp16_weights=False)
+    layer.load_state_dict(source.state_dict())
+    layer.to("cuda")
+    inputs = torch.randn(2, 64, device="cuda")
+    expected = layer(inputs)
+
+    # Start from a pre-quantized CPU layer, as the model loader does.
+    cpu_state_dict = {key: value.to("cpu") for key, value in layer.state_dict().items()}
+    layer.load_state_dict(cpu_state_dict)
+
+    cached_model = CachedModelOnlyFullLoad(layer, torch.device("cuda"), total_bytes=100, keep_ram_copy=False)
+    cached_model.full_load_to_vram()
+    assert layer.weight.device.type == "cuda"
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cuda"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cuda"
+    assert torch.allclose(layer(inputs), expected, atol=1e-5)
+
+    cached_model.full_unload_from_vram()
+    assert layer.weight.device.type == "cpu"
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cpu"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cpu"
+
+    cached_model.full_load_to_vram()
+    assert layer.weight.CB is not None and layer.weight.CB.device.type == "cuda"
+    assert layer.weight.CB.data_ptr() == layer.weight.data.data_ptr()
+    assert layer.weight.SCB is not None and layer.weight.SCB.device.type == "cuda"
+    assert torch.allclose(layer(inputs), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("keep_ram_copy", [False, True])
+def test_last_unlock_preserves_tied_invoke_int8_state_for_reload(keep_ram_copy: bool):
+    """The unlock dtype restore must not replace quantized data under a live CB/SCB pair."""
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA to exercise bitsandbytes conversion")
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeInt8Params, InvokeLinear8bitLt
+
+    model = torch.nn.Module()
+    model.embed = torch.nn.Embedding(128, 64)
+    model.linear = InvokeLinear8bitLt(input_features=64, output_features=128, has_fp16_weights=False)
+    model.linear.weight = InvokeInt8Params(
+        data=model.embed.weight.data,
+        requires_grad=False,
+        has_fp16_weights=False,
+        CB=None,
+        SCB=None,
+    )
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=keep_ram_copy,
+        execution_device="cuda",
+        storage_device="cpu",
+        logger=logging.getLogger(__name__),
+        shared_cpu_weights=None,
+    )
+    try:
+        cache.put("model", model)
+        record = cache.get("model")
+        assert record is not None
+        assert cache.lock(record, None)
+        inputs = torch.randn(2, 64, device="cuda")
+        expected = model.linear(inputs)
+        cache.unlock(record)
+        assert model.linear.weight.data.dtype == torch.int8
+        assert model.linear.weight.CB is not None
+        assert model.linear.weight.SCB is not None
+        record.cached_model.full_unload_from_vram()
+        record.cached_model.full_load_to_vram()
+        actual = model.linear(inputs)
+        assert torch.allclose(actual, expected, atol=1e-5)
+    finally:
+        cache.shutdown()
+
+
+def test_restore_counted_dtypes_skips_untied_specialized_parameter():
+    class SpecializedParameter(torch.nn.Parameter):
+        def __new__(cls, data):
+            return super().__new__(cls, data, requires_grad=False)
+
+        def cuda(self, device=None):
+            return self
+
+    model = torch.nn.Module()
+    model.untied = SpecializedParameter(torch.randn(8, 8))
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device("cpu"), total_bytes=100, keep_ram_copy=False
+    )
+    model.untied.data = torch.ones_like(model.untied, dtype=torch.int8)
+    model.untied.CB = model.untied.data
+    model.untied.SCB = torch.ones(8)
+
+    cached_model.restore_counted_dtypes()
+
+    assert model.untied.data.dtype == torch.int8
+    assert model.untied.CB is not None
+    assert model.untied.SCB is not None
 
 
 @parameterize_mps_and_cuda

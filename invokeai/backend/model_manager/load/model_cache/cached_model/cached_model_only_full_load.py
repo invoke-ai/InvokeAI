@@ -5,7 +5,12 @@ import torch
 
 from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
-from invokeai.backend.model_manager.load.model_cache.tensor_aliases import StorageKey, analyze_state_dict, storage_key
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
+    StorageKey,
+    analyze_state_dict,
+    move_shared,
+    storage_key,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
@@ -55,6 +60,24 @@ class CachedModelOnlyFullLoad:
         self._alias_groups: dict[str, tuple[str, ...]] = (
             analyze_state_dict(model.state_dict()).groups if isinstance(model, torch.nn.Module) else {}
         )
+        specialized_parameter_keys = (
+            {
+                f"{module_name + '.' if module_name else ''}{name}"
+                for module_name, module in model.named_modules(remove_duplicate=False)
+                for name, parameter in module._parameters.items()
+                if parameter is not None and type(parameter).cuda is not torch.Tensor.cuda
+            }
+            if isinstance(model, torch.nn.Module)
+            else set()
+        )
+        self._specialized_alias_groups = {
+            group
+            for group in dict.fromkeys(self._alias_groups.values())
+            if any(key in specialized_parameter_keys for key in group)
+        }
+        self._specialized_parameter_keys = specialized_parameter_keys | {
+            key for group in self._specialized_alias_groups for key in group
+        }
         # The dtype the cache counted each weight in, which the last unlock returns weights a holder cast in place to
         # (see `restore_counted_dtypes`). None for models that are not `nn.Module`s.
         self._counted_dtypes: dict[str, torch.dtype] | None = (
@@ -180,16 +203,23 @@ class CachedModelOnlyFullLoad:
             # and untie them (see `tensor_aliases`).
             copied: dict[StorageKey, torch.Tensor] = {}
             new_state_dict: dict[str, torch.Tensor] = {}
+            specialized_keys = {key for group in self._specialized_alias_groups for key in group}
             for k, v in self._cpu_state_dict.items():
+                if k in specialized_keys:
+                    new_state_dict[k] = v
+                    continue
                 key = storage_key(v)
                 if key not in copied:
                     copied[key] = v.to(self._compute_device, copy=True)
                 new_state_dict[k] = copied[key]
             self._model.load_state_dict(new_state_dict, assign=True)
+        elif isinstance(self._model, torch.nn.Module) and self._alias_groups:
+            self._move_alias_groups_to_device(self._model.state_dict(), self._compute_device)
 
         if self._has_packed_params:
             self._move_packed_params(self._compute_device)
         self._model.to(self._compute_device)
+        self._move_quantized_param_sidecars(self._compute_device)
 
         self._retie_shared_weights()
         self._is_in_vram = True
@@ -207,10 +237,13 @@ class CachedModelOnlyFullLoad:
         if self._cpu_state_dict is not None:
             # The RAM copy still has its tied names pointing at one tensor, so this restores the tie as well.
             self._model.load_state_dict(self._cpu_state_dict, assign=True)
+        elif isinstance(self._model, torch.nn.Module) and self._alias_groups:
+            self._move_alias_groups_to_device(self._model.state_dict(), self._offload_device)
 
         if self._has_packed_params:
             self._move_packed_params(self._offload_device)
         self._model.to(self._offload_device)
+        self._move_quantized_param_sidecars(self._offload_device)
 
         self._retie_shared_weights()
         self._is_in_vram = False
@@ -224,7 +257,15 @@ class CachedModelOnlyFullLoad:
         moved, so nothing else would put it back.
         """
         if self._counted_dtypes is not None:
-            return_to_counted_dtypes(self._model, self._counted_dtypes, self._alias_groups, self._cpu_state_dict)
+            counted_dtypes = {
+                key: dtype for key, dtype in self._counted_dtypes.items() if key not in self._specialized_parameter_keys
+            }
+            alias_groups = {
+                key: group
+                for key, group in self._alias_groups.items()
+                if not any(group_key in self._specialized_parameter_keys for group_key in group)
+            }
+            return_to_counted_dtypes(self._model, counted_dtypes, alias_groups, self._cpu_state_dict)
 
     def _move_packed_params(self, device: torch.device) -> None:
         """Move the GGUF and SDNQ parameters to `device` by replacing them, before `nn.Module.to()` sees them.
@@ -247,18 +288,72 @@ class CachedModelOnlyFullLoad:
                     moved_by_id[id(param)] = moved
                 module._parameters[name] = moved_by_id[id(param)]
 
+    def _move_quantized_param_sidecars(self, device: torch.device) -> None:
+        """Move bitsandbytes' CB/SCB attributes, which ``Module.to`` does not update with parameter data."""
+        if not isinstance(self._model, torch.nn.Module):
+            return
+        for module in self._model.modules():
+            for param in module._parameters.values():
+                if param is None:
+                    continue
+                for name in ("CB", "SCB"):
+                    sidecar = getattr(param, name, None)
+                    if not isinstance(sidecar, torch.Tensor):
+                        continue
+                    if name == "CB" and sidecar.shape == param.data.shape and sidecar.dtype == param.data.dtype:
+                        # bitsandbytes' quantized CB is the packed parameter data; keep one storage allocation after
+                        # Module.to() has replaced param.data and the old CB reference became stale.
+                        param.CB = param.data  # type: ignore[attr-defined]
+                    elif sidecar.device != device:
+                        setattr(param, name, sidecar.to(device))
+
+    def _move_alias_groups_to_device(self, state_dict: dict[str, torch.Tensor], device: torch.device) -> None:
+        """Move ordinary tied groups once; `.to()` handles all remaining tensors and buffers."""
+        moved: dict[StorageKey, torch.Tensor] = {}
+        for group in dict.fromkeys(self._alias_groups.values()):
+            if group in self._specialized_alias_groups:
+                continue
+            source = state_dict[group[0]]
+            if not isinstance(source, _PACKED_TENSOR_TYPES):
+                self._bind_alias_group(group, move_shared(source, device, moved))
+
+    def _bind_alias_group(self, group: tuple[str, ...], tensor: torch.Tensor) -> None:
+        """Bind registered parameters or buffers directly, avoiding partial state-dict hooks."""
+        parameter_slots: list[tuple[torch.nn.Module, str, torch.nn.Parameter]] = []
+        buffer_slots: list[tuple[torch.nn.Module, str]] = []
+        for key in group:
+            prefix, name = key.rsplit(".", 1) if "." in key else ("", key)
+            module = self._model.get_submodule(prefix) if prefix else self._model
+            parameter = module._parameters.get(name)
+            if parameter is not None:
+                parameter_slots.append((module, name, parameter))
+            elif name in module._buffers:
+                buffer_slots.append((module, name))
+        if parameter_slots:
+            for module, name, parameter in parameter_slots:
+                if torch._has_compatible_shallow_copy_type(parameter, tensor):
+                    parameter.data = tensor
+                else:
+                    module._parameters[name] = torch.nn.Parameter(tensor, requires_grad=parameter.requires_grad)
+            for module, name in buffer_slots:
+                module._buffers[name] = tensor
+        else:
+            for module, name in buffer_slots:
+                module._buffers[name] = tensor
+
     def _retie_shared_weights(self) -> None:
         """Re-point the names of a tied weight at one tensor after a device change.
 
-        `nn.Module.to()` copies each module's parameters with no memo across the modules that share one, so a tied
-        weight arrives as two tensors -- twice the memory, and writes through one name no longer visible through the
-        other. Only the `keep_ram_copy=False` path goes through `.to()` for the weights; with a RAM copy the state
-        dict is moved above, one copy per distinct tensor, and never splits. Dropping the duplicate here keeps its
-        cost to the move itself rather than for as long as the model is resident.
+        The no-shadow path pre-moves each tied group once before `nn.Module.to()` handles the remaining tensors, so
+        `.to()` sees those parameters already on the target device. The RAM-shadow path similarly moves one copy per
+        distinct tensor above. This final bind preserves aliases directly without invoking partial state-dict hooks.
         """
         if not self._alias_groups:
             return
         state_dict = self._model.state_dict()
-        self._model.load_state_dict(
-            {key: state_dict[group[0]] for key, group in self._alias_groups.items()}, strict=False, assign=True
-        )
+        for group in dict.fromkeys(self._alias_groups.values()):
+            if group in self._specialized_alias_groups:
+                continue
+            source = state_dict[group[0]]
+            if not isinstance(source, _PACKED_TENSOR_TYPES):
+                self._bind_alias_group(group, source)

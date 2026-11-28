@@ -88,6 +88,8 @@ class SeamRun:
     #: already widened here was widened before it was paid for. Empty when the loader reads a real
     #: file, because then there is no served dict to watch.
     dtypes_at_make_room: dict[str, torch.dtype] = field(default_factory=dict)
+    #: Keyword accounting passed through the cache seam, including mapped-source disposition.
+    reservation_kwargs: list[dict[str, Any]] = field(default_factory=list)
     #: ``(name, rooms_reserved)`` for each observed step, in call order -- how many times
     #: ``make_room`` had been called by the time that step ran.
     order: list[tuple[str, int]] = field(default_factory=list)
@@ -130,7 +132,7 @@ def prepare(
         served.append(served_checkpoint(dict(state_dict or {}))(_path, select=select, owned=owned))
         return served[-1]
 
-    def make_room(reserve: int) -> None:
+    def make_room(reserve: int, **_kwargs: Any) -> None:
         if not run.reserved and served:
             run.dtypes_at_make_room = {key: value.dtype for key, value in served[-1].items()}
         run.reserved.append(reserve)
@@ -148,6 +150,15 @@ def prepare(
     if seam.casts_fp8_storage:
         loader._apply_fp8_layerwise_casting = apply_casting
     run.loader = loader
+
+    reserve_for_load = getattr(seam.module, "reserve_for_load", None)
+    if reserve_for_load is not None:
+
+        def recording_reservation(*args: Any, **kwargs: Any) -> Any:
+            run.reservation_kwargs.append(kwargs)
+            return reserve_for_load(*args, **kwargs)
+
+        monkeypatch.setattr(seam.module, "reserve_for_load", recording_reservation)
 
     if state_dict is not None:
         has_helper = hasattr(seam.module, "load_safetensors_checkpoint")

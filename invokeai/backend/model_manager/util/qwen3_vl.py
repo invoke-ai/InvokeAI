@@ -154,7 +154,9 @@ def qwen3vl_visual_tower_nbytes(files: Iterable[Path]) -> int:
     return total
 
 
-def read_qwen3vl_visual_tower_tensors(files: Iterable[Path]) -> dict[str, torch.Tensor]:
+def read_qwen3vl_visual_tower_tensors(
+    files: Iterable[Path], mapped_storage_ids: set[int] | None = None
+) -> dict[str, torch.Tensor]:
     """Read only the visual tower's tensors from `files`, keyed as the checkpoint spells them.
 
     Filtered by key before anything is read, so the peak is the tower's size and not the encoder's: the
@@ -166,10 +168,14 @@ def read_qwen3vl_visual_tower_tensors(files: Iterable[Path]) -> dict[str, torch.
 
     tensors: dict[str, torch.Tensor] = {}
     for path in files:
-        with safe_open(str(path), framework="pt", device="cpu", backend=safetensors_backend(path)) as handle:
+        backend = safetensors_backend(path)
+        with safe_open(str(path), framework="pt", device="cpu", backend=backend) as handle:
             for key in handle.keys():
                 if is_qwen3vl_visual_key(key):
-                    tensors[key] = handle.get_tensor(key)
+                    tensor = handle.get_tensor(key)
+                    tensors[key] = tensor
+                    if mapped_storage_ids is not None and backend == "mmap":
+                        mapped_storage_ids.add(tensor.untyped_storage().data_ptr())
     return tensors
 
 

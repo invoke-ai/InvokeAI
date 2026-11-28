@@ -1,8 +1,10 @@
+import ctypes
 import sys
 import threading
 from collections import Counter, defaultdict
 from enum import Enum
 from functools import wraps
+from pathlib import Path
 from typing import Dict, Literal, Optional, Protocol, Union
 
 import psutil
@@ -25,6 +27,100 @@ MPS_DEVICE = torch.device("mps")
 # Devices for which the blind free-VRAM estimate has already been reported, so the
 # warning is emitted once per device rather than on every cache query.
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
+
+
+class _WindowsPerformanceInformation(ctypes.Structure):
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("commit_total", ctypes.c_size_t),
+        ("commit_limit", ctypes.c_size_t),
+        ("commit_peak", ctypes.c_size_t),
+        ("physical_total", ctypes.c_size_t),
+        ("physical_available", ctypes.c_size_t),
+        ("system_cache", ctypes.c_size_t),
+        ("kernel_total", ctypes.c_size_t),
+        ("kernel_paged", ctypes.c_size_t),
+        ("kernel_nonpaged", ctypes.c_size_t),
+        ("page_size", ctypes.c_size_t),
+        ("handle_count", ctypes.c_uint32),
+        ("process_count", ctypes.c_uint32),
+        ("thread_count", ctypes.c_uint32),
+    ]
+
+
+_WINDOWS_PERFORMANCE_INFORMATION_PTR = ctypes.POINTER(_WindowsPerformanceInformation)
+
+
+def _windows_commit_available() -> int | None:
+    """Return system commit bytes still available, or None when Windows cannot report it."""
+    if sys.platform != "win32":
+        return None
+
+    try:
+        info = _WindowsPerformanceInformation()
+        info.cb = ctypes.sizeof(info)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        get_performance_info = psapi.GetPerformanceInfo
+        get_performance_info.argtypes = [_WINDOWS_PERFORMANCE_INFORMATION_PTR, ctypes.c_uint32]
+        get_performance_info.restype = ctypes.c_int
+        if not get_performance_info(ctypes.byref(info), info.cb):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return max((info.commit_limit - info.commit_total) * info.page_size, 0)
+    except (AttributeError, OSError):
+        return None
+
+
+def _host_memory_available() -> int:
+    """Return conservative host headroom for CPU allocations, including cgroup and Windows commit limits."""
+    available = int(psutil.virtual_memory().available)
+    if sys.platform != "linux":
+        if sys.platform == "win32":
+            commit_available = _windows_commit_available()
+            if commit_available is not None:
+                available = min(available, commit_available)
+        return available
+    try:
+        cgroup = next(
+            (line.partition("::")[2] for line in Path("/proc/self/cgroup").read_text().splitlines() if "::" in line),
+            None,
+        )
+        if cgroup is None:
+            # shortcut: cgroup v1 is unsupported; use host MemAvailable until v2 support is available.
+            return available
+        parts = [part for part in cgroup.split("/") if part]
+        cgroup_headroom: int | None = None
+        for depth in range(len(parts), -1, -1):
+            cgroup_dir = Path("/sys/fs/cgroup") / "/".join(parts[:depth])
+            try:
+                limit = (cgroup_dir / "memory.max").read_text().strip()
+                if limit == "max":
+                    continue
+                limit = int(limit)
+                current = int((cgroup_dir / "memory.current").read_text())
+                if limit < 0 or current < 0:
+                    continue
+                reclaimable = 0
+                try:
+                    stats: dict[str, int] = {}
+                    for line in (cgroup_dir / "memory.stat").read_text().splitlines():
+                        key, value = line.split()
+                        stats[key] = int(value)
+                    inactive_file = stats.get("inactive_file")
+                    if inactive_file is not None and inactive_file >= 0:
+                        reclaimable = min(inactive_file, current)
+                except (OSError, ValueError):
+                    pass
+
+                remaining = max(0, min(limit, int(limit) - current + reclaimable))
+
+                cgroup_headroom = remaining if cgroup_headroom is None else min(cgroup_headroom, remaining)
+            except (OSError, ValueError):
+                continue
+        if cgroup_headroom is not None:
+            available = min(available, cgroup_headroom)
+    except (OSError, ValueError):
+        pass
+    return available
 
 
 class EmptyCacheOutcome(Enum):
@@ -88,11 +184,12 @@ def device_is_integrated(device: torch.device) -> Optional[bool]:
 def device_has_dedicated_vram(device: torch.device) -> bool:
     """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
 
-    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
-    XPU type keeps the discrete-device policy rather than guessing.
+    CUDA/ROCm retains its dedicated-memory budget. Integrated NVIDIA CUDA shares system RAM;
+    an unknown CUDA type keeps the dedicated-device policy rather than guessing. Integrated XPU
+    shares system RAM; an unknown XPU type keeps the discrete-device policy.
     """
     if device.type == "cuda":
-        return True
+        return torch.version.hip is not None or device_is_integrated(device) is not True
     if device.type == "xpu":
         return xpu_device_is_integrated(device) is not True
     return False
@@ -621,12 +718,14 @@ class TorchDevice:
         ``torch.cuda.mem_get_info``, except that on a ROCm build under Windows the free figure is capped by what the
         Windows video-memory budget still allows this process (`wddm.video_memory_budget`). There, torch's figure is
         the device total minus this process's own live allocations: it ignores other processes, and Windows pages
-        allocations into shared system memory well before it is exhausted instead of failing them.
+        allocations into shared system memory well before it is exhausted instead of failing them. Native CUDA uses
+        the CUDA allocation budget directly; its WDDM resident budget is a separate constraint.
         """
         free, total = torch.cuda.mem_get_info(device)
-        budget = video_memory_budget(device)
-        if budget is not None:
-            free = min(free, max(budget - (total - free), 0))
+        if torch.version.hip is not None:
+            budget = video_memory_budget(device)
+            if budget is not None:
+                free = min(free, max(budget - (total - free), 0))
         return free, total
 
     @classmethod
@@ -634,16 +733,24 @@ class TorchDevice:
         """What this process can hold on a GPU `device`, what it holds there included.
 
         On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
-        allocated. On one whose "VRAM" is system RAM (MPS, an integrated XPU): the system's available RAM plus what the
-        backend holds for this process (`torch.mps.driver_allocated_memory`, `torch.xpu.memory_reserved`), since the
-        device totals say nothing about what the host still has free. The model cache budgets from it
-        (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
-        device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
-        not a GPU.
+        allocated. On Windows native CUDA integrated GPUs, ``cudaMemGetInfo`` reports the combined dedicated+shared
+        allocation budget, so that budget is used for GPU transfers. Linux integrated CUDA and integrated XPU use
+        system available RAM plus what the backend holds for this process, since their device totals do not describe
+        host headroom. The model cache budgets from it (`ModelCache._get_vram_available`, which adds the caching
+        allocator's reclaimable blocks on a dedicated device), and a working-memory calibration plan sizes its cases
+        from it. Raises ValueError for a device that is not a GPU.
         """
         if device.type == "cuda":
+            if device_is_integrated(device) is True and torch.version.hip is None and sys.platform != "win32":
+                return _host_memory_available() + torch.cuda.memory_allocated(device)
             free, _ = cls.cuda_mem_get_info(device)
-            return free + torch.cuda.memory_allocated(device)
+            allocated = torch.cuda.memory_allocated(device)
+            available = free + allocated
+            if device_is_integrated(device) is True and torch.version.hip is None:
+                commit_available = _windows_commit_available()
+                if commit_available is not None:
+                    available = min(available, commit_available + allocated)
+            return available
         if device.type == "xpu" and device_has_dedicated_vram(device):
             free, _ = cls.xpu_mem_get_info(device)
             return free + torch.xpu.memory_allocated(device)

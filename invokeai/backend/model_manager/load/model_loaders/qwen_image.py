@@ -36,6 +36,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tow
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_WEIGHT_DTYPES,
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -44,6 +45,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
+    safetensors_backend,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -57,7 +59,12 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_unmarked_int8_weights,
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
-from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers, predict_nvfp4_install_size
+from invokeai.backend.quantization.nvfp4 import (
+    install_nvfp4_layers,
+    pop_nvfp4_layers,
+    predict_nvfp4_install_host_size,
+    predict_nvfp4_install_size,
+)
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_config_dict,
     load_bundled_qwen2_5_vl_tokenizer,
@@ -308,6 +315,7 @@ class QwenImageCheckpointModel(ModelLoader):
         if not isinstance(config, Main_Checkpoint_QwenImage_Config):
             raise TypeError(f"Expected Main_Checkpoint_QwenImage_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         keep_checkpoint_fp8, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
@@ -345,7 +353,9 @@ class QwenImageCheckpointModel(ModelLoader):
             keep_fp8 = False
         else:
             # ComfyUI 'scaled fp8': an fp8 weight plus its `weight_scale`, named in the header or by a per-layer marker.
-            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
+            layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Kept fp8 only when something uses them: the fp8 matmul, or fp8 storage the user asked of this model. For
             # storage the checkpoint's own scale is exact, where the layerwise cast of a folded weight has none.
             # Without either, a dequantize per forward would cost speed for memory nobody asked to save, so they are
@@ -374,6 +384,8 @@ class QwenImageCheckpointModel(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=source_tensors_mapped,
             )
             logger.info(
                 f"Qwen Image: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -391,6 +403,7 @@ class QwenImageCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=source_tensors_mapped,
             )
 
             if fp8_layers and not keep_fp8:
@@ -519,6 +532,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         device_keeps_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
@@ -577,6 +591,8 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
                 extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                extra_host_bytes=predict_nvfp4_install_host_size(model, nvfp4_payloads, model_dtype, skip_patterns),
+                source_tensors_mapped=source_tensors_mapped,
             )
             logger.info(
                 f"Qwen VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -587,9 +603,9 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
             # Extracted after the key remap so each scale travels with its weight and the recovered paths match the
             # model's modules. Pops every scale and marker, and refuses an unparsed scale spelling beside an fp8
             # weight rather than casting it unscaled.
-            fp8_layers = extract_fp8_scaled_layers(
-                sd, layer_hints={**extract_comfy_quant_hints(sd), **_remap_qwen_vl_checkpoint_keys(header_layers)}
-            )
+            layer_hints = {**extract_comfy_quant_hints(sd), **_remap_qwen_vl_checkpoint_keys(header_layers)}
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             # Text encoders have no FP8 Storage setting, so the device decides (`_storage_format`), as for the other
             # encoders: float8 where the device can hold it or multiply in it, folded into the compute dtype elsewhere.
             source_is_fp8 = bool(fp8_layers) or any(
@@ -608,6 +624,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads=nvfp4_payloads,
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)

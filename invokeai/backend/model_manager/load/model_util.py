@@ -23,6 +23,11 @@ from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageM
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
+# Embedded FP16 Tekken decoding measured about 8x the recovered byte payload before parsing.
+TOKENIZER_EMBEDDED_RUNTIME_MULTIPLIER = 8
+TOKENIZER_RUNTIME_OVERHEAD_BYTES = 130 * 2**20
+QWEN35_TOKENIZER_RUNTIME_OVERHEAD_BYTES = 220 * 2**20
+
 
 def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     """Get size of a model in memory in bytes."""
@@ -194,3 +199,38 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         return model_size
 
     return 0  # scheduler/feature_extractor/tokenizer - models without loading to gpu
+
+
+def calc_tokenizer_size_by_fs(
+    model_path: Path,
+    subfolder: Optional[str] = None,
+    *,
+    include_runtime_overhead: bool = False,
+    runtime_overhead_bytes: int = TOKENIZER_RUNTIME_OVERHEAD_BYTES,
+) -> int:
+    """Estimate the host memory needed by a tokenizer loaded from local files.
+
+    Compressed JSON tokenizers are tiny on disk but expand into a large parsed Rust/Python graph. Callers that load a
+    bundled tokenizer before any model tensors exist can include that cold-construction cost explicitly.
+    """
+    path = model_path / subfolder if subfolder is not None else model_path
+    if not path.is_dir():
+        return 0
+    tokenizer_names = {
+        "tokenizer.json",
+        "tokenizer.json.gz",
+        "tokenizer.model",
+        "spiece.model",
+        "tekken.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "chat_template.json",
+        "vocab.json",
+        "merges.txt",
+    }
+    files = [file for file in path.iterdir() if file.is_file() and file.name in tokenizer_names]
+    size = sum(file.stat().st_size for file in files)
+    if include_runtime_overhead and any(file.name in {"tokenizer.json", "tokenizer.json.gz"} for file in files):
+        size += runtime_overhead_bytes
+    return size

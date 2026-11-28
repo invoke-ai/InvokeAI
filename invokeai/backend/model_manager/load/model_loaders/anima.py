@@ -35,6 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -45,6 +46,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
+    safetensors_backend,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -121,6 +123,7 @@ class AnimaCheckpointModel(ModelLoader):
                 f"{model_path.name} is a GGUF file recorded as an Anima checkpoint by an earlier release. "
                 "Use 'Re-identify model' in the Model Manager to load it as a GGUF model."
             )
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         # Only the transformer's tensors are read: an all-in-one's bundled VAE and text encoder, and the runtime-derived
         # buffers and exporter metadata that aren't model weights, are dropped by name before any payload is read.
@@ -174,6 +177,7 @@ class AnimaCheckpointModel(ModelLoader):
                 **extract_comfy_quant_hints(sd),
                 **strip_layer_path_prefix(header_hints),
             }
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # Build at the checkpoint's own depth: 28 blocks for the official release, more for the
@@ -193,6 +197,7 @@ class AnimaCheckpointModel(ModelLoader):
                 architecture="Anima",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=source_tensors_mapped,
             )
             logger.info(
                 f"Anima: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -217,6 +222,7 @@ class AnimaCheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=source_tensors_mapped,
             )
 
             if fp8_layers and not keep_fp8:

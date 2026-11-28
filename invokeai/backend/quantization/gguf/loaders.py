@@ -19,6 +19,7 @@ from invokeai.backend.quantization.int8_convrot import (
     marker_layout,
 )
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 
 logger = InvokeAILogger.get_logger()
 
@@ -407,7 +408,7 @@ def unpack_ggml_at_load(
     sd: dict[str, torch.Tensor],
     model: torch.nn.Module,
     skip_patterns: tuple[str, ...],
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
 ) -> int:
     """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
 
@@ -423,9 +424,10 @@ def unpack_ggml_at_load(
     dequantized on every forward -- for a 53248-wide BF16 projection, a measured 1.87 GB transient
     per call.
 
-    The reservation is absolute, because `make_room` makes that much room rather than adding to the
+    The cache reservation is absolute, because `make_room` makes that much room rather than adding to the
     file-size reservation the framework made before the loader ran: everything that stays packed at
-    its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
+    its packed size, everything replaced at its unpacked size, and one replacement in flight. Host admission
+    is incremental because the GGUF reader already copied packed tensors into RAM. BF16 is
     reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
     the way -- about 8 bytes per element. What is in flight beside a result is the packed original it
     replaces and, for a quantized tensor, the temporaries of one row slice (see `unpack_ggml_tensor`).
@@ -453,7 +455,53 @@ def unpack_ggml_at_load(
         if key not in unpacked
     )
     in_flight = max((sd[key].quantized_data.nbytes + ggml_unpack_temp_bytes(sd[key]) for key in keys), default=0)
-    reserve(kept + sum(unpacked.values()) + in_flight)
+    reserved_bytes = kept + sum(unpacked.values()) + in_flight
+    # Same-dtype F16/F32 and BF16 unpacking are views of the mapped payload, so they add no host allocation.
+    zero_copy = {
+        key
+        for key in keys
+        if (
+            sd[key]._ggml_quantization_type is gguf.GGMLQuantizationType.BF16
+            and sd[key].compute_dtype is torch.bfloat16
+        )
+        or (
+            sd[key]._ggml_quantization_type in (gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.F32)
+            and sd[key].compute_dtype is sd[key].quantized_data.dtype
+        )
+    }
+    source_counts: dict[int, int] = {}
+    source_bytes: dict[int, int] = {}
+    source_storage_ids: dict[str, int] = {}
+    for value in sd.values():
+        source = (
+            value.quantized_data
+            if isinstance(value, GGMLTensor)
+            else value
+            if isinstance(value, torch.Tensor)
+            else None
+        )
+        if source is None or source.is_meta:
+            continue
+        storage = source.untyped_storage()
+        storage_id = storage.data_ptr()
+        source_counts[storage_id] = source_counts.get(storage_id, 0) + 1
+        source_bytes[storage_id] = storage.nbytes()
+    for key in keys:
+        source_storage_ids[key] = sd[key].quantized_data.untyped_storage().data_ptr()
+
+    # Outputs replace the copied GGUF sources in order; only the last alias releases a backing storage.
+    host_bytes_needed = 0
+    incremental_host_bytes = 0
+    for key in keys:
+        unpack_bytes = 0 if key in zero_copy else unpacked[key]
+        incremental_host_bytes += unpack_bytes
+        host_bytes_needed = max(host_bytes_needed, incremental_host_bytes + ggml_unpack_temp_bytes(sd[key]))
+        if key not in zero_copy:
+            storage_id = source_storage_ids[key]
+            source_counts[storage_id] -= 1
+            if source_counts[storage_id] == 0:
+                incremental_host_bytes -= source_bytes[storage_id]
+    require_ram_headroom(reserve(reserved_bytes, host_bytes_needed=host_bytes_needed), host_bytes_needed)
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
         sd[key] = unpack_ggml_tensor(sd[key])

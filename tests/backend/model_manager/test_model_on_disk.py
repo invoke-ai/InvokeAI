@@ -1,6 +1,8 @@
 """The header readers identification and loaders use instead of reading a model's tensors."""
 
+import builtins
 import json
+import sys
 from pathlib import Path
 
 import gguf
@@ -14,6 +16,7 @@ from invokeai.backend.model_manager.model_on_disk import (
     read_safetensors_header,
     safetensors_meta_state_dict,
 )
+from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 
 
 def test_gguf_metadata_keeps_scalar_fields_with_their_types_and_leaves_arrays_out(tmp_path: Path) -> None:
@@ -108,4 +111,97 @@ def test_a_file_shorter_than_a_header_length_is_refused(tmp_path: Path) -> None:
     path.write_bytes(b"\x01\x02")
 
     with pytest.raises(ValueError, match="is not a safetensors file"):
+        read_safetensors_header(path)
+
+
+def test_header_only_safetensors_has_a_complete_logical_data_section(tmp_path: Path) -> None:
+    marker = {"format": "int8_tensorwise"}
+    path = write_header_only_safetensors(
+        tmp_path / "header_only.safetensors", {"layer.weight": ([4], "U8")}, {"layer": marker}
+    )
+
+    header = read_safetensors_header(path)
+    raw = path.read_bytes()
+    header_length = int.from_bytes(raw[:8], "little")
+    logical_end = max(entry["data_offsets"][1] for entry in header.values())
+
+    assert header["layer.weight"]["shape"] == [4]
+    marker_start, marker_end = header["layer.comfy_quant"]["data_offsets"]
+    assert raw[8 + header_length + marker_start : 8 + header_length + marker_end] == json.dumps(marker).encode()
+    assert path.stat().st_size >= 8 + header_length + logical_end
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows sparse-file allocation")
+def test_header_only_safetensors_does_not_allocate_its_logical_tensor_data(tmp_path: Path) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    path = write_header_only_safetensors(tmp_path / "sparse.safetensors", {"weight": ([16 * 1024 * 1024], "U8")})
+    allocated_size_high = wintypes.DWORD()
+    get_compressed_file_size = ctypes.WinDLL("kernel32", use_last_error=True).GetCompressedFileSizeW
+    get_compressed_file_size.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+    get_compressed_file_size.restype = wintypes.DWORD
+    allocated_size_low = get_compressed_file_size(str(path), ctypes.byref(allocated_size_high))
+
+    assert path.stat().st_size >= 16 * 1024 * 1024
+    assert allocated_size_low != 0xFFFFFFFF or ctypes.get_last_error() == 0
+    assert (allocated_size_high.value << 32) | allocated_size_low < 1024 * 1024
+
+
+def test_a_header_cannot_request_more_than_the_safetensors_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reject an oversized declared header before attempting to read its bytes."""
+    max_header_length = 100_000_000
+    path = tmp_path / "huge.safetensors"
+    path.write_bytes((max_header_length + 1).to_bytes(8, "little"))
+
+    reads: list[int] = []
+    original_open = builtins.open
+
+    class _TrackedFile:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            self.file.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.file.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.file, name)
+
+        def read(self, size=-1):
+            reads.append(size)
+            if size > 8:
+                return b""
+            return self.file.read(size)
+
+    def tracked_open(*args, **kwargs):
+        return _TrackedFile(original_open(*args, **kwargs))
+
+    monkeypatch.setattr(builtins, "open", tracked_open)
+    with pytest.raises(ValueError, match="header length exceeds the 100000000-byte limit"):
+        read_safetensors_header(path)
+    assert reads == [8]
+
+
+@pytest.mark.parametrize(
+    "offsets",
+    [
+        ["0", 1],
+        [-1, 1],
+        [2, 1],
+        [0, 3],
+    ],
+    ids=["noninteger", "negative", "reversed", "payload-overrun"],
+)
+def test_invalid_tensor_offsets_are_refused(tmp_path: Path, offsets: list[object]) -> None:
+    header = json.dumps({"tensor": {"dtype": "U8", "shape": [1], "data_offsets": offsets}}).encode()
+    path = tmp_path / "invalid_offsets.safetensors"
+    path.write_bytes(len(header).to_bytes(8, "little") + header + b"\0")
+
+    with pytest.raises(ValueError, match="tensor.*offsets"):
         read_safetensors_header(path)

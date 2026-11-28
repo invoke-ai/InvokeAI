@@ -22,8 +22,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_loaders.flux import T5EncoderGGUFModel
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.t5.t5_tokenizer import _TOKENIZER_DIR
 from invokeai.backend.util.devices import TorchDevice
 from tests.backend.model_manager.load.umt5_gguf_fixture import write_tiny_umt5_gguf
 
@@ -126,6 +128,22 @@ def _t5_loader(device: str = "cpu") -> T5EncoderGGUFModel:
 
 def _gguf_config(path: Path, cpu_only: bool | None = None) -> T5Encoder_GGUF_Config:
     return T5Encoder_GGUF_Config.model_construct(path=str(path), name="tiny t5", cpu_only=cpu_only)
+
+
+@pytest.mark.parametrize("submodel_type", [SubModelType.Tokenizer2, SubModelType.Tokenizer3])
+def test_bundled_t5_tokenizer_admission_is_sized_from_bundled_assets(
+    tmp_path: Path, submodel_type: SubModelType
+) -> None:
+    path = tmp_path / "t5-xxl.gguf"
+    path_size = 8192
+    path.write_bytes(b"\x00" * path_size)
+    loader = _t5_loader()
+    config = _gguf_config(path)
+
+    tokenizer_size = sum(file.stat().st_size for file in _TOKENIZER_DIR.iterdir() if file.is_file())
+    assert calc_model_size_by_fs(_TOKENIZER_DIR) == 0
+    assert loader.get_size_fs(config, path, submodel_type) == tokenizer_size
+    assert loader.get_size_fs(config, path, SubModelType.TextEncoder2) == path_size
 
 
 def _assert_float32_throughout(model: T5EncoderModel, reference: T5EncoderModel, packed: dict[str, np.ndarray]) -> None:

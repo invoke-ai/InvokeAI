@@ -14,6 +14,7 @@ import json
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux2_Config
@@ -148,7 +149,9 @@ def _driver(
     fp8_storage: bool = False,
 ):
     checkpoint = tmp_path / "flux-2-klein-9b-int8-convrot.safetensors"
-    checkpoint.touch()
+    # The loader probes the real header to choose mmap vs pread; keep the probe tiny because the seam supplies the
+    # state dict used by the test. An int8 weight selects the mmap backend without exercising FP8 behavior.
+    save_file({"probe.weight": torch.zeros(1, dtype=torch.int8)}, str(checkpoint))
     config = Main_Checkpoint_Flux2_Config.model_construct(
         path=str(checkpoint),
         name="klein-9b-int8",
@@ -311,6 +314,32 @@ def test_a_dense_checkpoint_still_reaches_the_fp8_storage_pass(monkeypatch, tmp_
 
     assert calls == ["cast"]
     assert not any(isinstance(module, Int8ConvrotLinear) for module in model.modules())
+
+
+def test_a_mapped_bfloat16_checkpoint_has_no_cast_host_demand(monkeypatch, tmp_path) -> None:
+    state_dict, originals = _checkpoint()
+    for path in QUANTIZED:
+        del state_dict[f"{path}.comfy_quant"]
+        del state_dict[f"{path}.weight_scale"]
+        state_dict[f"{path}.weight"] = originals[path].to(torch.bfloat16)
+    state_dict = {
+        key: value.to(torch.bfloat16) if value.is_floating_point() else value for key, value in state_dict.items()
+    }
+
+    host_bytes: list[int] = []
+    original_reserve_for_load = flux.reserve_for_load
+
+    def record_reservation(*args, **kwargs):
+        def reserve(bytes_needed: int, **reserve_kwargs):
+            host_bytes.append(reserve_kwargs["host_bytes_needed"])
+            return args[0](bytes_needed, **reserve_kwargs)
+
+        return original_reserve_for_load(reserve, *args[1:], **kwargs)
+
+    monkeypatch.setattr(flux, "reserve_for_load", record_reservation)
+    _load(monkeypatch, tmp_path, state_dict)
+
+    assert host_bytes == [0, 0]
 
 
 def test_a_file_mixing_int8_with_scaled_fp8_is_refused(monkeypatch, tmp_path) -> None:

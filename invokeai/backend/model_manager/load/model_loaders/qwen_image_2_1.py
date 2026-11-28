@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import 
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
 from invokeai.backend.quantization.fp8_scaled import (
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -30,6 +31,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
+    safetensors_backend,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     translate_torchao_fp8_layers,
@@ -226,7 +228,8 @@ class QwenImage21CheckpointModel(ModelLoader):
             raise ValueError(f"Only the transformer is in a single file. Received: {submodel_type}")
 
         model_path = Path(config.path)
-        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
+        model_dtype = self._storage_format(config, SubModelType.Transformer)[1]
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
 
         sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
@@ -250,6 +253,7 @@ class QwenImage21CheckpointModel(ModelLoader):
             sd = drop_unconsumed_quantization_sidecars(sd)
         else:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_layers}
+            admit_mxfp8_scale_decode(sd, layer_hints, self._ram_cache.make_room)
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
             keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
 
@@ -266,6 +270,7 @@ class QwenImage21CheckpointModel(ModelLoader):
                 architecture="Qwen-Image-2.1",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"Qwen-Image-2.1: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -282,6 +287,7 @@ class QwenImage21CheckpointModel(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)

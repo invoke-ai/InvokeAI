@@ -12,6 +12,7 @@ import json
 import diffusers
 import pytest
 import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config
@@ -60,7 +61,8 @@ STORAGE_SEAM = dataclasses.replace(SEAM, casts_fp8_storage=False)
 
 def _driver(monkeypatch, tmp_path, state_dict: dict, model_class=None, seam: Seam = SEAM):
     checkpoint = tmp_path / "z_image_int8_convrot.safetensors"
-    checkpoint.touch()
+    # The loader seam replaces the checkpoint payload, but ownership selection still reads the real header.
+    save_file({"_fixture": torch.zeros(1)}, checkpoint)
     config = Main_Checkpoint_ZImage_Config.model_construct(path=str(checkpoint), name="z-image")
 
     def geometry(patch):
@@ -343,6 +345,8 @@ def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkey
     _bf16_nvfp4_header(monkeypatch, header)
 
     model = run.load(config)
+
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
 
     bf16 = torch.bfloat16
     # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal instruction

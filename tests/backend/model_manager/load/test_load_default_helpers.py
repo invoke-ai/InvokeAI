@@ -6,12 +6,17 @@ passes through (`put_in_eval_mode`) or in one shared resolver (`resolve_submodel
 
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
+from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Config
+from invokeai.backend.model_manager.load import load_default as load_default_module
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode, resolve_submodel_path
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
+from invokeai.backend.model_manager.taxonomy import FluxVariantType, ModelFormat, ModelType, SubModelType
 
 
 class TestPutInEvalMode:
@@ -158,13 +163,16 @@ class TestGetSizeFs:
     """Cache admission must size the folder loading will actually read.
 
     `make_room()` runs before the component is constructed, so a size of 0 reserves nothing and the
-    real multi-GB read lands on top of whatever was already resident.
+    real model read lands on top of whatever was already resident.
     """
 
     def _loader(self):
         from invokeai.backend.model_manager.load.load_default import ModelLoader
 
-        return ModelLoader.__new__(ModelLoader)
+        loader = ModelLoader.__new__(ModelLoader)
+        loader._torch_dtype = torch.float32
+        loader._torch_device = torch.device("cpu")
+        return loader
 
     def _component(self, root: Path, name: str, size: int) -> Path:
         folder = root / name
@@ -199,3 +207,202 @@ class TestGetSizeFs:
         config = SimpleNamespace(path=str(tmp_path), repo_variant=None, submodels=None)
 
         assert self._loader().get_size_fs(config, tmp_path, SubModelType.TextEncoder) == 0
+
+    def test_qwen_vl_checkpoint_tokenizer_does_not_size_the_checkpoint(self, tmp_path: Path) -> None:
+        """The checkpoint is unrelated to the vendored tokenizer loaded for this component."""
+        checkpoint = tmp_path / "qwen_vl.safetensors"
+        checkpoint.write_bytes(b"\x00" * 8192)
+        config = SimpleNamespace(
+            path=str(checkpoint),
+            repo_variant=None,
+            type=ModelType.QwenVLEncoder,
+            format=ModelFormat.Checkpoint,
+        )
+
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert self._loader().get_size_fs(config, checkpoint, SubModelType.TextEncoder) == checkpoint.stat().st_size
+
+    @pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.GGUFQuantized])
+    def test_qwen_vl_single_file_admits_cold_vendored_tokenizer_parse_then_skips_warm_parse(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, model_format: ModelFormat
+    ) -> None:
+        from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
+        from invokeai.backend.qwen2_5_vl import qwen2_5_vl_assets
+
+        checkpoint = tmp_path / "qwen_vl.safetensors"
+        checkpoint.write_bytes(b"\x00" * 8192)
+        config = SimpleNamespace(
+            path=str(checkpoint),
+            repo_variant=None,
+            type=ModelType.QwenVLEncoder,
+            format=model_format,
+        )
+        loader = self._loader()
+        cold_parse_bytes = calc_tokenizer_size_by_fs(qwen2_5_vl_assets._TOKENIZER_DIR, include_runtime_overhead=True)
+        monkeypatch.setattr(
+            qwen2_5_vl_assets.load_bundled_qwen2_5_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=0)
+        )
+
+        assert cold_parse_bytes > 100 * 2**20
+        assert loader.get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert loader._get_host_bytes_needed(config, checkpoint, SubModelType.Tokenizer) == cold_parse_bytes
+
+        monkeypatch.setattr(
+            qwen2_5_vl_assets.load_bundled_qwen2_5_vl_tokenizer, "cache_info", lambda: SimpleNamespace(currsize=1)
+        )
+        assert loader.get_size_fs(config, checkpoint, SubModelType.Tokenizer) == 0
+        assert loader._get_host_bytes_needed(config, checkpoint, SubModelType.Tokenizer) == 0
+
+    def test_flux_bundle_sizes_only_the_selected_transformer_payload(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.img_in.weight": torch.zeros(32),
+                "text_encoders.clip.weight": torch.zeros(4096),
+                "vae.decoder.weight": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None, name="bundle"
+        )
+
+        selected = self._loader().get_size_fs(config, checkpoint, SubModelType.Transformer)
+
+        assert selected == (4 + 32) * torch.float32.itemsize
+
+    def test_flux_bundle_reserves_selected_scale_conversion_bytes_separately(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.double_blocks.0.img_attn.norm.query.scale": torch.zeros(32),
+                "text_encoders.clip.scale": torch.zeros(4096),
+                "vae.decoder.scale": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        selected_source_bytes = (4 + 32) * torch.float32.itemsize
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == (
+            selected_source_bytes + (4 + 32) * 2
+        )
+
+    def test_flux_non_bundle_does_not_reserve_scale_conversion_bytes(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux.safetensors"
+        save_file({"double_blocks.0.img_attn.norm.key_norm.scale": torch.zeros(32)}, checkpoint)
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == 0
+
+    def test_flux_bundle_marker_counts_scale_conversion_even_when_all_keys_are_selected(self, tmp_path: Path) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.single_blocks.0.linear.scale": torch.zeros(8),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None
+        )
+
+        selected_source_bytes = (4 + 8) * torch.float32.itemsize
+        assert self._loader()._get_host_bytes_needed(config, checkpoint, SubModelType.Transformer) == (
+            selected_source_bytes + (4 + 8) * torch.bfloat16.itemsize
+        )
+
+    def test_flux_bundle_passes_total_host_peak_to_integrated_cuda_admission(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        checkpoint = tmp_path / "flux-bundle.safetensors"
+        marker = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+        save_file(
+            {
+                marker: torch.zeros(4),
+                "model.diffusion_model.img_in.weight": torch.zeros(32),
+                "model.diffusion_model.single_blocks.0.linear.scale": torch.zeros(8),
+                "text_encoders.clip.weight": torch.zeros(4096),
+            },
+            checkpoint,
+        )
+        config = Main_Checkpoint_FLUX_Config.model_construct(
+            path=str(checkpoint), variant=FluxVariantType.Dev, repo_variant=None, name="bundle"
+        )
+        loader = self._loader()
+        loader._ram_cache = MagicMock()
+        loader._ram_cache.shared_cpu_weights = None
+        loader._ram_cache.get_with_first_use_claim.side_effect = [IndexError, IndexError, (MagicMock(), None)]
+        loader._ram_cache.make_room.return_value = CacheClearResult(0, 0, False, True)
+        loader._ram_cache.put.return_value = MagicMock()
+        loader._app_config = SimpleNamespace(log_memory_usage=False)
+        loader._logger = MagicMock()
+        loader.config_check = None
+        loader._get_model_path = lambda _config: checkpoint  # type: ignore[method-assign]
+        loader._get_execution_device = lambda *_args: torch.device("cuda")  # type: ignore[method-assign]
+        loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
+        monkeypatch.setattr(load_default_module, "_is_integrated_cuda", lambda _device: True)
+
+        loader._load_and_cache(config, SubModelType.Transformer)
+
+        selected = loader.get_size_fs(config, checkpoint, SubModelType.Transformer)
+        converted = (4 + 8) * torch.bfloat16.itemsize
+        loader._ram_cache.make_room.assert_called_once_with(selected, host_bytes_needed=selected + converted)
+
+
+@pytest.mark.parametrize(
+    ("device", "refuses"),
+    [("cpu", False), ("cuda:1", False), ("mps", False), ("cuda:0", True)],
+)
+def test_cold_load_host_refusal_is_integrated_cuda_only(
+    tmp_path: Path, device: str, refuses: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only integrated CUDA treats live host headroom as a cold-load admission limit."""
+    from invokeai.backend.model_manager.load.load_default import ModelLoader
+
+    cache = MagicMock()
+    cache.execution_device = torch.device(device)
+    cache.shared_cpu_weights = None
+    cache.get_with_first_use_claim.side_effect = [IndexError, IndexError, (MagicMock(), None)]
+    cache.put.return_value = MagicMock()
+    cache.make_room = MagicMock(return_value=CacheClearResult(0, 0, False, False))
+    monkeypatch.setattr(
+        load_default_module, "_is_integrated_cuda", lambda candidate: candidate == torch.device("cuda:0")
+    )
+    loader = ModelLoader.__new__(ModelLoader)
+    loader._torch_dtype = torch.float32
+    loader._torch_device = torch.device(device)
+    loader._ram_cache = cache
+    loader._app_config = SimpleNamespace(log_memory_usage=False)
+    loader._logger = MagicMock()
+    loader._get_model_path = lambda _config: tmp_path  # type: ignore[method-assign]
+    loader.get_size_fs = lambda *_args: 123  # type: ignore[method-assign]
+    loader._load_model = MagicMock(return_value=object())  # type: ignore[method-assign]
+    config = SimpleNamespace(
+        base="base",
+        type="type",
+        name="model",
+        key="model",
+        path=str(tmp_path),
+        repo_variant=None,
+        submodels=None,
+    )
+
+    if refuses:
+        with pytest.raises(MemoryError, match="host memory"):
+            loader._load_and_cache(config)
+        loader._load_model.assert_not_called()  # type: ignore[attr-defined]
+    else:
+        loader._load_and_cache(config)
+        loader._load_model.assert_called_once()  # type: ignore[attr-defined]
+        cache.make_room.assert_called_once_with(123)

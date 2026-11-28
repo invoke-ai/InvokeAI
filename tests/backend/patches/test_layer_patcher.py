@@ -1,13 +1,16 @@
 import gc
+import threading
 import weakref
 from typing import Callable, Iterable
 
 import pytest
 import torch
 
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, integrated_cuda_admission_lock
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -674,6 +677,270 @@ def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
     patcher.join(timeout=10)
     assert not patcher.is_alive(), "patching a lazily-constructed LoRA must not deadlock on MODEL_LOAD_LOCK"
     assert result.get("done") is True
+
+
+def test_sidecar_transfer_holds_integrated_admission_after_the_model_read_lock(monkeypatch):
+    """A concurrent integrated-CUDA allocation must wait while a sidecar enters the execution device."""
+
+    class BlockingLoRA(LoRALayer):
+        def __init__(self, transfer_started: threading.Event, release_transfer: threading.Event):
+            super().__init__(
+                up=torch.ones(4, 2),
+                mid=None,
+                down=torch.ones(2, 4),
+                alpha=None,
+                bias=None,
+            )
+            self._transfer_started = transfer_started
+            self._release_transfer = release_transfer
+            self._transfer_calls = 0
+
+        def to(self, device=None, dtype=None):
+            if self._transfer_calls == 0:
+                self._transfer_started.set()
+                assert self._release_transfer.wait(timeout=5), "sidecar transfer was not released"
+            self._transfer_calls += 1
+            return super().to(device=device, dtype=dtype)
+
+    model = DummyModuleWithOneLayer(4, 4, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    transfer_started = threading.Event()
+    release_transfer = threading.Event()
+    admission_acquired = threading.Event()
+    patch = ModelPatchRaw({"linear_layer_1": BlockingLoRA(transfer_started, release_transfer)})
+    errors: list[BaseException] = []
+
+    def apply_patch() -> None:
+        try:
+            with LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=[(patch, 1.0)],
+                prefix="",
+                dtype=torch.float32,
+                force_sidecar_patching=True,
+                admission_device=torch.device("cuda:0"),
+            ):
+                pass
+        except BaseException as error:
+            errors.append(error)
+
+    def allocate() -> None:
+        with integrated_cuda_admission_lock(torch.device("cuda:0")):
+            admission_acquired.set()
+
+    monkeypatch.setattr(model_cache_module, "device_is_integrated", lambda _device: True)
+    patcher = threading.Thread(target=apply_patch)
+    allocator = threading.Thread(target=allocate)
+    try:
+        patcher.start()
+        assert transfer_started.wait(timeout=5), "sidecar transfer did not start"
+        allocator.start()
+        assert not admission_acquired.wait(timeout=0.5), "allocation raced the sidecar transfer"
+        release_transfer.set()
+        patcher.join(timeout=5)
+        allocator.join(timeout=5)
+    finally:
+        release_transfer.set()
+        patcher.join(timeout=5)
+        if allocator.ident is not None:
+            allocator.join(timeout=5)
+
+    assert not patcher.is_alive() and not allocator.is_alive()
+    assert not errors
+    assert admission_acquired.is_set()
+
+
+def test_exclusive_sidecar_transfer_blocks_a_concurrent_model_move():
+    """A discrete-CUDA cache move must wait while a BnB sidecar allocates on the device."""
+
+    class BlockingLoRA(LoRALayer):
+        def __init__(self, transfer_started: threading.Event, release_transfer: threading.Event):
+            super().__init__(
+                up=torch.ones(4, 2),
+                mid=None,
+                down=torch.ones(2, 4),
+                alpha=None,
+                bias=None,
+            )
+            self._transfer_started = transfer_started
+            self._release_transfer = release_transfer
+            self._transfer_calls = 0
+
+        def to(self, device=None, dtype=None):
+            if self._transfer_calls == 0:
+                self._transfer_started.set()
+                assert self._release_transfer.wait(timeout=5), "sidecar transfer was not released"
+            self._transfer_calls += 1
+            return super().to(device=device, dtype=dtype)
+
+    model = DummyModuleWithOneLayer(4, 4, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    transfer_started = threading.Event()
+    release_transfer = threading.Event()
+    move_acquired = threading.Event()
+    patch = ModelPatchRaw({"linear_layer_1": BlockingLoRA(transfer_started, release_transfer)})
+    errors: list[BaseException] = []
+
+    def apply_patch() -> None:
+        try:
+            with LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=[(patch, 1.0)],
+                prefix="",
+                dtype=torch.float32,
+                force_sidecar_patching=True,
+                exclusive_model_load_lock=True,
+            ):
+                pass
+        except BaseException as error:
+            errors.append(error)
+
+    def move_cached_model() -> None:
+        with MODEL_LOAD_LOCK.read_lock():
+            move_acquired.set()
+
+    patcher = threading.Thread(target=apply_patch)
+    mover = threading.Thread(target=move_cached_model)
+    try:
+        patcher.start()
+        assert transfer_started.wait(timeout=5), "sidecar transfer did not start"
+        mover.start()
+        assert not move_acquired.wait(timeout=0.5), "cache move raced the sidecar transfer"
+        release_transfer.set()
+        patcher.join(timeout=5)
+        mover.join(timeout=5)
+    finally:
+        release_transfer.set()
+        patcher.join(timeout=5)
+        if mover.ident is not None:
+            mover.join(timeout=5)
+
+    assert not patcher.is_alive() and not mover.is_alive()
+    assert not errors
+    assert move_acquired.is_set()
+
+
+def test_sidecar_restoration_holds_model_and_integrated_admission_locks(monkeypatch):
+    """Model moves and integrated allocations must wait for sidecars to return to their cache device."""
+
+    class BlockingRestoreLoRA(LoRALayer):
+        def __init__(self, restore_started: threading.Event, release_restore: threading.Event):
+            super().__init__(up=torch.ones(4, 2), mid=None, down=torch.ones(2, 4), alpha=None, bias=None)
+            self.restore_started = restore_started
+            self.release_restore = release_restore
+            self.transfer_calls = 0
+
+        def to(self, device=None, dtype=None):
+            self.transfer_calls += 1
+            if self.transfer_calls == 2:
+                self.restore_started.set()
+                assert self.release_restore.wait(timeout=5), "sidecar restoration was not released"
+            return super().to(device=device, dtype=dtype)
+
+    model = DummyModuleWithOneLayer(4, 4, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    restore_started = threading.Event()
+    release_restore = threading.Event()
+    move_acquired = threading.Event()
+    admission_acquired = threading.Event()
+    pin = _PinTracker()
+    patch = ModelPatchRaw({"linear_layer_1": BlockingRestoreLoRA(restore_started, release_restore)})
+    errors: list[BaseException] = []
+
+    def apply_patch() -> None:
+        try:
+            with LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=[(patch, 1.0, pin)],
+                prefix="",
+                dtype=torch.float32,
+                force_sidecar_patching=True,
+                admission_device=torch.device("cuda:0"),
+                exclusive_model_load_lock=True,
+            ):
+                pass
+        except BaseException as error:
+            errors.append(error)
+
+    def move_cached_model() -> None:
+        with MODEL_LOAD_LOCK.read_lock():
+            move_acquired.set()
+
+    def allocate() -> None:
+        with integrated_cuda_admission_lock(torch.device("cuda:0")):
+            admission_acquired.set()
+
+    monkeypatch.setattr(model_cache_module, "device_is_integrated", lambda _device: True)
+    patcher = threading.Thread(target=apply_patch)
+    mover = threading.Thread(target=move_cached_model)
+    allocator = threading.Thread(target=allocate)
+    try:
+        patcher.start()
+        assert restore_started.wait(timeout=5), "sidecar restoration did not start"
+        mover.start()
+        allocator.start()
+        assert not move_acquired.wait(timeout=0.5), "cache move raced sidecar restoration"
+        assert not admission_acquired.wait(timeout=0.5), "integrated allocation raced sidecar restoration"
+        release_restore.set()
+        patcher.join(timeout=5)
+        mover.join(timeout=5)
+        allocator.join(timeout=5)
+    finally:
+        release_restore.set()
+        patcher.join(timeout=5)
+        if mover.ident is not None:
+            mover.join(timeout=5)
+        if allocator.ident is not None:
+            allocator.join(timeout=5)
+
+    assert not patcher.is_alive() and not mover.is_alive() and not allocator.is_alive()
+    assert not errors
+    assert move_acquired.is_set() and admission_acquired.is_set()
+    assert pin.enter_count == pin.exit_count == 1
+
+
+def test_sidecar_restoration_error_releases_locks_and_cache_pin(monkeypatch):
+    class RaisingRestoreLoRA(LoRALayer):
+        def __init__(self):
+            super().__init__(up=torch.ones(4, 2), mid=None, down=torch.ones(2, 4), alpha=None, bias=None)
+            self.transfer_calls = 0
+
+        def to(self, device=None, dtype=None):
+            self.transfer_calls += 1
+            if self.transfer_calls == 2:
+                raise RuntimeError("restore failed")
+            return super().to(device=device, dtype=dtype)
+
+    model = DummyModuleWithOneLayer(4, 4, device="cpu", dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    pin = _PinTracker()
+    patch = ModelPatchRaw({"linear_layer_1": RaisingRestoreLoRA()})
+    monkeypatch.setattr(model_cache_module, "device_is_integrated", lambda _device: True)
+
+    with pytest.raises(RuntimeError, match="restore failed"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model,
+            patches=[(patch, 1.0, pin)],
+            prefix="",
+            dtype=torch.float32,
+            force_sidecar_patching=True,
+            admission_device=torch.device("cuda:0"),
+            exclusive_model_load_lock=True,
+        ):
+            pass
+
+    assert pin.enter_count == pin.exit_count == 1
+    locks_acquired = threading.Event()
+
+    def acquire_locks() -> None:
+        with MODEL_LOAD_LOCK.read_lock(), integrated_cuda_admission_lock(torch.device("cuda:0")):
+            locks_acquired.set()
+
+    lock_checker = threading.Thread(target=acquire_locks, daemon=True)
+    lock_checker.start()
+    lock_checker.join(timeout=5)
+    assert not lock_checker.is_alive()
+    assert locks_acquired.is_set()
 
 
 def _lora_layer(in_features: int, out_features: int, rank: int = 4, dtype: torch.dtype = torch.float16) -> LoRALayer:

@@ -111,6 +111,45 @@ def test_a_storage_registered_again_while_its_release_is_pending_is_not_register
     assert not runtime.registered and registry._pinned_bytes == 0
 
 
+def test_host_memory_available_drains_a_pending_release_after_a_lost_drain(
+    fake_streaming, monkeypatch: pytest.MonkeyPatch
+):
+    registry, runtime = fake_streaming
+    storage = _storage()
+    keys = storage_keys([storage])
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+    registry.lock(keys)
+    registry.release(holder)
+
+    sample_entered, release_sample = threading.Event(), threading.Event()
+
+    def sample() -> int:
+        sample_entered.set()
+        assert release_sample.wait(timeout=30)
+        return MB
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", sample)
+    result: list[int] = []
+    accessor = threading.Thread(target=lambda: result.append(registry.host_memory_available()))
+    accessor.start()
+    assert sample_entered.wait(timeout=30)
+    registry.unlock(keys)
+
+    # The deferred drain loses the registration lock held by the accessor. The _registering() finally block must
+    # retry it after the sampler returns, or this storage remains pinned until another registry call.
+    drain = threading.Thread(target=registry.drain_deferred)
+    drain.start()
+    drain.join(timeout=30)
+    release_sample.set()
+    accessor.join(timeout=30)
+
+    assert not accessor.is_alive() and not drain.is_alive()
+    assert result == [MB]
+    assert not runtime.registered
+    assert registry._pinned_bytes == 0
+
+
 def test_a_lock_waits_for_an_unregistration_in_progress(fake_streaming, monkeypatch: pytest.MonkeyPatch):
     """The copies a lock issues must not start while the range is being unregistered: they would race it."""
     registry, runtime = fake_streaming
@@ -578,3 +617,252 @@ def test_an_unwant_of_an_already_reclaimable_storage_counts_its_bytes_once(fake_
     assert registry._reclaimable_bytes == MB and list(registry._reclaimable) == [entry.key]
     assert registry._wanted_entries_on.get(CUDA0, 0) == 0
     registry.release(holder)
+
+
+def test_low_live_host_headroom_leaves_storage_pageable(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    faulted: list[torch.UntypedStorage] = []
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB - 1)
+    monkeypatch.setattr(weight_streaming, "_fault_in", faulted.append)
+    holder = PinHolder(CUDA0)
+
+    registry.update(holder, [storage])
+
+    assert faulted == []
+    assert not registry.is_registered(storage)
+    registry.release(holder)
+
+
+def test_live_headroom_is_rechecked_before_each_storage(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    first, second = _storage(), _storage()
+    faulted: list[torch.UntypedStorage] = []
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB)
+    monkeypatch.setattr(weight_streaming, "_fault_in", faulted.append)
+    holder = PinHolder(CUDA0)
+
+    registry.update(holder, [first, second])
+
+    assert faulted == [first]
+    assert registry.is_registered(first)
+    assert not registry.is_registered(second)
+    registry.release(holder)
+
+
+def test_headroom_is_checked_again_before_registration(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    available = iter((MB, 0))
+    faulted: list[torch.UntypedStorage] = []
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: next(available))
+    monkeypatch.setattr(weight_streaming, "_fault_in", faulted.append)
+    holder = PinHolder(CUDA0)
+
+    registry.update(holder, [storage])
+
+    assert faulted == [storage]
+    assert not registry.is_registered(storage)
+    registry.release(holder)
+
+
+def test_registration_headroom_is_cumulative(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    first, second = _storage(), _storage()
+    phase = ["fault"]
+    faulted: list[torch.UntypedStorage] = []
+
+    def available() -> int:
+        return 2 * MB if phase[0] == "fault" else int(1.5 * MB)
+
+    def fault_in(storage: torch.UntypedStorage) -> None:
+        faulted.append(storage)
+        if len(faulted) == 2:
+            phase[0] = "register"
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", available)
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = PinHolder(CUDA0)
+
+    registry.update(holder, [first, second])
+
+    assert faulted == [first, second]
+    assert registry.is_registered(first) != registry.is_registered(second)
+    assert registry._pinned_bytes == MB
+    registry.release(holder)
+
+
+def test_live_headroom_is_shared_across_updates(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    first, second = _storage(), _storage()
+    available = iter((2 * MB, int(1.5 * MB), int(1.5 * MB)))
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: next(available, int(1.5 * MB)))
+    first_holder, second_holder = PinHolder(CUDA0), PinHolder(CUDA0)
+
+    registry.update(first_holder, [first])
+    registry.update(second_holder, [second])
+
+    assert registry.is_registered(first)
+    assert registry.is_registered(second)
+    registry.release(second_holder)
+    registry.release(first_holder)
+
+
+def test_pending_pin_reservation_is_visible_to_host_admission(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    entered, proceed = threading.Event(), threading.Event()
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 2 * MB)
+
+    def fault_in(_storage: torch.UntypedStorage) -> None:
+        entered.set()
+        assert proceed.wait(timeout=30)
+
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = PinHolder(CUDA0)
+    thread = threading.Thread(target=registry.update, args=(holder, [storage]))
+    thread.start()
+    assert entered.wait(timeout=30)
+    assert registry.host_memory_available() == MB
+    proceed.set()
+    thread.join(timeout=30)
+    assert not thread.is_alive()
+    registry.release(holder)
+
+
+def test_host_memory_available_drains_queued_pin_release(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, runtime = fake_streaming
+    holder = PinHolder(CUDA0)
+    storage = _storage()
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB)
+    registry.update(holder, [storage])
+    registry.release_deferred(holder)
+
+    assert registry.host_memory_available() == MB
+    assert not registry.holds_registrations()
+    assert not runtime.registered
+
+
+def test_registration_headroom_failure_releases_reservation(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    available_calls = 0
+
+    def available() -> int:
+        nonlocal available_calls
+        available_calls += 1
+        if available_calls == 1:
+            return MB
+        raise RuntimeError("headroom probe failed")
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", available)
+    monkeypatch.setattr(weight_streaming, "_fault_in", lambda storage: None)
+    holder = PinHolder(CUDA0)
+
+    with pytest.raises(RuntimeError, match="headroom probe failed"):
+        registry.update(holder, [storage])
+
+    assert registry._host_reserved_bytes == 0
+    assert not registry.is_registered(storage)
+    registry.release(holder)
+
+
+def test_second_fault_failure_releases_all_reservations_for_retry(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    first, second = _storage(), _storage()
+    faulted: list[torch.UntypedStorage] = []
+
+    def fault_in(storage: torch.UntypedStorage) -> None:
+        faulted.append(storage)
+        if storage is second:
+            raise RuntimeError("fault failed")
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 2 * MB)
+    monkeypatch.setattr(weight_streaming, "_fault_in", fault_in)
+    holder = PinHolder(CUDA0)
+
+    with pytest.raises(RuntimeError, match="fault failed"):
+        registry.update(holder, [first, second])
+
+    assert faulted == [first, second]
+    assert registry._host_reserved_bytes == 0
+
+    monkeypatch.setattr(weight_streaming, "_fault_in", lambda storage: None)
+    registry.update(holder, [first])
+
+    assert registry.is_registered(first)
+    assert registry._host_reserved_bytes == 0
+    registry.release(holder)
+
+
+def test_registration_failure_releases_other_reserved_storages(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    first, second, third = _storage(), _storage(), _storage()
+    original_register = registry._register_locked
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: 3 * MB)
+    monkeypatch.setattr(weight_streaming, "_fault_in", lambda storage: None)
+
+    def fail_registration(key, storage, device):
+        if storage is second:
+            raise RuntimeError("registration failed")
+        return original_register(key, storage, device)
+
+    monkeypatch.setattr(registry, "_register_locked", fail_registration)
+    holder = PinHolder(CUDA0)
+
+    with pytest.raises(RuntimeError, match="registration failed"):
+        registry.update(holder, [first, second, third])
+
+    assert registry.is_registered(first)
+    assert not registry.is_registered(second)
+    assert not registry.is_registered(third)
+    assert registry._host_reserved_bytes == 0
+
+    monkeypatch.setattr(registry, "_register_locked", original_register)
+    registry.update(holder, [second, third])
+
+    assert registry.is_registered(second)
+    assert registry.is_registered(third)
+    assert registry._host_reserved_bytes == 0
+    registry.release(holder)
+
+
+def test_drain_failure_after_reservation_releases_headroom(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    storage = _storage()
+    drain_calls = 0
+
+    def drain_failure() -> None:
+        nonlocal drain_calls
+        drain_calls += 1
+        if drain_calls == 2:
+            raise RuntimeError("deferred drain failed")
+
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB)
+    monkeypatch.setattr(registry, "drain_deferred", drain_failure)
+    monkeypatch.setattr(weight_streaming, "_fault_in", lambda storage: None)
+    holder = PinHolder(CUDA0)
+
+    with pytest.raises(RuntimeError, match="deferred drain failed"):
+        registry.update(holder, [storage])
+
+    assert registry._host_reserved_bytes == 0
+    assert not registry.is_registered(storage)
+    registry.release(holder)
+
+
+def test_reclaimable_pins_do_not_count_as_returned_host_headroom(fake_streaming, monkeypatch: pytest.MonkeyPatch):
+    registry, _ = fake_streaming
+    idle, wanted = _storage(), _storage()
+    idle_holder, wanted_holder = PinHolder(CUDA0), PinHolder(CUDA0)
+    registry.update(idle_holder, [idle])
+    registry.idle(idle_holder)
+    monkeypatch.setattr(weight_streaming, "_host_memory_available", lambda: MB - 1)
+
+    registry.update(wanted_holder, [wanted])
+
+    assert registry.is_registered(idle)
+    assert not registry.is_registered(wanted)
+    registry.release(wanted_holder)
+    registry.release(idle_holder)

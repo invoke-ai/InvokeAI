@@ -15,7 +15,7 @@ also takes the published quantized builds: BFL's per-row scaled fp8 (`variants/f
 key names. The file says which it is.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from logging import Logger
 from pathlib import Path
 from typing import Any, Optional
@@ -41,12 +41,14 @@ from invokeai.backend.model_manager.configs.main import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_util import calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower, normalize_qwen3vl_rope_config
 from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_scaled import (
     COMFY_QUANT_SUFFIX,
     Fp8ScaledLayer,
+    admit_mxfp8_scale_decode,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -55,11 +57,12 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     load_safetensors_checkpoint,
     read_safetensors_metadata,
+    safetensors_backend,
     split_fp8_scaled_layers,
     translate_torchao_fp8_layers,
     warn_on_unattached_scales,
 )
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
@@ -77,6 +80,7 @@ from invokeai.backend.quantization.nvfp4 import (
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.ram import HostMemoryReserver, require_ram_headroom
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 _QK_NORM_WEIGHTS = (".norm_q.weight", ".norm_k.weight")
@@ -104,17 +108,18 @@ def _build_transformer(state_dict: dict) -> torch.nn.Module:
         return Flux3Transformer2DModel(**model_config)
 
 
-def _reserve_nothing(_bytes: int) -> None:
+def _reserve_nothing(_bytes: int, *, host_bytes_needed: int) -> None:
     """The reservation of a load that happens outside the RAM cache."""
 
 
 def flux3_transformer_from_single_file(
     sd: dict,
     dtype: torch.dtype,
-    reserve: Optional[Callable[[int], None]] = None,
+    reserve: Optional[HostMemoryReserver] = None,
     *,
     metadata: Optional[Mapping[str, Any]] = None,
     keep_fp8: bool = False,
+    source_tensors_mapped: bool = False,
     logger: Optional[Logger] = None,
 ) -> torch.nn.Module:
     """The transformer of a single-file FLUX.3 state dict (Black Forest Labs' names, or diffusers' for the torchao
@@ -174,7 +179,14 @@ def flux3_transformer_from_single_file(
     if int8_markers:
         # No int8 build carries nvfp4 or scaled fp8 layers beside them; `reject_unloadable_quantization` refused that.
         int8_layers = install_int8_convrot_layers(
-            model, sd, int8_markers, dtype, architecture="FLUX.3", reserve=make_room, skip_patterns=skip_patterns
+            model,
+            sd,
+            int8_markers,
+            dtype,
+            architecture="FLUX.3",
+            reserve=make_room,
+            skip_patterns=skip_patterns,
+            source_tensors_mapped=source_tensors_mapped,
         )
         how = (
             "multiplied in int8 where int8 Compute's kernels cover them, dequantized per forward elsewhere"
@@ -183,6 +195,7 @@ def flux3_transformer_from_single_file(
         )
         log.info(f"FLUX.3: kept {len(int8_layers)} of {len(int8_markers)} layer(s) in int8 (int8_tensorwise, {how}).")
     else:
+        admit_mxfp8_scale_decode(sd, layer_hints, reserve)
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
         reserve_for_load(
             make_room,
@@ -193,6 +206,8 @@ def flux3_transformer_from_single_file(
             skip_patterns=skip_patterns,
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
+            source_tensors_mapped=source_tensors_mapped,
+            modelopt_nvfp4_relayout=modelopt,
         )
         if fp8_layers and not keep_fp8:
             # Kept, they would be dequantized on every forward to save memory nobody asked to save.
@@ -237,7 +252,7 @@ class Flux3DiffusersModel(ModelLoader):
         # The tokenizer lives in `text_encoder/` and has no folder of its own; the generic sizing would fall
         # back to the folder root, which in a full repo download holds BFL's 11 GB single-file package.
         if submodel_type is SubModelType.Tokenizer:
-            return 0
+            return calc_tokenizer_size_by_fs(model_path, "text_encoder")
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
@@ -300,12 +315,14 @@ class Flux3CheckpointModel(ModelLoader):
 
         model_path = Path(config.path)
         decision = self._decision(config, SubModelType.Transformer)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         model = flux3_transformer_from_single_file(
             load_safetensors_checkpoint(model_path),
             decision.dtype,
             self._ram_cache.make_room,
             metadata=read_safetensors_metadata(model_path, self._logger),
             keep_fp8=decision.keep_checkpoint_fp8,
+            source_tensors_mapped=source_tensors_mapped,
             logger=self._logger,
         )
         if any(isinstance(module, DequantizingLinear) for module in model.modules()):
@@ -346,6 +363,16 @@ class Flux3GGUFCheckpointModel(ModelLoader):
         sd = CheckpointPrefix.detect(sd).strip(sd)
 
         model = _build_transformer(sd)
+        adaln = sd.get("final_layer.image.adaLN_modulation.1.weight")
+        if adaln is not None:
+            output_elements = adaln.tensor_shape.numel() if isinstance(adaln, GGMLTensor) else adaln.numel()
+            output_bytes = output_elements * compute_dtype.itemsize
+            # The GGML decode contract includes its output plus six whole-result temporaries. The subsequent cat
+            # overlaps only the decoded result, so compare both peaks instead of adding non-overlapping phases.
+            decode_bytes = output_bytes * (1 + HOST_DEQUANT_PEAK_COPIES) if isinstance(adaln, GGMLTensor) else 0
+            conversion_bytes = max(decode_bytes, 2 * output_bytes)
+            if conversion_bytes:
+                require_ram_headroom(self._ram_cache.make_room(0, host_bytes_needed=conversion_bytes), conversion_bytes)
         sd = convert_flux3_native_to_diffusers(sd)
         # The output adaLN weight comes back unpacked from the [shift, scale] swap; it joins the compute dtype
         # the packed tensors dequantize to.

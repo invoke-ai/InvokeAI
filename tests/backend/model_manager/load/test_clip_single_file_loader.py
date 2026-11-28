@@ -61,8 +61,17 @@ def _input_ids() -> torch.Tensor:
 
 
 def test_clip_l_loads_from_the_prefixed_file_into_a_plain_text_model(
-    loader: CLIPSingleFileLoader, tmp_path: Path
+    loader: CLIPSingleFileLoader, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    reservations: list[dict[str, object]] = []
+    reserve_for_load = loader_module.reserve_for_load
+
+    def record_reservation(*args: object, **kwargs: object) -> None:
+        reservations.append(kwargs)
+        reserve_for_load(*args, **kwargs)
+
+    monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
+
     reference = _reference(CLIPTextModel)
     file_sd = {f"text_model.{key}": value.half() for key, value in reference.state_dict().items()}
     file_sd["logit_scale"] = torch.tensor(4.6)
@@ -82,6 +91,7 @@ def test_clip_l_loads_from_the_prefixed_file_into_a_plain_text_model(
             model(input_ids=_input_ids()).pooler_output, expected(input_ids=_input_ids()).pooler_output
         )
     loader._ram_cache.make_room.assert_called_once()
+    assert reservations[0]["source_tensors_mapped"] is True
 
 
 def test_clip_g_loads_with_its_projection(loader: CLIPSingleFileLoader, tmp_path: Path) -> None:

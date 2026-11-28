@@ -18,6 +18,12 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.util.logging import InvokeAILogger
 
+_NF4_SERIALIZED_STATE_SUFFIX = ".quant_state.bitsandbytes__nf4"
+
+
+class HostMemoryAdmissionError(torch.OutOfMemoryError):
+    """Host-memory refusal raised before a device-to-host transfer begins."""
+
 
 class CachedModelWithPartialLoad:
     """A wrapper around a PyTorch model to handle partial loads and unloads between the CPU and the compute device.
@@ -83,11 +89,34 @@ class CachedModelWithPartialLoad:
         # failure-prone) step, so a failure there can release the reference cleanly without leaking it.
         #
         # Tied weights share one tensor under several keys. Their bytes are charged to the first of those keys and
-        # the rest are charged 0, so every sum over this dict counts the memory once; `_aliases` below keeps the
-        # group moving as a unit, so a charged key and its free aliases are never on different devices.
+        # the rest are charged 0, so every sum over this dict counts the memory once; `_aliases` below keeps tied
+        # names and serialized quantization sidecars moving as a unit.
         aliases = analyze_state_dict(model_state_dict)
-        self._aliases = aliases.groups
-        self._state_dict_bytes = aliases.bytes_by_key
+        alias_groups: dict[str, set[str]] = {key: set(group) for key, group in aliases.groups.items()}
+        # Bitsandbytes serializes NF4 quantization metadata below the packed parameter key (for example,
+        # `weight.quant_state.bitsandbytes__nf4`). These tensors have distinct storage, but moving only the packed
+        # bytes leaves the quantization state on the source device and makes the layer unusable.
+        parameter_keys = {
+            f"{module_name + '.' if module_name else ''}{name}"
+            for module_name, module in self._model.named_modules(remove_duplicate=False)
+            for name, parameter in module._parameters.items()
+            if parameter is not None
+        }
+        self._parameter_keys = parameter_keys
+        for key in model_state_dict:
+            parts = key.split(".")
+            for split_at in range(len(parts) - 1, 0, -1):
+                parent = ".".join(parts[:split_at])
+                if parent not in parameter_keys:
+                    continue
+                group = alias_groups.get(parent, {parent}) | alias_groups.get(key, {key})
+                for group_key in group:
+                    alias_groups[group_key] = group
+                break
+        self._aliases = {key: tuple(group) for key, group in alias_groups.items() if len(group) > 1}
+        self._state_dict_bytes = {
+            key: 0 if key.endswith(_NF4_SERIALIZED_STATE_SUFFIX) else size for key, size in aliases.bytes_by_key.items()
+        }
         self._total_bytes = sum(self._state_dict_bytes.values())
         # The dtype each of those byte counts is in. A holder may cast weights in place (the SD VAE nodes upcast the
         # VAE to fp32); the last unlock returns them to these dtypes (see `restore_counted_dtypes`), so between locks
@@ -142,18 +171,23 @@ class CachedModelWithPartialLoad:
 
         self._cpu_state_dict = cpu_state_dict
 
-    def _select_with_aliases(self, selected: set[str], key: str) -> int:
-        """Add `key` and everything tied to it to `selected`; return the bytes that adds.
+    def _group_is_on_device(self, state_dict: dict[str, torch.Tensor], key: str, device: torch.device) -> bool:
+        return not self._group_off_device_keys(state_dict, key, device)
 
-        A group moves as a unit: selecting only the alias that is charged 0 bytes would move the memory while the
-        accounting recorded nothing.
-        """
-        added_bytes = 0
-        for group_key in self._aliases.get(key, (key,)):
-            if group_key not in selected:
-                selected.add(group_key)
-                added_bytes += self._state_dict_bytes[group_key]
-        return added_bytes
+    def _group_off_device_keys(
+        self, state_dict: dict[str, torch.Tensor], key: str, device: torch.device
+    ) -> tuple[str, ...]:
+        group = self._aliases.get(key, (key,))
+        owner_on_device = any(
+            group_key in self._parameter_keys and state_dict[group_key].device.type == device.type
+            for group_key in group
+        )
+        return tuple(
+            group_key
+            for group_key in group
+            if state_dict[group_key].device.type != device.type
+            and not (owner_on_device and group_key.endswith(_NF4_SERIALIZED_STATE_SUFFIX))
+        )
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
         """Find all modules that support autocasting and let the cache stream their weights."""
@@ -205,10 +239,22 @@ class CachedModelWithPartialLoad:
         ```
         """
         state_dict_keys_by_module_prefix: dict[str, list[str]] = {}
+        named_modules = dict(self._model.named_modules(remove_duplicate=False))
         for key in state_dict.keys():
-            split = key.rsplit(".", 1)
-            # `split` will have length 1 if the root module has parameters.
-            module_name = split[0] if len(split) > 1 else ""
+            # Bitsandbytes serializes metadata for a parameter below its key (e.g. `weight.quant_state.*`). Those
+            # keys belong to the module that owns `weight`, not to a child module named `weight`.
+            parts = key.split(".")
+            module_name = None
+            for split_at in range(len(parts) - 1, -1, -1):
+                candidate = ".".join(parts[:split_at])
+                module = named_modules.get(candidate)
+                if module is not None and parts[split_at] in module._parameters | module._buffers:
+                    module_name = candidate
+                    break
+            if module_name is None:
+                split = key.rsplit(".", 1)
+                # `split` will have length 1 if the root module has parameters.
+                module_name = split[0] if len(split) > 1 else ""
             if module_name not in state_dict_keys_by_module_prefix:
                 state_dict_keys_by_module_prefix[module_name] = []
             state_dict_keys_by_module_prefix[module_name].append(key)
@@ -365,9 +411,9 @@ class CachedModelWithPartialLoad:
         asynchronously (`async_weight_streaming`), and mark them as streamed by this lock. What earlier locks pinned
         stays pinned (see `PinnedStorageRegistry`): models that take turns in VRAM pay for registration once.
 
-        Called by the holder of a settled lock, outside the global load lock and the cache's lock: page-locking
-        weights that are still only mapped from their file reads them into RAM (about 2.5 s/GiB measured), which
-        must not stall other models' construction or this device's cache. The lock keeps the residency fixed.
+        Called by the holder of a settled lock, under the global read lock and host-transfer admission but outside
+        the cache lock. Page-locking weights still mapped from their file reads them into RAM (about 2.5 s/GiB
+        measured), so it shares admission with integrated-device transfers that allocate in host RAM.
 
         Only with a RAM copy: its tensors are the ones the parameters point to while offloaded, and they stay put
         across loads and unloads. Without one, offloaded weights are fresh allocations on every unload.
@@ -432,9 +478,9 @@ class CachedModelWithPartialLoad:
         if self._cur_vram_bytes is None:
             cur_state_dict = self._model.state_dict()
             self._cur_vram_bytes = sum(
-                self._state_dict_bytes[k]
-                for k, v in cur_state_dict.items()
-                if v.device.type == self._compute_device.type
+                self._state_dict_bytes[key]
+                for key, tensor in cur_state_dict.items()
+                if tensor.device.type == self._compute_device.type
             )
         return self._cur_vram_bytes
 
@@ -462,9 +508,10 @@ class CachedModelWithPartialLoad:
         keys_to_repair: set[str] = set()
         repaired_required_tensors = 0
         for key in self._keys_in_modules_that_do_not_support_autocast:
-            if cur_state_dict[key].device.type != self._compute_device.type:
+            off_device_keys = self._group_off_device_keys(cur_state_dict, key, self._compute_device)
+            if off_device_keys:
                 # Tied names come along, but the count stays what the caller asked about: required tensors repaired.
-                self._select_with_aliases(keys_to_repair, key)
+                keys_to_repair.update(self._aliases.get(key, (key,)))
                 repaired_required_tensors += 1
         with self._transfer_operation():
             if keys_to_repair:
@@ -605,11 +652,14 @@ class CachedModelWithPartialLoad:
         # First, process the keys that *must* be loaded into VRAM. The pacing cap does not apply to
         # these: a pass must never end with the model in a state that cannot run.
         for key in self._keys_in_modules_that_do_not_support_autocast:
-            param = cur_state_dict[key]
-            if param.device.type == self._compute_device.type:
+            off_device_keys = self._group_off_device_keys(cur_state_dict, key, self._compute_device)
+            if not off_device_keys:
                 continue
 
-            vram_bytes_loaded += self._select_with_aliases(keys_to_load, key)
+            vram_bytes_loaded += sum(
+                self._state_dict_bytes[group_key] for group_key in off_device_keys if group_key not in keys_to_load
+            )
+            keys_to_load.update(self._aliases.get(key, (key,)))
 
         if vram_bytes_loaded > vram_bytes_to_load:
             logger = InvokeAILogger.get_logger()
@@ -620,12 +670,13 @@ class CachedModelWithPartialLoad:
 
         # Next, process the keys that can optionally be loaded into VRAM.
         fully_loaded = True
-        for key, param in cur_state_dict.items():
+        for key in cur_state_dict:
             # Skip the keys that have already been processed above.
             if key in keys_to_load:
                 continue
 
-            if param.device.type == self._compute_device.type:
+            off_device_keys = self._group_off_device_keys(cur_state_dict, key, self._compute_device)
+            if not off_device_keys:
                 continue
 
             if max_bytes is not None and vram_bytes_loaded >= max_bytes:
@@ -635,19 +686,18 @@ class CachedModelWithPartialLoad:
                 truncated = True
                 break
 
-            param_size = self._state_dict_bytes[key]
-            if param_size == 0 and key in self._aliases:
-                # A tied key whose group is charged to another name. It is loaded with that name, against the budget;
-                # selecting it here would move the group's memory without the budget ever seeing its bytes.
-                continue
-
-            if vram_bytes_loaded + param_size > vram_bytes_to_load:
+            candidate_keys = self._aliases.get(key, (key,))
+            candidate_bytes = sum(
+                self._state_dict_bytes[group_key] for group_key in off_device_keys if group_key not in keys_to_load
+            )
+            if vram_bytes_loaded + candidate_bytes > vram_bytes_to_load:
                 # TODO(ryand): Should we just break here? If we couldn't fit this parameter into VRAM, is it really
                 # worth continuing to search for a smaller parameter that would fit?
                 fully_loaded = False
                 continue
 
-            vram_bytes_loaded += self._select_with_aliases(keys_to_load, key)
+            keys_to_load.update(candidate_keys)
+            vram_bytes_loaded += candidate_bytes
 
         with self._transfer_operation():
             if len(keys_to_load) > 0:
@@ -676,7 +726,12 @@ class CachedModelWithPartialLoad:
         return vram_bytes_loaded, truncated
 
     @torch.no_grad()
-    def partial_unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
+    def partial_unload_from_vram(
+        self,
+        vram_bytes_to_free: int,
+        keep_required_weights_in_vram: bool = False,
+        host_bytes_available: int | None = None,
+    ) -> int:
         """Unload weights from VRAM until vram_bytes_to_free bytes are freed. Or the entire model is unloaded.
 
         :param keep_required_weights_in_vram: If True, any weights that must be kept in VRAM to run the model will be
@@ -694,11 +749,11 @@ class CachedModelWithPartialLoad:
         # Identify the keys that will be offloaded to CPU.
         keys_to_offload: set[str] = set()
 
-        for key, param in cur_state_dict.items():
+        for key in cur_state_dict:
             if vram_bytes_freed >= vram_bytes_to_free:
                 break
 
-            if param.device.type == offload_device:
+            if cur_state_dict[key].device.type == offload_device:
                 continue
 
             # A group is kept whenever any of its names is required: offloading it through one of its other names
@@ -711,7 +766,19 @@ class CachedModelWithPartialLoad:
                 required_weights_in_vram += self._state_dict_bytes[key]
                 continue
 
-            vram_bytes_freed += self._select_with_aliases(keys_to_offload, key)
+            group = self._aliases.get(key, (key,))
+            vram_bytes_freed += sum(
+                self._state_dict_bytes[group_key]
+                for group_key in group
+                if group_key not in keys_to_offload and cur_state_dict[group_key].device.type != offload_device
+            )
+            keys_to_offload.update(group)
+
+        available = max(host_bytes_available, 0) if host_bytes_available is not None else None
+        if available is not None and vram_bytes_freed > available:
+            raise HostMemoryAdmissionError(
+                f"Unloading {vram_bytes_freed} bytes to host memory needs more than the {available} bytes available."
+            )
 
         with self._transfer_operation():
             if len(keys_to_offload) > 0:

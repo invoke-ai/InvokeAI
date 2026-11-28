@@ -10,6 +10,7 @@ mock state dict with `keys_to_mock_state_dict()`, or write it back as a header w
 import json
 import math
 import struct
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -39,14 +40,49 @@ def token_extents(shape: list[int]) -> list[int]:
 _SAFETENSORS_DTYPE_BYTES = {"F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I64": 8, "I8": 1, "U8": 1}
 
 
+def _mark_sparse(file: Any) -> None:
+    """Declare a Windows file sparse before extending it past the bytes written."""
+    if sys.platform != "win32":
+        return
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    device_io_control = ctypes.WinDLL("kernel32", use_last_error=True).DeviceIoControl
+    device_io_control.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPVOID,
+    ]
+    device_io_control.restype = wintypes.BOOL
+    returned = wintypes.DWORD()
+    if not device_io_control(
+        wintypes.HANDLE(msvcrt.get_osfhandle(file.fileno())),
+        0x000900C4,  # FSCTL_SET_SPARSE
+        None,
+        0,
+        None,
+        0,
+        ctypes.byref(returned),
+        None,
+    ):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
 def write_header_only_safetensors(
     path: Path, keys: dict[str, tuple[list[int], str]], markers: Mapping[str, Mapping[str, Any]] | None = None
 ) -> Path:
-    """Write a safetensors file that has a fixture's real header and none of its data.
+    """Write a safetensors file with a fixture's real header and a sparse, zero-filled data section.
 
     Identification reads a safetensors file's header and nothing else, so a captured layout can be probed at its
-    real shapes -- a T5-XXL is told from a smaller T5 by its width -- without writing gigabytes. Anything that
-    reads tensor data from such a file fails, which is the point: identification must not.
+    real shapes -- a T5-XXL is told from a smaller T5 by its width -- without physically writing gigabytes. Tensor
+    data is logically present as zeroes, so use `write_shrunk_safetensors` when a test needs real tensor values.
 
     The one exception is `markers`, a fixture's decoded `.comfy_quant` markers by layer: identification reads those
     blobs to tell int8_tensorwise from other schemes that share its layout. They are written with their bytes, first
@@ -65,7 +101,11 @@ def write_header_only_safetensors(
         offset += nbytes
     encoded = json.dumps(header).encode("utf-8")
     encoded += b" " * (-len(encoded) % 8)
-    path.write_bytes(struct.pack("<Q", len(encoded)) + encoded + b"".join(blobs.values()))
+    payload = b"".join(blobs.values())
+    with path.open("wb") as file:
+        file.write(struct.pack("<Q", len(encoded)) + encoded + payload)
+        _mark_sparse(file)
+        file.truncate(8 + len(encoded) + offset)
     return path
 
 
@@ -105,13 +145,14 @@ def write_shrunk_safetensors(
     one whole scale tile of rows and blocks (`_NVFP4_TILE`), so a released layer stays a valid one and a misaligned
     one stays misaligned. Nothing else that reads a size may use this.
     """
-    tensors: dict[str, torch.Tensor] = {}
+    tensors: dict[str, torch.Tensor] = {
+        f"{layer}.comfy_quant": torch.frombuffer(
+            bytearray(json.dumps(dict(marker)).encode("utf-8")), dtype=torch.uint8
+        ).clone()
+        for layer, marker in (markers or {}).items()
+    }
     for key, (shape, dtype) in keys.items():
-        layer = key.removesuffix(".comfy_quant")
-        if markers is not None and layer != key and layer in markers:
-            raw = json.dumps(dict(markers[layer])).encode("utf-8")
-            tensors[key] = torch.frombuffer(bytearray(raw), dtype=torch.uint8).clone()
-        else:
+        if key not in tensors:
             tensors[key] = torch.zeros(_shrunk_extents(key, shape, dtype), dtype=_TORCH_DTYPES[dtype])
     save_file(tensors, str(path), metadata=dict(metadata) if metadata else None)
     return path

@@ -28,13 +28,26 @@ reserve=...)` next door. That is not only for tests: it keeps `backend/quantizat
 import edge into `backend/model_manager/load/model_cache`, which nothing in this package has today.
 """
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from typing import Any
 
 import torch
 
-from invokeai.backend.quantization.fp8_scaled import Fp8ScaledLayer, predict_cast_state_dict_size
-from invokeai.backend.quantization.nvfp4 import NVFP4Payload, predict_nvfp4_install_size
+from invokeai.backend.quantization.fp8_scaled import (
+    Fp8ScaledLayer,
+    fold_transient_bytes,
+    is_castable_float,
+    predict_cast_state_dict_size,
+    scaled_layer_for,
+    survives_split_and_cast,
+)
+from invokeai.backend.quantization.nvfp4 import (
+    NVFP4Payload,
+    predict_modelopt_nvfp4_relayout_host_size,
+    predict_nvfp4_install_host_size,
+    predict_nvfp4_install_size,
+)
+from invokeai.backend.util.ram import HostMemoryReserver, _source_is_mapped, require_ram_headroom, state_dict_cast_bytes
 
 
 def side_channel_bytes(fp8_layers: Mapping[str, Fp8ScaledLayer]) -> int:
@@ -58,7 +71,7 @@ def side_channel_bytes(fp8_layers: Mapping[str, Fp8ScaledLayer]) -> int:
 
 
 def reserve_for_load(
-    reserve: Callable[[int], None],
+    reserve: HostMemoryReserver,
     state_dict: Mapping[str, Any],
     dtype: torch.dtype,
     *,
@@ -67,6 +80,11 @@ def reserve_for_load(
     fp8_layers: Mapping[str, Fp8ScaledLayer],
     nvfp4_payloads: Mapping[str, NVFP4Payload],
     skip_patterns: Iterable[str] = (),
+    source_tensors_mapped: bool | Collection[int] | None = False,
+    modelopt_nvfp4_relayout: bool = False,
+    extra_host_bytes: int = 0,
+    folded_keys: Collection[str] = (),
+    folded_output_bytes: int = 0,
 ) -> int:
     """Ask for room for the state dict, the payloads it will install, and the scales it took out.
 
@@ -82,9 +100,17 @@ def reserve_for_load(
     give. `skip_patterns` keeps its default: omitting it is legible beside the `cast_state_dict` that
     omits it too, which is the only seam that does.
 
+    ``extra_host_bytes`` accounts for a bounded conversion outside the shared state-dict cast without
+    pretending that conversion's side channel is part of the final state dict.
+
+    ``folded_keys`` removes source keys consumed by an earlier fold from the later cast sizing. Their
+    replacement bytes are added back through ``folded_output_bytes``; metadata keys therefore do not
+    become bogus cast destinations.
+
     Returns the bytes asked for, so a caller can log or assert on them.
     """
     patterns = tuple(skip_patterns)
+    folded_keys = frozenset(folded_keys)
     nvfp4_bytes = 0
     if nvfp4_payloads:
         if model is None:
@@ -97,17 +123,180 @@ def reserve_for_load(
             )
         nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, dtype, patterns)
 
+    cast_state_dict = {key: tensor for key, tensor in state_dict.items() if key not in folded_keys}
     needed = (
         predict_cast_state_dict_size(
-            state_dict,
+            cast_state_dict,
             dtype,
             keep_fp8=keep_fp8,
             model=model,
             skip_patterns=patterns,
             scaled_layers=fp8_layers,
         )
+        + folded_output_bytes
         + nvfp4_bytes
         + side_channel_bytes(fp8_layers)
     )
-    reserve(needed)
+    # `dequantize_fp8_scaled` consumes this same mapping in insertion order. The state dict's key order is
+    # independent (and often differs after extraction), so use the mapping order for the cumulative fold peak.
+    fold_sd = {}
+    for path, layer in fp8_layers.items():
+        key = f"{path}.weight"
+        tensor = state_dict.get(key)
+        if (
+            tensor is not None
+            and is_castable_float(tensor)
+            and not (keep_fp8 and survives_split_and_cast(key, tensor, model, patterns, layer))
+        ):
+            fold_sd[key] = tensor
+    fold_delta = 0
+    fold_peak = 0
+    fold_source_counts: dict[int, int] = {}
+    fold_source_bytes: dict[int, int] = {}
+    fold_source_mapped: dict[int, bool] = {}
+    for tensor in state_dict.values():
+        if not isinstance(tensor, torch.Tensor) or tensor.is_meta:
+            continue
+        storage = tensor.untyped_storage()
+        storage_id = storage.data_ptr()
+        fold_source_counts[storage_id] = fold_source_counts.get(storage_id, 0) + 1
+        fold_source_bytes[storage_id] = storage.nbytes()
+        fold_source_mapped[storage_id] = _source_is_mapped(tensor, source_tensors_mapped)
+    for key, tensor in fold_sd.items():
+        layer = scaled_layer_for(key, fp8_layers)
+        if layer is None:
+            continue
+        output_bytes = tensor.nelement() * dtype.itemsize
+        fold_peak = max(
+            fold_peak,
+            fold_delta + output_bytes + fold_transient_bytes(tensor, layer.weight_scale),
+        )
+        fold_delta += output_bytes
+        # Fused checkpoints can expose several views of one source storage; release it only after the last view folds.
+        storage_id = tensor.untyped_storage().data_ptr()
+        fold_source_counts[storage_id] -= 1
+        if fold_source_counts[storage_id] == 0 and not fold_source_mapped[storage_id]:
+            fold_delta -= fold_source_bytes[storage_id]
+    cast_sd = {
+        key: tensor
+        for key, tensor in state_dict.items()
+        if is_castable_float(tensor)
+        and not (keep_fp8 and survives_split_and_cast(key, tensor, model, patterns, scaled_layer_for(key, fp8_layers)))
+        and key not in fold_sd
+        and key not in folded_keys
+    }
+    cast_target_bytes, cast_peak = state_dict_cast_bytes(
+        cast_sd,
+        dtype,
+        in_place=True,
+        source_tensors_mapped=source_tensors_mapped,
+    )
+    source_bytes = sum(
+        tensor.nelement() * tensor.element_size()
+        for key, tensor in state_dict.items()
+        if not tensor.is_meta
+        and (
+            not _source_is_mapped(tensor, source_tensors_mapped)
+            or (key not in fold_sd and key not in cast_sd and key not in folded_keys)
+            or getattr(tensor, "dtype", None) == dtype
+        )
+    )
+    source_bytes += sum(
+        scale.nelement() * scale.element_size()
+        for layer in fp8_layers.values()
+        for scale in (layer.weight_scale, layer.input_scale)
+        if scale is not None and not _source_is_mapped(scale, source_tensors_mapped)
+    )
+    source_bytes += sum(
+        payload.nbytes()
+        for payload in nvfp4_payloads.values()
+        if not _source_is_mapped(payload.weight, source_tensors_mapped)
+    )
+    mapped_nvfp4_source_bytes = sum(
+        payload.nbytes()
+        for payload in nvfp4_payloads.values()
+        if _source_is_mapped(payload.weight, source_tensors_mapped)
+    )
+    cast_source_bytes = sum(tensor.nelement() * tensor.element_size() for tensor in cast_sd.values())
+    cast_delta = cast_target_bytes - cast_source_bytes
+    folded_source_release_bytes = (
+        sum(
+            tensor.nelement() * tensor.element_size()
+            for key, tensor in state_dict.items()
+            if key in folded_keys
+            and isinstance(tensor, torch.Tensor)
+            and not tensor.is_meta
+            and not _source_is_mapped(tensor, source_tensors_mapped)
+        )
+        if folded_keys
+        else 0
+    )
+    post_fold_delta = folded_output_bytes - folded_source_release_bytes if folded_keys else fold_delta
+    # A mapped source at the destination dtype is reused by `cast_state_dict`; only differing dtypes allocate.
+    mapped_cast_bytes = sum(
+        tensor.nelement() * dtype.itemsize
+        for tensor in cast_sd.values()
+        if is_castable_float(tensor)
+        and getattr(tensor, "dtype", None) != dtype
+        and _source_is_mapped(tensor, source_tensors_mapped)
+    )
+    released_side_channel_bytes = 0
+    for path, layer in fp8_layers.items():
+        weight = state_dict.get(f"{path}.weight")
+        if weight is None:
+            continue
+        if not keep_fp8 or not survives_split_and_cast(f"{path}.weight", weight, model, patterns, layer):
+            released_side_channel_bytes += sum(
+                scale.nelement() * scale.element_size()
+                for scale in (layer.weight_scale, layer.input_scale)
+                if scale is not None and not _source_is_mapped(scale, source_tensors_mapped)
+            )
+    nvfp4_host_bytes = (
+        predict_nvfp4_install_host_size(
+            model,
+            nvfp4_payloads,
+            dtype,
+            patterns,
+            payloads_relaid_out=modelopt_nvfp4_relayout and bool(source_tensors_mapped),
+        )
+        if model is not None
+        else 0
+    )
+    mapped_sources = bool(source_tensors_mapped)
+    all_sources_mapped = mapped_sources and all(
+        _source_is_mapped(tensor, source_tensors_mapped)
+        for tensor in state_dict.values()
+        if isinstance(tensor, torch.Tensor) and not tensor.is_meta
+    )
+    if all_sources_mapped:
+        cast_phase_peak = max(fold_peak, post_fold_delta + mapped_cast_bytes)
+        cast_phase_delta = post_fold_delta + mapped_cast_bytes
+    elif mapped_sources:
+        cast_delta = sum(
+            tensor.nelement() * dtype.itemsize - tensor.nelement() * tensor.element_size()
+            for tensor in cast_sd.values()
+            if is_castable_float(tensor)
+            and getattr(tensor, "dtype", None) != dtype
+            and not _source_is_mapped(tensor, source_tensors_mapped)
+        )
+        cast_phase_peak = max(fold_peak, post_fold_delta + cast_peak)
+        cast_phase_delta = post_fold_delta + cast_delta + mapped_cast_bytes - released_side_channel_bytes
+    else:
+        cast_phase_peak = post_fold_delta + cast_peak
+        cast_phase_delta = post_fold_delta + cast_delta - released_side_channel_bytes
+    later_install_peak = max(
+        nvfp4_host_bytes,
+        predict_modelopt_nvfp4_relayout_host_size(nvfp4_payloads, source_tensors_mapped=source_tensors_mapped)
+        if modelopt_nvfp4_relayout
+        else 0,
+    )
+    host_bytes_needed = max(
+        0,
+        needed - source_bytes - mapped_nvfp4_source_bytes,
+        fold_peak,
+        cast_phase_peak,
+        cast_phase_delta + later_install_peak,
+        extra_host_bytes,
+    )
+    require_ram_headroom(reserve(needed, host_bytes_needed=host_bytes_needed), host_bytes_needed)
     return needed

@@ -27,7 +27,11 @@ from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import (
 )
 from invokeai.backend.model_manager.taxonomy import ModelType, Qwen35VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
-from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder, qwen3_5_text_config_from_config_json
+from invokeai.backend.qwen3_5.qwen3_5_encoder import (
+    _TOKENIZER_DIR,
+    Qwen35Encoder,
+    qwen3_5_text_config_from_config_json,
+)
 from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 
@@ -127,8 +131,17 @@ def _assert_loaded(model: Qwen35Encoder, expected: dict[str, torch.Tensor]) -> N
 
 
 def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision_tower(
-    tmp_path: Path, loader, tensors_read: list[str]
+    tmp_path: Path, loader, tensors_read: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    reservations: list[dict[str, object]] = []
+    reserve_for_load = loader_module.reserve_for_load
+
+    def record_reservation(*args: object, **kwargs: object) -> None:
+        reservations.append(kwargs)
+        reserve_for_load(*args, **kwargs)
+
+    monkeypatch.setattr(loader_module, "reserve_for_load", record_reservation)
+
     weights = _reference(final_norm=True).state_dict()
     path = tmp_path / "qwen3_5_9b.safetensors"
     save_file({**{f"language_model.{k}": v for k, v in weights.items()}, **_random(_VISION_TOWER)}, path)
@@ -137,7 +150,12 @@ def test_a_multimodal_export_loads_its_language_model_and_never_reads_the_vision
 
     _assert_loaded(model, weights)
     assert [key for key in tensors_read if not key.startswith("language_model.")] == []
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
+    # The reader reports the actual mmap-backed storages, rather than claiming that every selected tensor is mapped.
+    mapped_storage_ids = reservations[0]["source_tensors_mapped"]
+    assert isinstance(mapped_storage_ids, set)
+    assert mapped_storage_ids
 
 
 def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: list[str]) -> None:
@@ -155,7 +173,8 @@ def test_shards_load_as_one_checkpoint(tmp_path: Path, loader, tensors_read: lis
 
     _assert_loaded(model, weights)
     assert [key for key in tensors_read if key.startswith("visual.")] == []
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
 
 
 def test_a_checkpoint_without_its_final_norm_is_refused_when_the_norm_is_read(tmp_path: Path, loader) -> None:
@@ -197,7 +216,8 @@ def test_anima_3_8b_s_encoder_runs_its_last_layer_attention_only(tmp_path: Path,
     (expected,) = reference(input_ids, (_LAST,), last_layer_attention_only=True)
     (output,) = model(input_ids, (_LAST,))
     torch.testing.assert_close(output, expected)
-    loader._ram_cache.make_room.assert_called_once_with(_bytes(weights))
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (_bytes(weights),)
 
 
 @pytest.mark.parametrize(
@@ -362,8 +382,9 @@ def test_an_int8_whole_model_file_computes_what_its_dequantized_weights_compute(
     torch.testing.assert_close(output, expected, rtol=1e-4, atol=1e-5)
     # One reservation, for what the load ends with: marked Linears stay one byte per weight, and the activation
     # scales are not loaded.
-    loader._ram_cache.make_room.assert_called_once_with(
-        sum(t.nelement() * t.element_size() for t in model.state_dict().values())
+    loader._ram_cache.make_room.assert_called_once()
+    assert loader._ram_cache.make_room.call_args.args == (
+        sum(t.nelement() * t.element_size() for t in model.state_dict().values()),
     )
 
 
@@ -457,10 +478,19 @@ def test_a_shard_with_float8_weights_is_read_into_owned_storage_and_a_plain_shar
     assert backends == {fp8_shard: "pread", plain_shard: "mmap"}
 
 
-def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(tmp_path: Path, loader) -> None:
+def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.backend.qwen3_5.qwen3_5_encoder import load_bundled_qwen3_5_tokenizer
+
+    monkeypatch.setattr(load_bundled_qwen3_5_tokenizer, "cache_info", lambda: MagicMock(currsize=0))
     path = tmp_path / "encoder.safetensors"
     save_file(_random({"language_model.embed_tokens.weight": [64, 32]}), path)
     config = Qwen35Encoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
 
-    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == 0
+    tokenizer_bytes = sum(
+        (_TOKENIZER_DIR / name).stat().st_size for name in ("tokenizer.json.gz", "tokenizer_config.json")
+    )
+    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == tokenizer_bytes
+    assert tokenizer_bytes != path.stat().st_size
     assert loader.get_size_fs(config, path, SubModelType.TextEncoder) == path.stat().st_size

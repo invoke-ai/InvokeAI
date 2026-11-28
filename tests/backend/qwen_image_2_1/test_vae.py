@@ -337,6 +337,19 @@ def test_the_default_tile_is_the_largest_whose_working_memory_fits_half_the_devi
     assert default_tile_size("encode", GPU, 4) == 1024
 
 
+def test_an_integrated_cuda_default_tile_uses_current_host_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    _pin(monkeypatch, "cudnn")
+    monkeypatch.setattr(vae_module, "device_is_integrated", lambda _device: True)
+    monkeypatch.setattr(
+        vae_module.TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 20 * GIB)
+    )
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 4 * GIB)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _device: SimpleNamespace(total_memory=64 * GIB))
+
+    # The contract is 20 GiB available to the process minus its 4 GiB allocation: 16 GiB host headroom.
+    assert default_tile_size("decode", GPU, 2) == 768
+
+
 def test_an_encode_takes_its_own_default_tile(monkeypatch: pytest.MonkeyPatch) -> None:
     _pin(monkeypatch, "miopen", "expandable", "windows")
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: SimpleNamespace(total_memory=16 * GIB))

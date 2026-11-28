@@ -8,6 +8,7 @@ contract the loader-seam driver records as ``order`` (reservations made before e
 and ``dtypes_at_make_room`` (the working dict's dtypes when room was first made).
 """
 
+import builtins
 import json
 import logging
 from pathlib import Path
@@ -27,6 +28,7 @@ from invokeai.backend.model_manager.load.model_loaders.ltx2 import (
     LTX2DurationHeadLoader,
     LTX2FolderModel,
     LTX2Gemma4EncoderModel,
+    _LTX2ComponentLoading,
 )
 from invokeai.backend.model_manager.taxonomy import LTX2VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
@@ -99,6 +101,8 @@ def test_a_dense_bf16_file_loads_every_tensor_reserving_before_the_cast(monkeypa
         _transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry, observe=OBSERVED
     )
     model = run.load(_checkpoint_config(tmp_path, sd))
+
+    assert run.reservation_kwargs[-1]["source_tensors_mapped"] is True
 
     assert not any(p.is_meta for p in model.parameters())
     assert {p.dtype for p in model.parameters()} == {COMPUTE_DTYPE}
@@ -204,10 +208,98 @@ def test_undeclared_float8_weights_are_refused_by_name(monkeypatch, tmp_path) ->
 
 def _folder_loader(reserved: list[int] | None = None) -> LTX2FolderModel:
     loader = object.__new__(LTX2FolderModel)
-    loader._ram_cache = SimpleNamespace(make_room=(reserved.append if reserved is not None else lambda _n: None))
+    loader._ram_cache = SimpleNamespace(
+        make_room=lambda n, **_kwargs: reserved.append(n) if reserved is not None else None
+    )
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None)
     loader._torch_device = torch.device("cpu")
     return loader
+
+
+@pytest.mark.parametrize(
+    ("loader_type", "source_dtype", "target_dtype", "expected_host_bytes"),
+    [
+        (LTX2FolderModel, torch.bfloat16, torch.float32, 12 * torch.float32.itemsize),
+        (LTX2DurationHeadLoader, torch.bfloat16, torch.float32, 12 * torch.float32.itemsize),
+        (LTX2FolderModel, torch.bfloat16, torch.bfloat16, 0),
+    ],
+    ids=["audio-components-fp32", "duration-head-fp32", "same-dtype-noop"],
+)
+def test_mapped_bf16_components_reserve_the_distinct_fp32_output(
+    loader_type: type[_LTX2ComponentLoading],
+    source_dtype: torch.dtype,
+    target_dtype: torch.dtype,
+    expected_host_bytes: int,
+    tmp_path: Path,
+) -> None:
+    """Mapped BF16 sources remain file-backed while each dense component is widened to FP32."""
+    from safetensors import safe_open
+
+    path = tmp_path / "component.safetensors"
+    safetensors.torch.save_file(
+        {"first": torch.zeros(4, dtype=source_dtype), "second": torch.zeros(8, dtype=source_dtype)}, path
+    )
+    with safe_open(path, framework="pt", device="cpu") as file:
+        sd = {key: file.get_tensor(key) for key in file.keys()}
+
+    reservations: list[tuple[tuple[int, ...], dict[str, int]]] = []
+    loader = object.__new__(loader_type)
+    loader._ram_cache = SimpleNamespace(make_room=lambda *args, **kwargs: reservations.append((args, kwargs)))
+    loader._reserve_for_cast(sd, target_dtype)
+
+    expected = 12 * target_dtype.itemsize
+    assert reservations == [((expected,), {"host_bytes_needed": expected_host_bytes})]
+
+
+@pytest.mark.parametrize(
+    "header,declared_length",
+    [
+        (b'{"tensor": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}', None),
+        (b'{"tensor": {"dtype": "BF16", "shape": [1], "data_offsets": [0, 2]}}', 1_000_000),
+    ],
+    ids=["truncated-json", "oversized-header"],
+)
+def test_connector_header_is_validated_before_filtered_payload_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, header: bytes, declared_length: int | None
+) -> None:
+    """Connector sizing must reject malformed headers before requesting their declared length."""
+    path = tmp_path / "connectors.safetensors"
+    path.write_bytes((declared_length or len(header)).to_bytes(8, "little") + header + b"\0" * 2)
+    reads: list[int] = []
+    original_open = builtins.open
+
+    class _TrackedFile:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            self.file.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.file.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.file, name)
+
+        def read(self, size=-1):
+            reads.append(size)
+            return self.file.read(size)
+
+    def tracked_open(*args, **kwargs):
+        return _TrackedFile(original_open(*args, **kwargs))
+
+    monkeypatch.setattr(builtins, "open", tracked_open)
+    components = {
+        "text_projection": path.name,
+        "video_connector": path.name,
+        "audio_connector": path.name,
+    }
+    config = Main_Diffusers_LTX2_Config.model_construct(path=str(tmp_path), components=components)
+
+    with pytest.raises(ValueError, match="not a safetensors file"):
+        _folder_loader().get_size_fs(config, tmp_path, SubModelType.Connectors)
+    assert all(size <= len(header) for size in reads if size >= 0)
 
 
 def _cpu(monkeypatch) -> None:
@@ -269,13 +361,20 @@ def test_a_quantized_component_file_is_refused_before_any_room_is_made(monkeypat
 def test_the_folder_sizes_the_files_a_submodel_is_read_from(tmp_path) -> None:
     """`_load_and_cache` reserves `get_size_fs` before the read; a folder has no `<submodel>/` dir
     to size, so the read would otherwise land on an unreserved cache."""
-    for name, size in (
-        ("p.safetensors", 100),
-        ("vc.safetensors", 200),
-        ("ac.safetensors", 300),
-        ("v.safetensors", 1000),
-    ):
-        (tmp_path / name).write_bytes(b"\0" * size)
+    connector_files = {
+        "p.safetensors": "text_embedding_projection.",
+        "vc.safetensors": "video_embeddings_connector.",
+        "ac.safetensors": "audio_embeddings_connector.",
+    }
+    expected_connector_bytes = 0
+    for name, prefix in connector_files.items():
+        matching = torch.zeros(5)
+        unrelated = torch.zeros(100)
+        safetensors.torch.save_file(
+            {f"{prefix}matching": matching, "transformer_blocks.unrelated": unrelated}, tmp_path / name
+        )
+        expected_connector_bytes += matching.nelement() * matching.element_size()
+    (tmp_path / "v.safetensors").write_bytes(b"\0" * 1000)
     config = Main_Diffusers_LTX2_Config.model_construct(
         path=str(tmp_path),
         components={
@@ -286,7 +385,7 @@ def test_the_folder_sizes_the_files_a_submodel_is_read_from(tmp_path) -> None:
         },
     )
     loader = _folder_loader()
-    assert loader.get_size_fs(config, tmp_path, SubModelType.Connectors) == 600
+    assert loader.get_size_fs(config, tmp_path, SubModelType.Connectors) == expected_connector_bytes
     assert loader.get_size_fs(config, tmp_path, SubModelType.VAE) == 1000
     assert loader.get_size_fs(config, tmp_path, SubModelType.Vocoder) == 0
 
@@ -333,11 +432,18 @@ def test_the_connectors_are_read_out_of_a_bundled_transformer_file_by_key(monkey
     config = Main_Diffusers_LTX2_Config.model_construct(
         path=str(tmp_path),
         components={
+            "transformer": "bundle.safetensors",
             "text_projection": "bundle.safetensors",
             "video_connector": "bundle.safetensors",
             "audio_connector": "bundle.safetensors",
         },
     )
+    connector_bytes = sum(
+        tensor.nelement() * tensor.element_size()
+        for key, tensor in official.items()
+        if ltx2.layout.strip_transformer_prefix(key).startswith(ltx2._CONNECTOR_KEY_PREFIXES)
+    )
+    assert _folder_loader().get_size_fs(config, tmp_path, SubModelType.Connectors) == connector_bytes
     _cpu(monkeypatch)
     model = _folder_loader()._load_model(config, SubModelType.Connectors)
     torch.testing.assert_close(model.video_connector.learnable_registers, reference.video_connector.learnable_registers)
@@ -401,7 +507,7 @@ def test_the_text_tower_loads_from_the_file_with_its_int8_layer_packed(monkeypat
     _cpu(monkeypatch)
     loader = object.__new__(LTX2Gemma4EncoderModel)
     reserved: list[int] = []
-    loader._ram_cache = SimpleNamespace(make_room=reserved.append)
+    loader._ram_cache = SimpleNamespace(make_room=lambda n, **_kwargs: reserved.append(n))
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None)
     config = Gemma4Encoder_Gemma4Encoder_LTX2_Config.model_construct(
         path=str(gemma_folder.root), subfolder="", weight_file="te.safetensors"
@@ -547,7 +653,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
 
 def _duration_head_loader(reserved: list[int]) -> LTX2DurationHeadLoader:
     loader = object.__new__(LTX2DurationHeadLoader)
-    loader._ram_cache = SimpleNamespace(make_room=reserved.append)
+    loader._ram_cache = SimpleNamespace(make_room=lambda n, **_kwargs: reserved.append(n))
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None)
     return loader
 

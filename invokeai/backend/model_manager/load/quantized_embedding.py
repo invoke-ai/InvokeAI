@@ -9,12 +9,14 @@ from collections.abc import Iterable, Mapping
 from itertools import chain
 from typing import Any
 
+import gguf
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import ggml_unpack_temp_bytes, unpack_ggml_tensor
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.util.ram import require_ram_headroom
 
 
 def materialize_quantized_embedding(
@@ -39,11 +41,22 @@ def materialize_quantized_embedding(
     output_bytes = weight.shape.numel() * weight.compute_dtype.itemsize
     if isinstance(weight, GGMLTensor):
         # Some unquantized GGML decodes return a view; reserving an output is conservative there.
-        ram_cache.make_room(held_bytes + output_bytes + ggml_unpack_temp_bytes(weight))
+        cache_bytes = held_bytes + output_bytes + ggml_unpack_temp_bytes(weight)
+        zero_copy = (
+            weight._ggml_quantization_type is gguf.GGMLQuantizationType.BF16 and weight.compute_dtype is torch.bfloat16
+        ) or (
+            weight._ggml_quantization_type in (gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.F32)
+            and weight.compute_dtype is weight.quantized_data.dtype
+        )
+        host_bytes_needed = 0 if zero_copy else output_bytes + ggml_unpack_temp_bytes(weight)
+        require_ram_headroom(ram_cache.make_room(cache_bytes, host_bytes_needed=host_bytes_needed), host_bytes_needed)
         result = unpack_ggml_tensor(weight)
     else:
         # SDNQ retains whole-tensor decoding. Its peak allowance already includes the result.
-        ram_cache.make_room(held_bytes + HOST_DEQUANT_PEAK_COPIES * output_bytes)
+        host_bytes_needed = HOST_DEQUANT_PEAK_COPIES * output_bytes
+        require_ram_headroom(
+            ram_cache.make_room(held_bytes + host_bytes_needed, host_bytes_needed=host_bytes_needed), host_bytes_needed
+        )
         result = dequantize()
     # Keep the original Parameter intact if reserving or decoding raises.
     embedding.weight = torch.nn.Parameter(result, requires_grad=False)

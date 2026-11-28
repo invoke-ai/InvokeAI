@@ -23,6 +23,7 @@ installs the RoPE frequencies at the weights' bf16 for the first forward to repa
 
 import json
 import re
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
@@ -161,16 +162,22 @@ def moss_image_component_shards(directory: Path) -> Mapping[Path, list[str] | No
     return keys_by_shard
 
 
-def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
+def _read_component_state_dict(directory: Path, mapped_storage_ids: set[int] | None = None) -> dict[str, torch.Tensor]:
     """A component's whole state dict, read the way `moss_image_component_shards` says."""
     sd: dict[str, torch.Tensor] = {}
     for path, keys in moss_image_component_shards(directory).items():
         if keys is None:
-            sd.update(load_safetensors_checkpoint(path))
+            loaded = load_safetensors_checkpoint(path)
+            sd.update(loaded)
+            if mapped_storage_ids is not None and safetensors_backend(path) == "mmap":
+                mapped_storage_ids.update(tensor.untyped_storage().data_ptr() for tensor in loaded.values())
             continue
-        with safe_open(path, framework="pt", device="cpu", backend=safetensors_backend(path)) as f:
+        backend = safetensors_backend(path)
+        with safe_open(path, framework="pt", device="cpu", backend=backend) as f:
             for key in keys:
                 sd[key] = f.get_tensor(key)
+                if mapped_storage_ids is not None and backend == "mmap":
+                    mapped_storage_ids.add(sd[key].untyped_storage().data_ptr())
     return sd
 
 
@@ -211,6 +218,7 @@ class _MossImageTransformerLoading(ModelLoader):
         what: str,
         *,
         torchao_fp8: bool = False,
+        source_tensors_mapped: bool | Collection[int] = False,
     ) -> AnyModel:
         """Build the transformer from `sd`. `torchao_fp8` says `translate_torchao_fp8_layers` renamed layers to
         `.weight` + `.weight_scale`; that is the only source of fp8 scales accepted, any other is refused below."""
@@ -236,6 +244,8 @@ class _MossImageTransformerLoading(ModelLoader):
             sd.clear()
             sd.update(kept_sd)
             del kept_sd
+            # `sd` is mostly safetensors-backed, but `rope.bands` is owned. Mapped accounting conservatively avoids
+            # crediting the file-backed pages as reclaimed; this slightly overestimates for the small RoPE buffer.
             kept = install_int8_convrot_layers(
                 model,
                 sd,
@@ -244,6 +254,7 @@ class _MossImageTransformerLoading(ModelLoader):
                 architecture="MOSS-Image",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                source_tensors_mapped=source_tensors_mapped,
             )
             self._logger.info(
                 f"{what}: kept {len(kept)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, "
@@ -265,6 +276,7 @@ class _MossImageTransformerLoading(ModelLoader):
                 skip_patterns=skip_patterns,
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
+                source_tensors_mapped=source_tensors_mapped,
             )
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, dtype)
@@ -317,8 +329,15 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
                 with open(transformer_dir / "config.json", "r", encoding="utf-8") as f:
                     declared = json.load(f)
                 geometry = {key: value for key, value in declared.items() if not key.startswith("_")}
-                sd = _read_component_state_dict(transformer_dir)
-                return self._load_transformer(config, sd, geometry, f"MOSS-Image transformer in {model_path.name}")
+                mapped_storage_ids: set[int] = set()
+                sd = _read_component_state_dict(transformer_dir, mapped_storage_ids)
+                return self._load_transformer(
+                    config,
+                    sd,
+                    geometry,
+                    f"MOSS-Image transformer in {model_path.name}",
+                    source_tensors_mapped=mapped_storage_ids,
+                )
             case SubModelType.TextEncoder:
                 return self._load_text_encoder(config, model_path / "text_encoder")
             case SubModelType.Tokenizer:
@@ -381,6 +400,7 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
                 "Select a standalone Qwen3.5 9B encoder and FLUX.2 VAE on the MOSS-Image model loader."
             )
         model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
         sd = load_safetensors_checkpoint(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # unsloth's torchao fp8 build, renamed to the scaled-fp8 form. Before the split and the geometry read, which
@@ -394,6 +414,7 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
             moss_image_transformer_config(sd),
             f"MOSS-Image checkpoint {model_path.name}",
             torchao_fp8=torchao_fp8,
+            source_tensors_mapped=source_tensors_mapped,
         )
 
 

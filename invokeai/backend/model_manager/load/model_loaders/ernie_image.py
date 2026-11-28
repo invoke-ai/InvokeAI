@@ -18,8 +18,13 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    load_safetensors_checkpoint,
+    reject_quantized_side_channel,
+    safetensors_backend,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.util.ram import require_ram_headroom, state_dict_cast_bytes
 
 # The geometry of the released ERNIE-Image transformer, from the pipeline's `transformer/config.json`.
 # A single file carries no config, and `ErnieImageTransformer2DModel`'s own defaults describe a
@@ -115,9 +120,16 @@ class ErnieImageCheckpointModel(ModelLoader):
 
         model_dtype = self._decision(config, SubModelType.Transformer).dtype
 
-        sd = load_safetensors_checkpoint(Path(config.path))
+        model_path = Path(config.path)
+        source_tensors_mapped = safetensors_backend(model_path) == "mmap"
+        sd = load_safetensors_checkpoint(model_path)
         reject_quantized_side_channel(sd, f"ERNIE-Image checkpoint {Path(config.path).name}")
-        self._ram_cache.make_room(sum(t.nelement() * model_dtype.itemsize for t in sd.values()))
+        reserved_bytes, additional_bytes = state_dict_cast_bytes(
+            sd, model_dtype, in_place=True, source_tensors_mapped=source_tensors_mapped
+        )
+        require_ram_headroom(
+            self._ram_cache.make_room(reserved_bytes, host_bytes_needed=additional_bytes), additional_bytes
+        )
         for key in sd:
             sd[key] = sd[key].to(model_dtype)
 

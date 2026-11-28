@@ -2,6 +2,7 @@
 
 import copy
 import itertools
+import math
 import re
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ import torch
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_FLUX_Config
 from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase, StaleModelConfigError
 from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
@@ -22,17 +24,21 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
     FirstUseClaim,
     ModelCache,
+    _is_integrated_cuda,
     get_model_cache_key,
 )
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsPin
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs, calc_tokenizer_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
+from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
+    ModelFormat,
+    ModelType,
     SubModelType,
 )
 from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
-from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
+from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, is_scale_metadata_key, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, FP8_STORAGE_DTYPES, set_fp8_compute_dtype
 
@@ -563,7 +569,20 @@ class ModelLoader(ModelLoaderBase):
                 # peak) so the surge can be attributed without guessing.
                 log_mem = self._app_config.log_memory_usage
                 ram_before = MemorySnapshot.capture().process_ram if log_mem else 0
-                self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+                model_path = Path(config.path)
+                size_fs = self.get_size_fs(config, model_path, submodel_type)
+                host_bytes_needed = self._get_host_bytes_needed(config, model_path, submodel_type)
+                effective_execution_device = execution_device or self._ram_cache.execution_device
+                integrated_cuda = _is_integrated_cuda(effective_execution_device)
+                if integrated_cuda and host_bytes_needed:
+                    ram_admission = self._ram_cache.make_room(size_fs, host_bytes_needed=host_bytes_needed)
+                else:
+                    ram_admission = self._ram_cache.make_room(size_fs)
+                if integrated_cuda and getattr(ram_admission, "ram_headroom_satisfied", True) is False:
+                    raise MemoryError(
+                        f"Insufficient host memory to construct model '{cache_key}'; "
+                        "close other applications or load a smaller model."
+                    )
                 ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
                     loaded_model = put_in_eval_mode(self._load_model(config, submodel_type))
@@ -610,6 +629,28 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Get the size of the model on disk."""
+        if submodel_type is SubModelType.Transformer and isinstance(config, Main_Checkpoint_FLUX_Config):
+            # FLUX.1 bundles can carry VAE and text-encoder tensors beside the transformer. The loader's selector
+            # reads only the transformer payload, so admit only those bytes before constructing the model.
+            if model_path.is_file() and model_path.suffix == ".safetensors":
+                header = read_safetensors_header(model_path)
+                from invokeai.backend.model_manager.load.model_loaders.flux import (
+                    _FLUX_BUNDLE_MARKER_KEY,
+                    _transformer_of_flux_bundle,
+                )
+
+                selected = _transformer_of_flux_bundle(header)
+                if _FLUX_BUNDLE_MARKER_KEY in header:
+                    return sum(end - start for entry in selected.values() for start, end in [entry["data_offsets"]])
+        # Single-file Qwen2.5-VL checkpoints and GGUFs use InvokeAI's vendored tokenizer. The
+        # tokenizer request never reads the model file itself, so charging it here can refuse a
+        # prompt-only load despite the tokenizer having no model-file-sized allocation.
+        if (
+            submodel_type == SubModelType.Tokenizer
+            and getattr(config, "type", None) == ModelType.QwenVLEncoder
+            and getattr(config, "format", None) in (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized)
+        ):
+            return 0
         # Size the folder the model will actually be loaded from. This has to track
         # `resolve_submodel_path`, or a pipeline whose index calls its CLIP encoder `clip_encoder`
         # gets sized at the non-existent `text_encoder/` — 0 bytes — and `make_room()` reserves
@@ -631,6 +672,46 @@ class ModelLoader(ModelLoaderBase):
             subfolder=subfolder,
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
+
+    def _get_host_bytes_needed(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """Total cold-load host peak for work done before a loader can make its normal reservation."""
+        if (
+            submodel_type is SubModelType.Tokenizer
+            and getattr(config, "type", None) == ModelType.QwenVLEncoder
+            and getattr(config, "format", None) in (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized)
+        ):
+            from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
+                _TOKENIZER_DIR,
+                load_bundled_qwen2_5_vl_tokenizer,
+            )
+
+            if load_bundled_qwen2_5_vl_tokenizer.cache_info().currsize:
+                return 0
+            return calc_tokenizer_size_by_fs(_TOKENIZER_DIR, include_runtime_overhead=True)
+        if submodel_type is not SubModelType.Transformer or not isinstance(config, Main_Checkpoint_FLUX_Config):
+            return 0
+        if not model_path.is_file() or model_path.suffix != ".safetensors":
+            return 0
+        header = read_safetensors_header(model_path)
+        from invokeai.backend.model_manager.load.model_loaders.flux import (
+            _FLUX_BUNDLE_MARKER_KEY,
+            _transformer_of_flux_bundle,
+        )
+
+        selected = _transformer_of_flux_bundle(header)
+        if _FLUX_BUNDLE_MARKER_KEY not in header:
+            return 0
+        selected_source_bytes = sum(
+            end - start for entry in selected.values() for start, end in [entry["data_offsets"]]
+        )
+        converted_scale_bytes = sum(
+            math.prod(entry["shape"]) * torch.bfloat16.itemsize
+            for key, entry in selected.items()
+            if key.endswith("scale") and not is_scale_metadata_key(key) and entry.get("dtype") != "BF16"
+        )
+        return selected_source_bytes + converted_scale_bytes
 
     @staticmethod
     def _fp8_storage_asked_for(config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
@@ -924,8 +1005,8 @@ class ModelLoader(ModelLoaderBase):
         The exit puts back the *same tensors*, rather than re-quantizing to the storage dtype. Both
         end with a param of the storage dtype, and the difference is the whole point:
 
-        - `.to(storage_dtype)` allocates new storage. `CachedModelWithPartialLoad` keeps
-          `_cpu_state_dict = model.state_dict()` (the `keep_ram_copy_of_weights` default), so after
+        - `.to(storage_dtype)` allocates new storage. When `keep_ram_copy_of_weights` is enabled,
+          `CachedModelWithPartialLoad` keeps `_cpu_state_dict = model.state_dict()`, so after
           the first forward the param pointed at a private copy while that RAM copy pinned the
           original — both live, 2 bytes per element for every param still CPU-resident, against a
           budget snapshotted at `put()` that still said 1. It healed only when the model moved to

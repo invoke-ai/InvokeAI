@@ -337,6 +337,37 @@ def test_an_mxfp8_layer_nothing_names_is_refused_before_the_cache_is_evicted(
     loader._ram_cache.make_room.assert_not_called()
 
 
+def test_mxfp8_decode_is_refused_before_expanding_scales_when_host_room_is_exactly_short(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    checkpoint = _write(tmp_path, evidence="marker", mx_module=MX_MODULE)
+    _decide(monkeypatch, device="cpu", storage=True)
+    loader = _loader()
+    decoded_bytes = (
+        128 * 4 * (torch.float32.itemsize + torch.uint8.itemsize + 2 * torch.int32.itemsize + torch.float32.itemsize)
+    )
+
+    def make_room(_reserved: int, *, host_bytes_needed: int | None = None):
+        return SimpleNamespace(ram_headroom_satisfied=host_bytes_needed != decoded_bytes)
+
+    loader._ram_cache.make_room = MagicMock(side_effect=make_room)
+    extracted = False
+    original_extract = qwen_image.extract_fp8_scaled_layers
+
+    def observe_extract(*args, **kwargs):
+        nonlocal extracted
+        extracted = True
+        return original_extract(*args, **kwargs)
+
+    monkeypatch.setattr(qwen_image, "extract_fp8_scaled_layers", observe_extract)
+
+    with pytest.raises(MemoryError, match="Insufficient host memory"):
+        _load(checkpoint, loader)
+
+    assert extracted is False
+    assert loader._ram_cache.make_room.call_args.kwargs == {"host_bytes_needed": decoded_bytes}
+
+
 def test_the_reservation_counts_float8_weights_one_byte_and_everything_else_at_the_compute_dtype(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -373,7 +404,11 @@ def test_the_lm_head_in_the_file_is_neither_loaded_nor_reserved_for(
     assert list(model.lm_head.parameters()) == [] and list(model.lm_head.buffers()) == []
     assert not any("lm_head" in key for key in unexpected)
     widened = 4 * (checkpoint.linear_elements + checkpoint.other_elements) + checkpoint.scale_bytes
-    loader._ram_cache.make_room.assert_called_once_with(widened)
+    loader._ram_cache.make_room.assert_called_once()
+    call = loader._ram_cache.make_room.call_args
+    assert call.args == (widened,)
+    # Exact incremental peak for the fixed toy checkpoint; its file LM head is excluded from admission.
+    assert call.kwargs == {"host_bytes_needed": 1_216_512}
     with pytest.raises(RuntimeError, match="without its LM head"):
         model(input_ids=IDS)
 

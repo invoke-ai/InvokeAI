@@ -1,10 +1,15 @@
 import itertools
+from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
+    HostMemoryAdmissionError,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
+    CustomModuleMixin,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
@@ -17,6 +22,227 @@ from tests.backend.model_manager.load.model_cache.cached_model.utils import (
     parameterize_keep_ram_copy,
     parameterize_mps_and_cuda,
 )
+
+
+class _NF4StateDictModule(torch.nn.Module, CustomModuleMixin):
+    """CPU-testable stand-in for bitsandbytes' packed weight and serialized quantization sidecars."""
+
+    def __init__(self, regenerate_quant_state_on_cpu: bool = False):
+        super().__init__()
+        CustomModuleMixin.__init__(self)
+        self.regenerate_quant_state_on_cpu = regenerate_quant_state_on_cpu
+        self.weight = torch.nn.Parameter(torch.arange(16, dtype=torch.uint8).reshape(4, 4), requires_grad=False)
+        self.absmax = torch.ones(4, dtype=torch.uint8)
+        self.quant_map = torch.ones(16)
+        self.nested_absmax = torch.ones(1)
+        self.nested_quant_map = torch.ones(8)
+        self.quant_state = torch.ones(12, dtype=torch.uint8)
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        destination[prefix + "weight"] = self.weight if keep_vars else self.weight.detach()
+        for suffix, tensor in (
+            ("weight.absmax", self.absmax),
+            ("weight.quant_map", self.quant_map),
+            ("weight.nested_absmax", self.nested_absmax),
+            ("weight.nested_quant_map", self.nested_quant_map),
+            ("weight.quant_state.bitsandbytes__nf4", self.quant_state),
+        ):
+            if (
+                self.regenerate_quant_state_on_cpu
+                and suffix == "weight.quant_state.bitsandbytes__nf4"
+                and self.weight.device.type != "cpu"
+            ):
+                tensor = torch.ones_like(tensor, device="cpu")
+            destination[prefix + suffix] = tensor if keep_vars else tensor.detach()
+
+    def _load_from_state_dict(
+        self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+    ):
+        self.weight = torch.nn.Parameter(state_dict.pop(prefix + "weight"), requires_grad=False)
+        self.absmax = state_dict.pop(prefix + "weight.absmax")
+        self.quant_map = state_dict.pop(prefix + "weight.quant_map")
+        self.nested_absmax = state_dict.pop(prefix + "weight.nested_absmax")
+        self.nested_quant_map = state_dict.pop(prefix + "weight.nested_quant_map")
+        self.quant_state = state_dict.pop(prefix + "weight.quant_state.bitsandbytes__nf4")
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.linear(input, self.weight.float())
+
+
+def _nf4_cached_model(
+    keep_ram_copy: bool, regenerate_quant_state_on_cpu: bool = False
+) -> tuple[_NF4StateDictModule, CachedModelWithPartialLoad]:
+    model = torch.nn.Module()
+    model.linear = _NF4StateDictModule(regenerate_quant_state_on_cpu)
+    cached_model = CachedModelWithPartialLoad(model, torch.device("meta"), keep_ram_copy=keep_ram_copy)
+    return model.linear, cached_model
+
+
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+def test_nf4_partial_load_admits_packed_weight_and_sidecars_as_one_group(keep_ram_copy: bool) -> None:
+    layer, cached_model = _nf4_cached_model(keep_ram_copy)
+    packed_bytes = cached_model._state_dict_bytes["linear.weight"]
+    group_bytes = cached_model.total_bytes()
+
+    assert cached_model.partial_load_to_vram(packed_bytes - 1) == 0
+    assert all(tensor.device.type == "cpu" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == 0
+
+    assert cached_model.partial_load_to_vram(packed_bytes) == 0
+    assert all(tensor.device.type == "cpu" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == 0
+
+    assert cached_model.partial_load_to_vram(group_bytes) == group_bytes
+    assert all(tensor.device.type == "meta" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == group_bytes
+
+
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+@pytest.mark.parametrize("host_budget", ["below-packed", "packed-only"])
+def test_nf4_partial_unload_refuses_packed_weight_without_sidecars(keep_ram_copy: bool, host_budget: str) -> None:
+    layer, cached_model = _nf4_cached_model(keep_ram_copy)
+    packed_bytes = cached_model._state_dict_bytes["linear.weight"]
+    group_bytes = cached_model.total_bytes()
+    cached_model.partial_load_to_vram(group_bytes)
+
+    with pytest.raises(HostMemoryAdmissionError):
+        cached_model.partial_unload_from_vram(
+            group_bytes, host_bytes_available=packed_bytes - (1 if host_budget == "below-packed" else 0)
+        )
+
+    assert all(tensor.device.type == "meta" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == group_bytes
+
+
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+def test_nf4_partial_unload_admits_exact_group(keep_ram_copy: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    layer, cached_model = _nf4_cached_model(keep_ram_copy)
+    cpu_state_dict = {key: tensor.clone() for key, tensor in layer.state_dict().items()}
+    group_bytes = cached_model.total_bytes()
+    assert cached_model.partial_load_to_vram(group_bytes) == group_bytes
+
+    def restore_cpu_state_dict(*_args) -> None:
+        layer.load_state_dict(dict(cpu_state_dict))
+
+    # Meta tensors cannot materialize back to CPU; keep this CPU-CI test focused on unload selection and accounting.
+    monkeypatch.setattr(cached_model, "_load_state_dict_with_device_conversion", restore_cpu_state_dict)
+    assert cached_model.partial_unload_from_vram(group_bytes, host_bytes_available=group_bytes) == group_bytes
+    assert all(tensor.device.type == "cpu" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == 0
+
+
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+def test_nf4_regenerated_cpu_sidecar_does_not_recharge_resident_weight(
+    keep_ram_copy: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layer, cached_model = _nf4_cached_model(keep_ram_copy, regenerate_quant_state_on_cpu=True)
+    cpu_state_dict = {key: tensor.clone() for key, tensor in layer.state_dict().items()}
+    group_bytes = cached_model.total_bytes()
+    assert cached_model.cur_vram_bytes() == 0
+    assert cached_model.partial_load_to_vram(group_bytes) == group_bytes
+    resident_bytes = cached_model.cur_vram_bytes()
+
+    # bitsandbytes builds this serialization tensor anew on CPU for each state_dict() call.
+    for _ in range(2):
+        state_dict = layer.state_dict()
+        assert state_dict["weight"].device.type == "meta"
+        assert state_dict["weight.quant_state.bitsandbytes__nf4"].device.type == "cpu"
+        layer.absmax = torch.ones(4, dtype=torch.uint8)
+        assert not cached_model._group_is_on_device(
+            cached_model.model.state_dict(), "linear.weight", torch.device("meta")
+        )
+        layer.absmax = torch.ones(4, dtype=torch.uint8, device="meta")
+        assert cached_model.partial_load_to_vram(group_bytes) == 0
+        assert cached_model.repair_required_tensors_on_compute_device() == 0
+        assert cached_model.cur_vram_bytes() == resident_bytes
+
+    if not keep_ram_copy:
+        # Meta tensors cannot materialize back to CPU; exercise public unload selection and accounting only.
+        monkeypatch.setattr(
+            cached_model,
+            "_load_state_dict_with_device_conversion",
+            lambda *_args: layer.load_state_dict(dict(cpu_state_dict)),
+        )
+    assert cached_model.partial_unload_from_vram(group_bytes) == resident_bytes
+    assert all(tensor.device.type == "cpu" for tensor in layer.state_dict().values())
+    assert cached_model.cur_vram_bytes() == 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA and bitsandbytes NF4 kernels")
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+def test_nf4_quant_state_sidecars_move_with_weight(keep_ram_copy: bool):
+    """A no-shadow partial transfer must keep the NF4 weight and all quantization metadata together."""
+    from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
+
+    torch.manual_seed(0)
+    source = torch.nn.Linear(64, 4)
+    layer = InvokeLinearNF4(64, 4)
+    layer.load_state_dict(source.state_dict())
+    layer.to("cuda")
+    input = torch.randn(2, 64, device="cuda")
+    expected = layer(input)
+
+    # Start from a pre-quantized CPU layer, as the model loader does.
+    cpu_state_dict = {key: value.to("cpu") for key, value in layer.state_dict().items()}
+    layer.load_state_dict(cpu_state_dict)
+    model = torch.nn.Module()
+    model.linear = layer
+
+    cached_model = CachedModelWithPartialLoad(model, torch.device("cuda"), keep_ram_copy=keep_ram_copy)
+    assert cached_model.cur_vram_bytes() == 0
+    assert cached_model.partial_load_to_vram(cached_model.total_bytes()) == cached_model.total_bytes()
+
+    assert model.linear.weight.device.type == "cuda"
+    assert model.linear.weight.quant_state is not None
+    assert model.linear.weight.quant_state.absmax.device.type == "cuda"
+    assert model.linear.weight.quant_state.code.device.type == "cuda"
+    assert torch.allclose(model.linear(input), expected, atol=1e-5)
+
+    resident_bytes = cached_model.cur_vram_bytes()
+    for _ in range(2):
+        state_dict = model.linear.state_dict()
+        assert state_dict["weight"].device.type == "cuda"
+        assert state_dict["weight.quant_state.bitsandbytes__nf4"].device.type == "cpu"
+        assert cached_model.partial_load_to_vram(cached_model.total_bytes()) == 0
+        assert cached_model.repair_required_tensors_on_compute_device() == 0
+        assert cached_model.cur_vram_bytes() == resident_bytes
+        assert torch.allclose(model.linear(input), expected, atol=1e-5)
+
+    assert (
+        cached_model.partial_unload_from_vram(
+            cached_model.total_bytes(), host_bytes_available=cached_model.total_bytes()
+        )
+        == resident_bytes
+    )
+    assert model.linear.weight.device.type == "cpu"
+    assert model.linear.weight.quant_state.absmax.device.type == "cpu"
+    assert model.linear.weight.quant_state.code.device.type == "cpu"
+    assert cached_model.cur_vram_bytes() == 0
+
+    cached_model.full_load_to_vram()
+    assert model.linear.weight.quant_state.absmax.device.type == "cuda"
+    assert model.linear.weight.quant_state.code.device.type == "cuda"
+    assert torch.allclose(model.linear(input), expected, atol=1e-5)
+
+
+def test_sidecars_group_under_both_paths_of_shared_child():
+    shared = torch.nn.Linear(2, 2, bias=False)
+    model = torch.nn.Module()
+    model.a = shared
+    model.b = shared
+    cached_model = CachedModelWithPartialLoad(model, torch.device("cpu"), keep_ram_copy=False)
+
+    state_dict = {
+        "a.weight": shared.weight,
+        "a.weight.absmax": torch.ones(1),
+        "b.weight": shared.weight,
+        "b.weight.absmax": torch.ones(1),
+    }
+
+    grouped = cached_model._group_state_dict_keys_by_module_prefix(state_dict)
+
+    assert grouped["a"] == ["a.weight", "a.weight.absmax"]
+    assert grouped["b"] == ["b.weight", "b.weight.absmax"]
 
 
 @pytest.fixture
@@ -95,6 +321,24 @@ def test_a_tied_group_with_a_required_member_is_kept_on_the_device():
     assert freed_bytes == 0
     assert model.required.is_meta
     assert model.linear.weight.is_meta
+
+
+def test_partial_unload_checks_selected_host_bytes_before_transfer():
+    """Host admission prices the selected tensors, not the full resident partial model."""
+    with torch.device("meta"):
+        model = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 2))
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device("meta"), keep_ram_copy=False)
+    cached_model.full_load_to_vram()
+    selected_bytes = calc_tensor_size(model[0].weight) + calc_tensor_size(model[0].bias)
+    moved = patch.object(cached_model, "_load_state_dict_with_device_conversion", MagicMock())
+    with moved as transfer:
+        with pytest.raises(HostMemoryAdmissionError):
+            cached_model.partial_unload_from_vram(selected_bytes, host_bytes_available=selected_bytes - 1)
+        transfer.assert_not_called()
+        assert (
+            cached_model.partial_unload_from_vram(selected_bytes, host_bytes_available=selected_bytes) == selected_bytes
+        )
+        transfer.assert_called_once()
 
 
 @parameterize_mps_and_cuda

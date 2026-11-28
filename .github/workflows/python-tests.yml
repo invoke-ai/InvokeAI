@@ -72,6 +72,8 @@ jobs:
             os: blacksmith-8vcpu-windows-2025
             github-env: $env:GITHUB_ENV
             pytest-workers: logical
+            # Keep failed temp fixtures for diagnosis without accumulating every passing fixture on disk.
+            pytest-args: '-o tmp_path_retention_policy=failed'
             # This runner is Windows Server 2025 Core, which lacks the Video for Windows DLLs
             # (AVICAP32, MSVFW32) every standard Windows ffmpeg build links against, so ffmpeg
             # cannot start here. The `ffmpeg` tests run in windows-ffmpeg instead.
@@ -106,10 +108,10 @@ jobs:
             pytest-workers: '2'
             # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
             # inside the job timeout.
-            pytest-args: '--timeout=600'
-            # The latest main-synced run reached 98% before hitting the 60-minute job limit.
-            # Keep the per-test timeout and allow the suite 15 more minutes to report its result.
-            timeout-minutes: 75
+            pytest-args: '--timeout=600 -o tmp_path_retention_policy=failed'
+            # The latest PR run reached only 73% before the 75-minute job limit. Keep two workers
+            # for ffmpeg headroom and allow 120 minutes for the full suite to report its result.
+            timeout-minutes: 120
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.

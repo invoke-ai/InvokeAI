@@ -1,5 +1,5 @@
 import weakref
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
@@ -18,6 +18,9 @@ class CacheRecord:
     key: str
     # Model in memory.
     cached_model: CachedModelWithPartialLoad | CachedModelOnlyFullLoad
+    # Handles keep an evicted model alive; retain its RAM/shared-weight accounting until they die.
+    live_handles: weakref.WeakSet = field(default_factory=weakref.WeakSet, repr=False)
+    detached: bool = False
     _locks: int = 0
     # Set by ModelCache.drop_model() when the entry was locked at invalidation time.
     # ModelCache.unlock() evicts the entry as soon as the last lock releases so a setting

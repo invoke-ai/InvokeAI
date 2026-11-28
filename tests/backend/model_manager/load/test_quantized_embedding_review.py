@@ -33,4 +33,7 @@ def test_counts_nonaliased_model_parameters_but_not_meta_storage():
 
     assert materialize_quantized_embedding(embedding, model=model, state_dict=checkpoint, ram_cache=cache)
 
-    cache.make_room.assert_called_once_with(packed + (31 + 11 + 7) * 4 + 7 * output)
+    cache.make_room.assert_called_once_with(
+        packed + (31 + 11 + 7) * 4 + 7 * output,
+        host_bytes_needed=7 * output,
+    )

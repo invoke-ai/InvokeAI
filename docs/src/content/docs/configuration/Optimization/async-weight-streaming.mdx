@@ -1,7 +1,7 @@
 ---
 title: Async Weight Streaming
 description: Copy the layers of a partially loaded model from RAM to the GPU while the previous layers compute, with identical images.
-lastUpdated: 2026-11-14
+lastUpdated: 2026-11-23
 sidebar:
   order: 8
 ---
@@ -49,8 +49,10 @@ without it in these runs.
 - **An NVIDIA GPU, or an AMD GPU with ROCm.** On Apple silicon and the CPU, models load whole, so there is nothing to
   stream. Intel GPUs keep the blocking copy, and the log says so once: `async_weight_streaming is enabled, but not used
   on <device>: it needs an NVIDIA or AMD (ROCm) GPU.`
-- **`keep_ram_copy_of_weights: true`**, the default. Without the RAM copy, the layers in RAM are new allocations after
-  every unload and are not page-locked, so they keep the blocking copy. The log says so once.
+- **`keep_ram_copy_of_weights: true`**, the automatic default on separate-memory GPUs. Integrated CUDA, including RTX
+  Spark, defaults to `false`; set it explicitly to `true` to use async streaming there. Without the RAM copy, the
+  layers in RAM are new allocations after every unload and are not page-locked, so they keep the blocking copy. The log
+  says so once.
 - **`enable_partial_loading: true`**, the default.
 - **Room in the RAM cache for the models of one generation.** The first time a model's layers are locked costs time
   (see [Memory](#memory)); they then stay locked while the model is in the RAM cache. When the RAM cache cannot hold,

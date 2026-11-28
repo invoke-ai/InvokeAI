@@ -21,6 +21,8 @@ StateDict: TypeAlias = dict[str | int, Any]  # When are the keys int?
 
 logger = InvokeAILogger.get_logger()
 
+_SAFETENSORS_MAX_HEADER_LENGTH = 100_000_000
+
 
 SAFETENSORS_DTYPES: dict[str, torch.dtype] = {
     "BOOL": torch.bool,
@@ -67,7 +69,10 @@ def read_safetensors_header(path: Path) -> dict[str, Any]:
         header_length = int.from_bytes(f.read(8), "little")
         # Any 8 bytes decode to a length; for a file that is not safetensors that length is garbage, and reading it
         # would try to allocate it.
-        if header_length > os.fstat(f.fileno()).st_size - 8:
+        if header_length > _SAFETENSORS_MAX_HEADER_LENGTH:
+            raise ValueError(f"{not_safetensors}: its header length exceeds the 100000000-byte limit")
+        file_size = os.fstat(f.fileno()).st_size
+        if header_length > file_size - 8:
             raise ValueError(f"{not_safetensors}: its header length exceeds the file size")
         try:
             header = json.loads(f.read(header_length))
@@ -86,6 +91,15 @@ def read_safetensors_header(path: Path) -> dict[str, Any]:
             and len(entry["data_offsets"]) == 2
         ):
             raise ValueError(f"{not_safetensors}: its header entry '{key}' is not a tensor's dtype, shape and offsets")
+        start, end = entry["data_offsets"]
+        payload_size = file_size - 8 - header_length
+        if (
+            any(not isinstance(offset, int) or isinstance(offset, bool) for offset in (start, end))
+            or start < 0
+            or end < start
+            or end > payload_size
+        ):
+            raise ValueError(f"{not_safetensors}: its tensor entry '{key}' has invalid data offsets")
     return header
 
 
