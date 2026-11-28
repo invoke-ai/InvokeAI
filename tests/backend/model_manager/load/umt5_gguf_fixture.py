@@ -90,6 +90,7 @@ def write_tiny_umt5_gguf(
     *,
     matrix_type: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.Q8_0,
     with_tokenizer: bool = True,
+    omit_tensor: str | None = None,
     seed: int = 0,
 ) -> UMT5EncoderModel:
     """Write the GGUF, matrices stored as ``matrix_type``, and return the dense float32 model it encodes.
@@ -123,6 +124,8 @@ def write_tiny_umt5_gguf(
     state_dict = reference.state_dict()
     with torch.no_grad():
         for hf_name, gguf_name in _llamacpp_names(NUM_LAYERS).items():
+            if gguf_name == omit_tensor:
+                continue
             tensor = state_dict[hf_name]
             data = tensor.numpy().astype(np.float32)
             if data.ndim == 2 and "relative_attention_bias" not in hf_name:
