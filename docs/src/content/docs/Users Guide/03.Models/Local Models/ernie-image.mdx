@@ -1,7 +1,7 @@
 ---
 title: ERNIE-Image
 description: Generate images with Baidu's ERNIE-Image and ERNIE-Image Turbo, from the Diffusers pipelines, the single-file transformers or GGUF.
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-27
 sidebar:
   order: 3
 ---
@@ -28,9 +28,18 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 See the [System Requirements](/start-here/system-requirements/) table. For scale: the single-file
 transformer alone is about 16 GB (5.0 GB as GGUF Q4_K_M, 8.7 GB as Q8_0) and the standalone Ministral 3B
-encoder about 7.7 GB. On smaller
-cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models that
-don't fit entirely in VRAM.
+encoder about 7.7 GB. The three steps of a generation need VRAM one after another, not all at once:
+
+- **Prompt encoding** needs the encoder.
+- **Denoising** needs the transformer. The encoder does not have to fit beside it: the model cache moves
+  it out of VRAM when the transformer needs the room.
+- **Decoding** needs the FLUX.2 VAE (a few hundred MB) and, far more, working memory for the decode:
+  about 4.3 GB at 1024×1024 and 9.6 GB at 1536×1536 on Nvidia, more on AMD (about 6.6 GB at
+  1024×1024). InvokeAI reserves it before the decode and moves the transformer out of VRAM if the two
+  don't fit together.
+
+On smaller cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models
+that don't fit entirely in VRAM.
 
 ## Installing
 
@@ -63,7 +72,8 @@ single files do not.
 GGUF transformers load like the safetensors single file: the weights stay packed in memory and are
 unpacked layer by layer during generation, on every device. Measured on an RTX 4090 at 1024px with
 ERNIE-Image Turbo (8 steps): the Q4_K_M transformer holds 4.8 GB instead of 15.3 GB, the GPU peak drops
-from 23.6 GB to 17.8 GB, and an image takes 11.0 s against 11.6 s for the Diffusers pipeline.
+from 21.0 GB to 17.1 GB, and an image takes about 10 s with either. Both peaks include models the cache
+keeps in VRAM only because they fit, so neither is the least an ERNIE-Image generation needs.
 Other GGUF conversions with the same layout
 (for example vantagewithai's) install as well. Quantized safetensors single files (fp8, int8) are not
 supported. A GGUF build of the Ministral 3B encoder is refused at install with a message naming the file to use
