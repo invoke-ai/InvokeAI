@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import insert
+from sqlalchemy import insert, update
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.session_queue import MAX_QUEUE_ITEM_IDS_PER_REQUEST
@@ -27,6 +27,7 @@ from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 SUMMARIES_ROUTE = "/api/v1/queue/default/item_summaries_by_ids"
 FULL_ITEMS_ROUTE = "/api/v1/queue/default/items_by_ids"
 ITEM_IDS_ROUTE = "/api/v1/queue/default/item_ids"
+ACTIVE_IDS_ROUTE = "/api/v1/queue/default/active_ids"
 
 # SQLite's bind-parameter limit on builds >= 3.32. One id over it is what turns the unbounded
 # version of this route into a 500.
@@ -140,3 +141,145 @@ def test_item_ids_rejects_a_limit_outside_the_hydration_bound(mock_queue_invoker
 
     assert response.status_code == 422
     mock_queue_invoker.services.session_queue.get_queue_item_ids.assert_not_called()
+
+
+def test_active_item_ids_respect_origin_scope_and_ignore_the_recent_window(listed_queue: list[int]) -> None:
+    database = ApiDependencies.invoker.services.database
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id.in_([listed_queue[0], listed_queue[1], listed_queue[2]]))
+            .values(status="in_progress")
+        )
+
+    with database.begin(write=True) as conn:
+        session = GraphExecutionState(graph=Graph()).model_dump_json()
+        conn.execute(
+            insert(session_queue_table),
+            [
+                {
+                    "queue_id": "default",
+                    "session": session,
+                    "session_id": str(uuid.uuid4()),
+                    "batch_id": "newer-batch",
+                    "created_at": "2026-10-02 10:00:00.000",
+                    "origin": "webv2:p:a:q:newer",
+                    "status": "pending",
+                }
+                for _ in range(50)
+            ],
+        )
+    client = TestClient(app)
+    recent = client.get(ITEM_IDS_ROUTE, params={"origin_prefix": "webv2:p:a:q:", "limit": 50})
+    assert recent.status_code == 200
+    assert not set(listed_queue).intersection(recent.json()["item_ids"])
+    response = client.get(ACTIVE_IDS_ROUTE, params={"origin_prefix": "webv2:p:a:q:"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "item_ids": [listed_queue[2], listed_queue[0]],
+        "total_count": 2,
+        "executing_root_item_ids": [listed_queue[0], listed_queue[2]],
+    }
+
+
+def test_active_item_ids_include_waiting_parent_workflows(listed_queue: list[int]) -> None:
+    database = ApiDependencies.invoker.services.database
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id == listed_queue[0])
+            .values(status="in_progress")
+        )
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id.in_([listed_queue[1], listed_queue[2]]))
+            .values(status="waiting")
+        )
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id == listed_queue[4])
+            .values(status="completed")
+        )
+
+    client = TestClient(app)
+    response = client.get(ACTIVE_IDS_ROUTE, params={"origin_prefix": "webv2:p:a:q:"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "item_ids": [listed_queue[0], listed_queue[2]],
+        "total_count": 2,
+        "executing_root_item_ids": [listed_queue[0]],
+    }
+
+    response = client.get(ACTIVE_IDS_ROUTE)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "item_ids": [listed_queue[0], listed_queue[2], listed_queue[1]],
+        "total_count": 3,
+        "executing_root_item_ids": None,
+    }
+
+
+def test_active_item_ids_bound_waiting_parents_but_never_drop_executing_items(listed_queue: list[int]) -> None:
+    database = ApiDependencies.invoker.services.database
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id == listed_queue[0])
+            .values(status="in_progress")
+        )
+        session = GraphExecutionState(graph=Graph()).model_dump_json()
+        conn.execute(
+            insert(session_queue_table),
+            [
+                {
+                    "queue_id": "default",
+                    "session": session,
+                    "session_id": str(uuid.uuid4()),
+                    "batch_id": "waiting-batch",
+                    "created_at": "2026-10-02 10:00:00.000",
+                    "origin": "webv2:p:a:q:waiting",
+                    "status": "waiting",
+                }
+                for _ in range(100)
+            ],
+        )
+    response = TestClient(app).get(ACTIVE_IDS_ROUTE, params={"origin_prefix": "webv2:p:a:q:"})
+    assert response.status_code == 200
+    ids = response.json()["item_ids"]
+    assert response.json()["total_count"] == len(ids) == 51
+    assert ids[0] == listed_queue[0]
+    assert ids[1:] == sorted(ids[1:], reverse=True)
+    assert all(item_id > listed_queue[-1] for item_id in ids[1:])
+
+
+def test_active_item_ids_distinguish_executing_roots_from_waiting_parents(listed_queue: list[int]) -> None:
+    database = ApiDependencies.invoker.services.database
+    first, _, second, child, other_child = listed_queue
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id.in_([first, second]))
+            .values(status="waiting")
+        )
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id.in_([child, other_child]))
+            .values(status="in_progress", origin="webv2:p:a:q:1", root_item_id=first, parent_item_id=first)
+        )
+    client = TestClient(app)
+    params = {"origin_prefix": "webv2:p:a:q:"}
+    response = client.get(ACTIVE_IDS_ROUTE, params=params)
+    assert response.status_code == 200
+    assert response.json()["executing_root_item_ids"] == [first]
+
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(session_queue_table)
+            .where(session_queue_table.c.item_id == other_child)
+            .values(root_item_id=second, parent_item_id=second, origin="webv2:p:a:q:3")
+        )
+    response = client.get(ACTIVE_IDS_ROUTE, params=params)
+    assert response.status_code == 200
+    assert response.json()["executing_root_item_ids"] == [first, second]

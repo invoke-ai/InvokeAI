@@ -94,6 +94,7 @@ const openCanvasRuntime = (claimItemDelivery: QueueBackendPort['claimItemDeliver
     readCurrent: vi.fn(),
     readItemDetail: vi.fn(),
     readItemIds: vi.fn(),
+    readActiveItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
     readItemsById: vi.fn((ids) => Promise.resolve(ids.includes(rerun.id) ? [rerun] : [])),
     readNext: vi.fn(),
     readStatus: vi.fn(),

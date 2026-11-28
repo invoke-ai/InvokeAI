@@ -13,6 +13,12 @@ export type ProgressImageSnapshot = QueueProgressImage;
 
 export type ProgressImageTarget = QueueItemProgressTarget;
 
+/** Percentage accompanying a Canvas/Preview progress slot, regardless of workflow-call child item IDs. */
+interface SlotProgressSnapshot {
+  message: string;
+  percentage: number | null;
+}
+
 export type LatestProgressImageSnapshot = ProgressImageSnapshot & { target?: ProgressImageTarget };
 
 /** Held frames are latent-grid JPEG data URLs, a few KB each. */
@@ -34,6 +40,7 @@ interface SwapFrame {
 }
 
 const snapshotsByTarget = createKeyedTransientStore<string, ProgressImageSnapshot>();
+const progressByTarget = createKeyedTransientStore<string, SlotProgressSnapshot>();
 /** Insertion order is recency: `set` re-inserts, so the last entry is the most recently updated slot. */
 const targetsByKey = new Map<string, ProgressImageTarget>();
 const swapFrames = createKeyedTransientStore<string, SwapFrame>();
@@ -87,6 +94,7 @@ export const progressImageStore = {
     if (!target) {
       latestSnapshotStore.patchSnapshot({ latestSnapshot: null });
       snapshotsByTarget.clear();
+      progressByTarget.clear();
       targetsByKey.clear();
 
       for (const timer of swapExpiryTimers.values()) {
@@ -103,6 +111,7 @@ export const progressImageStore = {
     const didClearLatest = isLatestTarget(target);
 
     snapshotsByTarget.delete(targetKey);
+    progressByTarget.delete(targetKey);
     targetsByKey.delete(targetKey);
 
     if (didClearLatest) {
@@ -130,6 +139,18 @@ export const progressImageStore = {
 
     if (image) {
       holdSwap(target.queueItemId, image);
+    }
+  },
+  getProgress(target: ProgressImageTarget): SlotProgressSnapshot | null {
+    return progressByTarget.get(getTargetKey(target)) ?? null;
+  },
+  /** The percentage and preview share the exact (local run, iteration) slot identity. */
+  setProgress(progress: SlotProgressSnapshot | null, target: ProgressImageTarget): void {
+    const key = getTargetKey(target);
+    if (progress === null) {
+      progressByTarget.delete(key);
+    } else {
+      progressByTarget.set(key, progress);
     }
   },
   set(image: ProgressImageSnapshot, target?: ProgressImageTarget): void {
@@ -183,6 +204,10 @@ export const useProgressImage = (): LatestProgressImageSnapshot | null =>
 
 export const useQueueItemProgressImage = (queueItemId: string, itemIndex: number): ProgressImageSnapshot | null =>
   snapshotsByTarget.useValue(getTargetKey({ itemIndex, queueItemId })) ?? null;
+
+/** Canvas reads the same slot identity for its frame and progress percentage, even for called workflows. */
+export const useQueueItemSlotProgress = (queueItemId: string, itemIndex: number): SlotProgressSnapshot | null =>
+  progressByTarget.useValue(getTargetKey({ itemIndex, queueItemId })) ?? null;
 
 /**
  * The frame to show in place of this just-finished image until it has decoded; null once consumed or expired, for

@@ -13,6 +13,26 @@ export interface DocumentTitleLabels {
   queued: string;
 }
 
+/**
+ * Once concurrent execution is observed, represent batch progress by settled backend slots
+ * rather than unrelated percentages reported by individual GPUs.
+ */
+export const getBatchDocumentTitlePercent = ({
+  batchCount,
+  completedCount,
+}: {
+  batchCount: number;
+  completedCount: number;
+}): number | null => {
+  if (completedCount <= 0) {
+    return null;
+  }
+  const settledCount = Math.min(batchCount, completedCount);
+  const roundedPercent = Math.round((settledCount / batchCount) * 100);
+  // Rounding 199/200 yields 100%, but the last image is still running.
+  return settledCount === batchCount ? 100 : Math.min(99, roundedPercent);
+};
+
 export const formatDocumentTitle = ({
   baseTitle = DOCUMENT_TITLE_BASE,
   current,

@@ -4,6 +4,7 @@ from typing import Any, Coroutine, Optional
 
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
+    ActiveItemIdsResult,
     Batch,
     BatchStatus,
     CancelAllExceptCurrentResult,
@@ -308,6 +309,23 @@ class SessionQueueBase(ABC):
         If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_active_queue_item_ids(
+        self,
+        queue_id: str,
+        owner_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
+    ) -> ActiveItemIdsResult:
+        """Gets all executing ids, then waiting parent ids, descending within each group through the status index.
+
+        If owner_id or origin_prefix is provided, restricts the read to that scope. Without an origin prefix,
+        returns at most 50 newest waiting parents and no executing root metadata (None). With an origin prefix,
+        retains all matching waiting roots of executing children, even beyond 50, then fills any remaining
+        capacity with the newest ordinary waiting parents. Distinct executing root ids are returned in
+        ascending order (an empty list when none are executing).
+        Pending and terminal items are excluded. total_count counts the ids returned."""
         pass
 
     @abstractmethod

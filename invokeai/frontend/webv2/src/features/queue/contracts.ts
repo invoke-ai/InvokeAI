@@ -34,6 +34,7 @@ export {
   getQueueItemSnapshotPositivePrompt,
 } from './core/historySnapshot';
 export {
+  getFinishedImageCount,
   getProjectQueueIndicatorState,
   getQueueItemExpectedImageCount,
   getQueueProgressBarState,

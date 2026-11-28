@@ -35,8 +35,8 @@ import { useGalleryImageRecovery, useHostGalleryBoards } from '@features/gallery
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
-  useQueueItemProgress,
   useQueueItemProgressImage,
+  useQueueItemSlotProgress,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -1089,10 +1089,11 @@ const LivePreview = ({
   );
 };
 
-/** What a frameless session is doing, from its run's progress message; model loads are not named. */
+/** What a frameless session is doing, from its own slot's progress message; model loads are not named. */
 const PreviewStartingCue = ({ density, session }: { density: PreviewDensity; session: QueueActiveSession }) => {
   const { t } = useTranslation();
-  const label = useQueueItemProgress(session.queueItemId)?.message.trim() || t('widgets.preview.starting');
+  const label =
+    useQueueItemSlotProgress(session.queueItemId, session.itemIndex)?.message.trim() || t('widgets.preview.starting');
 
   return (
     <Box

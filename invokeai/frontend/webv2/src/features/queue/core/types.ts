@@ -246,6 +246,8 @@ export interface QueueStatusReadModel {
 
 export interface QueueItemIdsReadModel {
   itemIds: number[];
+  /** Atomic snapshot of distinct executing roots; null for unscoped active-id reads. */
+  executingRootItemIds?: number[] | null;
 }
 
 export interface QueueItemProgress {
@@ -352,6 +354,12 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     signal?: AbortSignal,
     limit?: number
   ): Promise<QueueItemIdsReadModel>;
+  /**
+   * All executing items and up to 50 waiting parents in scope, independently of recent history.
+   * Origin-scoped reads retain all waiting roots of executing children, even beyond 50.
+   * Executing root metadata is returned only for origin-scoped reads.
+   */
+  readActiveItemIds(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;
   readItemsById(itemIds: number[], signal?: AbortSignal): Promise<QueueItemReadModel[]>;
   readNext(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readStatus(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueStatusReadModel>;

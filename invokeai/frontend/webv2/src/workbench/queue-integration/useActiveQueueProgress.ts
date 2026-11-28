@@ -1,6 +1,11 @@
 import { useModelLoads } from '@features/models';
 import { getQueueActivity, getQueueSummary } from '@features/queue/contracts';
-import { useIsProcessorPaused, useQueueItemProgress, useQueueOpenWorkElsewhere } from '@features/queue/react';
+import {
+  useHasObservedConcurrentProgress,
+  useIsProcessorPaused,
+  useQueueItemProgress,
+  useQueueOpenWorkElsewhere,
+} from '@features/queue/react';
 import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 
 /** Pair active-project queue summaries with live item progress for consistent chrome surfaces. */
@@ -8,8 +13,14 @@ export const useActiveQueueProgress = () => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const baseSummary = getQueueSummary(queueItems);
   const progress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
+  const isConcurrentProgress = useHasObservedConcurrentProgress(baseSummary.runningQueueItemId ?? '');
 
-  return { progress, queueItems, summary: getQueueSummary(queueItems, progress) };
+  return {
+    isConcurrentProgress,
+    progress,
+    queueItems,
+    summary: getQueueSummary(queueItems, progress, isConcurrentProgress),
+  };
 };
 
 /**

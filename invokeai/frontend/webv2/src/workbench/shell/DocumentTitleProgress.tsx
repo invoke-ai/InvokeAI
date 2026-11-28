@@ -1,17 +1,30 @@
-import { getDeterminateProgressPercent } from '@features/queue/contracts';
+import {
+  getDeterminateProgressPercent,
+  getFinishedImageCount,
+  getQueueItemExpectedImageCount,
+} from '@features/queue/contracts';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { DOCUMENT_TITLE_BASE, formatDocumentTitle } from './documentTitle';
+import { DOCUMENT_TITLE_BASE, formatDocumentTitle, getBatchDocumentTitlePercent } from './documentTitle';
 
 /** Write rounded progress to document.title to avoid updating on every progress frame. */
 export const DocumentTitleProgress = () => {
   const { t } = useTranslation();
-  const { progress, summary } = useActiveQueueProgress();
-  const { current, total } = summary;
-  const percent = getDeterminateProgressPercent(progress?.percentage);
+  const { isConcurrentProgress, progress, queueItems, summary } = useActiveQueueProgress();
+  let { current, total } = summary;
+  let percent = getDeterminateProgressPercent(progress?.percentage);
+  const runningItem = queueItems.find((item) => item.id === summary.runningQueueItemId);
+  if (isConcurrentProgress && runningItem) {
+    // Concurrent progress describes the active batch, not whichever GPU last reported or the entire queue.
+    const batchCount = getQueueItemExpectedImageCount(runningItem);
+    const settledCount = getFinishedImageCount(runningItem, progress);
+    percent = getBatchDocumentTitlePercent({ batchCount, completedCount: settledCount });
+    current = Math.min(batchCount, settledCount + 1);
+    total = batchCount;
+  }
 
   const title = useMemo(
     () =>

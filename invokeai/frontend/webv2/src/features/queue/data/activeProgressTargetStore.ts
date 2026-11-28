@@ -10,19 +10,26 @@ import { createExternalStore } from '@platform/state/externalStore';
  */
 export interface ActiveProgressTargetSink {
   clear(target?: QueueItemProgressTarget): void;
+  /** Forget concurrency when the tracked run ends or detaches. */
+  forgetRun(queueItemId: string): void;
+  hasObservedConcurrency(queueItemId: string): boolean;
   /** The slot's first frame of its own arrived; it stays framed until cleared. */
   markFramed(target: QueueItemProgressTarget): void;
+  /** Latch only after the coordinator establishes overlap in actual execution. */
+  observeConcurrency(queueItemId: string): void;
   set(target: QueueItemProgressTarget): void;
   settle(target: QueueItemProgressTarget): void;
 }
 
 interface ActiveProgressTargetsSnapshot {
+  concurrentRunIds: ReadonlySet<string>;
   framedTargets: QueueItemProgressTarget[];
   settlingTargets: QueueItemProgressTarget[];
   targets: QueueItemProgressTarget[];
 }
 
 const store = createExternalStore<ActiveProgressTargetsSnapshot>({
+  concurrentRunIds: new Set(),
   framedTargets: [],
   settlingTargets: [],
   targets: [],
@@ -39,11 +46,11 @@ const without = (targets: QueueItemProgressTarget[], target: QueueItemProgressTa
 
 export const activeProgressTargetStore: ActiveProgressTargetSink = {
   clear(target) {
-    const { framedTargets, settlingTargets, targets } = store.getSnapshot();
+    const { concurrentRunIds, framedTargets, settlingTargets, targets } = store.getSnapshot();
 
     if (!target) {
-      if (targets.length > 0 || settlingTargets.length > 0 || framedTargets.length > 0) {
-        store.patchSnapshot({ framedTargets: [], settlingTargets: [], targets: [] });
+      if (targets.length > 0 || settlingTargets.length > 0 || framedTargets.length > 0 || concurrentRunIds.size > 0) {
+        store.patchSnapshot({ concurrentRunIds: new Set(), framedTargets: [], settlingTargets: [], targets: [] });
       }
 
       return;
@@ -59,12 +66,29 @@ export const activeProgressTargetStore: ActiveProgressTargetSink = {
       ...(remainingFramed.length !== framedTargets.length ? { framedTargets: remainingFramed } : {}),
     });
   },
+  forgetRun(queueItemId) {
+    const { concurrentRunIds } = store.getSnapshot();
+    if (concurrentRunIds.has(queueItemId)) {
+      const next = new Set(concurrentRunIds);
+      next.delete(queueItemId);
+      store.patchSnapshot({ concurrentRunIds: next });
+    }
+  },
+  hasObservedConcurrency(queueItemId) {
+    return store.getSnapshot().concurrentRunIds.has(queueItemId);
+  },
   markFramed(target) {
     activeProgressTargetStore.set(target);
     const { framedTargets } = store.getSnapshot();
 
     if (!includes(framedTargets, target)) {
       store.patchSnapshot({ framedTargets: [...framedTargets, target] });
+    }
+  },
+  observeConcurrency(queueItemId) {
+    const { concurrentRunIds } = store.getSnapshot();
+    if (!concurrentRunIds.has(queueItemId)) {
+      store.patchSnapshot({ concurrentRunIds: new Set([...concurrentRunIds, queueItemId]) });
     }
   },
   set(target) {
@@ -129,6 +153,10 @@ export const useFollowedProgressTargets = (): QueueItemProgressTarget[] => store
 /** Every running or settling slot that has shown a frame of its own. */
 export const useFramedProgressTargets = (): QueueItemProgressTarget[] =>
   store.useSelector((snapshot) => snapshot.framedTargets);
+
+/** Whether this tracked run has had multiple running slots at once. */
+export const useHasObservedConcurrentProgress = (queueItemId: string): boolean =>
+  store.useSelector((snapshot) => snapshot.concurrentRunIds.has(queueItemId));
 
 export const getActiveProgressTargets = (): QueueItemProgressTarget[] => store.getSnapshot().targets;
 

@@ -10,8 +10,8 @@ import { useCurrentBatchItems } from './queueDataStore';
 import { QueueItemRow } from './QueueItemRow';
 
 /**
- * CURRENT BATCH — the running item plus every pending item in the same backend batch. Its items are all unfinished, so
- * it shows under All and Active and steps aside for the finished-status filters.
+ * CURRENT BATCH — all running items across batches, plus pending items in the current (or next) item's batch.
+ * Its items are all unfinished, so it shows under All and Active and steps aside for the finished-status filters.
  */
 export const CurrentBatchSection = ({
   filter,

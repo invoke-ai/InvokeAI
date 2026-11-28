@@ -1,8 +1,5 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
-const isCurrentBatchStatus = (status: QueueItemReadModel['status']): boolean =>
-  status === 'pending' || status === 'in_progress';
-
 export const getCurrentBatchItems = ({
   current,
   items,
@@ -13,15 +10,17 @@ export const getCurrentBatchItems = ({
   next: QueueItemReadModel | null;
 }): QueueItemReadModel[] => {
   const batchId = current?.batchId ?? next?.batchId ?? null;
-
-  if (!batchId) {
-    return [];
-  }
-
   const itemsById = new Map<number, QueueItemReadModel>();
 
   for (const item of [current, next, ...items]) {
-    if (item && item.batchId === batchId && isCurrentBatchStatus(item.status)) {
+    if (!item) {
+      continue;
+    }
+
+    const isRunning = item.status === 'in_progress';
+    const isPendingCurrentBatch = batchId !== null && item.status === 'pending' && item.batchId === batchId;
+
+    if (isRunning || isPendingCurrentBatch) {
       itemsById.set(item.id, item);
     }
   }

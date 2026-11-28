@@ -91,6 +91,7 @@ export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendIte
 
 export const mapQueueItemIdsDTO = (dto: QueueItemIdsResultDTO): QueueItemIdsReadModel => ({
   itemIds: dto.item_ids,
+  ...(dto.executing_root_item_ids === undefined ? {} : { executingRootItemIds: dto.executing_root_item_ids }),
 });
 
 const mapQueueCountsDTO = (dto: QueueStatusCountsDTO): QueueCounts => ({

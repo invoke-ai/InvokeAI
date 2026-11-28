@@ -186,6 +186,7 @@ const mocks = vi.hoisted(() => {
     framedProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     runningProgressTargets: undefined as { queueItemId: string; itemIndex: number }[] | undefined,
     slotProgressImage: undefined as unknown,
+    slotProgress: new Map<string, { message: string; percentage: number | null }>(),
     useActiveProgressTarget: vi.fn(() => null as unknown),
     useProgressImage: vi.fn(() => null as unknown),
   };
@@ -255,6 +256,8 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
   useFollowedProgressTargets: () => mockFollowedProgressTargets(),
   useFramedProgressTargets: () => mocks.framedProgressTargets ?? mockFollowedProgressTargets(),
   useProgressImage: () => mocks.useProgressImage(),
+  useQueueItemSlotProgress: (queueItemId: string, itemIndex: number) =>
+    mocks.slotProgress.get(`${queueItemId}:${itemIndex}`) ?? null,
   useQueueItemProgressImage: (queueItemId: string, itemIndex: number) => {
     if (mocks.slotProgressImage !== undefined) {
       return mocks.slotProgressImage;
@@ -891,6 +894,7 @@ beforeEach(() => {
   mocks.framedProgressTargets = undefined;
   mocks.runningProgressTargets = undefined;
   mocks.slotProgressImage = undefined;
+  mocks.slotProgress.clear();
 });
 
 afterEach(async () => {
@@ -1578,6 +1582,13 @@ describe('preview keyboard navigation boundary', () => {
     expect(stageSources().some((src) => src?.startsWith('data:image/png'))).toBe(false);
     expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('widgets.preview.starting');
     expect(statusLines()).toContain('widgets.preview.startingAnnouncement');
+
+    mocks.slotProgress.set('queue-item-live:1', { message: 'Decoding first image', percentage: 0.95 });
+    mocks.slotProgress.set('queue-item-live:2', { message: 'Preparing second image', percentage: null });
+    await rerender();
+
+    expect(host!.querySelector('[data-preview-starting-cue]')?.textContent).toBe('Preparing second image');
+    expect(stageSources()).toContain(resultOfSlotOne.imageUrl);
   });
 
   it('keeps the same-root preview through child gaps and browser focus changes until the next denoising step', async () => {
@@ -1627,13 +1638,11 @@ describe('preview keyboard navigation boundary', () => {
             mocks.useActiveProgressTarget.mockReturnValue(target);
             mocks.runningProgressTargets = [target];
           },
-          waitForChild: (target: { itemIndex: number; queueItemId: string }) => {
-            activeTarget = target;
-            mocks.useActiveProgressTarget.mockReturnValue(target);
-            mocks.runningProgressTargets = [target];
-          },
+          forgetRun: () => {},
+          hasObservedConcurrency: () => false,
+          observeConcurrency: () => {},
           settle: () => {},
-        } as NonNullable<Parameters<typeof createQueueCoordinator>[1]['activeProgressTarget']>,
+        },
         backend,
         modelLoads: { completed: () => {}, reset: () => {}, started: () => {} },
         nodeExecution: {
@@ -1655,7 +1664,9 @@ describe('preview keyboard navigation boundary', () => {
             }
           },
           clearHeld: () => {},
+          getProgress: () => null,
           hold: () => {},
+          setProgress: () => {},
           set: (image, target) => {
             const frame = target ? { ...image, target } : image;
             mocks.useProgressImage.mockReturnValue(frame);

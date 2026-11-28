@@ -86,7 +86,11 @@ const completedRun = (itemId: number, seed: number): QueueServerItemDTO =>
   });
 
 const setGenerateSeed = (seed: number) => {
-  backendItems[GENERATE_ID - 1] = completedRun(GENERATE_ID, seed);
+  // Replacing the backend result must not discard the submitting project's origin.
+  backendItems[GENERATE_ID - 1] = {
+    ...completedRun(GENERATE_ID, seed),
+    origin: backendItems[GENERATE_ID - 1]?.origin,
+  };
 };
 
 const itemIdReads = () => server.requests.filter((request) => request.startsWith('GET item_ids'));
@@ -121,6 +125,11 @@ beforeEach(() => {
   const project = state.projects[0]!;
   // The newest item is this project's Generate run; the 50 before it came from elsewhere.
   backendItems = Array.from({ length: GENERATE_ID }, (_, index) => completedRun(index + 1, 900 + index));
+  // Queue reads now honor origin_prefix, as the real backend does.
+  backendItems[GENERATE_ID - 1] = {
+    ...backendItems[GENERATE_ID - 1]!,
+    origin: `${buildProjectQueueItemOriginPrefix(project.id)}${LOCAL_RUN_ID}`,
+  };
   setGenerateSeed(1234);
   project.queue = {
     items: [

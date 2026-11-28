@@ -10,7 +10,7 @@ import type {
 } from '@features/queue/data/serverTypes';
 
 import { assertAccountScopeCurrent, captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
-import { apiFetchJson } from '@platform/transport/http';
+import { ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
 
 const QUEUE_ID = 'default';
 const QUEUE_MUTATION_CONCURRENCY = 8;
@@ -101,7 +101,42 @@ export const getQueueItemIds = (
     { signal }
   );
 
-/** Reads `action`'s answer for `itemIds` in id order, one bounded request per page of ids. */
+/**
+ * Fetch active ids separately; older servers may return a 404 or the app's HTML shell.
+ * Probe again on the next read so a transient proxy error cannot permanently hide executing jobs.
+ */
+export const getActiveQueueItemIds = async (
+  scope: QueueQueryScope = {},
+  signal?: AbortSignal
+): Promise<QueueItemIdsResultDTO> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  requestSignal.throwIfAborted();
+
+  let result: QueueItemIdsResultDTO;
+  try {
+    const response = await apiFetch(
+      buildQueueUrl(`active_ids${buildQueryString({ origin_prefix: scope.originPrefix })}`),
+      { signal: requestSignal }
+    );
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+    // Older packaged servers may serve their HTML shell for an unknown GET route.
+    const unsupported = response.status === 200 && contentType === 'text/html';
+    result = unsupported ? { item_ids: [] } : ((await response.json()) as QueueItemIdsResultDTO);
+  } catch (error) {
+    // Older servers may instead return 404. Only this optional endpoint falls back.
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
+    result = { item_ids: [] };
+  }
+  assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
+
+  return result;
+};
+
+/** Reads `action`'s answer for `itemIds` in request order, one bounded request per page of ids. */
 const readQueueItemIdPages = async <T>(
   action: 'item_summaries_by_ids' | 'items_by_ids',
   itemIds: number[],
@@ -121,7 +156,7 @@ const readQueueItemIdPages = async <T>(
   return results;
 };
 
-/** Hydrates items in id order. */
+/** Hydrates items in request order. */
 export const getQueueItemsByIds = (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> =>
   readQueueItemIdPages<QueueServerItemDTO>('items_by_ids', itemIds, signal);
 

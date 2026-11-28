@@ -71,15 +71,24 @@ const compareQueuePosition = (a: QueueItem, b: QueueItem): number => {
   return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
 };
 
-const getRunningImageOrdinal = (item: QueueItem, progress: QueueItemProgress | null): number => {
-  const expectedCount = getQueueItemExpectedImageCount(item);
-  const completedCount = progress?.completedItemCount ?? 0;
-  const activeIndex = progress?.activeItemIndex ?? completedCount + 1;
+export const getFinishedImageCount = (item: QueueItem, progress: QueueItemProgress | null = null): number => {
+  const settledCount = new Set([...(item.completedBackendItemIds ?? []), ...(item.cancelledBackendItemIds ?? [])]).size;
+  return Math.min(getQueueItemExpectedImageCount(item), Math.max(progress?.completedItemCount ?? 0, settledCount));
+};
 
+const getRunningImageOrdinal = (item: QueueItem, progress: QueueItemProgress | null, isConcurrent: boolean): number => {
+  const expectedCount = getQueueItemExpectedImageCount(item);
+  const settledOrdinal = getFinishedImageCount(item, progress) + 1;
+  // Only use the settled count in place of the executing ordinal after observing concurrency.
+  const activeIndex = isConcurrent ? settledOrdinal : (progress?.activeItemIndex ?? settledOrdinal);
   return Math.min(expectedCount, Math.max(1, activeIndex));
 };
 
-export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress | null = null): QueueSummary => {
+export const getQueueSummary = (
+  items: QueueItem[],
+  progress: QueueItemProgress | null = null,
+  isConcurrent = false
+): QueueSummary => {
   const openItems = items.filter(isOpenQueueItem).sort(compareQueuePosition);
   const total = openItems.reduce((sum, item) => sum + getQueueItemExpectedImageCount(item), 0);
 
@@ -88,16 +97,24 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
   }
 
   const runningItem = openItems.find((item) => item.status === 'running');
+  // Progress belongs to the selected running batch only. Other open batches
+  // contribute their own settled slots; queued work must still be counted.
+  const remaining = openItems.reduce((sum, item) => {
+    const unsettled =
+      getQueueItemExpectedImageCount(item) - getFinishedImageCount(item, item.id === runningItem?.id ? progress : null);
+    // Backend completion precedes result delivery. A running local item is still open until delivery closes it.
+    return sum + Math.max(item.status === 'running' ? 1 : 0, unsettled);
+  }, 0);
 
   if (!runningItem) {
-    return { current: 0, remaining: total, runningQueueItemId: null, total };
+    return { current: 0, remaining, runningQueueItemId: null, total };
   }
 
   let current = 0;
 
   for (const item of openItems) {
     if (item.id === runningItem.id) {
-      current += getRunningImageOrdinal(item, progress);
+      current += getRunningImageOrdinal(item, progress, isConcurrent);
       break;
     }
 
@@ -106,8 +123,8 @@ export const getQueueSummary = (items: QueueItem[], progress: QueueItemProgress 
 
   current = Math.min(current, total);
 
-  // `current` is the one-based ordinal of the active image, so that image remains in the countdown until it completes.
-  return { current, remaining: Math.max(0, total - current + 1), runningQueueItemId: runningItem.id, total };
+  // The active ordinal and the all-batch countdown describe different things.
+  return { current, remaining, runningQueueItemId: runningItem.id, total };
 };
 
 export const getProjectQueueIndicatorState = ({

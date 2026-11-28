@@ -6,6 +6,7 @@ export {
   useActiveProgressTargets,
   useFollowedProgressTargets,
   useFramedProgressTargets,
+  useHasObservedConcurrentProgress,
 } from './data/activeProgressTargetStore';
 export { type ItemProgress, useActiveProgressItemIds, useItemProgress } from './data/itemProgressStore';
 export {
@@ -13,6 +14,7 @@ export {
   type LatestProgressImageSnapshot,
   useProgressImage,
   useQueueItemProgressImage,
+  useQueueItemSlotProgress,
   useQueueItemSwapProgressImage,
 } from './data/progressImageStore';
 export { type QueueItemProgressSink, useQueueItemProgress } from './data/progressStore';

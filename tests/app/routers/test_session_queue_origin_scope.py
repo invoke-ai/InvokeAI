@@ -51,8 +51,11 @@ def _project_view(client: TestClient, token: str) -> dict[str, Any]:
     current = client.get("/api/v1/queue/default/current", params=params, headers=_auth(token)).json()
     next_item = client.get("/api/v1/queue/default/next", params=params, headers=_auth(token)).json()
     ids = client.get("/api/v1/queue/default/item_ids", params=params, headers=_auth(token)).json()["item_ids"]
+    active = client.get("/api/v1/queue/default/active_ids", params=params, headers=_auth(token)).json()
     return {
         "ids": sorted(ids),
+        "active_ids": sorted(active["item_ids"]),
+        "executing_root_item_ids": sorted(active["executing_root_item_ids"]),
         "pending": status["pending"],
         "in_progress": status["in_progress"],
         "current": current and current["item_id"],
@@ -69,21 +72,29 @@ def test_an_origin_scoped_read_shows_a_non_admin_only_their_own_items(
     # (with the higher priority) so that an unscoped read would pick them.
     other_running, other_pending = _put(queue, intruder, "in_progress"), _put(queue, intruder, "pending")
     own_running, own_pending = _put(queue, owner, "in_progress"), _put(queue, owner, "pending")
+    other_waiting = _put(queue, intruder, "waiting")
+    own_waiting = _put(queue, owner, "waiting")
     with sqlite_cursor_of(queue) as cursor:
         cursor.execute("UPDATE session_queue SET priority = 1 WHERE item_id = ?", (other_pending,))
 
     assert _project_view(client, user1_token) == {
-        "ids": [own_running, own_pending],
+        "ids": [own_running, own_pending, own_waiting],
+        "active_ids": [own_running, own_waiting],
+        "executing_root_item_ids": [own_running],
         "pending": 1,
         "in_progress": 1,
         "current": own_running,
         "status_current": own_running,
         "next": own_pending,
     }
-    assert _project_view(client, user2_token)["ids"] == [other_running, other_pending]
+    assert _project_view(client, user2_token)["ids"] == [other_running, other_pending, other_waiting]
+    assert _project_view(client, user2_token)["active_ids"] == [other_running, other_waiting]
+    assert _project_view(client, user2_token)["executing_root_item_ids"] == [other_running]
     # Admins see the whole queue as before.
     assert _project_view(client, admin_token) == {
-        "ids": [other_running, other_pending, own_running, own_pending],
+        "ids": [other_running, other_pending, own_running, own_pending, other_waiting, own_waiting],
+        "active_ids": [other_running, own_running, other_waiting, own_waiting],
+        "executing_root_item_ids": [other_running, own_running],
         "pending": 2,
         "in_progress": 2,
         "current": other_running,

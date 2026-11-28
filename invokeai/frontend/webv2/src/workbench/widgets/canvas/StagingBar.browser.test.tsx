@@ -1,6 +1,5 @@
 import '@fontsource/inter/index.css';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { QueueItemProgress } from '@features/queue/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/api';
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import type { WorkbenchState } from '@workbench/projectContracts';
@@ -24,10 +23,11 @@ const contextMenu = vi.hoisted(() => ({
   loadRecall: vi.fn(),
   targets: [] as { slotId: string; x: number; y: number }[],
 }));
-const queueProgress = vi.hoisted(() => ({ current: null as QueueItemProgress | null }));
+const slotProgress = vi.hoisted(() => new Map<string, { message: string; percentage: number | null }>());
 vi.mock('@features/queue/react', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useQueueItemProgress: () => queueProgress.current,
+  useQueueItemSlotProgress: (queueItemId: string, itemIndex: number) =>
+    slotProgress.get(`${queueItemId}:${itemIndex}`) ?? null,
 }));
 vi.mock('./StagingItemContextMenu', () => ({
   loadStagingItemRecall: contextMenu.loadRecall,
@@ -200,9 +200,39 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  slotProgress.clear();
 });
 
 describe('StagingBar thumbnail strip', () => {
+  it('shows concurrent iterations of one run independently and leaves waiting slots without a badge', async () => {
+    const waiting = { message: 'Preparing', percentage: null };
+    slotProgress.set('queue-item:1', waiting);
+    slotProgress.set('queue-item:2', waiting);
+    const slotAt = (index: number) => makePlaceholder(index + 1);
+    const render = () => renderStagingBar(4, 0, noop, noop, noop, slotAt, { isGenerating: true });
+    const badges = (thumbnails: HTMLElement[]) =>
+      thumbnails.map((thumbnail) => thumbnail.querySelector('[role="progressbar"]') !== null);
+
+    expect(badges((await render()).thumbnails)).toEqual([true, true, false, false]);
+
+    // An event for a different iteration must not take over or hide a running slot's badge.
+    slotProgress.set('queue-item:2', { message: 'Loading model', percentage: null });
+    expect(badges((await render()).thumbnails)).toEqual([true, true, false, false]);
+
+    slotProgress.delete('queue-item:1');
+    slotProgress.set('queue-item:3', waiting);
+    expect(badges((await render()).thumbnails)).toEqual([false, true, true, false]);
+  });
+
+  it('shows determinate progress only on the Canvas slot reporting progress', async () => {
+    slotProgress.set('queue-item:1', { message: 'Child sampling', percentage: 0.5 });
+    const slotAt = (index: number) => makePlaceholder(index + 1);
+    const { thumbnails } = await renderStagingBar(2, 0, noop, noop, noop, slotAt, { isGenerating: true });
+    const progressBar = thumbnails[0]!.querySelector('[role="progressbar"]');
+    expect(progressBar?.getAttribute('aria-valuenow')).toBe('50');
+    expect(thumbnails[1]!.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
   it('keeps every thumbnail reachable by scrolling when many images are staged', async () => {
     const { overlay, thumbnails, viewport } = await renderStagingBar(24);
     const bounds = viewport.getBoundingClientRect();

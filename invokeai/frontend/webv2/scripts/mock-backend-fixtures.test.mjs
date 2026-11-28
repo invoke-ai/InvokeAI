@@ -1059,3 +1059,61 @@ test('image PATCH adopts an intermediate as hidden durable Canvas pixels on ever
     assert.equal(missing.status, 404);
   });
 });
+
+test('active IDs retain required waiting roots only for origin-scoped reads', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+  try {
+    const readJson = async (path, init) => {
+      const response = await fetch(`${backend.origin}${path}`, init);
+      assert.equal(response.ok, true, `${path} returned ${response.status}`);
+      return response.json();
+    };
+    const originPrefix = 'webv2:p:project-a:q:';
+    const route = '/api/v1/queue/default/active_ids';
+    const scopedRoute = `${route}?origin_prefix=${encodeURIComponent(originPrefix)}`;
+    assert.deepEqual(await readJson(route), { executing_root_item_ids: null, item_ids: [], total_count: 0 });
+    assert.deepEqual(await readJson(scopedRoute), { executing_root_item_ids: [], item_ids: [], total_count: 0 });
+
+    for (const requiredCount of [1, 55]) {
+      await readJson('/__reset', { method: 'POST' });
+      const parents = Array.from({ length: 60 }, (_, index) => index + 1);
+      const roots = parents.slice(0, requiredCount);
+      const children = roots.map((id) => id + 60);
+      await readJson('/__queue_items', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            ...parents.map((id) => ({ item_id: id, origin: `${originPrefix}run`, status: 'waiting' })),
+            ...roots.map((id) => ({
+              item_id: id + 60,
+              origin: `${originPrefix}run`,
+              parent_item_id: id,
+              root_item_id: id,
+              status: 'in_progress',
+            })),
+            { item_id: 200, origin: `${originPrefix}run`, status: 'pending' },
+          ],
+        }),
+      });
+      const ordinary = parents
+        .slice(requiredCount)
+        .reverse()
+        .slice(0, Math.max(0, 50 - requiredCount));
+      const scopedIds = [...[...children].reverse(), ...[...roots, ...ordinary].sort((a, b) => b - a)];
+      const unscopedIds = [...[...children].reverse(), ...parents.slice(-50).reverse()];
+      assert.deepEqual(await readJson(scopedRoute), {
+        executing_root_item_ids: roots,
+        item_ids: scopedIds,
+        total_count: scopedIds.length,
+      });
+      assert.deepEqual(await readJson(route), {
+        executing_root_item_ids: null,
+        item_ids: unscopedIds,
+        total_count: unscopedIds.length,
+      });
+    }
+  } finally {
+    await backend.close();
+  }
+});
