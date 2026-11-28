@@ -1,12 +1,13 @@
 """Installed models: each one's config, a JSON document whose members the other columns are generated from."""
 
 import functools
+from collections.abc import Sequence
 from typing import Any, Optional
 
 from sqlalchemy import ColumnElement, Connection, Select, bindparam, delete, insert, literal, select, update
 
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
-from invokeai.app.services.shared.database.queries.base import QueryModule, locking, read, write
+from invokeai.app.services.shared.database.dialect import fold_case
+from invokeai.app.services.shared.database.queries.base import QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.models import models
 
 _M = models.c
@@ -29,18 +30,23 @@ _DELETE = delete(models).where(_M.id == bindparam("key"))
 
 # The search filters, in the order `search` takes them.
 _FILTERS = (_M.name, _M.base, _M.type, _M.format)
-# Keyed by the values of `ModelRecordOrderBy`, which is not imported: its module loads the model manager. Names and
-# bases sort ignoring case.
+# Keyed by the values of `ModelRecordOrderBy`, which is not imported: its module loads the model manager. Orders by
+# name ignore case, which SQL cannot do alike on every backend: `_by_name` sorts them in Python, from the columns
+# `_SORTED_COLUMNS` names. A base is lowercase ASCII (`BaseModelType`), so it sorts as it is.
 _ORDERINGS: dict[str, tuple[ColumnElement[Any], ...]] = {
-    "default": (_M.type, CaseInsensitiveOrder(_M.base), CaseInsensitiveOrder(_M.name), _M.format),
     "type": (_M.type,),
-    "base": (CaseInsensitiveOrder(_M.base),),
-    "name": (CaseInsensitiveOrder(_M.name),),
+    "base": (_M.base,),
     "format": (_M.format,),
     "size": (_M.file_size,),
     "created_at": (_M.created_at,),
     "updated_at": (_M.updated_at,),
     "path": (_M.path,),
+}
+_SORTED_COLUMNS = (_M.config, _M.id, _M.type, _M.base, _M.name, _M.format)
+# The sort keys of the orders `_ORDERINGS` leaves out, from a row of `_SORTED_COLUMNS`; the key breaks ties.
+_NAME_KEYS = {
+    "default": lambda row: (row[2], row[3], fold_case(row[4]), row[5], row[1]),
+    "name": lambda row: (fold_case(row[4]), row[1]),
 }
 
 
@@ -48,12 +54,27 @@ _ORDERINGS: dict[str, tuple[ColumnElement[Any], ...]] = {
 def _search(filtered: tuple[bool, ...], order_by: str, descending: bool) -> Select[Any]:
     """The configs of the models matching the filters that are set, in order; few combinations of filters and
     orders exist."""
-    statement = select(_M.config).where(
-        *(column == bindparam(f"filter_{column.name}") for column, on in zip(_FILTERS, filtered, strict=True) if on)
+    conditions = tuple(
+        column == bindparam(f"filter_{column.name}") for column, on in zip(_FILTERS, filtered, strict=True) if on
     )
+    if order_by in _NAME_KEYS:
+        return select(*_SORTED_COLUMNS).where(*conditions)
     # The key breaks ties, so that equal values keep one order.
     ordering = (*_ORDERINGS[order_by], _M.id)
-    return statement.order_by(*(column.desc() if descending else column.asc() for column in ordering))
+    return (
+        select(_M.config)
+        .where(*conditions)
+        .order_by(*(column.desc() if descending else column.asc() for column in ordering))
+    )
+
+
+def _configs(result: tuple[Sequence[Any], str, bool]) -> list[str]:
+    """The configs of rows `search` read, in order: sorted here, outside the transaction, by name ignoring case."""
+    rows, order_by, descending = result
+    if order_by in _NAME_KEYS:
+        rows = sorted(rows, key=_NAME_KEYS[order_by], reverse=descending)
+        return [row[0] for row in rows]
+    return list(rows)
 
 
 class ModelQueries(QueryModule):
@@ -71,6 +92,7 @@ class ModelQueries(QueryModule):
     def exists(self, conn: Connection, key: str) -> bool:
         return conn.execute(_EXISTS, {"key": key}).first() is not None
 
+    @mapped(_configs)
     @read
     def search(
         self,
@@ -82,13 +104,18 @@ class ModelQueries(QueryModule):
         model_format: Optional[str],
         order_by: str,
         descending: bool,
-    ) -> list[str]:
+    ) -> tuple[Sequence[Any], str, bool]:
         """The configs of the models matching every filter given (an empty one matches all), ordered by
-        `order_by`, a value of `ModelRecordOrderBy`."""
+        `order_by`, a value of `ModelRecordOrderBy`: the rows `_configs` makes them from."""
         values = (name, base, model_type, model_format)
         statement = _search(tuple(bool(value) for value in values), order_by, descending)
         parameters = {f"filter_{column.name}": value for column, value in zip(_FILTERS, values, strict=True) if value}
-        return list(conn.execute(statement, parameters).scalars().all())
+        rows = (
+            conn.execute(statement, parameters).all()
+            if order_by in _NAME_KEYS
+            else conn.execute(statement, parameters).scalars().all()
+        )
+        return rows, order_by, descending
 
     @read
     def at_path(self, conn: Connection, path: str) -> list[str]:

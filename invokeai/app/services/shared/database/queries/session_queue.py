@@ -38,6 +38,7 @@ from invokeai.app.services.shared.database.dialect import (
     Unindexed,
     bound_set,
     fixed_limit,
+    like_parameters,
     like_prefix,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
@@ -106,24 +107,38 @@ _SUMMARIES = (
 )
 
 
-def _origin_matches() -> ColumnElement[bool]:
-    return CaseInsensitiveLike(_Q.origin, bindparam("origin_pattern"))
+def _origin_matches(slots: int) -> ColumnElement[bool]:
+    return CaseInsensitiveLike(_Q.origin, "origin_pattern", slots)
 
 
-def _origin_pattern(origin_prefix: Optional[str]) -> Optional[str]:
-    return like_prefix(origin_prefix) if origin_prefix is not None else None
+class _Origin(NamedTuple):
+    """The origin prefix of a call: the replacement slots its statement is built with (None: no origin condition),
+    the values it binds."""
+
+    slots: Optional[int]
+    parameters: dict[str, Any]
+
+
+def _origin(origin_prefix: Optional[str]) -> _Origin:
+    if origin_prefix is None:
+        return _Origin(None, {})
+    pattern = like_prefix(origin_prefix)
+    parameters = like_parameters("origin_pattern", pattern, pattern.slots)
+    return _Origin(pattern.slots, parameters)
 
 
 # The origin is tested on the listing index; only the matching items' rows are read.
-_LINEAGE = select(_Q.item_id, _Q.status, _Q.origin, _Q.retried_from_item_id).where(_IN_QUEUE, _origin_matches())
+@functools.cache
+def _lineage_query(slots: int) -> Select[Any]:
+    return select(_Q.item_id, _Q.status, _Q.origin, _Q.retried_from_item_id).where(_IN_QUEUE, _origin_matches(slots))
 
 
 @functools.cache
-def _item_by_status(status: str, by_origin: bool, by_owner: bool) -> Select[Any]:
+def _item_by_status(status: str, by_owner: bool, origin: Optional[int]) -> Select[Any]:
     """The pending item to run next, or an item in progress (the earliest enqueued of several)."""
     conditions = [_IN_QUEUE_UNINDEXED, _Q.status == literal(status)]
-    if by_origin:
-        conditions.append(_origin_matches())
+    if origin is not None:
+        conditions.append(_origin_matches(origin))
     if by_owner:
         conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     ordering = [_Q.priority.desc(), _Q.created_at, _Q.item_id] if status == "pending" else [_Q.item_id]
@@ -166,15 +181,15 @@ def _page(by_status: bool, by_destination: bool, after: bool) -> Select[Any]:
 
 
 @functools.cache
-def _item_ids(descending: bool, by_owner: bool, by_origin: bool, limited: bool) -> Select[Any]:
+def _item_ids(descending: bool, by_owner: bool, limited: bool, origin: Optional[int]) -> Select[Any]:
     """The ids, in an order the listing index yields on SQLite without a sort (newest first), or sorting only the items
     that share a creation time (oldest first); so a limited read stops after its window."""
     conditions = [_IN_QUEUE]
     if by_owner:
         # Off the account's own index, which holds no creation time: the listing index reads it in order.
         conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
-    if by_origin:
-        conditions.append(_origin_matches())
+    if origin is not None:
+        conditions.append(_origin_matches(origin))
     # The item id breaks ties, in enqueue order either way, as SQLite returned them before: a batch's items share
     # their creation time to the millisecond, and the queue's views show a batch in that order.
     ordering = [_Q.created_at.desc() if descending else _Q.created_at, _Q.item_id]
@@ -183,12 +198,12 @@ def _item_ids(descending: bool, by_owner: bool, by_origin: bool, limited: bool) 
 
 
 @functools.cache
-def _status_counts(with_own: bool, by_origin: bool, by_owner: bool) -> Select[Any]:
+def _status_counts(with_own: bool, by_owner: bool, origin: Optional[int]) -> Select[Any]:
     """Every status's count in the queue (or one account's part of it, `by_owner`) and, `with_own`, in the caller's
     part of it, in one pass: on SQLite the listing index holds every column read, so no row is."""
     conditions = [_IN_QUEUE]
-    if by_origin:
-        conditions.append(_origin_matches())
+    if origin is not None:
+        conditions.append(_origin_matches(origin))
     if by_owner:
         conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     own = func.sum(case((_Q.user_id == bindparam("user_id"), 1), else_=0)) if with_own else literal(0)
@@ -196,11 +211,11 @@ def _status_counts(with_own: bool, by_origin: bool, by_owner: bool) -> Select[An
 
 
 @functools.cache
-def _current(by_origin: bool, by_owner: bool) -> Select[Any]:
+def _current(by_owner: bool, origin: Optional[int]) -> Select[Any]:
     """The identifiers of the item in progress, the earliest enqueued of several."""
     conditions = [_IN_QUEUE_UNINDEXED, _IN_PROGRESS]
-    if by_origin:
-        conditions.append(_origin_matches())
+    if origin is not None:
+        conditions.append(_origin_matches(origin))
     if by_owner:
         conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     return (
@@ -497,11 +512,18 @@ _BATCH_ITEM_IDS = select(_Q.item_id).where(_IN_BATCH).order_by(_Q.item_id)
 _ACTIVE_WORK = (
     select(literal(1)).where(_Q.status.in_([literal("pending"), literal("in_progress")])).limit(fixed_limit(1))
 )
+
+
 # The unfinished items found by their status, the origin then tested on their rows: the read costs the queue's live
 # items, where the listing index would walk its whole history.
-_UNFINISHED_ORIGINS = select(_Q.origin).where(
-    _IN_QUEUE_UNINDEXED, _Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]), _origin_matches()
-)
+@functools.cache
+def _unfinished_origins_query(slots: int) -> Select[Any]:
+    return select(_Q.origin).where(
+        _IN_QUEUE_UNINDEXED,
+        _Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]),
+        _origin_matches(slots),
+    )
+
 
 _THE_RECEIPT = and_(
     _R.queue_id == bindparam("queue_id"),
@@ -585,7 +607,6 @@ class Scope(NamedTuple):
         return {
             "queue_id": self.queue_id,
             "user_id": self.user_id,
-            "origin_pattern": _origin_pattern(self.origin_prefix),
             "destination": self.destination,
             "batch_ids": sorted(set(self.batch_ids)) if self.batch_ids is not None else None,
         }
@@ -594,12 +615,12 @@ class Scope(NamedTuple):
 @functools.cache
 def _scoped(
     by_user: bool,
-    by_origin: bool,
     by_destination: bool,
     by_batch: bool,
     statuses: tuple[str, ...],
     locked: bool,
     ordered: bool,
+    origin: Optional[int],
 ) -> Select[Any]:
     """The (item id, owner) of the scope's items of these statuses (all, for none), locked for a change if `locked`;
     unlocked, only their ids. (`user_id` and `status` follow the session in the row, which SQLite reaches through
@@ -615,8 +636,8 @@ def _scoped(
         # Beside a batch, the batch index finds the rows; beside a status, the status index leads with the account.
         user: ColumnElement[Any] = Unindexed(_Q.user_id) if by_batch else _Q.user_id
         conditions.append(user == bindparam("user_id"))
-    if by_origin:
-        conditions.append(_origin_matches())
+    if origin is not None:
+        conditions.append(_origin_matches(origin))
     if by_destination:
         conditions.append(_Q.destination == bindparam("destination"))
     if by_batch:
@@ -631,13 +652,18 @@ def _scoped(
     return statement.with_for_update() if locked else statement
 
 
-def _scope_shape(scope: Scope) -> tuple[bool, bool, bool, bool]:
-    return (
+def _scoped_rows(conn: Connection, scope: Scope, statuses: tuple[str, ...], locked: bool) -> Sequence[Row[Any]]:
+    origin = _origin(scope.origin_prefix)
+    statement = _scoped(
         scope.user_id is not None,
-        scope.origin_prefix is not None,
         scope.destination is not None,
         scope.batch_ids is not None,
+        statuses,
+        locked,
+        conn.dialect.name != "sqlite",
+        origin.slots,
     )
+    return conn.execute(statement, {**scope.parameters(), **origin.parameters}).all()
 
 
 def _locked_scope(conn: Connection, scope: Scope, statuses: tuple[str, ...]) -> Sequence[Sequence[Any]]:
@@ -647,8 +673,7 @@ def _locked_scope(conn: Connection, scope: Scope, statuses: tuple[str, ...]) -> 
     transaction, and a child enqueue in flight has committed when the lock is granted, so the chains read are those
     the change applies against. (Read before the lock, an item could start running, or a running item enqueue its
     children, between the read and the change.)"""
-    statement = _scoped(*_scope_shape(scope), statuses, True, conn.dialect.name != "sqlite")
-    rows = sorted(conn.execute(statement, scope.parameters()).all())
+    rows = sorted(_scoped_rows(conn, scope, statuses, True))
     if scope.except_current and rows:
         running = _current_chain(conn, scope.queue_id)
         rows = [row for row in rows if int(row[0]) not in running]
@@ -786,8 +811,9 @@ class SessionQueueQueries(QueryModule):
     ) -> Optional[Row[Any]]:
         """The `pending` item that runs next (highest priority, then oldest), or the `in_progress` one first
         claimed; of the account's items only, with `owner_id`."""
-        statement = _item_by_status(status, origin_prefix is not None, owner_id is not None)
-        parameters = {"queue_id": queue_id, "origin_pattern": _origin_pattern(origin_prefix), "owner_id": owner_id}
+        origin = _origin(origin_prefix)
+        statement = _item_by_status(status, owner_id is not None, origin.slots)
+        parameters = {"queue_id": queue_id, "owner_id": owner_id, **origin.parameters}
         return _row_of(conn, conn.execute(statement, parameters).scalar())
 
     @read
@@ -845,26 +871,26 @@ class SessionQueueQueries(QueryModule):
     ) -> list[int]:
         """The ids of the queue's items (the account's, with the origin, if given) by creation time; with `limit`, the
         first `limit` of that order."""
-        statement = _item_ids(descending, owner_id is not None, origin_prefix is not None, limit is not None)
-        parameters = {
-            "queue_id": queue_id,
-            "owner_id": owner_id,
-            "origin_pattern": _origin_pattern(origin_prefix),
-            "limit": limit,
-        }
+        origin = _origin(origin_prefix)
+        statement = _item_ids(descending, owner_id is not None, limit is not None, origin.slots)
+        parameters = {"queue_id": queue_id, "owner_id": owner_id, "limit": limit, **origin.parameters}
         return list(conn.execute(statement, parameters).scalars().all())
 
     @mapped(_lineage)
     @read
     def lineage(self, conn: Connection, queue_id: str, origin_prefix: str) -> Sequence[Row[Any]]:
         """Id, status, origin and retry source of the queue's items with the origin, in no order."""
-        return conn.execute(_LINEAGE, {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}).all()
+        origin = _origin(origin_prefix)
+        parameters = {"queue_id": queue_id, **origin.parameters}
+        return conn.execute(_lineage_query(origin.slots), parameters).all()
 
     @read
     def unfinished_origins(self, conn: Connection, queue_id: str, origin_prefix: str) -> list[str]:
         """The origin of each of the queue's items pending, in progress or waiting with the origin, in no order."""
-        parameters = {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}
-        return list(conn.execute(_UNFINISHED_ORIGINS, parameters).scalars().all())
+        origin = _origin(origin_prefix)
+        statement = _unfinished_origins_query(origin.slots)
+        parameters = {"queue_id": queue_id, **origin.parameters}
+        return list(conn.execute(statement, parameters).scalars().all())
 
     @mapped(_summaries)
     @read
@@ -883,15 +909,11 @@ class SessionQueueQueries(QueryModule):
     ) -> StatusCounts:
         """The counts and the item in progress, of the account's items only with `owner_id`; `user_id`'s share of
         them besides."""
-        by_origin, by_owner = origin_prefix is not None, owner_id is not None
-        parameters = {
-            "queue_id": queue_id,
-            "user_id": user_id,
-            "origin_pattern": _origin_pattern(origin_prefix),
-            "owner_id": owner_id,
-        }
-        rows = conn.execute(_status_counts(user_id is not None, by_origin, by_owner), parameters).all()
-        current = conn.execute(_current(by_origin, by_owner), parameters).first()
+        origin, by_owner = _origin(origin_prefix), owner_id is not None
+        parameters = {"queue_id": queue_id, "user_id": user_id, "owner_id": owner_id, **origin.parameters}
+        counts = _status_counts(user_id is not None, by_owner, origin.slots)
+        rows = conn.execute(counts, parameters).all()
+        current = conn.execute(_current(by_owner, origin.slots), parameters).first()
         return StatusCounts(
             counts={str(row[0]): int(row[1]) for row in rows},
             own_counts={str(row[0]): int(row[2]) for row in rows if row[2]},
@@ -1024,8 +1046,7 @@ class SessionQueueQueries(QueryModule):
     @read
     def in_progress(self, conn: Connection, scope: Scope) -> list[int]:
         """The ids of the scope's items in progress."""
-        statement = _scoped(*_scope_shape(scope), ("in_progress",), False, conn.dialect.name != "sqlite")
-        return sorted(int(row[0]) for row in conn.execute(statement, scope.parameters()).all())
+        return sorted(int(row[0]) for row in _scoped_rows(conn, scope, ("in_progress",), False))
 
     @read
     def has_active_work(self, conn: Connection) -> bool:

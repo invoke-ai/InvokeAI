@@ -296,6 +296,17 @@ def _save_with_metadata(store: VideoRecordStorage, name: str, metadata: str | No
     )
 
 
+def test_a_search_ignores_the_case_of_letters_beyond_ascii(store: VideoRecordStorage) -> None:
+    _save_with_metadata(store, "lower.mp4", '{"prompt": "frische äpfel"}')
+    _save_with_metadata(store, "capitals.mp4", '{"prompt": "FRISCHE ÄPFEL"}')
+    _save_with_metadata(store, "plain.mp4", '{"prompt": "frische apfel"}')
+
+    names = store.get_video_names(search_term="Äpfel", is_admin=True)
+
+    assert sorted(names.video_names) == ["capitals.mp4", "lower.mp4"]
+    assert store.get_many(limit=10, search_term="äpfel", is_admin=True).total == 2
+
+
 def test_media_origin_is_projected_out_of_the_metadata_blob(store: VideoRecordStorage) -> None:
     """The record carries `media_origin` so clients need no separate /metadata request.
 

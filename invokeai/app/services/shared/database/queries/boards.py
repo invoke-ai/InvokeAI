@@ -29,7 +29,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecord,
     BoardRecordOrderBy,
 )
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
+from invokeai.app.services.shared.database.dialect import fold_case
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.queries.board_access import readable_board
 from invokeai.app.services.shared.database.schema.boards import board_members, boards
@@ -147,6 +147,14 @@ def _boards(rows: Sequence[Sequence[Any]]) -> list[BoardRecord]:
     return [_board(row) for row in rows]
 
 
+def _boards_by_name(result: tuple[Sequence[Sequence[Any]], Optional[SQLiteDirection]]) -> list[BoardRecord]:
+    """The boards, sorted by name ignoring case then id when a direction is given; here, outside the transaction."""
+    rows, by_name = result
+    if by_name is not None:
+        rows = sorted(rows, key=lambda row: (fold_case(row[1]), row[0]), reverse=by_name == SQLiteDirection.Descending)
+    return _boards(rows)
+
+
 def _boards_and_total(result: tuple[Sequence[Sequence[Any]], int]) -> tuple[list[BoardRecord], int]:
     rows, total = result
     return _boards(rows), total
@@ -194,14 +202,18 @@ def _list(
     paged: bool,
 ) -> Select[Any]:
     # The enums are also strings, which share their cache entries: compare by value, never by identity.
-    # `get_all` has always sorted names case-insensitively, a page of `get_many` by the names as stored.
-    key: ColumnElement[Any] = boards.c.board_name if order_by == BoardRecordOrderBy.Name else boards.c.created_at
+    # A page of `get_many` sorts by the names as stored. `get_all` sorts them ignoring case, in Python (`all`), so
+    # its statement has no order by name.
+    statement = _listing(select(*_BOARD_COLUMNS), is_admin, include_archived)
     if order_by == BoardRecordOrderBy.Name and not paged:
-        key = CaseInsensitiveOrder(boards.c.board_name)
+        return statement
+    key: ColumnElement[Any] = boards.c.board_name if order_by == BoardRecordOrderBy.Name else boards.c.created_at
     # The board id breaks ties, so that equal keys keep one order from page to page.
-    ordering = [key, boards.c.board_id]
-    statement = _listing(select(*_BOARD_COLUMNS), is_admin, include_archived).order_by(
-        *(column.desc() if direction == SQLiteDirection.Descending else column.asc() for column in ordering)
+    statement = statement.order_by(
+        *(
+            column.desc() if direction == SQLiteDirection.Descending else column.asc()
+            for column in [key, boards.c.board_id]
+        )
     )
     if paged:
         statement = statement.limit(bindparam("limit")).offset(bindparam("offset"))
@@ -273,7 +285,7 @@ class BoardQueries(QueryModule):
         total: int = conn.execute(_count(is_admin, include_archived), parameters).scalar_one()
         return rows, total
 
-    @mapped(_boards)
+    @mapped(_boards_by_name)
     @read
     def all(
         self,
@@ -284,10 +296,11 @@ class BoardQueries(QueryModule):
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         include_archived: bool,
-    ) -> Sequence[Row[Any]]:
-        """Every board the user sees."""
+    ) -> tuple[Sequence[Row[Any]], Optional[SQLiteDirection]]:
+        """Every board the user sees, with the direction of the sort by name that is left to `_boards_by_name`."""
         statement = _list(is_admin, include_archived, order_by, direction, False)
-        return conn.execute(statement, {"user_id": user_id}).all()
+        rows = conn.execute(statement, {"user_id": user_id}).all()
+        return rows, (direction if order_by == BoardRecordOrderBy.Name else None)
 
     @read
     def shared_user_ids(self, conn: Connection, board_id: str) -> list[str]:

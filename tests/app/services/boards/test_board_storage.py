@@ -196,6 +196,29 @@ def test_boards_list_by_name_ignoring_case(database: Database, board_records: Bo
     assert [board.board_name for board in by_name] == ["apple", "Banana", "cherry"]
 
 
+@pytest.mark.parametrize("direction", [SQLiteDirection.Ascending, SQLiteDirection.Descending])
+def test_boards_list_by_name_ignoring_the_case_of_letters_beyond_ascii(
+    database: Database, board_records: BoardRecordStorage, direction: SQLiteDirection
+) -> None:
+    # Ids against the order of the names, so that only the tie-break orders `åland` and `Åland` (the same name).
+    _insert_boards(
+        database,
+        [
+            ("b4", "zebra", "2026-01-01 00:00:00.000"),
+            ("b3", "Åland", "2026-01-01 00:00:00.000"),
+            ("b2", "Ångström", "2026-01-01 00:00:00.000"),
+            ("b1", "åland", "2026-01-01 00:00:00.000"),
+        ],
+    )
+
+    boards = board_records.get_all(ALICE, False, BoardRecordOrderBy.Name, direction)
+
+    expected = ["b4", "b1", "b3", "b2"]
+    assert [board.board_id for board in boards] == (
+        expected if direction == SQLiteDirection.Ascending else expected[::-1]
+    )
+
+
 def test_boards_list_by_age(database: Database, board_records: BoardRecordStorage) -> None:
     # Ages that agree with neither the order of insertion nor that of the ids.
     _insert_boards(

@@ -83,6 +83,16 @@ def test_presets_are_listed_by_name_ignoring_case_and_equal_names_by_id(
     assert [preset.id for preset in presets.get_many(user_id=ALICE)] == ["p2", "p3", "p4", "p1"]
 
 
+def test_presets_beyond_ascii_are_listed_by_the_folded_name_and_equal_names_by_id(
+    database: Database, presets: StylePresetRecordsStorage
+) -> None:
+    # `å` sorts after `z`; `Åland` and `åland` are one name.
+    named = (("p1", "zebra"), ("p4", "Åland"), ("p3", "åland"), ("p2", "Ångström"))
+    database.queries.style_presets.insert({preset_id: _preset(name) for preset_id, name in named}, ALICE)
+
+    assert [preset.id for preset in presets.get_many(user_id=ALICE)] == ["p1", "p3", "p4", "p2"]
+
+
 def test_a_created_preset_is_stored_as_returned(presets: StylePresetRecordsStorage) -> None:
     created = presets.create(_preset("shared", is_public=True), ALICE)
 

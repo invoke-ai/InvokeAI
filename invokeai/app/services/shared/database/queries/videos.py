@@ -29,6 +29,8 @@ from invokeai.app.services.shared.database.dialect import (
     fixed_limit,
     insert_ignore,
     like_contains,
+    like_parameters,
+    like_slots,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import board_videos
@@ -134,7 +136,8 @@ class _Shape(NamedTuple):
     board: str
     # Whether the listing is limited to what one account may see; else everything, as for an administrator.
     scoped: bool
-    search: bool
+    # The replacement slots of the search pattern (`LikePattern.slots`); None without a search.
+    search: Optional[int]
 
 
 def _shape(
@@ -153,7 +156,7 @@ def _shape(
         intermediate=is_intermediate is not None,
         board="any" if board_id is None else "none" if board_id == "none" else "one",
         scoped=user_id is not None and not is_admin,
-        search=bool(search_term),
+        search=like_contains(search_term).slots if search_term else None,
     )
 
 
@@ -165,12 +168,12 @@ def _parameters(
     search_term: Optional[str],
     user_id: Optional[str],
 ) -> dict[str, Any]:
+    pattern = like_contains(search_term) if search_term else None
     return {
         "video_origin": video_origin.value if video_origin is not None else None,
         "is_intermediate": is_intermediate,
         "board_id": board_id,
-        # Lowered here, as the legacy storage did: SQLite's LIKE folds the case of ASCII letters only.
-        "pattern": like_contains(search_term.lower()) if search_term else None,
+        **like_parameters("pattern", pattern, like_slots(pattern)),
         "user_id": user_id,
     }
 
@@ -194,9 +197,13 @@ def _conditions(shape: _Shape) -> list[ColumnElement[bool]]:
     elif shape.scoped:
         # Without a board, still only the account's own videos, so that it cannot list every account's.
         conditions.append(own)
-    if shape.search:
-        pattern: ColumnElement[str] = bindparam("pattern")
-        conditions.append(or_(CaseInsensitiveLike(_V.metadata, pattern), CaseInsensitiveLike(_V.created_at, pattern)))
+    if shape.search is not None:
+        conditions.append(
+            or_(
+                CaseInsensitiveLike(_V.metadata, "pattern", shape.search),
+                CaseInsensitiveLike(_V.created_at, "pattern", shape.search),
+            )
+        )
     return conditions
 
 

@@ -1025,6 +1025,60 @@ test('board_id=all lists unboarded items and those on active readable boards, al
   });
 });
 
+test('workflow names and search fold case the way the server does, beyond ASCII', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const create = (name, tags = '') =>
+      getJson(backend, '/api/v1/workflows/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workflow: {
+            name,
+            author: '',
+            description: '',
+            version: '1.0.0',
+            contact: '',
+            tags,
+            notes: '',
+            exposedFields: [],
+            meta: { version: '3.0.0', category: 'user' },
+            nodes: [],
+            edges: [],
+          },
+        }),
+      });
+    const first = await create('zebra');
+    const second = await create('Åland', 'KITCHEN');
+    const third = await create('Ångström');
+    const fourth = await create('åland');
+    const list = (query) => getJson(backend, `/api/v1/workflows/?categories=user&${query}`);
+
+    // `å` sorts after `z`; `Åland` and `åland` are one name, so their ids order them.
+    const ascending = await list('order_by=name&direction=ASC');
+    const tied = [second.workflow_id, fourth.workflow_id].sort();
+    assert.deepEqual(
+      ascending.items.map((item) => item.workflow_id),
+      [first.workflow_id, ...tied, third.workflow_id]
+    );
+    const descending = await list('order_by=name&direction=DESC');
+    assert.deepEqual(
+      descending.items.map((item) => item.workflow_id),
+      ascending.items.map((item) => item.workflow_id).reverse()
+    );
+    // Search folds both sides, and looks in the tags too.
+    const found = await list('query=%C3%85LAND');
+    assert.deepEqual(found.items.map((item) => item.workflow_id).sort(), tied);
+    assert.deepEqual(
+      (await list('query=kitchen')).items.map((item) => item.workflow_id),
+      [second.workflow_id]
+    );
+  } finally {
+    await backend.close();
+  }
+});
+
 test('image PATCH adopts an intermediate as hidden durable Canvas pixels on every read', async () => {
   await withRepresentativeBackend(async (backend) => {
     const form = new FormData();

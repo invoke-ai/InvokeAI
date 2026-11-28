@@ -753,6 +753,19 @@ def test_models_that_tie_are_listed_by_key_and_names_ignore_case(store: ModelRec
         assert keys(order_by, SQLiteDirection.Descending) == ["k4", "k3", "k2", "k1"]
 
 
+def test_names_beyond_ascii_sort_ignoring_case_and_equal_ones_by_key(store: ModelRecordServiceBase) -> None:
+    # `å` sorts after `z`; `Åland` and `åland` are the same name, so their keys order them.
+    for key, name in (("k4", "Ångström"), ("k3", "zebra"), ("k2", "åland"), ("k1", "Åland")):
+        store.add_model(_embedding(key, name=name))
+
+    def keys(order_by: ModelRecordOrderBy, direction: SQLiteDirection) -> list[str]:
+        return [model.key for model in store.search_by_attr(order_by=order_by, direction=direction)]
+
+    for order_by in (ModelRecordOrderBy.Name, ModelRecordOrderBy.Default):
+        assert keys(order_by, SQLiteDirection.Ascending) == ["k3", "k1", "k2", "k4"]
+        assert keys(order_by, SQLiteDirection.Descending) == ["k4", "k2", "k1", "k3"]
+
+
 _MAIN = {
     "variant": ModelVariantType.Normal,
     "prediction_type": SchedulerPredictionType.Epsilon,

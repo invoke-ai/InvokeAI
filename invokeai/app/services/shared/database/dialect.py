@@ -1,11 +1,25 @@
 """SQL constructs that each backend spells differently, compiled for the backend in use."""
 
+import functools
 import json
 import re
+import unicodedata
 from collections.abc import Iterable, Sequence
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
-from sqlalchemy import Boolean, FromClause, Insert, Integer, Join, String, Table, UniqueConstraint, literal_column
+from sqlalchemy import (
+    Boolean,
+    FromClause,
+    Insert,
+    Integer,
+    Join,
+    String,
+    Table,
+    UniqueConstraint,
+    bindparam,
+    literal_column,
+)
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.compiler import SQLCompiler
@@ -180,12 +194,127 @@ def _compile_json_string_mysql(element: JsonString, compiler: SQLCompiler, **kw:
     return f"CASE WHEN JSON_VALID({document}) THEN {member} END"
 
 
-class CaseInsensitiveLike(FunctionElement[bool]):
-    """`expression LIKE pattern`, ignoring case, with backslash as the escape character in `pattern` (see
-    `like_prefix`).
+def fold_case(text: str) -> str:
+    """`text` with each character mapped to its simple lowercase (`Å` to `å`): what SQLite matches by and what the
+    stored sort keys hold.
 
-    SQLite's own LIKE, which ignores the case of ASCII letters, there; LOWER() on both sides elsewhere, which
-    folds the case of every letter. (Lowering on SQLite would cost as much as the scan it filters.)
+    Character by character: `ß` stays apart from `ss`, the final sigma `ς` from `σ`, and the length never changes. A
+    character whose lowercase is more than one character stays as it is (`İ`).
+
+    The stored keys (`workflow_library.name_key`, `fonts.family_key` and `fonts.label_key`) hold this: changing the
+    function makes them stale, and needs a migration that writes them again.
+
+    A server's LOWER() is not this function: it keeps some characters `fold_case` folds (MariaDB keeps `ẞ`), folds
+    some it keeps (`İ`), and its tables are of another Unicode version (MariaDB's differ from Python's much more than
+    MySQL's: about 740 code points against about 130 below 0x20000, measured). So a server is never given a pattern
+    folded here (see `LikePattern.unfolded`); only SQLite matches by `fold_case`.
+    """
+    if text.isascii():
+        # The same, without a call per character: the sorts of whole lists fold every name they hold.
+        return text.lower()
+    return "".join(lowered if len(lowered := character.lower()) == 1 else character for character in text)
+
+
+# Cased characters exist in the first two planes only (`test_dialect` scans every code point to make a new Unicode
+# version fail loudly).
+_CASED_CODE_POINTS = 0x20000
+
+
+@functools.cache
+def _preimages() -> dict[str, tuple[str, ...]]:
+    # The characters that fold to another one, grouped by it, minus the canonical singletons (KELVIN SIGN and
+    # the like: `normalize("NFC", x) != x`). A scan of the cased planes, made on first need and kept.
+    preimages: dict[str, list[str]] = {}
+    for code_point in range(_CASED_CODE_POINTS):
+        if 0xD800 <= code_point <= 0xDFFF:
+            continue
+        character = chr(code_point)
+        folded = character.lower()
+        if len(folded) == 1 and folded != character and unicodedata.normalize("NFC", character) == character:
+            preimages.setdefault(folded, []).append(character)
+    return {folded: tuple(characters) for folded, characters in preimages.items()}
+
+
+def case_variants(folded: str) -> tuple[str, ...]:
+    """The characters other than `folded` that fold to it and that NFC text can hold, by code point."""
+    return _preimages().get(folded, ())
+
+
+# The most replacement pairs a pattern has. Each is one `replace()` pass over every row SQLite reads, so a text of
+# many letters would take seconds per scan (measured: 7 pairs 0.5 s, 30 pairs 2.45 s over 20 000 rows of 4 KB); the
+# letters beyond them match any character on SQLite.
+MAX_PAIRS = 8
+
+
+@dataclass(frozen=True, slots=True)
+class LikePattern:
+    """What a `CaseInsensitiveLike` is matched with.
+
+    On SQLite: `pattern`, the LIKE pattern of the folded text, and `pairs`, the characters SQLite's own LIKE does not
+    already treat as equal to the ones they fold to, each as (character in the stored value, character it is
+    replaced with before the match). SQLite's LIKE ignores the case of ASCII letters only, so `Å` is no `å` to it;
+    the statement replaces `Å` in the stored value with `å` first, which is the same as folding the stored value.
+    ASCII texts have no pairs. The pairs are:
+    - every character of NFC text that folds to a letter of the text (`Å` for `å`); not the characters of NFC-unstable
+      folds (the Kelvin, Ångström and Ohm signs, Greek capitals with oxia), which NFC text never holds, so a plain
+      letter does not find them;
+    - a character of the text itself that is one of those, so that a text holding it finds it as typed.
+
+    Each pair is one `replace()` pass over every row, so there are at most `MAX_PAIRS`, the first characters of the
+    text first. A letter left without its pair matches any one character in `pattern` (`_`): SQLite returns a
+    superset of the values, never fewer.
+
+    On a server: `unfolded`, the LIKE pattern of the text as given, which the statement lowers itself. A server's
+    LOWER() keeps some characters `fold_case` folds (MariaDB keeps `ẞ`) and folds some it keeps (`İ`), so a pattern
+    folded in Python could miss the very value it was taken from there. (MySQL 8.4 lowers `ẞ` to `ß`.)
+    """
+
+    pattern: str
+    unfolded: str
+    pairs: tuple[tuple[str, str], ...]
+
+    @property
+    def slots(self) -> int:
+        """The number of replacements a statement carries for this pattern: the pairs rounded up to 0, 1, 2, 4 or
+        8, so that statements share shapes."""
+        return 0 if not self.pairs else 1 << (len(self.pairs) - 1).bit_length()
+
+    def parameters(self, name: str, slots: int) -> dict[str, Optional[str]]:
+        """The bound values of `CaseInsensitiveLike(column, name, slots)`: `slots` (at least `self.slots`)
+        replacements, the spare ones `'' -> ''`, which change nothing."""
+        return like_parameters(name, self, slots)
+
+
+def like_parameters(name: str, pattern: Optional[LikePattern], slots: int) -> dict[str, Optional[str]]:
+    """The bound values of `CaseInsensitiveLike(column, name, slots)` for `pattern`, or for None, which matches
+    nothing."""
+    pairs = pattern.pairs if pattern is not None else ()
+    parameters: dict[str, Optional[str]] = {
+        name: pattern.pattern if pattern is not None else None,
+        f"{name}_unfolded": pattern.unfolded if pattern is not None else None,
+    }
+    for index in range(slots):
+        replaced, replacement = pairs[index] if index < len(pairs) else ("", "")
+        parameters[f"{name}_from_{index}"] = replaced
+        parameters[f"{name}_to_{index}"] = replacement
+    return parameters
+
+
+def like_slots(*patterns: Optional[LikePattern]) -> int:
+    """The replacement slots of a statement that matches all of `patterns`."""
+    return max((pattern.slots for pattern in patterns if pattern is not None), default=0)
+
+
+class CaseInsensitiveLike(FunctionElement[bool]):
+    """`expression LIKE pattern`, ignoring case, with backslash as the escape character in the pattern (see
+    `like_prefix`). `name` is the bound parameter of the pattern and `slots` the replacements of the statement's
+    shape (`LikePattern.slots`); bind them with `LikePattern.parameters(name, slots)`.
+
+    SQLite matches the pattern folded by `fold_case`. Its LIKE ignores the case of ASCII letters only, so it first
+    replaces the other characters that fold to a character of the pattern in `expression`, one `replace()` pass over
+    each row per slot, at most `MAX_PAIRS`; beyond them it over-matches (`LikePattern`). (Lowering on SQLite would
+    cost as much as the scan it filters; a text of ASCII letters has no slots and costs what the plain LIKE did.) A
+    server compares `lower(expression)` with `lower(pattern as given)`, and ignores the replacement parameters.
     """
 
     inherit_cache = True
@@ -195,8 +324,14 @@ class CaseInsensitiveLike(FunctionElement[bool]):
     # LIKE on an index with its collation into a range of that index.
     _is_implicitly_boolean = True
 
-    def __init__(self, expression: ColumnElement[str], pattern: ColumnElement[str]) -> None:
-        super().__init__(expression, pattern)
+    def __init__(self, expression: ColumnElement[str], name: str, slots: int) -> None:
+        super().__init__(
+            expression,
+            bindparam(name),
+            bindparam(f"{name}_unfolded"),
+            *(bindparam(f"{name}_from_{index}") for index in range(slots)),
+            *(bindparam(f"{name}_to_{index}") for index in range(slots)),
+        )
 
 
 class ContainsText(FunctionElement[bool]):
@@ -229,28 +364,64 @@ def _escape_like(text: str) -> str:
     return escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
 
 
-def like_prefix(prefix: str) -> str:
+def _like_pattern(text: str, prefix: str, suffix: str) -> LikePattern:
+    if text.isascii():
+        # No character that NFC text holds folds to an ASCII one but the ASCII capitals, which LIKE folds itself.
+        return LikePattern(prefix + _escape_like(text.lower()) + suffix, prefix + _escape_like(text) + suffix, ())
+    folded = fold_case(text)
+    # The characters, by the folded character, that SQLite's LIKE does not equate with it: those of NFC text that
+    # fold to it, and the ones typed in the text that NFC-unstable folds make (the Kelvin sign).
+    needed: dict[str, list[str]] = {}
+    for character in dict.fromkeys(folded):
+        variants = [variant for variant in case_variants(character) if not variant.isascii()]
+        if variants:
+            needed[character] = variants
+    for typed in dict.fromkeys(text):
+        target = fold_case(typed)
+        if target != typed and not typed.isascii() and typed not in case_variants(target):
+            needed.setdefault(target, []).append(typed)
+    pairs: list[tuple[str, str]] = []
+    uncovered: set[str] = set()
+    for character in dict.fromkeys(folded):
+        variants = needed.get(character, [])
+        if len(pairs) + len(variants) <= MAX_PAIRS:
+            pairs.extend((variant, character) for variant in variants)
+        else:
+            uncovered.add(character)
+    # A character without its pair matches any one character, so that no value is missed.
+    matching = "".join("_" if character in uncovered else _escape_like(character) for character in folded)
+    return LikePattern(prefix + matching + suffix, prefix + _escape_like(text) + suffix, tuple(pairs))
+
+
+def like_prefix(prefix: str) -> LikePattern:
     """The `CaseInsensitiveLike` pattern of the values that start with `prefix`; `%`, `_` and `\\` in it match
     only themselves."""
-    return _escape_like(prefix) + "%"
+    return _like_pattern(prefix, "", "%")
 
 
-def like_contains(text: str) -> str:
+def like_contains(text: str) -> LikePattern:
     """The `CaseInsensitiveLike` pattern of the values that contain `text`; `%`, `_` and `\\` in it match only
     themselves."""
-    return "%" + _escape_like(text) + "%"
+    return _like_pattern(text, "%", "%")
 
 
 @compiles(CaseInsensitiveLike, "sqlite")
 def _compile_case_insensitive_like_sqlite(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
-    expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
+    # The unfolded pattern is a server's; left out, it is no parameter of the statement here.
+    expression, pattern, _unfolded, *rest = element.clauses
+    expression, pattern = compiler.process(expression, **kw), compiler.process(pattern, **kw)
+    replacements = [compiler.process(clause, **kw) for clause in rest]
+    half = len(replacements) // 2
+    for replaced, replacement in zip(replacements[:half], replacements[half:], strict=False):
+        expression = f"replace({expression}, {replaced}, {replacement})"
     return f"{expression} LIKE {pattern} ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
 
 
 @compiles(CaseInsensitiveLike)
 def _compile_case_insensitive_like(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
-    expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
-    return f"lower({expression}) LIKE lower({pattern}) ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
+    expression, _folded, unfolded, *_ = element.clauses
+    expression, unfolded = compiler.process(expression, **kw), compiler.process(unfolded, **kw)
+    return f"lower({expression}) LIKE lower({unfolded}) ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
 
 
 # The longest string a bound set holds on a server: media names are at most 255 characters.
@@ -344,33 +515,6 @@ def _compile_keyset_after_sqlite(element: KeysetAfter, compiler: SQLCompiler, **
 def _compile_keyset_after(element: KeysetAfter, compiler: SQLCompiler, **kw: Any) -> str:
     first, second, first_value, second_value = (compiler.process(clause, **kw) for clause in element.clauses)
     return f"({first} > {first_value} OR ({first} = {first_value} AND {second} > {second_value}))"
-
-
-class CaseInsensitiveOrder(FunctionElement[str]):
-    """`expression` as an ORDER BY key that ignores case.
-
-    SQLite's NOCASE collation there, which folds the case of ASCII letters as its LOWER() does; LOWER() elsewhere,
-    which folds the case of every letter. (LOWER() on SQLite is a function call per row: a fifth of the time it
-    takes to order 500 models, measured.)
-    """
-
-    inherit_cache = True
-    name = "case_insensitive_order"
-
-    def __init__(self, expression: ColumnElement[str]) -> None:
-        super().__init__(expression)
-
-
-@compiles(CaseInsensitiveOrder, "sqlite")
-def _compile_case_insensitive_order_sqlite(element: CaseInsensitiveOrder, compiler: SQLCompiler, **kw: Any) -> str:
-    (expression,) = (compiler.process(clause, **kw) for clause in element.clauses)
-    return f"{expression} COLLATE NOCASE"
-
-
-@compiles(CaseInsensitiveOrder)
-def _compile_case_insensitive_order(element: CaseInsensitiveOrder, compiler: SQLCompiler, **kw: Any) -> str:
-    (expression,) = (compiler.process(clause, **kw) for clause in element.clauses)
-    return f"lower({expression})"
 
 
 class Unindexed(FunctionElement[Any]):

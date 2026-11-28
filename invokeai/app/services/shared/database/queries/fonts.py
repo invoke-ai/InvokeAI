@@ -26,9 +26,11 @@ from sqlalchemy import (
 from invokeai.app.services.fonts.fonts_common import FontAxis, FontInstance, FontRecord, FontScope, FontSource
 from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
-    CaseInsensitiveOrder,
     fixed_limit,
+    fold_case,
     like_contains,
+    like_parameters,
+    like_slots,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.fonts import fonts
@@ -78,7 +80,9 @@ _UPDATE_DIRECTORY_FONT = (
         filename=bindparam("filename"),
         source_path=bindparam("source_path"),
         family=bindparam("family"),
+        family_key=bindparam("family_key"),
         label=bindparam("label"),
+        label_key=bindparam("label_key"),
         style=bindparam("style"),
         weight=bindparam("weight"),
         content_hash=bindparam("content_hash"),
@@ -134,7 +138,8 @@ class UploadedFont(NamedTuple):
 class _Shape(NamedTuple):
     scope: FontScope
     by_hash: bool
-    searched: bool
+    # The replacement slots of the search pattern (`LikePattern.slots`); None without a search.
+    searched: Optional[int]
 
 
 def _json_axes(axes: tuple[FontAxis, ...]) -> str:
@@ -213,7 +218,9 @@ def _metadata_values(font: DirectoryFont | UploadedFont) -> dict[str, Any]:
     return {
         "filename": font.filename,
         "family": font.family,
+        "family_key": fold_case(font.family),
         "label": font.label,
+        "label_key": fold_case(font.label),
         "style": font.style,
         "weight": font.weight,
         "content_hash": font.content_hash,
@@ -232,13 +239,12 @@ def _conditions(shape: _Shape) -> list[ColumnElement[bool]]:
         conditions.append(or_(_DIRECTORY, and_(_UPLOADED, _SHARED)))
     if shape.by_hash:
         conditions.append(_F.content_hash == bindparam("hash"))
-    if shape.searched:
-        pattern = bindparam("pattern")
+    if shape.searched is not None:
         conditions.append(
             or_(
-                CaseInsensitiveLike(_F.family, pattern),
-                CaseInsensitiveLike(_F.label, pattern),
-                CaseInsensitiveLike(_F.filename, pattern),
+                CaseInsensitiveLike(_F.family, "pattern", shape.searched),
+                CaseInsensitiveLike(_F.label, "pattern", shape.searched),
+                CaseInsensitiveLike(_F.filename, "pattern", shape.searched),
             )
         )
     return conditions
@@ -249,7 +255,7 @@ def _listing(shape: _Shape) -> Select[Any]:
     return (
         select(*_COLUMNS)
         .where(*_conditions(shape))
-        .order_by(CaseInsensitiveOrder(_F.family), CaseInsensitiveOrder(_F.label), _F.id)
+        .order_by(_F.family_key, _F.label_key, _F.id)
         .limit(bindparam("limit"))
         .offset(bindparam("offset"))
     )
@@ -283,12 +289,13 @@ class FontQueries(QueryModule):
         """`limit` of the fonts the account may see, from `offset`, by family and label ignoring case, then id; and
         how many there are. `scope` keeps only the account's private uploads, or only the shared fonts; `search`
         keeps the fonts whose family, label or file name contains it, ignoring case."""
-        shape = _Shape(scope, content_hash is not None, bool(search))
+        pattern = like_contains(search) if search else None
+        shape = _Shape(scope, content_hash is not None, pattern.slots if pattern is not None else None)
         parameters: dict[str, Any] = {"user": user_id}
         if content_hash is not None:
             parameters["hash"] = content_hash
-        if search:
-            parameters["pattern"] = like_contains(search)
+        if pattern is not None:
+            parameters.update(like_parameters("pattern", pattern, like_slots(pattern)))
         rows = conn.execute(_listing(shape), {**parameters, "limit": limit, "offset": offset}).all()
         if len(rows) < limit and (rows or offset == 0):
             # The page ends the listing, so it tells how many there are.

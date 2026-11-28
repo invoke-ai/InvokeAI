@@ -239,6 +239,18 @@ def test_an_update_without_changes_still_needs_a_prompt_the_account_may_change(s
         svc.update("does-not-exist", SystemPromptChanges(), user_id=None)
 
 
+def test_prompts_beyond_ascii_are_listed_by_the_folded_name_and_equal_names_by_id(
+    database: Database, svc: SystemPromptRecordsStorage
+) -> None:
+    # `å` sorts after `z`; `Åland` and `åland` are one name.
+    for prompt_id, name in (("p1", "zebra"), ("p4", "Åland"), ("p3", "åland"), ("p2", "Ångström")):
+        database.queries.system_prompts.insert(prompt_id, SystemPromptWithoutId(name=name, content="x"), "alice", False)
+
+    for user_id in ("alice", None):
+        listed = [prompt.id for prompt in svc.get_many(user_id=user_id) if prompt.user_id == "alice"]
+        assert listed == ["p1", "p3", "p4", "p2"]
+
+
 def test_prompts_are_listed_by_name_ignoring_case_and_equal_names_by_id(
     database: Database, svc: SystemPromptRecordsStorage
 ) -> None:

@@ -48,6 +48,8 @@ from invokeai.app.services.shared.database.dialect import (
     bound_set,
     fixed_limit,
     like_contains,
+    like_parameters,
+    like_slots,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, read
 from invokeai.app.services.shared.database.queries.board_access import listed_board
@@ -91,7 +93,8 @@ class _Shape(NamedTuple):
     board: str
     # Whether the listing is limited to one account's items; else everything, as for an administrator.
     scoped: bool
-    search: bool
+    # The replacement slots of the search pattern (`LikePattern.slots`); None without a search.
+    search: Optional[int]
     created_date: bool
     created_from: bool
     created_to: bool
@@ -125,21 +128,21 @@ class Filters(NamedTuple):
             starred=self.starred is not None,
             board="any" if self.board_id is None else self.board_id if self.board_id in ("none", "all") else "one",
             scoped=self.user_id is not None and not self.is_admin,
-            search=bool(self.search_term),
+            search=like_contains(self.search_term).slots if self.search_term else None,
             created_date=self.created_date is not None,
             created_from=self.created_from is not None,
             created_to=self.created_to is not None,
         )
 
     def parameters(self) -> dict[str, Any]:
+        pattern = like_contains(self.search_term) if self.search_term else None
         return {
             "origin": self.origin.value if self.origin is not None else None,
             "is_intermediate": self.is_intermediate,
             "starred": self.starred,
             "board_id": self.board_id,
             "user_id": self.user_id,
-            # Lowered here, as the legacy services did: SQLite's LIKE folds the case of ASCII letters only.
-            "pattern": like_contains(self.search_term.lower()) if self.search_term else None,
+            **like_parameters("pattern", pattern, like_slots(pattern)),
             "created_date": self.created_date,
             "created_date_before": day_after(self.created_date) if self.created_date is not None else None,
             "created_from": self.created_from,
@@ -207,10 +210,12 @@ def _conditions(kind: str, shape: _Shape, joined: bool) -> list[ColumnElement[bo
     elif shape.scoped:
         # Without a board, still only the account's own items, so that it cannot list every account's.
         conditions.append(own)
-    if shape.search:
-        pattern: ColumnElement[str] = bindparam("pattern")
+    if shape.search is not None:
         conditions.append(
-            or_(CaseInsensitiveLike(media.c.metadata, pattern), CaseInsensitiveLike(media.c.created_at, pattern))
+            or_(
+                CaseInsensitiveLike(media.c.metadata, "pattern", shape.search),
+                CaseInsensitiveLike(media.c.created_at, "pattern", shape.search),
+            )
         )
     return conditions
 

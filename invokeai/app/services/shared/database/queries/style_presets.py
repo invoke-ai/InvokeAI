@@ -19,7 +19,7 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
+from invokeai.app.services.shared.database.dialect import fold_case
 from invokeai.app.services.shared.database.queries.base import QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.style_presets import style_presets
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
@@ -51,8 +51,8 @@ def _update(fields: tuple[str, ...]) -> Update:
 
 @functools.cache
 def _list(visible_to_all: bool, scoped: bool, typed: bool) -> Select[Any]:
-    """The presets an account sees, in name order: an administrator every one, anyone else the bundled and shared
-    ones, and with `scoped` also its own."""
+    """The presets an account sees: an administrator every one, anyone else the bundled and shared ones, and with
+    `scoped` also its own. In no order: `_presets` sorts them."""
     statement = select(*_COLUMNS)
     if not visible_to_all:
         visible = [_P.type == literal(PresetType.Default.value), _P.is_public == true()]
@@ -61,8 +61,7 @@ def _list(visible_to_all: bool, scoped: bool, typed: bool) -> Select[Any]:
         statement = statement.where(or_(*visible))
     if typed:
         statement = statement.where(_P.type == bindparam("type"))
-    # The id breaks ties, so that equal names keep one order.
-    return statement.order_by(CaseInsensitiveOrder(_P.name), _P.id)
+    return statement
 
 
 def _preset(row: Sequence[Any]) -> StylePresetRecordDTO:
@@ -74,7 +73,8 @@ def _preset_or_none(row: Optional[Sequence[Any]]) -> Optional[StylePresetRecordD
 
 
 def _presets(rows: Sequence[Sequence[Any]]) -> list[StylePresetRecordDTO]:
-    return [_preset(row) for row in rows]
+    # By name ignoring case, then id, so that equal names keep one order. Here, outside the transaction.
+    return [_preset(row) for row in sorted(rows, key=lambda row: (fold_case(row[1]), row[0]))]
 
 
 class StylePresetQueries(QueryModule):
@@ -88,7 +88,7 @@ class StylePresetQueries(QueryModule):
     def all(
         self, conn: Connection, *, type: Optional[PresetType], user_id: Optional[str], is_admin: bool
     ) -> Sequence[Row[Any]]:
-        """The presets the account sees, of `type` if given, in name order."""
+        """The presets the account sees, of `type` if given, by name ignoring case."""
         statement = _list(is_admin, user_id is not None, type is not None)
         return conn.execute(statement, {"user_id": user_id, "type": type}).all()
 

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fontTools.fontBuilder import FontBuilder
@@ -28,7 +29,7 @@ from invokeai.app.services.fonts.fonts_default import MAX_INDEXED_FONT_BYTES, Fo
 from invokeai.app.services.fonts.fonts_parsing import parse_font_bytes
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import fonts as font_queries
-from invokeai.app.services.shared.database.queries.fonts import FontQueries, UploadedFont
+from invokeai.app.services.shared.database.queries.fonts import DirectoryFont, FontQueries, UploadedFont
 from invokeai.app.services.shared.database.schema.fonts import fonts as fonts_table
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
@@ -523,6 +524,54 @@ def test_listing_filters_by_account_scope_and_hash_and_orders_ignoring_case(
     assert font_service.list(user_id=bob, scope=FontScope.PRIVATE)[1] == 1
 
 
+def test_listing_orders_by_the_folded_family_and_label_beyond_ascii(
+    font_service: FontService, database: Database
+) -> None:
+    # `å` sorts after `z`; `Åland` and `åland` are one family, ordered by label, then id.
+    _catalog_upload(database, "font_1", "zebra", owner_id=None, digit="a")
+    _catalog_upload(database, "font_2", "Åland", owner_id=None, label="Bold", digit="b")
+    _catalog_upload(database, "font_3", "åland", owner_id=None, label="bold", digit="c")
+    _catalog_upload(database, "font_4", "Ångström", owner_id=None, digit="d")
+    _catalog_upload(database, "font_5", "åland", owner_id=None, label="Åbold", digit="e")
+
+    records, total = font_service.list(user_id="system")
+
+    assert ([record.id for record in records], total) == (["font_1", "font_2", "font_3", "font_5", "font_4"], 5)
+
+
+def test_the_keys_of_a_font_are_its_folded_family_and_label_after_each_write(database: Database) -> None:
+    def keys() -> list[tuple[Any, ...]]:
+        with database.begin(write=False) as conn:
+            columns = (fonts_table.c.family, fonts_table.c.label, fonts_table.c.family_key, fonts_table.c.label_key)
+            return [tuple(row) for row in conn.execute(select(*columns).order_by(fonts_table.c.id)).all()]
+
+    _catalog_upload(database, "font_a", "ÅLAND Sans", owner_id=None, label="Ångström Bold", digit="a")
+    directory = DirectoryFont(
+        id="font_dir",
+        filename="Dir.ttf",
+        source_path="Dir.ttf",
+        family="ÅLAND Serif",
+        label="Regular",
+        style="normal",
+        weight=400,
+        content_hash="b" * 64,
+        byte_size=100,
+        axes=(),
+        instances=(),
+    )
+    database.queries.fonts.replace_directory_fonts([directory], frozenset({"font_dir"}))
+    assert keys()[1][2:] == ("åland serif", "regular")
+
+    database.queries.fonts.replace_directory_fonts(
+        [directory._replace(family="Ångström Serif", label="ÅLAND")], frozenset({"font_dir"})
+    )
+
+    assert keys() == [
+        ("ÅLAND Sans", "Ångström Bold", "åland sans", "ångström bold"),
+        ("Ångström Serif", "ÅLAND", "ångström serif", "åland"),
+    ]
+
+
 def test_listing_search_matches_text_ignoring_case(font_service: FontService, database: Database) -> None:
     _catalog_upload(database, "font_percent", "Grotesk 100%", owner_id=None, digit="a")
     _catalog_upload(database, "font_thousand", "Grotesk 1000", owner_id=None, digit="b")
@@ -539,6 +588,18 @@ def test_listing_search_matches_text_ignoring_case(font_service: FontService, da
     assert found("FONT_SPACE.TTF") == ["font_space"]
     first, total = font_service.list(user_id="system", search="grotesk", limit=1)
     assert ([record.id for record in first], total) == (["font_percent"], 2)
+
+
+def test_listing_search_ignores_the_case_of_letters_beyond_ascii(font_service: FontService, database: Database) -> None:
+    _catalog_upload(database, "font_upper", "ÅLAND Sans", owner_id=None, digit="a")
+    _catalog_upload(database, "font_serif", "ÅLAND Serif", owner_id=None, digit="b")
+    _catalog_upload(database, "font_plain", "Aland Mono", owner_id=None, digit="c")
+
+    def found(search: str) -> list[str]:
+        return [record.id for record in font_service.list(user_id="system", search=search)[0]]
+
+    assert found("åland") == ["font_upper", "font_serif"]
+    assert found("ÅLAND SANS") == ["font_upper"]
 
 
 def test_quota_counts_each_place_of_uploads_on_its_own(

@@ -6,7 +6,6 @@ from collections.abc import Collection, Sequence
 from typing import Any, Literal, NamedTuple, Optional, Unpack
 
 from sqlalchemy import (
-    BindParameter,
     ColumnElement,
     Connection,
     Row,
@@ -25,7 +24,13 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveLike, CaseInsensitiveOrder, like_contains
+from invokeai.app.services.shared.database.dialect import (
+    CaseInsensitiveLike,
+    fold_case,
+    like_contains,
+    like_parameters,
+    like_slots,
+)
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.workflows import workflow_library
 from invokeai.app.services.shared.database.types import now_text
@@ -56,6 +61,8 @@ class _Shape(NamedTuple):
     categories: tuple[WorkflowCategory, ...]
     # How many tags a workflow is looked for under, any of them.
     tags: int
+    # The replacement slots of the patterns the tags and the text are matched with (`LikePattern.slots`).
+    folds: int
     has_been_opened: Optional[bool]
     # Whether a text is looked for in the name, description and tags.
     searching: bool
@@ -94,19 +101,23 @@ def _where(
     searched = query.strip() if query else ""
     tags = list(tags or ())
     slots = _slots(len(tags))
+    tag_patterns = [like_contains(tag.strip()) for tag in tags]
+    query_pattern = like_contains(searched) if searched else None
+    folds = like_slots(*tag_patterns, query_pattern)
     shape = _Shape(
         categories=tuple(sorted({WorkflowCategory(category) for category in categories or ()})),
         tags=slots,
+        folds=folds,
         has_been_opened=_flag(has_been_opened),
         searching=bool(searched),
         scoped=user_id is not None,
         is_public=_flag(is_public),
     )
-    parameters: dict[str, Any] = {
-        f"tag_{i}": like_contains(tags[i].strip()) if i < len(tags) else None for i in range(slots)
-    }
-    if searched:
-        parameters["query"] = like_contains(searched)
+    parameters: dict[str, Any] = {}
+    for i in range(slots):
+        parameters.update(like_parameters(f"tag_{i}", tag_patterns[i] if i < len(tags) else None, folds))
+    if query_pattern is not None:
+        parameters.update(like_parameters("query", query_pattern, folds))
     if user_id is not None:
         parameters["user_id"] = user_id
     return shape, parameters
@@ -127,13 +138,13 @@ _SUMMARY_COLUMNS = (
 _LIST_COLUMNS = (*_SUMMARY_COLUMNS, _W.description, _W.category, _W.tags)
 _SUMMARY_NAMES = tuple(column.name for column in _SUMMARY_COLUMNS)
 _LIST_NAMES = tuple(column.name for column in _LIST_COLUMNS)
-# Names sort ignoring case, as model names do.
+# Names sort by their folded form, kept in `name_key` (see the schema).
 _ORDER_COLUMNS: dict[WorkflowRecordOrderBy, ColumnElement[Any]] = {
     WorkflowRecordOrderBy.CreatedAt: _W.created_at,
     WorkflowRecordOrderBy.UpdatedAt: _W.updated_at,
     WorkflowRecordOrderBy.OpenedAt: _W.opened_at,
     WorkflowRecordOrderBy.LastRunAt: _W.last_run_at,
-    WorkflowRecordOrderBy.Name: CaseInsensitiveOrder(_W.name),
+    WorkflowRecordOrderBy.Name: _W.name_key,
     WorkflowRecordOrderBy.IsPublic: _W.is_public,
 }
 # Workflows never opened or run sort after the others in both directions. Both dialects sort NULL lowest, and MySQL
@@ -154,12 +165,14 @@ _INSERT = insert(workflow_library)
 _SAVE = (
     update(workflow_library)
     .where(_W.workflow_id == bindparam("target_workflow_id"))
-    .values(workflow=bindparam("new_workflow"), revision=_W.revision + 1)
+    .values(workflow=bindparam("new_workflow"), name_key=bindparam("new_name_key"), revision=_W.revision + 1)
 )
 _SET_PUBLIC = (
     update(workflow_library)
     .where(_W.workflow_id == bindparam("target_workflow_id"))
-    .values(workflow=bindparam("new_workflow"), is_public=bindparam("new_is_public"))
+    .values(
+        workflow=bindparam("new_workflow"), name_key=bindparam("new_name_key"), is_public=bindparam("new_is_public")
+    )
 )
 _DELETE = delete(workflow_library).where(_THE_WORKFLOW)
 
@@ -170,16 +183,15 @@ def _conditions(shape: _Shape) -> list[ColumnElement[bool]]:
     if shape.categories:
         conditions.append(_W.category.in_([literal(category.value) for category in shape.categories]))
     if shape.tags:
-        conditions.append(or_(*(CaseInsensitiveLike(_W.tags, bindparam(f"tag_{i}")) for i in range(shape.tags))))
+        conditions.append(or_(*(CaseInsensitiveLike(_W.tags, f"tag_{i}", shape.folds) for i in range(shape.tags))))
     if shape.has_been_opened is not None:
         conditions.append(_W.opened_at.is_not(None) if shape.has_been_opened else _W.opened_at.is_(None))
     if shape.searching:
-        query: BindParameter[str] = bindparam("query")
         conditions.append(
             or_(
-                CaseInsensitiveLike(_W.name, query),
-                CaseInsensitiveLike(_W.description, query),
-                CaseInsensitiveLike(_W.tags, query),
+                CaseInsensitiveLike(_W.name, "query", shape.folds),
+                CaseInsensitiveLike(_W.description, "query", shape.folds),
+                CaseInsensitiveLike(_W.tags, "query", shape.folds),
             )
         )
     if shape.scoped:
@@ -217,10 +229,10 @@ def _count(shape: _Shape) -> Select[Any]:
 
 
 @functools.lru_cache(maxsize=256)
-def _tag_counts(slots: int, shape: _Shape) -> Select[Unpack[tuple[Any, ...]]]:
+def _tag_counts(slots: int, folds: int, shape: _Shape) -> Select[Unpack[tuple[Any, ...]]]:
     """How many of the workflows `shape` covers have each tag, in one pass."""
     counts: list[ColumnElement[int]] = [
-        func.count(case((CaseInsensitiveLike(_W.tags, bindparam(f"count_{i}")), 1))) for i in range(slots)
+        func.count(case((CaseInsensitiveLike(_W.tags, f"count_{i}", folds), 1))) for i in range(slots)
     ]
     return select(*counts).where(*_conditions(shape))
 
@@ -357,8 +369,13 @@ class WorkflowQueries(QueryModule):
         counts: list[int] = []
         for chunk in itertools.batched(tags, _TAG_SLOTS):
             slots = _slots(len(chunk))
-            patterns = {f"count_{i}": like_contains(chunk[i].strip()) if i < len(chunk) else None for i in range(slots)}
-            row: Sequence[Any] = conn.execute(_tag_counts(slots, shape), {**parameters, **patterns}).one()
+            like = [like_contains(tag.strip()) for tag in chunk]
+            folds = like_slots(*like)
+            patterns: dict[str, Any] = {}
+            for i in range(slots):
+                patterns.update(like_parameters(f"count_{i}", like[i] if i < len(chunk) else None, folds))
+            statement = _tag_counts(slots, folds, shape)
+            row: Sequence[Any] = conn.execute(statement, {**parameters, **patterns}).one()
             counts.extend(row[: len(chunk)])
         return counts
 
@@ -396,22 +413,40 @@ class WorkflowQueries(QueryModule):
         return list(conn.execute(_tag_lists(shape), parameters).scalars().all())
 
     @write
-    def insert(self, conn: Connection, *, workflow_id: str, workflow: str, user_id: str, is_public: bool) -> None:
-        """Adds a workflow at revision 1."""
+    def insert(
+        self, conn: Connection, *, workflow_id: str, workflow: str, name: str, user_id: str, is_public: bool
+    ) -> None:
+        """Adds a workflow at revision 1. `name` is the name `workflow`, the document, holds."""
         conn.execute(
-            _INSERT, {"workflow_id": workflow_id, "workflow": workflow, "user_id": user_id, "is_public": is_public}
+            _INSERT,
+            {
+                "workflow_id": workflow_id,
+                "workflow": workflow,
+                "name_key": fold_case(name),
+                "user_id": user_id,
+                "is_public": is_public,
+            },
         )
 
     @write
-    def save(self, conn: Connection, workflow_id: str, workflow: str) -> None:
-        """Writes the workflow's document as its next revision."""
-        conn.execute(_SAVE, {"target_workflow_id": workflow_id, "new_workflow": workflow})
+    def save(self, conn: Connection, workflow_id: str, workflow: str, name: str) -> None:
+        """Writes the workflow's document as its next revision. `name` is the name the document holds."""
+        conn.execute(
+            _SAVE, {"target_workflow_id": workflow_id, "new_workflow": workflow, "new_name_key": fold_case(name)}
+        )
 
     @write
-    def set_public(self, conn: Connection, workflow_id: str, workflow: str, is_public: bool) -> None:
-        """Writes whether the workflow is shared, with its document carrying the matching tag; the revision stays."""
+    def set_public(self, conn: Connection, workflow_id: str, workflow: str, name: str, is_public: bool) -> None:
+        """Writes whether the workflow is shared, with its document carrying the matching tag; the revision stays.
+        `name` is the name the document holds."""
         conn.execute(
-            _SET_PUBLIC, {"target_workflow_id": workflow_id, "new_workflow": workflow, "new_is_public": is_public}
+            _SET_PUBLIC,
+            {
+                "target_workflow_id": workflow_id,
+                "new_workflow": workflow,
+                "new_name_key": fold_case(name),
+                "new_is_public": is_public,
+            },
         )
 
     @write

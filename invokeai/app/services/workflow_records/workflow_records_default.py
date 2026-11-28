@@ -102,7 +102,11 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             try:
                 q.workflows.insert(
-                    workflow_id=workflow_with_id.id, workflow=document_json, user_id=user_id, is_public=is_public
+                    workflow_id=workflow_with_id.id,
+                    workflow=document_json,
+                    name=workflow_with_id.name,
+                    user_id=user_id,
+                    is_public=is_public,
                 )
             except UniqueViolation as error:
                 # Only a reserved id can collide; a generated one is unique for practical purposes.
@@ -148,7 +152,7 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 raise WorkflowAccessDeniedError(workflow.id)
             if expected_revision is not None and stored.revision != expected_revision:
                 raise WorkflowRevisionConflictError(workflow.id, expected_revision, stored.revision)
-            q.workflows.save(workflow.id, document_json)
+            q.workflows.save(workflow.id, document_json, workflow.name)
             q.media_references.replace(
                 owner_kind="workflow", user_id=owner, owner_id=workflow.id, references=references
             )
@@ -193,7 +197,7 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
             workflow = workflow.model_copy(update={"tags": ", ".join(tags_list)})
             # Visibility is bookkeeping: the `shared` tag rewrite does not advance the content revision, so an editor
             # holding the previous revision is not asked to resolve a conflict it cannot see.
-            q.workflows.set_public(workflow_id, workflow.model_dump_json(), is_public)
+            q.workflows.set_public(workflow_id, workflow.model_dump_json(), workflow.name, is_public)
             return q.workflows.summary(workflow_id), workflow
 
         summary, workflow = self._queries.run(change)
@@ -320,13 +324,14 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 q.workflows.insert(
                     workflow_id=workflow.id,
                     workflow=workflow.model_dump_json(),
+                    name=workflow.name,
                     user_id=WORKFLOW_LIBRARY_DEFAULT_USER_ID,
                     is_public=False,
                 )
             for workflow in changed:
                 # Not `update`, which refuses bundled workflows. A changed bundle is new content, so its revision
                 # advances like any other write.
-                q.workflows.save(workflow.id, workflow.model_dump_json())
+                q.workflows.save(workflow.id, workflow.model_dump_json(), workflow.name)
             return obsolete, missing, changed
 
         obsolete, missing, changed = self._queries.run(sync)

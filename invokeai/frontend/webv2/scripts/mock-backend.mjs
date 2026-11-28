@@ -18,6 +18,17 @@ import {
 import { fixturePng, mediaDimensions } from './mock-media.mjs';
 import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
+/**
+ * The server's case folding (`fold_case` in the database layer): each character becomes its simple lowercase, and
+ * stays as it is where that lowercase is more than one character (`İ`).
+ */
+const foldCase = (text) =>
+  Array.from(String(text), (character) => {
+    const lowered = character.toLowerCase();
+
+    return Array.from(lowered).length === 1 ? lowered : character;
+  }).join('');
+
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
 
@@ -919,7 +930,7 @@ const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = 
   const mediaKind = getRequestedMediaKind(url);
   const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
-  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const searchTerm = foldCase(url.searchParams.get('search_term')?.trim() ?? '');
 
   return getGalleryCandidates(state)
     .filter(({ item, origin: itemOrigin, searchable }) => {
@@ -955,7 +966,7 @@ const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = 
         return false;
       }
       if (searchTerm) {
-        const document = `${JSON.stringify(searchable ?? {})} ${item.created_at}`.toLocaleLowerCase();
+        const document = foldCase(`${JSON.stringify(searchable ?? {})} ${item.created_at}`);
 
         if (!document.includes(searchTerm)) {
           return false;
@@ -1011,7 +1022,7 @@ const listVideos = (state, url) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
   const intermediate = getOptionalBoolean(url, 'is_intermediate');
-  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const searchTerm = foldCase(url.searchParams.get('search_term')?.trim() ?? '');
   const orderDir = url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const starredFirst = url.searchParams.get('starred_first') !== 'false';
   const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
@@ -1032,8 +1043,7 @@ const listVideos = (state, url) => {
       }
 
       return (
-        !searchTerm ||
-        `${JSON.stringify(video.metadata ?? {})} ${video.created_at}`.toLocaleLowerCase().includes(searchTerm)
+        !searchTerm || foldCase(`${JSON.stringify(video.metadata ?? {})} ${video.created_at}`).includes(searchTerm)
       );
     })
     .map(toVideoDto)
@@ -1156,7 +1166,7 @@ const listImages = (state, url) => {
   const createdFrom = url.searchParams.get('created_from');
   const createdTo = url.searchParams.get('created_to');
   const orderDir = url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const searchTerm = foldCase(url.searchParams.get('search_term')?.trim() ?? '');
   const starredFirst = url.searchParams.get('starred_first') === 'true';
   const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
   const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 100) || 0);
@@ -1179,7 +1189,7 @@ const listImages = (state, url) => {
       return false;
     }
 
-    return !searchTerm || image.image_name.toLocaleLowerCase().includes(searchTerm);
+    return !searchTerm || foldCase(image.image_name).includes(searchTerm);
   });
 
   items.sort((left, right) => {
@@ -3597,7 +3607,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
 
       if (method === 'GET' && (path === '/api/v1/workflows' || path === '/api/v1/workflows/')) {
         const categories = url.searchParams.getAll('categories');
-        const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
+        const query = foldCase(url.searchParams.get('query')?.trim() ?? '');
         const tags = url.searchParams.getAll('tags');
         const isPublic = url.searchParams.get('is_public');
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
@@ -3608,11 +3618,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
-        // As the server: NOCASE names, NULLs last in both directions, the id breaking ties.
-        const sortKey = (workflow) =>
-          orderBy === 'name'
-            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
-            : (workflow[orderBy] ?? null);
+        // As the server: names folded, NULLs last in both directions, the id breaking ties.
+        const sortKey = (workflow) => (orderBy === 'name' ? foldCase(workflow.name) : (workflow[orderBy] ?? null));
         const compare = (left, right) => (left === right ? 0 : left < right ? -1 : 1);
         const compareKeys = (left, right) =>
           left === right ? 0 : left === null ? 1 : right === null ? -1 : sign * compare(left, right);
@@ -3620,7 +3627,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           .filter(
             (workflow) =>
               (categories.length === 0 || categories.includes(workflow.category)) &&
-              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (!query ||
+                foldCase(`${workflow.name}\n${workflow.description}\n${workflow.tags ?? ''}`).includes(query)) &&
               (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag))) &&
               (isPublic === null || String(workflow.is_public) === isPublic) &&
               matchesOpened(workflow)

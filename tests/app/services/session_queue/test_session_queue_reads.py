@@ -438,6 +438,14 @@ class TestServiceReads:
             "TOOL_RUN:upper",
         }
 
+    def test_an_origin_prefix_ignores_the_case_of_letters_beyond_ascii(
+        self, database: Database, service: SessionQueue
+    ) -> None:
+        for origin in ("Åland:one", "åland:two", "ÅLAND:three", "Aland:four", "xÅland:five"):
+            _item(database, origin=origin)
+
+        assert service.get_unfinished_origins(QUEUE, "ÅLAND:") == {"Åland:one", "åland:two", "ÅLAND:three"}
+
     def test_batch_status_and_destination_counts(self, database: Database, service: SessionQueue) -> None:
         _item(database, batch_id="b", status="pending", origin="canvas", destination="gallery")
         _item(database, batch_id="b", status="completed", origin="canvas", destination="gallery")

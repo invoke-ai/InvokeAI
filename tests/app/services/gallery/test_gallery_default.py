@@ -1051,9 +1051,22 @@ class TestFilters:
             user_id="alice",
         )
 
-        result = services["gallery"].list_item_names(search_term="ÄPFEL", is_admin=True)
+        services["images"].save(
+            image_name="capitals.png",
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            width=8,
+            height=8,
+            has_workflow=False,
+            metadata='{"prompt": "FRISCHE ÄPFEL"}',
+            user_id="alice",
+        )
+        _save_marked_video(services["videos"], "video.mp4", user_id="alice", metadata='{"prompt": "Äpfel"}')
 
-        assert [item.name for item in result.items] == ["apples.png"]
+        for term in ("äpfel", "ÄPFEL"):
+            result = services["gallery"].list_item_names(search_term=term, is_admin=True)
+
+            assert sorted(item.name for item in result.items) == ["apples.png", "capitals.png", "video.mp4"]
 
     def test_the_categories_filter_applies_to_both_kinds_in_pages_and_names(self, services) -> None:
         for name, category in (("general.png", ImageCategory.GENERAL), ("control.png", ImageCategory.CONTROL)):

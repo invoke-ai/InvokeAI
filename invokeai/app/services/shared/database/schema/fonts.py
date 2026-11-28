@@ -35,6 +35,11 @@ fonts = table(
     inserted_at(),
     # Set by the font service; no trigger ever maintained it.
     inserted_at("updated_at"),
+    # `fold_case(family)` and `fold_case(label)`, which the listing sorts by: every writer of a font sets them
+    # (`queries/fonts.py`). Nullable only because the migration that added them could not make a column NOT NULL on
+    # SQLite. Last, where a migration adds them.
+    Column("family_key", LongText()),
+    Column("label_key", LongText()),
     CheckConstraint("scope IN ('private', 'shared')", name="scope"),
     CheckConstraint("source IN ('uploaded', 'directory')", name="source"),
     CheckConstraint("weight >= 1 AND weight <= 1000", name="weight"),
@@ -60,12 +65,12 @@ Index(
     sqlite_where=text("source = 'directory'"),
 )
 Index("idx_fonts_uploaded_hash", fonts.c.source, fonts.c.scope, fonts.c.owner_id, fonts.c.content_hash)
-# For listing by family, case-insensitively. Only SQLite has it: a server can neither index a column under
-# another collation nor sort by a prefix index, and `idx_fonts_uploaded_hash` serves the filter there.
+# For listing by family. Only SQLite has it: a server cannot sort by a prefix index, and
+# `idx_fonts_uploaded_hash` serves the filter there.
 Index(
     "idx_fonts_visible_private",
     fonts.c.source,
     fonts.c.scope,
     fonts.c.owner_id,
-    fonts.c.family.collate("NOCASE"),
+    fonts.c.family_key,
 ).ddl_if(dialect="sqlite")

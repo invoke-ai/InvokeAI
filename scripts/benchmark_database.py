@@ -51,6 +51,16 @@ SYSTEM_PROMPTS = 20
 WILDCARDS = 25
 MODELS = 500
 VIDEOS = 2_000
+# The catalog of fonts and the queue's items that a search, or a prefix of the origin, reads.
+FONTS = 2_000
+QUEUE_ITEMS = 5_000
+# Searches. On SQLite each letter beyond ASCII costs a `replace()` pass over every row: ASCII text needs none, `å`
+# one pair, and eight Greek letters with one capital each the most a pattern has (8). None of the terms occurs in the
+# seeded text, so each scans every row. (Spelled with escapes so that the file is read the same wherever it is checked
+# out.)
+SEARCH_PLAIN = "landscape neon"
+SEARCH_NON_ASCII = "\u00e5land"
+SEARCH_GREEK = "\u03b1\u03b2\u03b3\u03b4\u03b5\u03b6\u03b7\u03bb"
 WORKFLOW_TAGS = ["sdxl", "flux", "upscale", "inpaint", "video", "portrait", "landscape", "controlnet"]
 
 
@@ -119,7 +129,7 @@ class Services:
 
 def _metadata(rng: random.Random) -> str:
     words = ["portrait", "landscape", "cinematic", "volumetric", "light", "detailed", "film", "grain", "neon"]
-    prompt = " ".join(rng.choice(words) for _ in range(120))
+    prompt = " ".join(rng.choice(words) for _ in range(250))
     return json.dumps(
         {
             "generation_mode": "txt2img",
@@ -299,7 +309,47 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
         services.wildcard_records.create(WildcardWithoutId(name=f"set{i}", values=values), user_id="user-0")
     for i in range(MODELS):
         services.model_records.add_model(_model_config(i))
+    _seed_fonts_and_queue(services)
     return names
+
+
+def _seed_fonts_and_queue(services: Services) -> None:
+    from invokeai.app.services.fonts.fonts_common import FontScope
+    from invokeai.app.services.shared.database.queries.fonts import UploadedFont
+
+    for i in range(FONTS):
+        services.database.queries.fonts.insert_upload(
+            UploadedFont(
+                id=f"font-{i}",
+                owner_id=None,
+                scope=FontScope.SHARED,
+                filename=f"font-{i}.ttf",
+                storage_path=f"font-{i}.ttf",
+                family=f"Family {i} Sans" if i % 2 else f"Family {i} Serif",
+                label="Regular" if i % 3 else "Bold Condensed",
+                style="normal",
+                weight=400,
+                content_hash=f"{i:064x}",
+                byte_size=100,
+                axes=(),
+                instances=(),
+            )
+        )
+    origins = ["canvas", "workflows", "tool_run:upscale", "tool_run:segment", "api"]
+    statuses = ["pending", "in_progress", "completed", "failed"]
+    with services.database.queries.transaction() as q:
+        for i in range(QUEUE_ITEMS):
+            q.session_queue.insert_item(
+                {
+                    "queue_id": "default",
+                    "batch_id": f"batch-{i // 10}",
+                    "session_id": f"session-{i}",
+                    "session": "{}",
+                    "status": statuses[i % len(statuses)],
+                    "user_id": "system",
+                    "origin": f"{origins[i % len(origins)]}:{i}",
+                }
+            )
 
 
 def _operations(
@@ -331,7 +381,7 @@ def _operations(
     def board_dto_queries() -> object:
         # The queries of `BoardService.get_dto`: the board with the project claiming it, and its counts.
         return (
-            services.board_records.get_with_project_id(a_board),
+            services.board_records.get_with_inbox_project(a_board),
             services.board_image_records.get_counts_for_board(a_board),
             services.board_video_records.get_counts_for_board(a_board),
         )
@@ -378,6 +428,8 @@ def _operations(
     model_keys = [str(uuid.UUID(int=i)) for i in range(MODELS)]
 
     general = [ImageCategory.GENERAL]
+    from invokeai.app.services.fonts.fonts_common import FontScope
+
     video_names = services.video_records.get_video_names(user_id="system", is_admin=True).video_names
 
     def save_image() -> object:
@@ -432,6 +484,58 @@ def _operations(
             ),
             10,
         ),
+        # A search reads every image's metadata, which holds a few KB of JSON.
+        "image_records.get_many(search, ASCII)": (
+            lambda: services.image_records.get_many(
+                limit=100, search_term=SEARCH_PLAIN, user_id="system", is_admin=True
+            ),
+            10,
+        ),
+        "image_records.get_many(search, non-ASCII)": (
+            lambda: services.image_records.get_many(
+                limit=100, search_term=SEARCH_NON_ASCII, user_id="system", is_admin=True
+            ),
+            10,
+        ),
+        "image_records.get_many(search, Greek, 8 pairs)": (
+            lambda: services.image_records.get_many(
+                limit=100, search_term=SEARCH_GREEK, user_id="system", is_admin=True
+            ),
+            10,
+        ),
+        "gallery.get_item_names(search, ASCII)": (
+            lambda: services.gallery.get_item_names(search_term=SEARCH_PLAIN, user_id="system", is_admin=True),
+            10,
+        ),
+        "gallery.get_item_names(search, non-ASCII)": (
+            lambda: services.gallery.get_item_names(search_term=SEARCH_NON_ASCII, user_id="system", is_admin=True),
+            10,
+        ),
+        "fonts.page(search, ASCII)": (
+            lambda: services.database.queries.fonts.page(
+                user_id="system", scope=FontScope.SHARED, content_hash=None, search="sans", offset=0, limit=50
+            ),
+            50,
+        ),
+        "fonts.page(search, non-ASCII)": (
+            lambda: services.database.queries.fonts.page(
+                user_id="system",
+                scope=FontScope.SHARED,
+                content_hash=None,
+                search=SEARCH_NON_ASCII,
+                offset=0,
+                limit=50,
+            ),
+            50,
+        ),
+        "session_queue.unfinished_origins(prefix, ASCII)": (
+            lambda: services.database.queries.session_queue.unfinished_origins("default", "tool_run:"),
+            50,
+        ),
+        "session_queue.unfinished_origins(prefix, non-ASCII)": (
+            lambda: services.database.queries.session_queue.unfinished_origins("default", SEARCH_NON_ASCII),
+            50,
+        ),
         "gallery.list_items(page of 100)": (
             lambda: services.gallery.list_items(
                 limit=100, categories=general, is_intermediate=False, user_id="system", is_admin=True
@@ -456,6 +560,10 @@ def _operations(
             lambda: services.client_state.get_keys_by_prefix("system", "canvas_snapshot:"),
             200,
         ),
+        "client_state.get_keys_by_prefix(non-ASCII)": (
+            lambda: services.client_state.get_keys_by_prefix("system", SEARCH_NON_ASCII + ":"),
+            200,
+        ),
         "client_state.set_by_key": (
             lambda: services.client_state.set_by_key("system", "canvas", json.dumps({"imageName": next(sample)})),
             200,
@@ -468,6 +576,30 @@ def _operations(
         "workflows.get_many(page of 50)": (
             lambda: services.workflow_records.get_many(
                 WorkflowRecordOrderBy.Name, SQLiteDirection.Ascending, library, page=0, per_page=50, user_id="system"
+            ),
+            50,
+        ),
+        "workflows.get_many(search, ASCII)": (
+            lambda: services.workflow_records.get_many(
+                WorkflowRecordOrderBy.Name,
+                SQLiteDirection.Ascending,
+                library,
+                page=0,
+                per_page=50,
+                query="upscale",
+                user_id="system",
+            ),
+            50,
+        ),
+        "workflows.get_many(search, non-ASCII)": (
+            lambda: services.workflow_records.get_many(
+                WorkflowRecordOrderBy.Name,
+                SQLiteDirection.Ascending,
+                library,
+                page=0,
+                per_page=50,
+                query=SEARCH_NON_ASCII,
+                user_id="system",
             ),
             50,
         ),
