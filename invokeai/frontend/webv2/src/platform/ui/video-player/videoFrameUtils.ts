@@ -1,8 +1,6 @@
 import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 
-import type { VideoFrameCopyFailureReason, VideoFrameCopyResult } from './videoFrameCopyKeys';
-
-export type { VideoFrameCopyFailureReason, VideoFrameCopyResult };
+import type { VideoFrameCopyResult } from './videoFrameCopyKeys';
 
 /** Seek far enough from zero to clear poster state and display native-resolution frame zero. */
 export const FIRST_FRAME_SEEK_SECONDS = 0.0001;

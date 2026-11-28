@@ -667,6 +667,144 @@ describe('queueCoordinator', () => {
     expect(harness.progressEntries.get('local-wf-parallel')?.slotPercentages).toEqual({ 1: 0.1 });
   });
 
+  it('repins from root progress to a second saved-workflow child and restores root tracking afterwards', async () => {
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-second-call',
+      enqueued: 1,
+      itemIds: [701],
+      requested: 1,
+    });
+
+    await harness.coordinator.submitGenerate('local-wf-second', {
+      ...generateRequest,
+      graph: { edges: [], id: 'g', nodes: { call1: { id: 'call1', type: 'call_saved_workflow' } } },
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 701, status: 'waiting' }));
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Child 1',
+      percentage: 0.8,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call1',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: 0.8 });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 801, status: 'completed' }));
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toBeUndefined();
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 701 }),
+      invocation_source_id: 'root_node',
+      message: 'Root node',
+      percentage: 0.5,
+      session_id: 'root-session',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: 0.5 });
+
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 701 }),
+      invocation_source_id: 'call2',
+      session_id: 'root-session',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: null });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 802 }),
+      message: 'Child 2',
+      percentage: 0.3,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call2',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: 0.3 });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 802 }),
+      message: 'Child 2',
+      percentage: 0.9,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call2',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: 0.9 });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 802, status: 'completed' }));
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: null });
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 701 }),
+      invocation_source_id: 'root_post',
+      message: 'Root post',
+      percentage: 0.6,
+      session_id: 'root-session',
+    });
+    expect(harness.progressEntries.get('local-wf-second')?.slotPercentages).toEqual({ 1: 0.6 });
+  });
+
+  it('repins from a parent child to a nested grandchild workflow call and releases canceled children', async () => {
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-nested-call',
+      enqueued: 1,
+      itemIds: [701],
+      requested: 1,
+    });
+
+    await harness.coordinator.submitGenerate('local-wf-nested', {
+      ...generateRequest,
+      graph: { edges: [], id: 'g', nodes: { call: { id: 'call', type: 'call_saved_workflow' } } },
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 701, status: 'waiting' }));
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Child own node',
+      parent_item_id: 701,
+      percentage: 0.6,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-nested')?.slotPercentages).toEqual({ 1: 0.6 });
+
+    harness.socket.fire('invocation_started', {
+      ...createStatusEvent({ item_id: 801 }),
+      invocation_source_id: 'nested_call',
+      parent_item_id: 701,
+      root_item_id: 701,
+      session_id: 'child-session',
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-nested')?.slotPercentages).toEqual({ 1: null });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 901 }),
+      message: 'Grandchild denoise',
+      parent_item_id: 801,
+      percentage: 0.75,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-nested')?.slotPercentages).toEqual({ 1: 0.75 });
+
+    harness.socket.fire('queue_items_canceled', {
+      canceled_item_ids: [901],
+      canceled_item_ids_by_user: { system: [901] },
+      queue_id: 'default',
+      timestamp: 1,
+      user_ids: ['system'],
+    });
+    expect(harness.progressEntries.get('local-wf-nested')?.slotPercentages).toEqual({ 1: null });
+
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 801 }),
+      message: 'Child post',
+      parent_item_id: 701,
+      percentage: 0.85,
+      root_item_id: 701,
+      workflow_call_parent_source_id: 'call',
+    });
+    expect(harness.progressEntries.get('local-wf-nested')?.slotPercentages).toEqual({ 1: 0.85 });
+  });
+
   it('replays buffered progress and invocation_started in chronological order so frames stay while slotPercentages resets', async () => {
     harness.coordinator.connect();
     let resolveEnqueue!: (value: { batchId: string; enqueued: number; itemIds: number[]; requested: number }) => void;

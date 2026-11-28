@@ -380,11 +380,13 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       }
       event.preventDefault();
       event.stopPropagation();
+      activeDragRef.current?.abort();
+      activeDragRef.current = null;
+      clearCommitFallback();
+      setResizePreview(null);
       const nextWidth = clampCurrentImageWidth(target[0]);
       const nextHeight = clampCurrentImageHeight(target[1]);
       if (nextWidth !== savedWidth || nextHeight !== savedHeight) {
-        clearCommitFallback();
-        setResizePreview(null);
         editGraph(
           { height: nextHeight, nodeId: node.id, type: 'setCurrentImageNodeSize', width: nextWidth },
           { projectId, workflowId }

@@ -432,6 +432,7 @@ const PreviewVideo = ({
       }
 
       consumeVideoSpanPlaybackRequest(request.token);
+      pendingSpanRequestRef.current = null;
 
       if (!isVideoSpanPlaybackFresh(request.requestedAt)) {
         return;

@@ -394,7 +394,7 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
     }
   });
 
-  it('updates rendered size, size pill, and ARIA live during zoom-aware resize, holds preview until commit, and aborts cleanly on unmount', async () => {
+  it('updates rendered size, size pill, and ARIA live during zoom-aware drag and holds preview until commit', async () => {
     const editGraph = vi.fn();
     const adapter = createProjectAdapter({
       editGraph,
@@ -412,6 +412,130 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
     expect(handle.getAttribute('aria-valuemax')).toBe('1600');
     expect(handle.getAttribute('aria-valuenow')).toBe('320');
     expect(host.querySelector('[data-testid="current-image-node-reset-size"]')).toBeNull();
+
+    await act(() => {
+      handle.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          buttons: 1,
+          clientX: 100,
+          clientY: 100,
+          pointerId: 1,
+        })
+      );
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 160, clientY: 140, pointerId: 1 })
+      );
+    });
+    await nextFrame();
+    expect(handle.hasAttribute('data-dragging')).toBe(true);
+    expect(getComputedStyle(shell).width).toBe('440px');
+    expect(getComputedStyle(shell).height).toBe('400px');
+    expect(Math.round(shell.getBoundingClientRect().width)).toBe(220);
+    expect(Math.round(shell.getBoundingClientRect().height)).toBe(200);
+    expect(host.querySelector('[data-testid="current-image-node-reset-size"]')?.textContent).toBe('440×400 ↺');
+    expect(handle.getAttribute('aria-valuenow')).toBe('440');
+    expect(handle.getAttribute('aria-valuetext')).toBe(
+      i18n.t('widgets.floating.resizeValue', { height: 400, width: 440 })
+    );
+
+    await act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 160, clientY: 140, pointerId: 1 })
+      );
+    });
+    expect(handle.hasAttribute('data-dragging')).toBe(false);
+    expect(editGraph).toHaveBeenCalledExactlyOnceWith(
+      { height: 400, nodeId: currentImageNode.id, type: 'setCurrentImageNodeSize', width: 440 },
+      { projectId: 'project-a', workflowId: currentImageGraph.id }
+    );
+    await nextFrame();
+    await nextFrame();
+    expect(getComputedStyle(shell).width).toBe('440px');
+    expect(getComputedStyle(shell).height).toBe('400px');
+
+    const committedGraph: ProjectGraphState = {
+      ...currentImageGraph,
+      nodes: [{ ...currentImageNode, data: { ...currentImageNode.data, height: 400, width: 440 } }],
+    };
+    await renderNode(
+      createProjectAdapter({
+        editGraph,
+        graph: committedGraph,
+        isWorkflowRunning: false,
+        projectId: 'project-a',
+        queueItems: [],
+      }),
+      { graph: committedGraph, zoom: 0.5 }
+    );
+    expect(getComputedStyle(shell).width).toBe('440px');
+    expect(getComputedStyle(shell).height).toBe('400px');
+
+    await renderNode(adapter, { graph: currentImageGraph, zoom: 0.5 });
+    expect(getComputedStyle(shell).width).toBe('320px');
+    expect(getComputedStyle(shell).height).toBe('320px');
+  });
+
+  it('releases the held post-drag preview after the fallback timer when a commit is rejected', async () => {
+    const editGraph = vi.fn();
+    const adapter = createProjectAdapter({
+      editGraph,
+      isWorkflowRunning: false,
+      projectId: 'project-a',
+      queueItems: [],
+    });
+
+    await renderNode(adapter, { zoom: 0.5 });
+
+    const shell = host.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
+    const handle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await act(() => {
+        handle.dispatchEvent(
+          new PointerEvent('pointerdown', {
+            bubbles: true,
+            button: 0,
+            buttons: 1,
+            clientX: 100,
+            clientY: 100,
+            pointerId: 10,
+          })
+        );
+        window.dispatchEvent(
+          new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 150, clientY: 130, pointerId: 10 })
+        );
+      });
+      await act(() => {
+        window.dispatchEvent(
+          new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 150, clientY: 130, pointerId: 10 })
+        );
+      });
+      expect(getComputedStyle(shell).width).toBe('420px');
+      await act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(getComputedStyle(shell).width).toBe('320px');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores sub-threshold pointer jitter, cancels on Escape, and aborts cleanly on unmount', async () => {
+    const editGraph = vi.fn();
+    const adapter = createProjectAdapter({
+      editGraph,
+      isWorkflowRunning: false,
+      projectId: 'project-a',
+      queueItems: [],
+    });
+
+    await renderNode(adapter, { zoom: 0.5 });
+
+    const shell = host.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
+    const handle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
 
     await act(() => {
       handle.dispatchEvent(
@@ -444,104 +568,6 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
           buttons: 1,
           clientX: 100,
           clientY: 100,
-          pointerId: 2,
-        })
-      );
-      window.dispatchEvent(
-        new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 160, clientY: 140, pointerId: 2 })
-      );
-    });
-    await nextFrame();
-    expect(handle.hasAttribute('data-dragging')).toBe(true);
-    expect(getComputedStyle(shell).width).toBe('440px');
-    expect(getComputedStyle(shell).height).toBe('400px');
-    expect(Math.round(shell.getBoundingClientRect().width)).toBe(220);
-    expect(Math.round(shell.getBoundingClientRect().height)).toBe(200);
-    expect(host.querySelector('[data-testid="current-image-node-reset-size"]')?.textContent).toBe('440×400 ↺');
-    expect(handle.getAttribute('aria-valuenow')).toBe('440');
-    expect(handle.getAttribute('aria-valuetext')).toBe(
-      i18n.t('widgets.floating.resizeValue', { height: 400, width: 440 })
-    );
-
-    await act(() => {
-      window.dispatchEvent(
-        new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 160, clientY: 140, pointerId: 2 })
-      );
-    });
-    expect(handle.hasAttribute('data-dragging')).toBe(false);
-    expect(editGraph).toHaveBeenCalledExactlyOnceWith(
-      { height: 400, nodeId: currentImageNode.id, type: 'setCurrentImageNodeSize', width: 440 },
-      { projectId: 'project-a', workflowId: currentImageGraph.id }
-    );
-    await nextFrame();
-    await nextFrame();
-    expect(getComputedStyle(shell).width).toBe('440px');
-    expect(getComputedStyle(shell).height).toBe('400px');
-
-    const committedGraph: ProjectGraphState = {
-      ...currentImageGraph,
-      nodes: [{ ...currentImageNode, data: { ...currentImageNode.data, height: 400, width: 440 } }],
-    };
-    await renderNode(
-      createProjectAdapter({
-        editGraph,
-        graph: committedGraph,
-        isWorkflowRunning: false,
-        projectId: 'project-a',
-        queueItems: [],
-      }),
-      { graph: committedGraph, zoom: 0.5 }
-    );
-    expect(getComputedStyle(shell).width).toBe('440px');
-    expect(getComputedStyle(shell).height).toBe('400px');
-
-    // Undoing back to 320x320 must not resurrect the held 440x400 preview.
-    await renderNode(adapter, { graph: currentImageGraph, zoom: 0.5 });
-    expect(getComputedStyle(shell).width).toBe('320px');
-    expect(getComputedStyle(shell).height).toBe('320px');
-
-    // A rejected commit (parent never updates saved size) releases the held preview after the fallback timer.
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      editGraph.mockClear();
-      await act(() => {
-        handle.dispatchEvent(
-          new PointerEvent('pointerdown', {
-            bubbles: true,
-            button: 0,
-            buttons: 1,
-            clientX: 100,
-            clientY: 100,
-            pointerId: 10,
-          })
-        );
-        window.dispatchEvent(
-          new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 150, clientY: 130, pointerId: 10 })
-        );
-      });
-      await act(() => {
-        window.dispatchEvent(
-          new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 150, clientY: 130, pointerId: 10 })
-        );
-      });
-      expect(getComputedStyle(shell).width).toBe('420px');
-      await act(() => {
-        vi.advanceTimersByTime(500);
-      });
-      expect(getComputedStyle(shell).width).toBe('320px');
-    } finally {
-      vi.useRealTimers();
-    }
-
-    editGraph.mockClear();
-    await act(() => {
-      handle.dispatchEvent(
-        new PointerEvent('pointerdown', {
-          bubbles: true,
-          button: 0,
-          buttons: 1,
-          clientX: 100,
-          clientY: 100,
           pointerId: 3,
         })
       );
@@ -556,6 +582,45 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
     expect(editGraph).not.toHaveBeenCalled();
     expect(getComputedStyle(shell).width).toBe('320px');
 
+    await act(() => {
+      handle.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          buttons: 1,
+          clientX: 100,
+          clientY: 100,
+          pointerId: 4,
+        })
+      );
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 150, clientY: 150, pointerId: 4 })
+      );
+    });
+    await nextFrame();
+    await act(() => {
+      root.render(null);
+    });
+    await act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 150, clientY: 150, pointerId: 4 })
+      );
+    });
+    expect(editGraph).not.toHaveBeenCalled();
+  });
+
+  it('supports keyboard resize steps, clamping, and double-click reset', async () => {
+    const editGraph = vi.fn();
+    const adapter = createProjectAdapter({
+      editGraph,
+      isWorkflowRunning: false,
+      projectId: 'project-a',
+      queueItems: [],
+    });
+
+    await renderNode(adapter, { zoom: 0.5 });
+
+    const handle = host.querySelector<HTMLElement>('[data-testid="current-image-node-resize-handle"]')!;
     for (const [init, expected] of [
       [{ key: 'ArrowRight' }, { height: 320, width: 352 }],
       [
@@ -582,7 +647,22 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
       { projectId: 'project-a', workflowId: currentImageGraph.id }
     );
 
+    const minGraph: ProjectGraphState = {
+      ...currentImageGraph,
+      nodes: [{ ...currentImageNode, data: { ...currentImageNode.data, height: 160, width: 200 } }],
+    };
     editGraph.mockClear();
+    await renderNode(
+      createProjectAdapter({
+        editGraph,
+        graph: minGraph,
+        isWorkflowRunning: false,
+        projectId: 'project-a',
+        queueItems: [],
+      }),
+      { graph: minGraph, zoom: 0.5 }
+    );
+    const minShell = host.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
     await act(() => {
       handle.dispatchEvent(
         new PointerEvent('pointerdown', {
@@ -591,22 +671,21 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
           buttons: 1,
           clientX: 100,
           clientY: 100,
-          pointerId: 4,
+          pointerId: 7,
         })
       );
       window.dispatchEvent(
-        new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 150, clientY: 150, pointerId: 4 })
+        new PointerEvent('pointermove', { bubbles: true, buttons: 1, clientX: 160, clientY: 140, pointerId: 7 })
       );
     });
     await nextFrame();
+    expect(getComputedStyle(minShell).width).toBe('320px');
+
     await act(() => {
-      root.render(null);
+      handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Home' }));
     });
-    await act(() => {
-      window.dispatchEvent(
-        new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 150, clientY: 150, pointerId: 4 })
-      );
-    });
+    expect(handle.hasAttribute('data-dragging')).toBe(false);
+    expect(getComputedStyle(minShell).width).toBe('200px');
     expect(editGraph).not.toHaveBeenCalled();
   });
 
@@ -643,7 +722,6 @@ describe('CurrentImageFlowNode with production queue coordinator', () => {
       const shell = host.querySelector<HTMLElement>('[data-workflow-node-shell="true"]')!;
       expect(Math.round(shell.getBoundingClientRect().width)).toBe(200);
       expect(Math.round(shell.getBoundingClientRect().height)).toBe(160);
-      // Both Waiting and Generating header text stay hidden below 280 px so the title keeps room.
       expect(host.querySelector('[data-node-status-indicator="true"]')).toBeNull();
 
       await act(() => {

@@ -80,7 +80,6 @@ it('keeps drag grip, context menu, and span request handling eager while the laz
     );
 
   try {
-    // 1) A request made before the lazy player loads is consumed immediately by the eager shell so leaving retires it.
     requestVideoSpanPlayback({ endSeconds: 2, itemKey: SOURCE.itemKey, startSeconds: 0.5 });
 
     await act(async () => {
@@ -102,14 +101,11 @@ it('keeps drag grip, context menu, and span request handling eager while the laz
     });
     expect(onContextMenu).toHaveBeenCalledExactlyOnceWith(50, 60);
 
-    // Leave the clip before the chunk resolves so the consumed request is discarded with the shell instance.
     await act(() => {
       root.render(null);
     });
     expect(getVideoSpanPlaybackRequest()).toBeNull();
 
-    // 2) Mount the clip again with a fresh span request while the chunk is still loading, stay on it, and release the chunk:
-    // the shell hands the consumed request off to the lazy player once it resolves.
     const stayedToken = requestVideoSpanPlayback({ endSeconds: 2, itemKey: SOURCE.itemKey, startSeconds: 0.5 });
     await act(() => {
       renderClip();
