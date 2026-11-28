@@ -79,9 +79,11 @@ class ModelSearch:
         self.on_search_completed = on_search_completed
         self.should_stop = should_stop
         self.models_found: set[Path] = set()
+        self._visited_dirs: set[Path] = set()
 
     def search_started(self) -> None:
         self.models_found = set()
+        self._visited_dirs = set()
         if self.on_search_started:
             self.on_search_started(self._directory)
 
@@ -115,6 +117,14 @@ class ModelSearch:
             or absolute_path.parent in self.models_found
         ):
             return
+        # The same directory can be reached more than once when it is symlinked into several places, which is how
+        # tools like Stability Matrix share one model directory between apps. Walk each physical directory once,
+        # otherwise every model behind the link is reported twice (and only one of the two paths matches what the
+        # model manager has on record). Resolving also breaks symlink cycles.
+        resolved_path = absolute_path.resolve()
+        if resolved_path in self._visited_dirs:
+            return
+        self._visited_dirs.add(resolved_path)
         entries = os.scandir(absolute_path.as_posix())
         entries = [entry for entry in entries if not entry.name.startswith(".")]
         dirs = [entry for entry in entries if entry.is_dir()]
