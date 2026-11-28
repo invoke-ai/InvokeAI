@@ -97,22 +97,7 @@ interface NormalizedGraph {
   edges: Json[];
 }
 
-/**
- * Settings the record may leave out although they change the graph. Each entry names what the run does not need
- * recalled and why; one that suppresses nothing in its base's test fails as stale.
- */
-interface Exception {
-  /** The base whose test applies the entry and reports it stale. */
-  base: GateBase;
-  setting: Setting;
-  /** Matches case labels; every case when absent. */
-  cases?: RegExp;
-  reason: string;
-}
-
 type GateBase = SupportedGenerateBase | 'external';
-
-const EXCEPTIONS: readonly Exception[] = [];
 
 /**
  * Settings the record holds only where the graph reads them. The VAE precision reaches the graph through an encode or
@@ -726,7 +711,6 @@ const GATE_BASES: GateBase[] = [...new Set(generateGraphCases.map(({ base }) => 
 describe('image record write gate', () => {
   it.each(GATE_BASES)('records every setting of %s that changes the compiled graph', (gateBase) => {
     const failures: string[] = [];
-    const used = new Map<Exception, number>();
     const settingsKeys = Object.keys(VARIATIONS) as Setting[];
     const pairs = supplierCases(failures, gateBase);
     const cases = [
@@ -734,21 +718,6 @@ describe('image record write gate', () => {
       ...canvasCases(gateBase),
       ...pairs.flatMap(({ own, sourced }) => [own, sourced]),
     ];
-
-    const excepted = (setting: Setting, label: string): boolean => {
-      const entry = EXCEPTIONS.find(
-        (candidate) =>
-          candidate.base === gateBase &&
-          candidate.setting === setting &&
-          (!candidate.cases || candidate.cases.test(label))
-      );
-
-      if (entry) {
-        used.set(entry, (used.get(entry) ?? 0) + 1);
-      }
-
-      return entry !== undefined;
-    };
 
     const check = (
       label: string,
@@ -778,11 +747,9 @@ describe('image record write gate', () => {
         return true;
       }
 
-      if (!excepted(setting, label)) {
-        failures.push(
-          `\`${label}\`: ${setting} ${show(before)} -> ${show(after)} changes the graph (${graphHint(base.graph, varied.graph)}) but not the record`
-        );
-      }
+      failures.push(
+        `\`${label}\`: ${setting} ${show(before)} -> ${show(after)} changes the graph (${graphHint(base.graph, varied.graph)}) but not the record`
+      );
 
       return false;
     };
@@ -835,12 +802,6 @@ describe('image record write gate', () => {
         before,
         after
       );
-    }
-
-    for (const entry of EXCEPTIONS.filter((candidate) => candidate.base === gateBase)) {
-      if (!used.has(entry)) {
-        failures.push(`stale exception for ${entry.setting} (${entry.reason}) suppresses nothing`);
-      }
     }
 
     expect(failures).toEqual([]);

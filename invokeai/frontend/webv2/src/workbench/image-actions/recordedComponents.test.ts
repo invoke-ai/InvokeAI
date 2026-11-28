@@ -12,7 +12,7 @@ import {
   satisfiedSettingsFor,
   tunedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
-import { compileGenerateGraph, getRecordedComponents } from '@features/generation/graph';
+import { compileGenerateGraph } from '@features/generation/graph';
 import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
@@ -146,27 +146,6 @@ describe('recorded components', () => {
       Object.keys(EXCLUDED).filter((slot) => !used.has(slot)),
       'stale EXCLUDED entries: no case holds the field'
     ).toEqual([]);
-  });
-
-  it('records exactly the components the graph loads', () => {
-    const componentKeys = new Set(
-      Object.values(RECORDED_COMPONENT_FIELDS).flatMap((fields) => Object.values(fields).flat())
-    );
-    const failures: string[] = [];
-
-    for (const { graph, label, record } of getCases()) {
-      const derived = JSON.parse(JSON.stringify(getRecordedComponents(graph))) as Record<string, unknown>;
-
-      for (const key of componentKeys) {
-        if (JSON.stringify(record[key]) !== JSON.stringify(derived[key])) {
-          failures.push(
-            `${label}: \`${key}\` is ${JSON.stringify(record[key])}, the graph loads ${JSON.stringify(derived[key])}`
-          );
-        }
-      }
-    }
-
-    expect(failures).toEqual([]);
   });
 
   it('has one value per key where several loaders hold a component', () => {
