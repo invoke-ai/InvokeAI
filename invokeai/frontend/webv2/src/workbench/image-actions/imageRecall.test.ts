@@ -33,7 +33,7 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/models/core/architectureCapabilities.testing';
-import { compileUpscaleGraph } from '@features/upscale/core/graph';
+import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -2206,10 +2206,30 @@ describe('a record of VAE settings only', () => {
     const capabilities = getImageRecallCapabilities(input);
 
     expect(capabilities).toMatchObject({ all: true, remix: true });
-    expect(buildImageRecallSettings({ mayBeWorkflowRun: false, ...input, kind: 'all' })?.values).toMatchObject(
-      restored
-    );
+    const result = buildImageRecallSettings({ mayBeWorkflowRun: false, ...input, kind: 'all' });
+
+    expect(result?.values).toMatchObject(restored);
+    // The settings are not a VAE pick: a fresh project's fallback model keeps its default VAE beside them.
+    expect(result?.fields).toEqual(['vaeSettings']);
   });
+
+  it.each([{ vae_precision: 'fp16' }, { color_compensation: true }])(
+    'applies nothing of %j for a run that may be a workflow, whose editor writes these as defaults',
+    (metadata) => {
+      expect(
+        buildImageRecallSettings({
+          mayBeWorkflowRun: true,
+          currentValues: createValues({ model: sdxlModel, modelKey: sdxlModel.key }),
+          image,
+          kind: 'all',
+          metadata,
+          models: [],
+          supportedModels: [],
+          vaeModels: [],
+        })
+      ).toBeNull();
+    }
+  );
 });
 
 describe('Diffusers main that records itself as its component source', () => {
@@ -3024,7 +3044,9 @@ describe('recall onto a panel holding unused standalone components', () => {
   });
 
   describe('a record naming a standalone encoder and VAE beside a panel running on a component source', () => {
-    const recall = (base: 'qwen-image' | 'wan' | 'z-image', installed: boolean) => {
+    type Installed = 'all' | 'encoderMissing' | 'neither' | 'vaeMissing';
+
+    const recall = (base: 'qwen-image' | 'wan' | 'z-image', installed: Installed, kind: ImageRecallKind = 'all') => {
       const { model, settings } = satisfiedSettingsFor(base, {
         label: 'gguf',
         overrides: { format: 'gguf_quantized' },
@@ -3038,45 +3060,54 @@ describe('recall onto a panel holding unused standalone components', () => {
         compileGenerateGraph(settings, model, 'gallery', PROJECT_SETTINGS).backendGraph.nodes
       ).find((node) => node.type === 'core_metadata');
       const catalog = recallCatalogFor(model, settings);
+      const hasEncoder = installed === 'all' || installed === 'vaeMissing';
+      const hasVae = installed === 'all' || installed === 'encoderMissing';
       const values = buildImageRecallSettings({
         mayBeWorkflowRun: false,
         currentValues: createValues({ ...panel, model, modelKey: model.key }),
         image,
-        kind: 'all',
+        kind,
         metadata,
-        models: installed ? [...catalog.models, source] : [model, source],
+        models: [
+          ...catalog.models.filter((candidate) => hasEncoder || candidate.key !== settings[encoder]!.key),
+          source,
+        ],
         supportedModels: [model],
-        vaeModels: installed ? catalog.vaeModels : [],
+        vaeModels: hasVae ? catalog.vaeModels : [],
       })!.values;
 
       return { metadata, model, panel, recorded: settings, source, values, encoder };
     };
 
-    it.each(['qwen-image', 'wan', 'z-image'] as const)(
-      'keeps the source of a %s panel while the recorded encoder and VAE are not installed',
-      (base) => {
-        const { encoder, metadata, model, panel, recorded, source, values } = recall(base, false);
+    it.each(
+      (['qwen-image', 'wan', 'z-image'] as const).flatMap((base) =>
+        (['all', 'remix'] as const).flatMap((kind) =>
+          (['neither', 'encoderMissing', 'vaeMissing'] as const).map((installed) => [base, kind, installed] as const)
+        )
+      )
+    )('keeps the source of a %s panel on %s with the recorded models missing (%s)', (base, kind, installed) => {
+      const { encoder, metadata, model, panel, recorded, source, values } = recall(base, installed, kind);
 
-        expect(recorded[encoder]).toBeTruthy();
-        expect(recorded.vae).toBeTruthy();
-        expect(metadata).toMatchObject({ vae: { key: recorded.vae!.key } });
-        // The panel compiled on the source before recall, and still does.
-        expect(() => compileGenerateGraph(panel, model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
-        expect(values.componentSourceModel?.key).toBe(source.key);
-        expect(() => compileGenerateGraph(values, values.model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
-      }
-    );
+      expect(recorded[encoder]).toBeTruthy();
+      expect(recorded.vae).toBeTruthy();
+      expect(metadata).toMatchObject({ vae: { key: recorded.vae!.key } });
+      // The panel compiled on the source before recall, and still does.
+      expect(() => compileGenerateGraph(panel, model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
+      expect(values.componentSourceModel?.key).toBe(source.key);
+      expect(() => compileGenerateGraph(values, values.model, 'gallery', PROJECT_SETTINGS)).not.toThrow();
+    });
 
-    it.each(['qwen-image', 'wan', 'z-image'] as const)(
-      'still clears the source of a %s panel once the recorded encoder and VAE are restored',
-      (base) => {
-        const { encoder, recorded, values } = recall(base, true);
+    it.each(
+      (['qwen-image', 'wan', 'z-image'] as const).flatMap((base) =>
+        (['all', 'remix'] as const).map((kind) => [base, kind] as const)
+      )
+    )('still clears the source of a %s panel on %s once the recorded encoder and VAE are restored', (base, kind) => {
+      const { encoder, recorded, values } = recall(base, 'all', kind);
 
-        expect(values[encoder]?.key).toBe(recorded[encoder]!.key);
-        expect(values.vae?.key).toBe(recorded.vae!.key);
-        expect(values.componentSourceModel).toBeNull();
-      }
-    );
+      expect(values[encoder]?.key).toBe(recorded[encoder]!.key);
+      expect(values.vae?.key).toBe(recorded.vae!.key);
+      expect(values.componentSourceModel).toBeNull();
+    });
   });
 
   describe('a record that names no components', () => {
@@ -3157,6 +3188,27 @@ describe('recall onto a panel holding unused standalone components', () => {
       expect(panel.qwenVLEncoderModel && panel.vae).toBeTruthy();
       expect(values.qwenVLEncoderModel).toBeNull();
       expect(values.vae).toBeNull();
+    });
+
+    it('keeps the panel components of a Model only upscale, whose copy cannot say whether its source ran a workflow', () => {
+      const { model, settings } = qwenImage;
+      const panel = withStandaloneComponents(model, settings);
+      const source = Object.values(
+        compileGenerateGraph(settings, model, 'gallery', PROJECT_SETTINGS).backendGraph.nodes
+      ).find((node) => node.type === 'core_metadata')!;
+      const upscaled = compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image: { height: 512, image_name: 'source.png', width: 512 },
+        scale: 2,
+        sourceMetadata: source,
+        upscaleModel: { base: 'any', key: 'upscaler', name: 'Upscaler', scale: 4, type: 'spandrel_image_to_image' },
+      } as never).backendGraph.nodes.upscale_output!.metadata as Record<string, unknown>;
+
+      expect(panel.qwenVLEncoderModel && panel.vae).toBeTruthy();
+      // The source's own record names every loader selection, so it clears the panel's picks.
+      expect(recallOnto(model, panel, source).qwenVLEncoderModel).toBeNull();
+      expect(upscaled).toMatchObject({ generation_mode: source.generation_mode, model: source.model });
+      expect(componentsOf(recallOnto(model, panel, upscaled))).toEqual(componentsOf(panel));
     });
   });
 });
