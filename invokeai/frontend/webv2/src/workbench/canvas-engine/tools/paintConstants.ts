@@ -6,7 +6,7 @@ export const MASK_PAINT_COLOR = '#ffffff';
 /** Freehand `thinning` applied when brush pressure sensitivity is on. */
 export const PRESSURE_THINNING = 0.5;
 
-/** Fraction to grow/shrink the brush/eraser diameter per size-step notch (ctrl+wheel or `[`/`]`). */
+/** Fraction to grow/shrink the brush/eraser diameter per size-step notch (ctrl/cmd+wheel or `[`/`]`). */
 export const SIZE_STEP_FACTOR = 0.1;
 
 /** Clamps a brush/eraser diameter while retaining hundredth-pixel precision. */

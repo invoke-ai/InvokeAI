@@ -48,7 +48,7 @@ A pick that changes a layer is one undoable step. Gradient stops are not picked 
 
 ### Tool options
 
-* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll with a mouse wheel. On a trackpad, **Ctrl**+scroll zooms instead. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
+* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so do **Ctrl**+scroll and, on macOS, **Cmd**+scroll, with a mouse wheel or a trackpad. Pinching a trackpad zooms. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases.
 
 The Brush, Eraser, Shape and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
@@ -213,8 +213,8 @@ The gear button in the header opens the canvas settings. They are saved with the
 <Image src={canvasSettings} alt="The Canvas settings popover with Behavior, Display and Grid options." width={420} />
 
 * **Behavior**
-  * **Scroll input** — **Auto-detect** (the default) zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. If your device is misread, choose it: a mouse with smooth scrolling can look like a trackpad once one was recognized. With **Mouse wheel**, scrolling zooms and **Ctrl**+scroll resizes the brush. With **Trackpad**, scrolling pans and **Ctrl**+scroll zooms. **[** and **]** resize the brush in every mode.
-  * **Invert scroll for brush size** — reverses **Ctrl**+scroll brush sizing.
+  * **Scroll input** — **Auto-detect** (the default) zooms with a mouse wheel, and pans and pinch-zooms with a trackpad. If your device is misread, choose it: a mouse with smooth scrolling can look like a trackpad once one was recognized. With **Mouse wheel**, scrolling zooms. With **Trackpad**, scrolling pans and pinching zooms. **[** and **]**, **Ctrl**+scroll and, on macOS, **Cmd**+scroll resize the brush in every mode.
+  * **Invert scroll for brush size** — reverses brush sizing with **Ctrl**+scroll or **Cmd**+scroll.
   * **Clip strokes to frame** — keeps painting inside the generation frame.
   * **Output only generated regions** — when on, an inpainting or outpainting result contains only the regenerated area, with the rest transparent; when off, it includes the whole frame.
 * **Display**
