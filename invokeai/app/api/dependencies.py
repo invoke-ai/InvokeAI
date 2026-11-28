@@ -29,7 +29,9 @@ from invokeai.app.services.files.files_disk import DiskFileService
 from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_files.image_files_s3 import S3CompatibleImageFileStorage
 from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
 from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
@@ -135,7 +137,16 @@ class ApiDependencies:
         if output_folder is None:
             raise ValueError("Output folder is not set")
 
-        image_files = DiskImageFileStorage(f"{output_folder}/images")
+        image_files: ImageFileStorageBase
+        if config.storage_backend == "s3":
+            image_files = S3CompatibleImageFileStorage(
+                bucket=config.s3_bucket,
+                endpoint_url=config.s3_endpoint_url,
+                region_name=config.s3_region,
+                pil_compress_level=config.pil_compress_level,
+            )
+        else:
+            image_files = DiskImageFileStorage(f"{output_folder}/images")
         files = DiskFileService(
             output_folder / "files",
             max_file_size=config.max_file_upload_size_bytes,
@@ -165,13 +176,26 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = ImageRecordStorage(database)
-        image_moves = ImageMoveService(database, image_files=image_files, config=configuration, logger=logger)
+        # The image-move / subfolder-reorganize service is filesystem-only
+        # (os.replace, fsync, empty-dir cleanup) and has no meaning for object
+        # storage, so it is not created for the S3 backend. The image_moves API
+        # then reports unavailable (503) and subfoldering is forced flat at write
+        # time (see ImageService._create_and_store), so nothing ever needs moving.
+        image_moves: "ImageMoveService | None"
+        if config.storage_backend == "s3":
+            image_moves = None
+        else:
+            image_moves = ImageMoveService(database, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
         video_records = VideoRecordStorage(database)
         videos = VideoService()
         board_video_records = BoardVideoRecordStorage(database)
         gallery = GalleryService(database)
-        gallery_maintenance = GalleryMaintenanceService()
+        # Gallery maintenance compares records against files with filesystem stat() calls, so on S3
+        # every image would look missing. Its API reports unavailable (503) when it is not created.
+        gallery_maintenance: "GalleryMaintenanceService | None" = (
+            None if config.storage_backend == "s3" else GalleryMaintenanceService()
+        )
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](

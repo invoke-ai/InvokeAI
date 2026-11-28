@@ -8,6 +8,10 @@ InvokeAI can move existing images into the folder layout selected by [`image_sub
 
 This operation changes where image files and thumbnails are stored on disk. It does not change image names, boards, generation metadata, or gallery records.
 
+:::note[Disk backend only]
+Image Storage Maintenance applies to the local **disk** backend. It is not available when [`storage_backend`](/configuration/object-storage/) is `s3`. Object storage is always flat and has no move operation, so the maintenance panel is hidden in Settings for S3 deployments.
+:::
+
 ## Access
 
 Open **Settings → Server → Image storage**. The **Folder layout for new images** select changes `image_subfolder_strategy` immediately for images saved from then on. Below it, **Move existing images** shows how many images are stored outside the current layout, the state of the last move job, and the **Start Move** and **Recover** buttons; each asks for confirmation before it starts.

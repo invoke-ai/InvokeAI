@@ -10,6 +10,7 @@ import {
   useStartImageMoveMutation,
   useStartImageMoveRecoveryMutation,
 } from 'services/api/endpoints/imageMoves';
+import { useGetRuntimeConfigQuery } from 'services/api/endpoints/appInfo';
 import type { S } from 'services/api/types';
 
 import { isTerminalImageMoveJobState } from './imageStorageMaintenanceUtils';
@@ -48,7 +49,12 @@ const invalidatedImageMoveJobIds = new Set<number>();
 export const SettingsImageStorageMaintenance = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const canAccess = useIsAdmin();
+  const isAdmin = useIsAdmin();
+  const { data: runtimeConfig } = useGetRuntimeConfigQuery(undefined, { skip: !isAdmin });
+  // The S3 backend has no filesystem move/reorganize path, so storage
+  // maintenance (move-all / recovery) is not applicable and is hidden.
+  const isS3Backend = runtimeConfig?.config.storage_backend === 's3';
+  const canAccess = isAdmin && !isS3Backend;
   const [startImageMove, startImageMoveState] = useStartImageMoveMutation();
   const [startImageMoveRecovery, startImageMoveRecoveryState] = useStartImageMoveRecoveryMutation();
   const [shouldPollStatus, setShouldPollStatus] = useState(false);

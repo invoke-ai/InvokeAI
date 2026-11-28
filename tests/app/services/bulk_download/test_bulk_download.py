@@ -1,7 +1,9 @@
+import io
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, Optional
 from zipfile import ZipFile
 
 import pytest
@@ -113,6 +115,39 @@ def test_handler_image_names(tmp_path: Path, monkeypatch: Any, mock_image_dto: I
     )
 
 
+def test_handler_streams_local_path_when_available(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """When the backend exposes a real filesystem path (disk), the handler streams it
+    via ZipFile.write rather than materializing the bytes in memory (per review)."""
+    expected_zip_path, expected_image_path, mock_image_contents = prepare_handler_test(
+        tmp_path, monkeypatch, mock_image_dto, mock_invoker
+    )
+
+    real_file = tmp_path / "real_image.png"
+    real_file.write_text(mock_image_contents)
+
+    class _LocalImageFiles:
+        def get_local_path(self, image_name, thumbnail=False, image_subfolder=""):
+            return real_file
+
+        def open_stream(self, image_name, thumbnail=False, image_subfolder=""):
+            raise AssertionError("open_stream must not be called when a local path is available")
+
+        def get_bytes(self, image_name, thumbnail=False, image_subfolder=""):
+            raise AssertionError("get_bytes must not be called when a local path is available")
+
+    monkeypatch.setattr(mock_invoker.services, "image_files", _LocalImageFiles())
+
+    bulk_download_service = BulkDownloadService()
+    bulk_download_service.start(mock_invoker)
+    bulk_download_service.handler([mock_image_dto.image_name], None, None)
+
+    assert_handler_success(
+        expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
+    )
+
+
 def prepare_two_image_download(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
     """Patch the invoker for a two-image download; returns the dtos and the disk path lookup to patch."""
     monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
@@ -139,7 +174,7 @@ def test_archive_is_not_downloadable_until_complete(
 
     visible_while_writing: list[bool] = []
 
-    def get_path(name: str) -> str:
+    def get_local_path(name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         if name == names[1]:
             # The first image is already written into the archive at this point.
             try:
@@ -147,9 +182,9 @@ def test_archive_is_not_downloadable_until_complete(
                 visible_while_writing.append(True)
             except BulkDownloadTargetException:
                 visible_while_writing.append(False)
-        return str(disk_dir / name)
+        return disk_dir / name
 
-    monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+    monkeypatch.setattr(mock_invoker.services, "image_files", SimpleNamespace(get_local_path=get_local_path))
 
     service.handler(names, None, None)
 
@@ -225,10 +260,15 @@ def test_failed_archive_leaves_no_file_behind(
     service = BulkDownloadService()
     service.start(mock_invoker)
 
-    def get_path(name: str) -> str:
-        return str(disk_dir / ("missing.png" if name == names[1] else name))
+    def get_local_path(name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
+        return disk_dir / ("missing.png" if name == names[1] else name)
 
-    monkeypatch.setattr(mock_invoker.services.images, "get_path", get_path)
+    def open_stream(name: str, thumbnail: bool = False, image_subfolder: str = "") -> io.BytesIO:
+        raise FileNotFoundError(name)
+
+    monkeypatch.setattr(
+        mock_invoker.services, "image_files", SimpleNamespace(get_local_path=get_local_path, open_stream=open_stream)
+    )
 
     with pytest.raises(FileNotFoundError):
         service.handler(names, None, None)
@@ -397,15 +437,23 @@ def prepare_handler_test(tmp_path: Path, monkeypatch: Any, mock_image_dto: Image
         mock_get_all_board_image_names_for_board,
     )
 
-    # Create a mock image file so that the contents of the zip file are not empty
-    mock_image_path: Path = tmp_path / mock_image_dto.image_name
+    # The handler reads via image_files.get_local_path() (disk) or, when there's
+    # no local path, image_files.open_stream() (remote, e.g. S3). Stub both so
+    # the remote/streaming branch returns the mock contents.
     mock_image_contents: str = "Totally an image"
-    mock_image_path.write_text(mock_image_contents)
 
-    def mock_get_path(*args, **kwargs):
-        return str(mock_image_path)
+    class _StubImageFiles:
+        def get_local_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Optional[Path]:
+            # No local path -> exercise the remote (open_stream) branch.
+            return None
 
-    monkeypatch.setattr(mock_invoker.services.images, "get_path", mock_get_path)
+        def open_stream(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> io.BytesIO:
+            return io.BytesIO(mock_image_contents.encode())
+
+        def get_bytes(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> bytes:
+            return mock_image_contents.encode()
+
+    monkeypatch.setattr(mock_invoker.services, "image_files", _StubImageFiles())
 
     return expected_zip_path, expected_image_path, mock_image_contents
 

@@ -1,12 +1,15 @@
 import asyncio
 import io
 import json
+import pathlib
 import traceback
 from datetime import date
-from typing import Annotated, ClassVar, Optional
+from typing import Annotated, BinaryIO, ClassVar, Iterator, Optional
+from urllib.parse import quote
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, StringConstraints, model_validator
@@ -71,6 +74,94 @@ def _get_image_cache_control() -> str:
     if ApiDependencies.invoker.services.configuration.multiuser:
         return "private, no-store"
     return f"max-age={IMAGE_MAX_AGE}"
+
+
+_IMAGE_STREAM_CHUNK_SIZE = 256 * 1024
+
+
+def _iter_and_close(stream: BinaryIO) -> Iterator[bytes]:
+    """Yield a binary stream in chunks, always closing it when finished."""
+    try:
+        while chunk := stream.read(_IMAGE_STREAM_CHUNK_SIZE):
+            yield chunk
+    finally:
+        stream.close()
+
+
+def _inline_content_disposition(filename: str) -> str:
+    """Build a safe ``inline`` Content-Disposition value.
+
+    Mirrors Starlette's FileResponse logic: a plain token is quoted directly,
+    otherwise RFC 5987 ``filename*`` percent-encoding is used. This also
+    neutralizes header-injection vectors (embedded quotes, CR/LF) in the name.
+    """
+    # safe="" so "/" is percent-encoded too; a path-like name must not slip into
+    # the quoted filename="..." branch.
+    quoted = quote(filename, safe="")
+    if quoted == filename:
+        return f'inline; filename="{filename}"'
+    return f"inline; filename*=utf-8''{quoted}"
+
+
+def _image_response_headers(filename: Optional[str]) -> dict[str, str]:
+    headers = {"Cache-Control": _get_image_cache_control()}
+    if filename is not None:
+        # One Content-Disposition for all backends, so the same filename yields
+        # an identical header.
+        headers["Content-Disposition"] = _inline_content_disposition(filename)
+    return headers
+
+
+def _set_content_length_header(headers: dict[str, str], content_length: Optional[int]) -> None:
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+
+
+async def _serve_image(image_name: str, *, thumbnail: bool, media_type: str, filename: Optional[str]) -> Response:
+    """Serve an image (or thumbnail) without buffering the whole payload in memory.
+
+    Uses ``FileResponse`` (sendfile streaming) when the backend exposes a real
+    local path; otherwise streams the backend's ``open_stream()`` in chunks and
+    closes it afterward. Works for any backend (disk or S3). Blocking lookups
+    run in a threadpool so the event loop is not blocked.
+    """
+    images = ApiDependencies.invoker.services.images
+    headers = _image_response_headers(filename)
+
+    def _existing_local_path() -> Optional[pathlib.Path]:
+        # Resolve the backend's local path and confirm it exists, all inside the
+        # threadpool so no filesystem I/O runs on the event loop.
+        path = images.get_local_path(image_name, thumbnail)
+        # is_file() (not exists()) so a directory path never reaches FileResponse.
+        return path if path is not None and path.is_file() else None
+
+    local_path = await run_in_threadpool(_existing_local_path)
+    if local_path is not None:
+        return FileResponse(local_path, media_type=media_type, headers=headers)
+    stream = await run_in_threadpool(images.open_stream, image_name, thumbnail)
+    _set_content_length_header(headers, getattr(stream, "content_length", None))
+    # Single close path: _iter_and_close's finally runs on normal completion and on
+    # disconnect (the send error closes the generator). Starlette skips background on
+    # disconnect, so a BackgroundTask would only double-close the normal path.
+    return StreamingResponse(_iter_and_close(stream), media_type=media_type, headers=headers)
+
+
+async def _serve_image_head(image_name: str, *, thumbnail: bool, media_type: str, filename: Optional[str]) -> Response:
+    """Serve image headers without streaming a remote object body."""
+    images = ApiDependencies.invoker.services.images
+    headers = _image_response_headers(filename)
+
+    def _existing_local_path() -> Optional[pathlib.Path]:
+        path = images.get_local_path(image_name, thumbnail)
+        return path if path is not None and path.is_file() else None
+
+    local_path = await run_in_threadpool(_existing_local_path)
+    if local_path is not None:
+        return FileResponse(local_path, media_type=media_type, headers=headers)
+
+    content_length = await run_in_threadpool(images.get_content_length, image_name, thumbnail)
+    _set_content_length_header(headers, content_length)
+    return Response(status_code=200, media_type=media_type, headers=headers)
 
 
 class ResizeToDimensions(BaseModel):
@@ -436,7 +527,8 @@ def get_image_workflow(
         404: {"description": "Image not found"},
     },
 )
-def get_image_full(
+async def get_image_full(
+    request: Request,
     current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> Response:
@@ -445,18 +537,14 @@ def get_image_full(
     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
     Returns 409 while image storage maintenance is active.
     """
-    _assert_image_read_access(image_name, current_user)
-    assert_image_move_maintenance_inactive()
+    await run_in_threadpool(_assert_image_read_access, image_name, current_user)
+    await run_in_threadpool(assert_image_move_maintenance_inactive)
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(image_name)
-        with open(path, "rb") as f:
-            content = f.read()
-        response = Response(content, media_type="image/png")
-        response.headers["Cache-Control"] = _get_image_cache_control()
-        response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
-        return response
-    except Exception:
+        if request.method == "HEAD":
+            return await _serve_image_head(image_name, thumbnail=False, media_type="image/png", filename=image_name)
+        return await _serve_image(image_name, thumbnail=False, media_type="image/png", filename=image_name)
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         raise HTTPException(status_code=404)
 
 
@@ -472,7 +560,7 @@ def get_image_full(
         404: {"description": "Image not found"},
     },
 )
-def get_image_thumbnail(
+async def get_image_thumbnail(
     current_user: CurrentMediaUserOrDefault,
     image_name: str = Path(description="The name of thumbnail image file to get"),
 ) -> Response:
@@ -481,17 +569,12 @@ def get_image_thumbnail(
     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
     Returns 409 while image storage maintenance is active.
     """
-    _assert_image_read_access(image_name, current_user)
-    assert_image_move_maintenance_inactive()
+    await run_in_threadpool(_assert_image_read_access, image_name, current_user)
+    await run_in_threadpool(assert_image_move_maintenance_inactive)
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
-        with open(path, "rb") as f:
-            content = f.read()
-        response = Response(content, media_type="image/webp")
-        response.headers["Cache-Control"] = _get_image_cache_control()
-        return response
-    except Exception:
+        return await _serve_image(image_name, thumbnail=True, media_type="image/webp", filename=None)
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         raise HTTPException(status_code=404)
 
 

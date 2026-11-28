@@ -326,6 +326,7 @@ dependencies = [
 # these extras install nothing.
 "onnx-cuda" = ["onnxruntime-gpu; (sys_platform != 'win32' or platform_machine != 'ARM64')"]
 "onnx-directml" = ["onnxruntime-directml; (sys_platform != 'win32' or platform_machine != 'ARM64')"]
+"s3" = ["boto3"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
@@ -342,6 +343,7 @@ dependencies = [
   "httpx",
   "polyfactory==2.19.0",
   "humanize==4.12.1",
+  "boto3",
 ]
 
 [tool.uv]
@@ -648,6 +650,7 @@ addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "s3_integration: Real S3/B2 object-store integration tests. Disabled by default (also marked slow). Run with -m s3_integration and the CI_TEST_S3_* env vars set.",
   "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
   "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
   "platform_independent: The outcome cannot depend on the operating system for the same dependency set: import-graph boundaries in a fresh interpreter, static source scans, deterministic counts and shapes. Windows CI, which installs the linux dependency set, deselects them.",
